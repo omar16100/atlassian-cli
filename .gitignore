@@ -1,0 +1,20 @@
+# Environment and secrets
+.env
+
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Claude Code
+.claude/

@@ -1,0 +1,57 @@
+[workspace]
+members = [
+    "crates/cli",
+    "crates/api",
+    "crates/auth",
+    "crates/config",
+    "crates/output",
+    "crates/bulk",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["atlassiancli contributors"]
+license = "MIT"
+repository = "https://github.com/yourusername/atlassiancli"
+
+[workspace.dependencies]
+# CLI
+clap = { version = "4.5", features = ["derive", "env", "wrap_help"] }
+tokio = { version = "1.40", features = ["full"] }
+
+# HTTP & Serialization
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Output formatting
+tabled = "0.16"
+colored = "2.1"
+indicatif = "0.17"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Auth & Config
+keyring = "3.6"
+base64 = "0.22"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+url = "2.5"
+dirs = "5.0"
+futures = "0.3"
+backoff = { version = "0.4", features = ["tokio"] }
+async-trait = "0.1"
+async-stream = "0.3"
+
+# Testing
+wiremock = "0.6"
