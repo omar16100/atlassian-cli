@@ -99,7 +99,11 @@ pub async fn get_workspace(ctx: &BitbucketContext<'_>, workspace: &str) -> Resul
     ctx.renderer.render(&view)
 }
 
-pub async fn list_projects(ctx: &BitbucketContext<'_>, workspace: &str, limit: usize) -> Result<()> {
+pub async fn list_projects(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    limit: usize,
+) -> Result<()> {
     let query = form_urlencoded::Serializer::new(String::new())
         .append_pair("pagelen", &limit.min(100).to_string())
         .finish();
@@ -138,13 +142,15 @@ pub async fn list_projects(ctx: &BitbucketContext<'_>, workspace: &str, limit: u
     ctx.renderer.render(&rows)
 }
 
-pub async fn get_project(ctx: &BitbucketContext<'_>, workspace: &str, project_key: &str) -> Result<()> {
+pub async fn get_project(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    project_key: &str,
+) -> Result<()> {
     let path = format!("/2.0/workspaces/{workspace}/projects/{project_key}");
-    let project: Project = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to fetch project {project_key} in workspace {workspace}"))?;
+    let project: Project = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch project {project_key} in workspace {workspace}")
+    })?;
 
     #[derive(Serialize)]
     struct View<'a> {
@@ -159,7 +165,11 @@ pub async fn get_project(ctx: &BitbucketContext<'_>, workspace: &str, project_ke
         key: project.key.as_str(),
         name: project.name.as_str(),
         description: project.description.as_deref().unwrap_or(""),
-        visibility: if project.is_private { "private" } else { "public" },
+        visibility: if project.is_private {
+            "private"
+        } else {
+            "public"
+        },
         uuid: project.uuid.as_deref().unwrap_or(""),
     };
 
@@ -207,7 +217,11 @@ pub async fn create_project(
     let created = Created {
         key: project.key.as_str(),
         name: project.name.as_str(),
-        visibility: if project.is_private { "private" } else { "public" },
+        visibility: if project.is_private {
+            "private"
+        } else {
+            "public"
+        },
     };
 
     ctx.renderer.render(&created)
@@ -231,11 +245,9 @@ pub async fn update_project(
     }
 
     let path = format!("/2.0/workspaces/{workspace}/projects/{project_key}");
-    let project: Project = ctx
-        .client
-        .put(&path, &payload)
-        .await
-        .with_context(|| format!("Failed to update project {project_key} in workspace {workspace}"))?;
+    let project: Project = ctx.client.put(&path, &payload).await.with_context(|| {
+        format!("Failed to update project {project_key} in workspace {workspace}")
+    })?;
 
     tracing::info!(
         project_key = project.key.as_str(),
@@ -278,11 +290,9 @@ pub async fn delete_project(
     }
 
     let path = format!("/2.0/workspaces/{workspace}/projects/{project_key}");
-    let _: serde_json::Value = ctx
-        .client
-        .delete(&path)
-        .await
-        .with_context(|| format!("Failed to delete project {project_key} from workspace {workspace}"))?;
+    let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
+        format!("Failed to delete project {project_key} from workspace {workspace}")
+    })?;
 
     tracing::info!(project_key, workspace, "Project deleted successfully");
 

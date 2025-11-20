@@ -104,7 +104,10 @@ pub async fn archive_stale_repos(
     }
 
     if dry_run {
-        println!("DRY RUN - No changes made. Found {} stale repositories:", stale_repos.len());
+        println!(
+            "DRY RUN - No changes made. Found {} stale repositories:",
+            stale_repos.len()
+        );
     }
 
     ctx.renderer.render(&stale_repos)
@@ -148,11 +151,7 @@ pub async fn delete_merged_branches(
                     .as_ref()
                     .and_then(|t| t.date.as_deref())
                     .unwrap_or(""),
-                action: if dry_run {
-                    "would delete"
-                } else {
-                    "deleted"
-                },
+                action: if dry_run { "would delete" } else { "deleted" },
             });
 
             if !dry_run {
@@ -160,12 +159,12 @@ pub async fn delete_merged_branches(
                     "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
                     branch.name
                 );
-                let _: serde_json::Value = ctx
-                    .client
-                    .delete(&delete_path)
-                    .await
-                    .with_context(|| {
-                        format!("Failed to delete branch {} from {workspace}/{repo_slug}", branch.name)
+                let _: serde_json::Value =
+                    ctx.client.delete(&delete_path).await.with_context(|| {
+                        format!(
+                            "Failed to delete branch {} from {workspace}/{repo_slug}",
+                            branch.name
+                        )
                     })?;
 
                 tracing::info!(

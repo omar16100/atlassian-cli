@@ -135,13 +135,9 @@ pub async fn delete_webhook(
     webhook_uuid: &str,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/hooks/{webhook_uuid}");
-    let _: serde_json::Value = ctx
-        .client
-        .delete(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to delete webhook {webhook_uuid} from {workspace}/{repo_slug}")
-        })?;
+    let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
+        format!("Failed to delete webhook {webhook_uuid} from {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         webhook_uuid,
@@ -154,7 +150,11 @@ pub async fn delete_webhook(
     Ok(())
 }
 
-pub async fn list_ssh_keys(ctx: &BitbucketContext<'_>, workspace: &str, repo_slug: &str) -> Result<()> {
+pub async fn list_ssh_keys(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys");
 
     let response: SshKeyList = ctx
@@ -233,13 +233,9 @@ pub async fn delete_ssh_key(
     key_uuid: &str,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys/{key_uuid}");
-    let _: serde_json::Value = ctx
-        .client
-        .delete(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to delete SSH key {key_uuid} from {workspace}/{repo_slug}")
-        })?;
+    let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
+        format!("Failed to delete SSH key {key_uuid} from {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         key_uuid,

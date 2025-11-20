@@ -90,9 +90,15 @@ pub async fn list_commits(
     query.append_pair("pagelen", &limit.min(100).to_string());
 
     let path = if let Some(b) = branch {
-        format!("/2.0/repositories/{workspace}/{repo_slug}/commits/{b}?{}", query.finish())
+        format!(
+            "/2.0/repositories/{workspace}/{repo_slug}/commits/{b}?{}",
+            query.finish()
+        )
     } else {
-        format!("/2.0/repositories/{workspace}/{repo_slug}/commits?{}", query.finish())
+        format!(
+            "/2.0/repositories/{workspace}/{repo_slug}/commits?{}",
+            query.finish()
+        )
     };
 
     let response: CommitList = ctx
@@ -118,12 +124,7 @@ pub async fn list_commits(
                 .author
                 .as_ref()
                 .and_then(|a| a.user.as_ref().map(|u| u.display_name.as_str()))
-                .or_else(|| {
-                    commit
-                        .author
-                        .as_ref()
-                        .and_then(|a| a.raw.as_deref())
-                })
+                .or_else(|| commit.author.as_ref().and_then(|a| a.raw.as_deref()))
                 .unwrap_or(""),
             message: commit
                 .message
@@ -149,13 +150,9 @@ pub async fn get_commit(
     commit_hash: &str,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/commit/{commit_hash}");
-    let commit: Commit = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to fetch commit {commit_hash} for {workspace}/{repo_slug}")
-        })?;
+    let commit: Commit = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch commit {commit_hash} for {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct View<'a> {
@@ -194,13 +191,9 @@ pub async fn get_commit_diff(
     commit_hash: &str,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/diffstat/{commit_hash}");
-    let response: DiffStat = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to fetch diff for commit {commit_hash} in {workspace}/{repo_slug}")
-        })?;
+    let response: DiffStat = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch diff for commit {commit_hash} in {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -253,13 +246,9 @@ pub async fn browse_source(
         format!("/2.0/repositories/{workspace}/{repo_slug}/src/{commit}/")
     };
 
-    let response: SourceList = ctx
-        .client
-        .get(&api_path)
-        .await
-        .with_context(|| {
-            format!("Failed to browse source at {commit} in {workspace}/{repo_slug}")
-        })?;
+    let response: SourceList = ctx.client.get(&api_path).await.with_context(|| {
+        format!("Failed to browse source at {commit} in {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -274,10 +263,7 @@ pub async fn browse_source(
         .map(|file| Row {
             file_type: file.file_type.as_str(),
             path: file.path.as_str(),
-            size: file
-                .size
-                .map(|s| format!("{s} bytes"))
-                .unwrap_or_default(),
+            size: file.size.map(|s| format!("{s} bytes")).unwrap_or_default(),
         })
         .collect();
 

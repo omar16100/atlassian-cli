@@ -137,9 +137,8 @@ async fn test_jira_update_issue() {
         }
     });
 
-    let response: Result<serde_json::Value, _> = client
-        .put("/rest/api/3/issue/TEST-123", &payload)
-        .await;
+    let response: Result<serde_json::Value, _> =
+        client.put("/rest/api/3/issue/TEST-123", &payload).await;
 
     assert!(response.is_ok());
 }
@@ -266,7 +265,8 @@ async fn test_jira_create_component() {
         "description": "Backend component"
     });
 
-    let response: Result<serde_json::Value, _> = client.post("/rest/api/3/component", &payload).await;
+    let response: Result<serde_json::Value, _> =
+        client.post("/rest/api/3/component", &payload).await;
 
     assert!(response.is_ok());
     let component = response.unwrap();
@@ -354,12 +354,10 @@ async fn test_jira_error_handling() {
 
     Mock::given(method("GET"))
         .and(path("/rest/api/3/issue/NOTFOUND-999"))
-        .respond_with(
-            ResponseTemplate::new(404).set_body_json(serde_json::json!({
-                "errorMessages": ["Issue does not exist or you do not have permission to see it."],
-                "errors": {}
-            })),
-        )
+        .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+            "errorMessages": ["Issue does not exist or you do not have permission to see it."],
+            "errors": {}
+        })))
         .mount(&mock_server)
         .await;
 

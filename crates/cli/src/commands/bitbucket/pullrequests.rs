@@ -135,11 +135,9 @@ pub async fn get_pull_request(
     pr_id: i64,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}");
-    let pr: PullRequest = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}"))?;
+    let pr: PullRequest = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct View<'a> {
@@ -270,13 +268,9 @@ pub async fn update_pull_request(
     }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}");
-    let pr: PullRequest = ctx
-        .client
-        .put(&path, &payload)
-        .await
-        .with_context(|| {
-            format!("Failed to update pull request {pr_id} in {workspace}/{repo_slug}")
-        })?;
+    let pr: PullRequest = ctx.client.put(&path, &payload).await.with_context(|| {
+        format!("Failed to update pull request {pr_id} in {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         pr_id = pr.id,
@@ -322,13 +316,9 @@ pub async fn merge_pull_request(
     }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/merge");
-    let pr: PullRequest = ctx
-        .client
-        .post(&path, &payload)
-        .await
-        .with_context(|| {
-            format!("Failed to merge pull request {pr_id} in {workspace}/{repo_slug}")
-        })?;
+    let pr: PullRequest = ctx.client.post(&path, &payload).await.with_context(|| {
+        format!("Failed to merge pull request {pr_id} in {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         pr_id = pr.id,
@@ -426,13 +416,9 @@ pub async fn unapprove_pull_request(
     pr_id: i64,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/approve");
-    let _: serde_json::Value = ctx
-        .client
-        .delete(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to unapprove pull request {pr_id} in {workspace}/{repo_slug}")
-        })?;
+    let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
+        format!("Failed to unapprove pull request {pr_id} in {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         pr_id,
@@ -457,13 +443,9 @@ pub async fn list_pr_comments(
     }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
-    let response: CommentList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}")
-        })?;
+    let response: CommentList = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -485,12 +467,7 @@ pub async fn list_pr_comments(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(
-            pr_id,
-            workspace,
-            repo_slug,
-            "No comments on pull request"
-        );
+        tracing::info!(pr_id, workspace, repo_slug, "No comments on pull request");
         return Ok(());
     }
 
@@ -511,19 +488,11 @@ pub async fn add_pr_comment(
     });
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
-    let comment: Comment = ctx
-        .client
-        .post(&path, &payload)
-        .await
-        .with_context(|| {
-            format!("Failed to add comment to pull request {pr_id} in {workspace}/{repo_slug}")
-        })?;
+    let comment: Comment = ctx.client.post(&path, &payload).await.with_context(|| {
+        format!("Failed to add comment to pull request {pr_id} in {workspace}/{repo_slug}")
+    })?;
 
-    tracing::info!(
-        comment_id = comment.id,
-        pr_id,
-        "Comment added successfully"
-    );
+    tracing::info!(comment_id = comment.id, pr_id, "Comment added successfully");
 
     println!("✓ Comment added to pull request #{pr_id}");
     Ok(())
@@ -544,9 +513,7 @@ pub async fn add_pr_reviewers(
             .client
             .put(&path, &serde_json::json!({}))
             .await
-            .with_context(|| {
-                format!("Failed to add reviewer {uuid} to pull request {pr_id}")
-            })?;
+            .with_context(|| format!("Failed to add reviewer {uuid} to pull request {pr_id}"))?;
 
         tracing::info!(uuid, pr_id, "Reviewer added successfully");
     }

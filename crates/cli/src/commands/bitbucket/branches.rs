@@ -111,13 +111,9 @@ pub async fn get_branch(
     branch_name: &str,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{branch_name}");
-    let branch: Branch = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to fetch branch {branch_name} from {workspace}/{repo_slug}")
-        })?;
+    let branch: Branch = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch branch {branch_name} from {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct View<'a> {
@@ -167,13 +163,9 @@ pub async fn create_branch(
     });
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches");
-    let branch: Branch = ctx
-        .client
-        .post(&path, &payload)
-        .await
-        .with_context(|| {
-            format!("Failed to create branch {branch_name} in {workspace}/{repo_slug}")
-        })?;
+    let branch: Branch = ctx.client.post(&path, &payload).await.with_context(|| {
+        format!("Failed to create branch {branch_name} in {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         branch = branch.name.as_str(),
@@ -222,13 +214,9 @@ pub async fn delete_branch(
     }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{branch_name}");
-    let _: serde_json::Value = ctx
-        .client
-        .delete(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to delete branch {branch_name} from {workspace}/{repo_slug}")
-        })?;
+    let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
+        format!("Failed to delete branch {branch_name} from {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         branch = branch_name,
@@ -259,11 +247,8 @@ pub async fn protect_branch(
     }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/branch-restrictions");
-    let restriction: BranchRestriction = ctx
-        .client
-        .post(&path, &payload)
-        .await
-        .with_context(|| {
+    let restriction: BranchRestriction =
+        ctx.client.post(&path, &payload).await.with_context(|| {
             format!("Failed to add branch protection for {workspace}/{repo_slug}")
         })?;
 
@@ -286,10 +271,7 @@ pub async fn protect_branch(
         id: restriction.id,
         kind: restriction.kind.clone(),
         pattern: restriction.pattern.unwrap_or_default(),
-        required_approvals: restriction
-            .value
-            .map(|v| v.to_string())
-            .unwrap_or_default(),
+        required_approvals: restriction.value.map(|v| v.to_string()).unwrap_or_default(),
     };
 
     ctx.renderer.render(&protected)
@@ -303,13 +285,9 @@ pub async fn unprotect_branch(
 ) -> Result<()> {
     let path =
         format!("/2.0/repositories/{workspace}/{repo_slug}/branch-restrictions/{restriction_id}");
-    let _: serde_json::Value = ctx
-        .client
-        .delete(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to remove branch protection from {workspace}/{repo_slug}")
-        })?;
+    let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
+        format!("Failed to remove branch protection from {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         restriction_id,
@@ -333,13 +311,9 @@ pub async fn list_restrictions(
     }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/branch-restrictions");
-    let response: RestrictionList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to list branch restrictions for {workspace}/{repo_slug}")
-        })?;
+    let response: RestrictionList = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to list branch restrictions for {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct Row {

@@ -256,7 +256,10 @@ pub async fn add_page_label(ctx: &ConfluenceContext<'_>, page_id: &str, label: &
 
     let _: Value = ctx
         .client
-        .post(&format!("/wiki/rest/api/content/{}/label", page_id), &payload)
+        .post(
+            &format!("/wiki/rest/api/content/{}/label", page_id),
+            &payload,
+        )
         .await
         .with_context(|| format!("Failed to add label to page {}", page_id))?;
 
@@ -273,7 +276,10 @@ pub async fn remove_page_label(
 ) -> Result<()> {
     let _: Value = ctx
         .client
-        .delete(&format!("/wiki/rest/api/content/{}/label?name={}", page_id, label))
+        .delete(&format!(
+            "/wiki/rest/api/content/{}/label?name={}",
+            page_id, label
+        ))
         .await
         .with_context(|| format!("Failed to remove label from page {}", page_id))?;
 
@@ -539,7 +545,10 @@ pub async fn create_blog(
         .context("Failed to create blog post")?;
 
     tracing::info!(id = %response.id, title = %response.title, "Blog post created successfully");
-    println!("✅ Created blog post: {} (ID: {})", response.title, response.id);
+    println!(
+        "✅ Created blog post: {} (ID: {})",
+        response.title, response.id
+    );
     Ok(())
 }
 
@@ -598,7 +607,11 @@ pub async fn update_blogpost(
 }
 
 // Delete blog post
-pub async fn delete_blogpost(ctx: &ConfluenceContext<'_>, blogpost_id: &str, force: bool) -> Result<()> {
+pub async fn delete_blogpost(
+    ctx: &ConfluenceContext<'_>,
+    blogpost_id: &str,
+    force: bool,
+) -> Result<()> {
     if !force {
         println!(
             "⚠️  This will permanently delete blog post {}. Use --force to confirm.",
