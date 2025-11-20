@@ -1,5 +1,5 @@
 [package]
-name = "atlassiancli-api"
+name = "atlassian-cli-api"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

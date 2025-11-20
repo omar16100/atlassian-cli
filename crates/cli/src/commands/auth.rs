@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
-use atlassiancli_auth::{token_key, CredentialStore};
-use atlassiancli_config::Config;
-use atlassiancli_output::OutputRenderer;
+use atlassian_cli_auth::{token_key, CredentialStore};
+use atlassian_cli_config::Config;
+use atlassian_cli_output::OutputRenderer;
 use clap::{Args, Subcommand};
 use serde::Serialize;
 use url::Url;
@@ -202,7 +202,7 @@ fn list_profiles(
     }
 
     if rows.is_empty() {
-        tracing::info!("No profiles configured yet. Use `atlassiancli auth login` to add one.");
+        tracing::info!("No profiles configured yet. Use `atlassian-cli auth login` to add one.");
     }
 
     renderer.render(&rows)
@@ -225,7 +225,7 @@ fn read_token_from_stdin() -> Result<String> {
 fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
-        .context("No profile found. Use `atlassiancli auth login` to create one.")?;
+        .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
 
     let base_url = profile
         .base_url
@@ -236,9 +236,9 @@ fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<
     let secret_key = token_key(base_url, profile_name);
     let token = store
         .get_secret(&secret_key)?
-        .context("No API token found. Use `atlassiancli auth login` to authenticate.")?;
+        .context("No API token found. Use `atlassian-cli auth login` to authenticate.")?;
 
-    let client = atlassiancli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
+    let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 
     let runtime = tokio::runtime::Runtime::new()?;
     let user_data: serde_json::Value = runtime.block_on(async {
@@ -269,7 +269,7 @@ fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<
 fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
-        .context("No profile found. Use `atlassiancli auth login` to create one.")?;
+        .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
 
     let base_url = profile
         .base_url
@@ -280,11 +280,11 @@ fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result
     let secret_key = token_key(base_url, profile_name);
     let token = store
         .get_secret(&secret_key)?
-        .context("No API token found. Use `atlassiancli auth login` to authenticate.")?;
+        .context("No API token found. Use `atlassian-cli auth login` to authenticate.")?;
 
     println!("Testing authentication for profile '{}'...", profile_name);
 
-    let client = atlassiancli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
+    let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 
     let runtime = tokio::runtime::Runtime::new()?;
     let result: Result<serde_json::Value> = runtime.block_on(async {

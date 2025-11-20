@@ -1,5 +1,5 @@
 [package]
-name = "atlassiancli-output"
+name = "atlassian-cli-output"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

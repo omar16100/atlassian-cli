@@ -9,7 +9,7 @@ pub struct AtlassianClient {
 impl AtlassianClient {
     pub fn new(base_url: impl Into<String>) -> Result<Self> {
         let client = reqwest::Client::builder()
-            .user_agent("atlassiancli/0.1.0")
+            .user_agent("atlassian-cli/0.1.0")
             .build()?;
 
         Ok(Self {

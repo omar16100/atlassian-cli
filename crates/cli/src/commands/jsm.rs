@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use atlassiancli_api::ApiClient;
-use atlassiancli_output::OutputRenderer;
+use atlassian_cli_api::ApiClient;
+use atlassian_cli_output::OutputRenderer;
 use clap::{Args, Subcommand};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;

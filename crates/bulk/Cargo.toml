@@ -1,5 +1,5 @@
 [package]
-name = "atlassiancli-bulk"
+name = "atlassian-cli-bulk"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

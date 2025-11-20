@@ -3,22 +3,22 @@ mod commands;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use atlassiancli_api::ApiClient;
-use atlassiancli_auth::{token_key, CredentialStore};
-use atlassiancli_config::Config;
-use atlassiancli_output::{OutputFormat, OutputRenderer};
+use atlassian_cli_api::ApiClient;
+use atlassian_cli_auth::{token_key, CredentialStore};
+use atlassian_cli_config::Config;
+use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Parser, Subcommand};
 use commands::auth::{self, AuthCommand};
 use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Parser, Debug)]
-#[command(name = "atlassiancli", version, about = "Unified Atlassian Cloud CLI", long_about = None)]
+#[command(name = "atlassian-cli", version, about = "Unified Atlassian Cloud CLI", long_about = None)]
 struct Cli {
     /// Profile to use from config file
     #[arg(short, long)]
     profile: Option<String>,
 
-    /// Path to config file (defaults to ~/.atlassiancli/config.yaml)
+    /// Path to config file (defaults to ~/.atlassian-cli/config.yaml)
     #[arg(long)]
     config: Option<PathBuf>,
 
@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
     let config_path = cli.config.clone();
     let mut config = Config::load(config_path.as_ref())?;
     let renderer = OutputRenderer::new(cli.output);
-    let credential_store = CredentialStore::new("atlassiancli");
+    let credential_store = CredentialStore::new("atlassian-cli");
 
     let profile_ctx = if matches!(cli.command, AtlassianCommand::Auth(_)) {
         None
@@ -86,28 +86,14 @@ async fn main() -> Result<()> {
                 .as_ref()
                 .expect("profile context is available for product commands");
             let client = build_product_client(profile)?;
-            commands::confluence::execute(
-                args,
-                commands::confluence::ConfluenceContext {
-                    client,
-                    renderer: &renderer,
-                },
-            )
-            .await?
+            commands::confluence::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Bitbucket(args) => {
             let profile = profile_ctx
                 .as_ref()
                 .expect("profile context is available for product commands");
             let client = build_product_client(profile)?;
-            commands::bitbucket::execute(
-                args,
-                commands::bitbucket::BitbucketContext {
-                    client,
-                    renderer: &renderer,
-                },
-            )
-            .await?
+            commands::bitbucket::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Jsm(args) => {
             let profile = profile_ctx
@@ -139,7 +125,7 @@ async fn main() -> Result<()> {
 
 fn init_tracing(debug: bool) -> Result<()> {
     let default = if debug {
-        "info,atlassiancli=debug"
+        "info,atlassian-cli=debug"
     } else {
         "info"
     };

@@ -33,7 +33,7 @@ impl ApiClient {
         let url = Url::parse(base_url.as_ref()).map_err(ApiError::InvalidUrl)?;
 
         let client = Client::builder()
-            .user_agent(format!("atlassiancli/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!("atlassian-cli/{}", env!("CARGO_PKG_VERSION")))
             .timeout(Duration::from_secs(30))
             .build()
             .map_err(ApiError::RequestFailed)?;
@@ -69,6 +69,10 @@ impl ApiClient {
     pub fn with_retry_config(mut self, config: RetryConfig) -> Self {
         self.retry_config = config;
         self
+    }
+
+    pub fn base_url(&self) -> &str {
+        self.base_url.as_str()
     }
 
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
@@ -183,7 +187,7 @@ impl ApiClient {
         Ok(result)
     }
 
-    fn apply_auth(&self, request: RequestBuilder) -> RequestBuilder {
+    pub fn apply_auth(&self, request: RequestBuilder) -> RequestBuilder {
         match &self.auth {
             Some(AuthMethod::Basic { username, token }) => {
                 request.basic_auth(username, Some(token))

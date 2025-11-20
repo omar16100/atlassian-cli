@@ -9,7 +9,7 @@ fn test_cli_version() {
 
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("atlassiancli"));
+    assert!(stdout.contains("atlassian-cli"));
     assert!(stdout.contains("0.1.0"));
 }
 

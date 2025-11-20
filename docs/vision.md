@@ -1,4 +1,4 @@
-# atlassiancli Vision
+# atlassian-cli Vision
 
 ## Opportunity Overview
 - The official Atlassian CLI (ACLI) only exposes limited Jira workitem and basic admin commands, leaving major gaps across Jira administration, Confluence, Bitbucket, Jira Service Management (JSM), Opsgenie, and Bamboo.
@@ -6,7 +6,7 @@
 - Estimated market: ~300k Atlassian Cloud customers with 10–20% potential CLI power users (30k–60k active users).
 
 ## Product Vision
-Deliver **atlassiancli**: a unified, open-source, Rust-based CLI that treats Atlassian Cloud as programmable infrastructure. The suite should feel consistent across products, unlock automation/scripting workflows, and make bulk administration tasks safe and repeatable.
+Deliver **atlassian-cli**: a unified, open-source, Rust-based CLI that treats Atlassian Cloud as programmable infrastructure. The suite should feel consistent across products, unlock automation/scripting workflows, and make bulk administration tasks safe and repeatable.
 
 ### Pillars
 1. **Comprehensive Coverage** – Provide first-class CLI support for Confluence, Bitbucket, JSM, Opsgenie, Bamboo, and extended Jira administration features missing from ACLI.
@@ -32,7 +32,7 @@ Deliver **atlassiancli**: a unified, open-source, Rust-based CLI that treats Atl
 
 ## Reference Architecture
 ```
-atlassiancli/
+atlassian-cli/
 ├── Cargo.toml                # Workspace manifest
 ├── Cargo.lock
 ├── crates/
@@ -54,7 +54,7 @@ atlassiancli/
 ## Delivery Roadmap (20 Weeks)
 1. **Phase 1 – Foundation (Weeks 1‑3)**
    - Week 1: Cargo workspace init, Clap scaffolding, config/profile loader, Makefile/justfile, CI/CD.
-   - Week 2: Auth layer (API tokens with email+token and PAT support), multi-profile manager, keyring secure storage, `atlcli auth` commands.
+   - Week 2: Auth layer (API tokens with email+token and PAT support), multi-profile manager, keyring secure storage, `atlassian-cli auth` commands.
    - Week 3: Shared HTTP client with retry/rate limiting, logging, error handling, pagination helpers, output formatters, unit test harness.
 2. **Phase 2 – Jira CLI (Weeks 4‑6)**  
    - Week 4: Issue CRUD/search, transitions, assignments.  
@@ -106,6 +106,6 @@ Milestones: Week 3 foundation complete; Week 6 Jira ready; Week 9 Confluence rea
 
 ## Immediate Next Steps
 1. Validate personas and must-have workflows with 3–5 target teams.  
-2. Lock Rust/Clap stack decisions, confirm workspace structure, bootstrap scaffolding (`atlassiancli` binary).  
+2. Lock Rust/Clap stack decisions, confirm workspace structure, bootstrap scaffolding (`atlassian-cli` binary).
 3. Stand up Week 1 deliverables (config, auth shell, CI, docs skeleton).  
-4. Prepare marketing presence (atlassiancli.com) and roadmap artifact mirroring this plan.
+4. Prepare marketing presence (atlassian-cli.com) and roadmap artifact mirroring this plan.

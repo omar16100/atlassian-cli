@@ -41,10 +41,10 @@ impl fmt::Display for ProductKind {
 
 pub fn handle(product: ProductKind, args: &ProductArgs) -> Result<()> {
     if args.passthrough.is_empty() {
-        tracing::info!(target: "atlassiancli", product = %product, "Product support coming soon.");
+        tracing::info!(target: "atlassian-cli", product = %product, "Product support coming soon.");
     } else {
         tracing::warn!(
-            target: "atlassiancli",
+            target: "atlassian-cli",
             product = %product,
             args = ?args.passthrough,
             "Product command is not implemented yet"

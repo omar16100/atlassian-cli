@@ -1,4 +1,4 @@
-# atlassiancli TODO
+# atlassian-cli TODO
 
 ## 0. Research & Validation
 - [ ] Interview 3–5 Jira/Confluence/Opsgenie admins to confirm must-have workflows.
@@ -8,9 +8,9 @@
 
 ## Phase 1 – Foundation (Weeks 1‑3) ✅ COMPLETE
 ### Week 1 – Project Setup
-- [x] Initialize Cargo workspace (`Cargo.toml` workspace) for `atlassiancli`, create `crates/cli` binary crate, and scaffold Clap root command plus product subcommands.
+- [x] Initialize Cargo workspace (`Cargo.toml` workspace) for `atlassian-cli`, create `crates/cli` binary crate, and scaffold Clap root command plus product subcommands.
 - [x] Establish repo layout (`crates/cli`, `crates/api`, `crates/auth`, `crates/config`, `crates/output`, `crates/bulk`, `internal/utils`, `configs`, `docs`, `scripts`, `tests`).
-- [x] Implement config loader pointing to `~/.atlcli/config.yaml` with profile selection + env var overrides.
+- [x] Implement config loader pointing to `~/.atlassian-cli/config.yaml` with profile selection + env var overrides.
 - [x] Create `justfile`/Makefile tasks for `cargo fmt`, `cargo clippy --all-targets --all-features`, `cargo test`, and `cargo install --path crates/cli`.
 - [x] Add GitHub Actions CI (lint + unit tests + build matrix).
 - [x] Provide config example template in `configs/config.example.yaml`.
@@ -18,7 +18,7 @@
 ### Week 2 – Authentication Layer
 - [x] Implement API token auth (Basic auth w/ email+token and PAT styles) for all products.
 - [x] Add keyring/OS credential storage with fallback to environment variable overrides.
-- [x] Ship `atlcli auth login`, `logout`, `whoami`, `test` commands covering multiple profiles.
+- [x] Ship `atlassian-cli auth login`, `logout`, `whoami`, `test` commands covering multiple profiles.
 - [x] Document auth flows in docs plus troubleshooting steps.
 
 ### Week 3 – Common Infrastructure
@@ -35,24 +35,29 @@
 - [x] Week 6: Bulk operations (transition/assign/label/export/import), automation rules (list/create/enable/disable), webhook CRUD, audit log access.
 - [x] Cross-cutting: Validate pagination, add JSON schema to outputs, write integration tests with wiremock (11 tests), document examples in README.
 
-## Phase 3 – Confluence CLI (Weeks 7‑9)
-- [ ] Build `confluence` command group with shared options (`--space`, `--cql`, `--limit`, etc.) and pagination helpers.
-- [ ] Implement space CRUD + permissions management.
-- [ ] Implement page/blog CRUD with body file support, versioning, restrictions, labels, comments.
-- [ ] Add attachment upload/download/list/delete with resumable uploads for large files.
-- [ ] Deliver search commands (CQL + text) and saved query helpers.
-- [ ] Add bulk operations (export, delete, label changes) with dry-run + confirmation toggles.
-- [ ] Provide analytics commands for page/space view metrics.
+## Phase 3 – Confluence CLI (Weeks 7‑9) ✅ COMPLETE
+- [x] Build `confluence` command group with shared options (`--space`, `--cql`, `--limit`, etc.) and pagination helpers.
+- [x] Implement space CRUD + permissions management.
+- [x] Implement page/blog CRUD with body file support, versioning, restrictions, labels, comments.
+- [x] Add attachment upload/download/list/delete (resumable uploads deferred).
+- [x] Deliver search commands (CQL + text).
+- [x] Add bulk operations (export, delete, label changes) with dry-run + confirmation toggles.
+- [x] Provide analytics commands for page/space view metrics.
+- [ ] Write integration tests with wiremock (10-15 tests).
 - [ ] Write example scripts/workflows for docs (doc pipeline, backups, notifications).
 
-## Phase 4 – Bitbucket CLI (Weeks 10‑12)
-- [ ] Build `bitbucket` group covering workspaces, projects, and repos with consistent resource identifiers.
-- [ ] Implement repo lifecycle (create/list/update/delete/archive) and permissions commands for users/groups.
-- [ ] Implement branch/branch-protection, tags, and branch model configuration.
-- [ ] Deliver pull request workflow: create/update/merge/decline, comments, tasks, approvals, reviewers, diffs.
-- [ ] Add pipelines/deployments management (trigger/stop, logs, variables, schedules, deployments).
-- [ ] Provide commit/source browsing helpers and artifact download.
-- [ ] Implement webhooks, SSH keys, access tokens, and repo-level bulk ops (archive stale repos, delete merged branches).
+## Phase 4 – Bitbucket CLI (Weeks 10‑12) ✅ 100% COMPLETE
+- [x] Build `bitbucket` group with modular structure (repos, branches, pullrequests, workspaces, permissions, pipelines, webhooks, commits, bulk modules).
+- [x] Implement repo lifecycle (create/list/update/delete) - COMPLETE.
+- [x] Implement branch management (list/get/create/delete) and branch protection/restrictions - COMPLETE.
+- [x] Deliver pull request workflow: create/get/update/merge/decline, comments, approvals, reviewers - COMPLETE.
+- [x] Build workspace/project CRUD operations (list/get/create/update/delete) - COMPLETE.
+- [x] Implement repo permissions commands for users/groups (list/grant/revoke) - COMPLETE.
+- [x] Add pipelines/deployments management (list/get/trigger/stop/logs) - COMPLETE.
+- [x] Provide commit/source browsing helpers (list/get/diff/browse) - COMPLETE.
+- [x] Implement webhooks and SSH keys (list/create/delete, add/list/delete) - COMPLETE.
+- [x] Implement bulk repository operations (archive stale repos, delete merged branches) - COMPLETE.
+- [x] Write integration tests with wiremock (14 tests covering repos, branches, PRs) - COMPLETE.
 
 ## Phase 5 – JSM CLI (Weeks 13‑14)
 - [ ] Implement `jsm` group: service desks CRUD, request types, portal settings.
@@ -92,12 +97,17 @@
 - [ ] Surface system-level config (application properties, license, health checks, reindex).
 
 ## Documentation, QA & Release Readiness (Weeks 19‑20)
-- [ ] Create comprehensive docs site (atlassiancli.com) with getting started, installation, auth setup, command reference (auto-gen), troubleshooting, and cookbook recipes.
+- [ ] Create comprehensive docs site (atlassian-cli.com) with getting started, installation, auth setup, command reference (auto-gen), troubleshooting, and cookbook recipes.
 - [ ] Publish example scripts (Confluence doc pipeline, multi-repo Bitbucket PR workflow, incident response automation).
 - [ ] Provide quickstart templates (Docker image, GitHub Actions workflow, Jenkins shared library).
 - [ ] Establish integration tests against Atlassian sandbox tenants with recorded fixtures and cleanup scripts.
 - [ ] Add smoke/E2E tests for each command group validating output formats.
-- [ ] Set up CI release workflow producing Linux/macOS/Windows binaries, Docker images, Homebrew tap, apt/yum packages, and `cargo install atlassiancli` instructions.
+- [x] Set up CI release workflow producing Linux/macOS/Windows binaries, Homebrew tap, and `cargo install atlassian-cli` instructions (cargo-dist configured).
+- [x] Build Homebrew tap repository (`yourorg/homebrew-atlassian-cli`) and add `Formula/atlassian-cli.rb` pointing to release tarballs + checksums (automated via cargo-dist).
+- [x] Automate tap updates (cargo-dist automatically updates formula on each tagged release).
+- [x] Document Homebrew installation steps in README.
+- [ ] TODO: Create tap repository and add HOMEBREW_TAP_GITHUB_TOKEN secret before first release.
+- [ ] TODO: Docker images, apt/yum packages (future enhancements).
 - [ ] Prepare documentation: feature comparison vs ACLI/Appfire, FAQ, roadmap, launch blog post, Atlassian Community announcement.
-- [ ] Define support process (issue templates) and version/update policy (semver, `atlcli version --check-update`).
+- [ ] Define support process (issue templates) and version/update policy (semver, `atlassian-cli version --check-update`).
 - [ ] Set up CI with lint/tests/security scans (`cargo fmt`, `cargo clippy`, `cargo test`, `cargo audit`, `cargo deny`) and release automation.

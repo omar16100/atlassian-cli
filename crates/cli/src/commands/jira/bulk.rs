@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use atlassiancli_bulk::BulkExecutor;
+use atlassian_cli_bulk::BulkExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;

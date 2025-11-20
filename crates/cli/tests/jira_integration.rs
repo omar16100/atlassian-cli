@@ -1,4 +1,4 @@
-use atlassiancli_api::ApiClient;
+use atlassian_cli_api::ApiClient;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

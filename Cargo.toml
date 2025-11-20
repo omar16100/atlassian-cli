@@ -12,9 +12,10 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["atlassiancli contributors"]
+authors = ["atlassian-cli contributors"]
 license = "MIT"
-repository = "https://github.com/yourusername/atlassiancli"
+repository = "https://github.com/omar16100/atlassian-cli"
+homepage = "https://github.com/omar16100/atlassian-cli"
 
 [workspace.dependencies]
 # CLI
@@ -55,3 +56,8 @@ async-stream = "0.3"
 
 # Testing
 wiremock = "0.6"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
