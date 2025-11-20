@@ -29,13 +29,14 @@
 - [x] Stand up bulk worker abstraction (concurrency limits, dry-run flag, progress bars, transaction log file).
 - [x] Ensure unit tests cover config/auth/output modules.
 
-## Phase 2 – Jira CLI (Weeks 4‑6) ✅ COMPLETE
+## Phase 2 – Jira CLI (Weeks 4‑6) ✅ 100% COMPLETE
 - [x] Week 4: `jira` command group with issue CRUD, transitions, assign/unassign, watchers, link management, `jira search --jql`.
 - [x] Week 5: Project lifecycle: list/get/create/delete, components, versions, roles; custom fields list/create/update; workflow listing/export.
 - [x] Week 6: Bulk operations (transition/assign/label/export/import), automation rules (list/create/enable/disable), webhook CRUD, audit log access.
 - [x] Cross-cutting: Validate pagination, add JSON schema to outputs, write integration tests with wiremock (11 tests), document examples in README.
+- [x] Write example scripts for docs (bulk-transition, sprint-report, project-cleanup).
 
-## Phase 3 – Confluence CLI (Weeks 7‑9) ✅ COMPLETE
+## Phase 3 – Confluence CLI (Weeks 7‑9) ✅ 100% COMPLETE
 - [x] Build `confluence` command group with shared options (`--space`, `--cql`, `--limit`, etc.) and pagination helpers.
 - [x] Implement space CRUD + permissions management.
 - [x] Implement page/blog CRUD with body file support, versioning, restrictions, labels, comments.
@@ -43,8 +44,8 @@
 - [x] Deliver search commands (CQL + text).
 - [x] Add bulk operations (export, delete, label changes) with dry-run + confirmation toggles.
 - [x] Provide analytics commands for page/space view metrics.
-- [ ] Write integration tests with wiremock (10-15 tests).
-- [ ] Write example scripts/workflows for docs (doc pipeline, backups, notifications).
+- [x] Write integration tests with wiremock (15 tests covering all operations).
+- [x] Write example scripts for docs (doc-pipeline, backup-space, bulk-cleanup, space-report).
 
 ## Phase 4 – Bitbucket CLI (Weeks 10‑12) ✅ 100% COMPLETE
 - [x] Build `bitbucket` group with modular structure (repos, branches, pullrequests, workspaces, permissions, pipelines, webhooks, commits, bulk modules).
@@ -58,6 +59,7 @@
 - [x] Implement webhooks and SSH keys (list/create/delete, add/list/delete) - COMPLETE.
 - [x] Implement bulk repository operations (archive stale repos, delete merged branches) - COMPLETE.
 - [x] Write integration tests with wiremock (14 tests covering repos, branches, PRs) - COMPLETE.
+- [x] Write example scripts for docs (pr-automation, repo-audit, branch-cleanup).
 
 ## Phase 5 – JSM CLI (Weeks 13‑14)
 - [ ] Implement `jsm` group: service desks CRUD, request types, portal settings.
@@ -98,7 +100,7 @@
 
 ## Documentation, QA & Release Readiness (Weeks 19‑20)
 - [ ] Create comprehensive docs site (atlassian-cli.com) with getting started, installation, auth setup, command reference (auto-gen), troubleshooting, and cookbook recipes.
-- [ ] Publish example scripts (Confluence doc pipeline, multi-repo Bitbucket PR workflow, incident response automation).
+- [x] Publish example scripts (Confluence: doc-pipeline/backup-space/bulk-cleanup/space-report; Jira: bulk-transition/sprint-report/project-cleanup; Bitbucket: pr-automation/repo-audit/branch-cleanup).
 - [ ] Provide quickstart templates (Docker image, GitHub Actions workflow, Jenkins shared library).
 - [ ] Establish integration tests against Atlassian sandbox tenants with recorded fixtures and cleanup scripts.
 - [ ] Add smoke/E2E tests for each command group validating output formats.
