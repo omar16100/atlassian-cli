@@ -40,7 +40,7 @@ impl CredentialStore {
     }
 }
 
-/// Helper to construct a key for per-instance secrets.
-pub fn token_key(instance: &str, profile: &str) -> String {
-    format!("{instance}:{profile}")
+/// Helper to construct a key for profile secrets.
+pub fn token_key(profile: &str) -> String {
+    profile.to_string()
 }

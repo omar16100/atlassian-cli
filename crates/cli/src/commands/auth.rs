@@ -8,6 +8,26 @@ use clap::{Args, Subcommand};
 use serde::Serialize;
 use url::Url;
 
+/// Multi-tier token lookup: profile-specific env var → generic env var → keyring
+fn get_token(profile_name: &str, store: &CredentialStore) -> Option<String> {
+    // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
+    let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", profile_name.to_uppercase());
+    std::env::var(&profile_env_var)
+        .ok()
+        .filter(|t| !t.trim().is_empty())
+        .or_else(|| {
+            // 2. Check generic env var: ATLASSIAN_API_TOKEN
+            std::env::var("ATLASSIAN_API_TOKEN")
+                .ok()
+                .filter(|t| !t.trim().is_empty())
+        })
+        .or_else(|| {
+            // 3. Try keyring as fallback
+            let secret_key = token_key(profile_name);
+            store.get_secret(&secret_key).ok().flatten()
+        })
+}
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum AuthCommand {
     /// Add or update a profile and store credentials securely
@@ -111,7 +131,7 @@ fn login(
         config.default_profile = Some(args.profile.clone());
     }
 
-    let secret_key = token_key(base_url.as_str(), &args.profile);
+    let secret_key = token_key(&args.profile);
     store
         .set_secret(&secret_key, &token)
         .context("Failed to store token in keyring")?;
@@ -134,17 +154,12 @@ fn logout(
     config_path: Option<&Path>,
     store: &CredentialStore,
 ) -> Result<()> {
-    let profile = config
+    let _profile = config
         .profiles
         .get(&args.profile)
         .ok_or_else(|| anyhow!("Profile '{}' does not exist", args.profile))?;
 
-    let base_url = profile
-        .base_url
-        .as_deref()
-        .ok_or_else(|| anyhow!("Profile '{}' is missing a base_url", args.profile))?;
-
-    let secret_key = token_key(base_url, &args.profile);
+    let secret_key = token_key(&args.profile);
     store
         .delete_secret(&secret_key)
         .context("Failed to delete token from keyring")?;
@@ -185,8 +200,7 @@ fn list_profiles(
     let mut rows = Vec::new();
     for (name, profile) in &config.profiles {
         let base_url = profile.base_url.as_deref().unwrap_or("");
-        let secret_key = token_key(base_url, name);
-        let has_token = store.get_secret(&secret_key)?.is_some();
+        let has_token = get_token(name, store).is_some();
         let row = Row {
             name,
             base_url,
@@ -233,10 +247,12 @@ fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<
         .context("Profile missing base_url")?;
     let email = profile.email.as_deref().context("Profile missing email")?;
 
-    let secret_key = token_key(base_url, profile_name);
-    let token = store
-        .get_secret(&secret_key)?
-        .context("No API token found. Use `atlassian-cli auth login` to authenticate.")?;
+    let token = get_token(profile_name, store).ok_or_else(|| {
+        anyhow!(
+            "No token found for profile '{profile_name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login`",
+            profile_name.to_uppercase()
+        )
+    })?;
 
     let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 
@@ -277,10 +293,12 @@ fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result
         .context("Profile missing base_url")?;
     let email = profile.email.as_deref().context("Profile missing email")?;
 
-    let secret_key = token_key(base_url, profile_name);
-    let token = store
-        .get_secret(&secret_key)?
-        .context("No API token found. Use `atlassian-cli auth login` to authenticate.")?;
+    let token = get_token(profile_name, store).ok_or_else(|| {
+        anyhow!(
+            "No token found for profile '{profile_name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login`",
+            profile_name.to_uppercase()
+        )
+    })?;
 
     println!("Testing authentication for profile '{}'...", profile_name);
 
