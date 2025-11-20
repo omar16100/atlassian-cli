@@ -7,26 +7,24 @@ use super::utils::JiraContext;
 // Issue CRUD Operations
 
 pub async fn search_issues(ctx: &JiraContext<'_>, jql: &str, limit: usize) -> Result<()> {
-    #[derive(Serialize)]
-    struct SearchPayload<'a> {
-        jql: &'a str,
-        #[serde(rename = "maxResults")]
-        max_results: usize,
-    }
-
     #[derive(Deserialize)]
     struct SearchResponse {
         issues: Vec<Issue>,
+        #[serde(rename = "isLast")]
+        is_last: Option<bool>,
+        #[serde(rename = "nextPageToken")]
+        next_page_token: Option<String>,
     }
 
-    let payload = SearchPayload {
-        jql,
-        max_results: limit.min(1000),
-    };
+    let max_results = limit.min(1000);
+    let query = format!("/rest/api/3/search/jql?jql={}&maxResults={}&fields=key,summary,status,assignee,issuetype",
+        urlencoding::encode(jql),
+        max_results
+    );
 
     let response: SearchResponse = ctx
         .client
-        .post("/rest/api/3/search", &payload)
+        .get(&query)
         .await
         .context("Failed to execute search")?;
 
