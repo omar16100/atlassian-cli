@@ -1,7 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::utils::ConfluenceContext;
+use crate::query::CqlBuilder;
 
 // Search using CQL
 pub async fn search_cql(
@@ -75,4 +76,54 @@ pub async fn search_in_space(
 ) -> Result<()> {
     let cql = format!("space = \"{}\" AND text ~ \"{}\"", space_key, query);
     search_cql(ctx, &cql, limit).await
+}
+
+// Search using filter parameters
+#[allow(clippy::too_many_arguments)]
+pub async fn search_params(
+    ctx: &ConfluenceContext<'_>,
+    space: Option<&str>,
+    r#type: Option<&str>,
+    creator: Option<&str>,
+    label: &[String],
+    title: Option<&str>,
+    text: Option<&str>,
+    show_query: bool,
+    limit: usize,
+) -> Result<()> {
+    let mut builder = CqlBuilder::new();
+
+    // Add filters conditionally
+    if let Some(s) = space {
+        builder = builder.eq("space", s);
+    }
+    if let Some(t) = r#type {
+        builder = builder.eq("type", t);
+    }
+    if let Some(c) = creator {
+        builder = builder.eq("creator", c);
+    }
+    if !label.is_empty() {
+        builder = builder.in_list("label", label);
+    }
+    if let Some(t) = title {
+        builder = builder.contains("title", t);
+    }
+    if let Some(txt) = text {
+        builder = builder.contains("text", txt);
+    }
+
+    let cql = builder.finish();
+    if cql.is_empty() {
+        return Err(anyhow!(
+            "No search criteria provided. Use filter flags to build a query"
+        ));
+    }
+
+    if show_query {
+        println!("CQL Query: {}", cql);
+        println!();
+    }
+
+    search_cql(ctx, &cql, Some(limit)).await
 }
