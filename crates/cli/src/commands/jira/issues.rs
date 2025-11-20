@@ -10,8 +10,10 @@ pub async fn search_issues(ctx: &JiraContext<'_>, jql: &str, limit: usize) -> Re
     #[derive(Deserialize)]
     struct SearchResponse {
         issues: Vec<Issue>,
+        #[allow(dead_code)]
         #[serde(rename = "isLast")]
         is_last: Option<bool>,
+        #[allow(dead_code)]
         #[serde(rename = "nextPageToken")]
         next_page_token: Option<String>,
     }

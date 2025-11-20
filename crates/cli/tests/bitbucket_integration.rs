@@ -30,7 +30,7 @@ async fn test_bitbucket_list_repos() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -61,7 +61,7 @@ async fn test_bitbucket_get_repo() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -89,7 +89,7 @@ async fn test_bitbucket_create_repo() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -123,7 +123,7 @@ async fn test_bitbucket_update_repo() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -151,7 +151,7 @@ async fn test_bitbucket_delete_repo() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -191,7 +191,7 @@ async fn test_bitbucket_list_branches() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -219,7 +219,7 @@ async fn test_bitbucket_create_branch() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -254,7 +254,7 @@ async fn test_bitbucket_delete_branch() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -304,7 +304,7 @@ async fn test_bitbucket_list_pull_requests() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -338,7 +338,7 @@ async fn test_bitbucket_create_pull_request() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -387,7 +387,7 @@ async fn test_bitbucket_merge_pull_request() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -420,7 +420,7 @@ async fn test_bitbucket_approve_pull_request() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -453,7 +453,7 @@ async fn test_bitbucket_branch_protection() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -490,7 +490,7 @@ async fn test_bitbucket_error_handling() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 

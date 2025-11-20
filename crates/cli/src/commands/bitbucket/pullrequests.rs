@@ -34,6 +34,7 @@ struct PullRequest {
 #[derive(Deserialize)]
 struct User {
     display_name: String,
+    #[allow(dead_code)]
     #[serde(default)]
     uuid: Option<String>,
 }
@@ -41,6 +42,7 @@ struct User {
 #[derive(Deserialize)]
 struct PullRequestBranch {
     branch: BranchRef,
+    #[allow(dead_code)]
     #[serde(default)]
     repository: Option<Repository>,
 }
@@ -52,15 +54,19 @@ struct BranchRef {
 
 #[derive(Deserialize)]
 struct Repository {
+    #[allow(dead_code)]
     #[serde(default)]
     full_name: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct Participant {
+    #[allow(dead_code)]
     #[serde(default)]
     approved: bool,
+    #[allow(dead_code)]
     user: User,
+    #[allow(dead_code)]
     role: String,
 }
 
@@ -179,6 +185,7 @@ pub async fn get_pull_request(
     ctx.renderer.render(&view)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_pull_request(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -381,8 +388,10 @@ pub async fn approve_pull_request(
 ) -> Result<()> {
     #[derive(Deserialize)]
     struct Approval {
+        #[allow(dead_code)]
         #[serde(default)]
         approved: bool,
+        #[allow(dead_code)]
         user: User,
     }
 

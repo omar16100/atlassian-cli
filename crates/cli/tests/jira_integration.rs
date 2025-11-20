@@ -38,7 +38,7 @@ async fn test_jira_search_issues() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -71,7 +71,7 @@ async fn test_jira_get_issue() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -97,7 +97,7 @@ async fn test_jira_create_issue() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -126,7 +126,7 @@ async fn test_jira_update_issue() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -153,7 +153,7 @@ async fn test_jira_delete_issue() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -186,7 +186,7 @@ async fn test_jira_transition_issue() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -228,7 +228,7 @@ async fn test_jira_list_projects() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -255,7 +255,7 @@ async fn test_jira_create_component() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -308,7 +308,7 @@ async fn test_jira_audit_list() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -337,7 +337,7 @@ async fn test_jira_list_webhooks() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -361,7 +361,7 @@ async fn test_jira_error_handling() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 

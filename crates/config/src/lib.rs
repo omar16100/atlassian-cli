@@ -116,12 +116,16 @@ mod tests {
 
     #[test]
     fn test_save_and_load() {
-        let mut config = Config::default();
-        config.default_profile = Some("work".to_string());
+        let mut config = Config {
+            default_profile: Some("work".to_string()),
+            ..Default::default()
+        };
 
-        let mut profile = Profile::default();
-        profile.base_url = Some("https://test.atlassian.net".to_string());
-        profile.email = Some("test@example.com".to_string());
+        let profile = Profile {
+            base_url: Some("https://test.atlassian.net".to_string()),
+            email: Some("test@example.com".to_string()),
+            ..Default::default()
+        };
 
         config.profiles.insert("work".to_string(), profile);
 
@@ -155,8 +159,10 @@ mod tests {
     #[test]
     fn test_profile_retrieval() {
         let mut config = Config::default();
-        let mut profile = Profile::default();
-        profile.base_url = Some("https://test.atlassian.net".to_string());
+        let profile = Profile {
+            base_url: Some("https://test.atlassian.net".to_string()),
+            ..Default::default()
+        };
 
         config.profiles.insert("test".to_string(), profile);
 
@@ -166,17 +172,23 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_requested() {
-        let mut config = Config::default();
-        config.default_profile = Some("default".to_string());
+        let mut config = Config {
+            default_profile: Some("default".to_string()),
+            ..Default::default()
+        };
 
-        let mut default_profile = Profile::default();
-        default_profile.base_url = Some("https://default.atlassian.net".to_string());
+        let default_profile = Profile {
+            base_url: Some("https://default.atlassian.net".to_string()),
+            ..Default::default()
+        };
         config
             .profiles
             .insert("default".to_string(), default_profile);
 
-        let mut work_profile = Profile::default();
-        work_profile.base_url = Some("https://work.atlassian.net".to_string());
+        let work_profile = Profile {
+            base_url: Some("https://work.atlassian.net".to_string()),
+            ..Default::default()
+        };
         config.profiles.insert("work".to_string(), work_profile);
 
         let (name, profile) = config.resolve_profile(Some("work")).unwrap();
@@ -189,11 +201,15 @@ mod tests {
 
     #[test]
     fn test_resolve_profile_default() {
-        let mut config = Config::default();
-        config.default_profile = Some("default".to_string());
+        let mut config = Config {
+            default_profile: Some("default".to_string()),
+            ..Default::default()
+        };
 
-        let mut default_profile = Profile::default();
-        default_profile.base_url = Some("https://default.atlassian.net".to_string());
+        let default_profile = Profile {
+            base_url: Some("https://default.atlassian.net".to_string()),
+            ..Default::default()
+        };
         config
             .profiles
             .insert("default".to_string(), default_profile);
@@ -210,8 +226,10 @@ mod tests {
     fn test_resolve_profile_first_available() {
         let mut config = Config::default();
 
-        let mut profile = Profile::default();
-        profile.base_url = Some("https://only.atlassian.net".to_string());
+        let profile = Profile {
+            base_url: Some("https://only.atlassian.net".to_string()),
+            ..Default::default()
+        };
         config.profiles.insert("only".to_string(), profile);
 
         let result = config.resolve_profile(None);
@@ -234,8 +252,10 @@ mod tests {
     fn test_resolve_profile_nonexistent_requested() {
         let mut config = Config::default();
 
-        let mut profile = Profile::default();
-        profile.base_url = Some("https://test.atlassian.net".to_string());
+        let profile = Profile {
+            base_url: Some("https://test.atlassian.net".to_string()),
+            ..Default::default()
+        };
         config.profiles.insert("test".to_string(), profile);
 
         assert!(config.resolve_profile(Some("nonexistent")).is_none());
@@ -251,13 +271,16 @@ mod tests {
 
     #[test]
     fn test_yaml_serialization() {
-        let mut config = Config::default();
-        config.default_profile = Some("prod".to_string());
+        let mut config = Config {
+            default_profile: Some("prod".to_string()),
+            ..Default::default()
+        };
 
-        let mut profile = Profile::default();
-        profile.base_url = Some("https://prod.atlassian.net".to_string());
-        profile.email = Some("admin@example.com".to_string());
-        profile.api_token = Some("secret-token-123".to_string());
+        let profile = Profile {
+            base_url: Some("https://prod.atlassian.net".to_string()),
+            email: Some("admin@example.com".to_string()),
+            api_token: Some("secret-token-123".to_string()),
+        };
 
         config.profiles.insert("prod".to_string(), profile);
 
