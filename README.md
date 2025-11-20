@@ -109,6 +109,8 @@ crates/
    # Confluence
    atlassian-cli confluence search --cql "space = DEV and type = page" --limit 5
    atlassian-cli confluence space list --limit 10
+   atlassian-cli confluence page get --id 12345
+   atlassian-cli confluence page list --space DEV --limit 25
 
    # Bitbucket - Repositories
    atlassian-cli bitbucket --workspace myteam repo list --limit 10

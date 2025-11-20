@@ -21,6 +21,7 @@ struct Permission {
 struct User {
     #[serde(rename = "display_name")]
     display_name: String,
+    #[allow(dead_code)]
     #[serde(default)]
     uuid: Option<String>,
 }
@@ -28,6 +29,7 @@ struct User {
 #[derive(Deserialize)]
 struct Group {
     name: String,
+    #[allow(dead_code)]
     slug: String,
 }
 

@@ -33,7 +33,7 @@ async fn test_list_spaces() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -68,7 +68,7 @@ async fn test_get_space() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -93,7 +93,7 @@ async fn test_create_space() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -140,7 +140,7 @@ async fn test_list_pages() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -177,7 +177,7 @@ async fn test_get_page() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -204,7 +204,7 @@ async fn test_create_page() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -251,7 +251,7 @@ async fn test_update_page() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -295,7 +295,7 @@ async fn test_list_blogposts() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -320,7 +320,7 @@ async fn test_create_blogpost() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -372,7 +372,7 @@ async fn test_list_attachments() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -400,7 +400,7 @@ async fn test_get_attachment() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -445,7 +445,7 @@ async fn test_search_cql() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -478,7 +478,7 @@ async fn test_search_text() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -536,7 +536,7 @@ async fn test_bulk_export_json() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
@@ -562,7 +562,7 @@ async fn test_bulk_add_labels() {
         .mount(&mock_server)
         .await;
 
-    let client = ApiClient::new(&mock_server.uri())
+    let client = ApiClient::new(mock_server.uri())
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
