@@ -1,12 +1,72 @@
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::utils::JiraContext;
+use crate::query::JqlBuilder;
 
 // Issue CRUD Operations
 
-pub async fn search_issues(ctx: &JiraContext<'_>, jql: &str, limit: usize) -> Result<()> {
+#[allow(clippy::too_many_arguments)]
+pub async fn search_issues(
+    ctx: &JiraContext<'_>,
+    jql: Option<&str>,
+    assignee: Option<&str>,
+    status: &[String],
+    priority: Option<&str>,
+    label: &[String],
+    r#type: Option<&str>,
+    project: Option<&str>,
+    text: Option<&str>,
+    show_query: bool,
+    limit: usize,
+) -> Result<()> {
+    // Build JQL from filters or use raw JQL
+    let final_jql = if let Some(raw_jql) = jql {
+        raw_jql.to_string()
+    } else {
+        // Build JQL from filter parameters
+        let mut builder = JqlBuilder::new();
+
+        if let Some(a) = assignee {
+            builder = builder.eq("assignee", a);
+        }
+        if !status.is_empty() {
+            builder = builder.in_list("status", status);
+        }
+        if let Some(p) = priority {
+            builder = builder.eq("priority", p);
+        }
+        if !label.is_empty() {
+            builder = builder.in_list("labels", label);
+        }
+        if let Some(t) = r#type {
+            builder = builder.eq("type", t);
+        }
+        if let Some(proj) = project {
+            builder = builder.eq("project", proj);
+        }
+        if let Some(txt) = text {
+            builder = builder.contains("summary", txt);
+        }
+
+        let built_jql = builder.finish();
+        if built_jql.is_empty() {
+            return Err(anyhow!(
+                "No search criteria provided. Use --jql or filter flags (--assignee, --status, etc.)"
+            ));
+        }
+        built_jql
+    };
+
+    // Show query if requested
+    if show_query {
+        println!("JQL Query: {}", final_jql);
+        if jql.is_none() {
+            println!();
+        }
+    }
+
     #[derive(Deserialize)]
     struct SearchResponse {
         issues: Vec<Issue>,
@@ -21,7 +81,7 @@ pub async fn search_issues(ctx: &JiraContext<'_>, jql: &str, limit: usize) -> Re
     let max_results = limit.min(1000);
     let query = format!(
         "/rest/api/3/search/jql?jql={}&maxResults={}&fields=key,summary,status,assignee,issuetype",
-        urlencoding::encode(jql),
+        urlencoding::encode(&final_jql),
         max_results
     );
 

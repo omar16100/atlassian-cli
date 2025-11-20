@@ -353,6 +353,40 @@ enum SearchCommands {
         #[arg(long)]
         limit: Option<usize>,
     },
+    /// Search using filter parameters
+    Params {
+        /// Filter by space key
+        #[arg(short = 's', long)]
+        space: Option<String>,
+
+        /// Filter by content type (page, blogpost, attachment)
+        #[arg(short = 't', long)]
+        r#type: Option<String>,
+
+        /// Filter by creator (use @me for current user)
+        #[arg(short = 'c', long)]
+        creator: Option<String>,
+
+        /// Filter by label (repeatable)
+        #[arg(short = 'l', long, num_args = 0..)]
+        label: Vec<String>,
+
+        /// Search in title
+        #[arg(long)]
+        title: Option<String>,
+
+        /// Free text search
+        #[arg(long)]
+        text: Option<String>,
+
+        /// Display generated CQL query
+        #[arg(long)]
+        show_query: bool,
+
+        /// Maximum number of results
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -558,6 +592,29 @@ pub async fn execute(
                 query,
                 limit,
             } => search::search_in_space(&ctx, &space, &query, limit).await,
+            SearchCommands::Params {
+                space,
+                r#type,
+                creator,
+                label,
+                title,
+                text,
+                show_query,
+                limit,
+            } => {
+                search::search_params(
+                    &ctx,
+                    space.as_deref(),
+                    r#type.as_deref(),
+                    creator.as_deref(),
+                    &label,
+                    title.as_deref(),
+                    text.as_deref(),
+                    show_query,
+                    limit,
+                )
+                .await
+            }
         },
         ConfluenceCommands::Bulk(cmd) => match cmd {
             BulkCommands::Delete {

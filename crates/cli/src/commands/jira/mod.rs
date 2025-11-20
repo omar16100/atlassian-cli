@@ -23,11 +23,45 @@ pub struct JiraArgs {
 
 #[derive(Subcommand, Debug, Clone)]
 enum JiraCommands {
-    /// Search issues using JQL
+    /// Search issues using JQL or filter parameters
     Search {
-        /// JQL query
+        /// Raw JQL query (conflicts with filter flags)
+        #[arg(long, conflicts_with_all = ["assignee", "status", "priority", "label", "type", "project", "text"])]
+        jql: Option<String>,
+
+        // Filter flags (only when --jql not used)
+        /// Filter by assignee (use @me for current user)
+        #[arg(short = 'a', long)]
+        assignee: Option<String>,
+
+        /// Filter by status (repeatable)
+        #[arg(short = 's', long, num_args = 0..)]
+        status: Vec<String>,
+
+        /// Filter by priority
+        #[arg(short = 'y', long)]
+        priority: Option<String>,
+
+        /// Filter by label (repeatable)
+        #[arg(short = 'l', long, num_args = 0..)]
+        label: Vec<String>,
+
+        /// Filter by issue type
+        #[arg(short = 't', long)]
+        r#type: Option<String>,
+
+        /// Filter by project
+        #[arg(short = 'p', long)]
+        project: Option<String>,
+
+        /// Free text search in summary
         #[arg(long)]
-        jql: String,
+        text: Option<String>,
+
+        /// Display generated JQL query
+        #[arg(long)]
+        show_query: bool,
+
         /// Maximum number of issues to return
         #[arg(long, default_value_t = 50)]
         limit: usize,
@@ -732,7 +766,33 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
     let ctx = JiraContext { client, renderer };
 
     match args.command {
-        JiraCommands::Search { jql, limit } => issues::search_issues(&ctx, &jql, limit).await,
+        JiraCommands::Search {
+            jql,
+            assignee,
+            status,
+            priority,
+            label,
+            r#type,
+            project,
+            text,
+            show_query,
+            limit,
+        } => {
+            issues::search_issues(
+                &ctx,
+                jql.as_deref(),
+                assignee.as_deref(),
+                &status,
+                priority.as_deref(),
+                &label,
+                r#type.as_deref(),
+                project.as_deref(),
+                text.as_deref(),
+                show_query,
+                limit,
+            )
+            .await
+        }
         JiraCommands::Get { key } => issues::view_issue(&ctx, &key).await,
         JiraCommands::Create {
             project,
