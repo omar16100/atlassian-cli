@@ -92,7 +92,7 @@ async fn main() -> Result<()> {
             let profile = profile_ctx
                 .as_ref()
                 .expect("profile context is available for product commands");
-            let client = build_product_client(profile)?;
+            let client = build_bitbucket_client(profile)?;
             commands::bitbucket::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Jsm(args) => {
@@ -162,12 +162,31 @@ fn resolve_active_profile(
         .clone()
         .ok_or_else(|| anyhow!("Profile '{name}' is missing an email."))?;
 
-    let secret_key = token_key(&base_url, name);
-    let token = store.get_secret(&secret_key)?.ok_or_else(|| {
-        anyhow!(
-            "No token stored for profile '{name}'. Run `atlcli auth login --profile {name}` again."
-        )
-    })?;
+    // Multi-tier token lookup: profile-specific env var → generic env var → keyring
+    let token = {
+        // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
+        let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", name.to_uppercase());
+        std::env::var(&profile_env_var)
+            .ok()
+            .filter(|t| !t.trim().is_empty())
+            .or_else(|| {
+                // 2. Check generic env var: ATLASSIAN_API_TOKEN
+                std::env::var("ATLASSIAN_API_TOKEN")
+                    .ok()
+                    .filter(|t| !t.trim().is_empty())
+            })
+            .or_else(|| {
+                // 3. Try keyring as fallback
+                let secret_key = token_key(name);
+                store.get_secret(&secret_key).ok().flatten()
+            })
+            .ok_or_else(|| {
+                anyhow!(
+                    "No token found for profile '{name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlcli auth login --profile {name}`",
+                    name.to_uppercase()
+                )
+            })?
+    };
 
     Ok(ActiveProfile {
         base_url,
@@ -178,5 +197,10 @@ fn resolve_active_profile(
 
 fn build_product_client(profile: &ActiveProfile) -> Result<ApiClient> {
     Ok(ApiClient::new(&profile.base_url)?
+        .with_basic_auth(profile.email.clone(), profile.token.clone()))
+}
+
+fn build_bitbucket_client(profile: &ActiveProfile) -> Result<ApiClient> {
+    Ok(ApiClient::new("https://api.bitbucket.org")?
         .with_basic_auth(profile.email.clone(), profile.token.clone()))
 }

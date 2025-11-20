@@ -16,11 +16,6 @@ pub async fn search_cql(
 
     #[derive(Deserialize)]
     struct SearchResult {
-        content: Content,
-    }
-
-    #[derive(Deserialize)]
-    struct Content {
         id: String,
         title: String,
         #[serde(rename = "type")]
@@ -52,9 +47,9 @@ pub async fn search_cql(
         .results
         .iter()
         .map(|r| Row {
-            id: r.content.id.as_str(),
-            title: r.content.title.as_str(),
-            content_type: r.content.content_type.as_str(),
+            id: r.id.as_str(),
+            title: r.title.as_str(),
+            content_type: r.content_type.as_str(),
         })
         .collect();
 
