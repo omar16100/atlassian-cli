@@ -163,7 +163,10 @@ pub async fn download_attachment(
         return Err(anyhow::anyhow!("Failed to download attachment"));
     }
 
-    let content = response.bytes().await.context("Failed to read attachment content")?;
+    let content = response
+        .bytes()
+        .await
+        .context("Failed to read attachment content")?;
 
     fs::write(output, content)
         .with_context(|| format!("Failed to write file: {}", output.display()))?;

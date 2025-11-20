@@ -155,9 +155,8 @@ async fn test_bitbucket_delete_repo() {
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
-    let response: Result<serde_json::Value, _> = client
-        .delete("/2.0/repositories/myworkspace/myrepo")
-        .await;
+    let response: Result<serde_json::Value, _> =
+        client.delete("/2.0/repositories/myworkspace/myrepo").await;
 
     assert!(response.is_ok());
 }
@@ -232,7 +231,10 @@ async fn test_bitbucket_create_branch() {
     });
 
     let response: Result<serde_json::Value, _> = client
-        .post("/2.0/repositories/myworkspace/myrepo/refs/branches", &payload)
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/refs/branches",
+            &payload,
+        )
         .await;
 
     assert!(response.is_ok());
@@ -351,7 +353,10 @@ async fn test_bitbucket_create_pull_request() {
     });
 
     let response: Result<serde_json::Value, _> = client
-        .post("/2.0/repositories/myworkspace/myrepo/pullrequests", &payload)
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests",
+            &payload,
+        )
         .await;
 
     assert!(response.is_ok());
@@ -365,7 +370,9 @@ async fn test_bitbucket_merge_pull_request() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .and(path("/2.0/repositories/myworkspace/myrepo/pullrequests/1/merge"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/1/merge",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "id": 1,
             "title": "Add new feature",
@@ -387,7 +394,10 @@ async fn test_bitbucket_merge_pull_request() {
     let payload = serde_json::json!({"merge_strategy": "merge_commit"});
 
     let response: Result<serde_json::Value, _> = client
-        .post("/2.0/repositories/myworkspace/myrepo/pullrequests/1/merge", &payload)
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/1/merge",
+            &payload,
+        )
         .await;
 
     assert!(response.is_ok());
@@ -400,7 +410,9 @@ async fn test_bitbucket_approve_pull_request() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .and(path("/2.0/repositories/myworkspace/myrepo/pullrequests/1/approve"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/1/approve",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "approved": true,
             "user": {"display_name": "Test User"}
@@ -413,7 +425,10 @@ async fn test_bitbucket_approve_pull_request() {
         .with_basic_auth("test@example.com", "fake-token");
 
     let response: Result<serde_json::Value, _> = client
-        .post("/2.0/repositories/myworkspace/myrepo/pullrequests/1/approve", &serde_json::json!({}))
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/1/approve",
+            &serde_json::json!({}),
+        )
         .await;
 
     assert!(response.is_ok());
@@ -426,7 +441,9 @@ async fn test_bitbucket_branch_protection() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("POST"))
-        .and(path("/2.0/repositories/myworkspace/myrepo/branch-restrictions"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/branch-restrictions",
+        ))
         .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
             "id": 123,
             "kind": "restrict_merges",
@@ -447,7 +464,10 @@ async fn test_bitbucket_branch_protection() {
     });
 
     let response: Result<serde_json::Value, _> = client
-        .post("/2.0/repositories/myworkspace/myrepo/branch-restrictions", &payload)
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/branch-restrictions",
+            &payload,
+        )
         .await;
 
     assert!(response.is_ok());
@@ -462,13 +482,11 @@ async fn test_bitbucket_error_handling() {
 
     Mock::given(method("GET"))
         .and(path("/2.0/repositories/myworkspace/notfound"))
-        .respond_with(
-            ResponseTemplate::new(404).set_body_json(serde_json::json!({
-                "error": {
-                    "message": "Repository not found"
-                }
-            })),
-        )
+        .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+            "error": {
+                "message": "Repository not found"
+            }
+        })))
         .mount(&mock_server)
         .await;
 
@@ -476,9 +494,8 @@ async fn test_bitbucket_error_handling() {
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
-    let response: Result<serde_json::Value, _> = client
-        .get("/2.0/repositories/myworkspace/notfound")
-        .await;
+    let response: Result<serde_json::Value, _> =
+        client.get("/2.0/repositories/myworkspace/notfound").await;
 
     assert!(response.is_err());
 }

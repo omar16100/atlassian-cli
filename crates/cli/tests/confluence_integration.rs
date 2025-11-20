@@ -72,8 +72,7 @@ async fn test_get_space() {
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
-    let response: Result<serde_json::Value, _> =
-        client.get("/wiki/api/v2/spaces?keys=DOCS").await;
+    let response: Result<serde_json::Value, _> = client.get("/wiki/api/v2/spaces?keys=DOCS").await;
 
     assert!(response.is_ok());
 }
@@ -104,8 +103,7 @@ async fn test_create_space() {
         "description": {"plain": {"value": "A new space"}}
     });
 
-    let response: Result<serde_json::Value, _> =
-        client.post("/wiki/api/v2/spaces", &payload).await;
+    let response: Result<serde_json::Value, _> = client.post("/wiki/api/v2/spaces", &payload).await;
 
     assert!(response.is_ok());
     let data = response.unwrap();
@@ -183,8 +181,7 @@ async fn test_get_page() {
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
-    let response: Result<serde_json::Value, _> =
-        client.get("/wiki/api/v2/pages/100001").await;
+    let response: Result<serde_json::Value, _> = client.get("/wiki/api/v2/pages/100001").await;
 
     assert!(response.is_ok());
     let data = response.unwrap();
@@ -221,8 +218,7 @@ async fn test_create_page() {
         }
     });
 
-    let response: Result<serde_json::Value, _> =
-        client.post("/wiki/api/v2/pages", &payload).await;
+    let response: Result<serde_json::Value, _> = client.post("/wiki/api/v2/pages", &payload).await;
 
     assert!(response.is_ok());
     let data = response.unwrap();
@@ -380,9 +376,8 @@ async fn test_list_attachments() {
         .unwrap()
         .with_basic_auth("test@example.com", "fake-token");
 
-    let response: Result<serde_json::Value, _> = client
-        .get("/wiki/api/v2/pages/100001/attachments")
-        .await;
+    let response: Result<serde_json::Value, _> =
+        client.get("/wiki/api/v2/pages/100001/attachments").await;
 
     assert!(response.is_ok());
     let data = response.unwrap();

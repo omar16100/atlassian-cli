@@ -38,13 +38,9 @@ pub async fn list_repo_permissions(
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/permissions");
 
-    let response: PermissionList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to list permissions for repository {workspace}/{repo_slug}")
-        })?;
+    let response: PermissionList = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to list permissions for repository {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -99,13 +95,9 @@ pub async fn grant_repo_permission(
     });
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/permissions/{user_uuid}");
-    let _: serde_json::Value = ctx
-        .client
-        .put(&path, &payload)
-        .await
-        .with_context(|| {
-            format!("Failed to grant permission to user {user_uuid} on {workspace}/{repo_slug}")
-        })?;
+    let _: serde_json::Value = ctx.client.put(&path, &payload).await.with_context(|| {
+        format!("Failed to grant permission to user {user_uuid} on {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         user_uuid,
@@ -126,13 +118,9 @@ pub async fn revoke_repo_permission(
     user_uuid: &str,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/permissions/{user_uuid}");
-    let _: serde_json::Value = ctx
-        .client
-        .delete(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to revoke permission from user {user_uuid} on {workspace}/{repo_slug}")
-        })?;
+    let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
+        format!("Failed to revoke permission from user {user_uuid} on {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         user_uuid,

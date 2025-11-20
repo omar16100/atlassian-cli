@@ -91,7 +91,10 @@ pub async fn bulk_add_labels(
                     .collect();
 
                 let _: Value = client
-                    .post(&format!("/wiki/rest/api/content/{}/label", id), &label_objects)
+                    .post(
+                        &format!("/wiki/rest/api/content/{}/label", id),
+                        &label_objects,
+                    )
                     .await
                     .with_context(|| format!("Failed to add labels to page {}", id))?;
 
@@ -126,7 +129,10 @@ pub async fn bulk_export_pages(
 
     let response: SearchResponse = ctx
         .client
-        .get(&format!("/wiki/rest/api/content/search?{}&expand=body.storage", query_string))
+        .get(&format!(
+            "/wiki/rest/api/content/search?{}&expand=body.storage",
+            query_string
+        ))
         .await
         .context("Failed to search pages")?;
 

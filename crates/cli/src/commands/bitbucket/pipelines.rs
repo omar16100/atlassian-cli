@@ -105,13 +105,9 @@ pub async fn get_pipeline(
     pipeline_uuid: &str,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}");
-    let pipeline: Pipeline = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| {
-            format!("Failed to fetch pipeline {pipeline_uuid} for {workspace}/{repo_slug}")
-        })?;
+    let pipeline: Pipeline = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch pipeline {pipeline_uuid} for {workspace}/{repo_slug}")
+    })?;
 
     #[derive(Serialize)]
     struct View<'a> {
@@ -162,13 +158,9 @@ pub async fn trigger_pipeline(
     });
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/");
-    let pipeline: Pipeline = ctx
-        .client
-        .post(&path, &payload)
-        .await
-        .with_context(|| {
-            format!("Failed to trigger pipeline for {ref_name} on {workspace}/{repo_slug}")
-        })?;
+    let pipeline: Pipeline = ctx.client.post(&path, &payload).await.with_context(|| {
+        format!("Failed to trigger pipeline for {ref_name} on {workspace}/{repo_slug}")
+    })?;
 
     tracing::info!(
         build_number = pipeline.build_number,
@@ -213,7 +205,8 @@ pub async fn stop_pipeline(
     repo_slug: &str,
     pipeline_uuid: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/stopPipeline");
+    let path =
+        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/stopPipeline");
     let _: serde_json::Value = ctx
         .client
         .post(&path, &serde_json::json!({}))
@@ -249,7 +242,8 @@ pub async fn get_pipeline_logs(
     );
 
     println!("Pipeline logs for step {step_uuid}:");
-    println!("View at: https://bitbucket.org/{workspace}/{repo_slug}/pipelines/results/{}/steps/{}",
+    println!(
+        "View at: https://bitbucket.org/{workspace}/{repo_slug}/pipelines/results/{}/steps/{}",
         pipeline_uuid.trim_matches('{').trim_matches('}'),
         step_uuid.trim_matches('{').trim_matches('}')
     );

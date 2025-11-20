@@ -17,7 +17,8 @@ pub async fn search_issues(ctx: &JiraContext<'_>, jql: &str, limit: usize) -> Re
     }
 
     let max_results = limit.min(1000);
-    let query = format!("/rest/api/3/search/jql?jql={}&maxResults={}&fields=key,summary,status,assignee,issuetype",
+    let query = format!(
+        "/rest/api/3/search/jql?jql={}&maxResults={}&fields=key,summary,status,assignee,issuetype",
         urlencoding::encode(jql),
         max_results
     );

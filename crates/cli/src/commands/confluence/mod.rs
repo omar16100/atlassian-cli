@@ -415,7 +415,11 @@ enum AnalyticsCommands {
     },
 }
 
-pub async fn execute(args: ConfluenceArgs, client: ApiClient, renderer: &OutputRenderer) -> Result<()> {
+pub async fn execute(
+    args: ConfluenceArgs,
+    client: ApiClient,
+    renderer: &OutputRenderer,
+) -> Result<()> {
     let ctx = ConfluenceContext { client, renderer };
 
     match args.command {
@@ -433,7 +437,9 @@ pub async fn execute(args: ConfluenceArgs, client: ApiClient, renderer: &OutputR
                 space_id,
                 name,
                 description,
-            } => spaces::update_space(&ctx, &space_id, name.as_deref(), description.as_deref()).await,
+            } => {
+                spaces::update_space(&ctx, &space_id, name.as_deref(), description.as_deref()).await
+            }
             SpaceCommands::Delete { space_id, force } => {
                 spaces::delete_space(&ctx, &space_id, force).await
             }
@@ -496,8 +502,14 @@ pub async fn execute(args: ConfluenceArgs, client: ApiClient, renderer: &OutputR
                 subject_type,
                 subject_id,
             } => {
-                pages::remove_page_restriction(&ctx, &page_id, &operation, &subject_type, &subject_id)
-                    .await
+                pages::remove_page_restriction(
+                    &ctx,
+                    &page_id,
+                    &operation,
+                    &subject_type,
+                    &subject_id,
+                )
+                .await
             }
         },
         ConfluenceCommands::Blog(cmd) => match cmd {
@@ -513,10 +525,9 @@ pub async fn execute(args: ConfluenceArgs, client: ApiClient, renderer: &OutputR
                 title,
                 body,
             } => pages::update_blogpost(&ctx, &blogpost_id, title.as_deref(), body.as_ref()).await,
-            BlogCommands::Delete {
-                blogpost_id,
-                force,
-            } => pages::delete_blogpost(&ctx, &blogpost_id, force).await,
+            BlogCommands::Delete { blogpost_id, force } => {
+                pages::delete_blogpost(&ctx, &blogpost_id, force).await
+            }
         },
         ConfluenceCommands::Attachment(cmd) => match cmd {
             AttachmentCommands::List { page_id } => {
@@ -560,7 +571,11 @@ pub async fn execute(args: ConfluenceArgs, client: ApiClient, renderer: &OutputR
                 dry_run,
                 concurrency,
             } => bulk::bulk_add_labels(&ctx, &cql, labels, dry_run, concurrency).await,
-            BulkCommands::Export { cql, output, format } => {
+            BulkCommands::Export {
+                cql,
+                output,
+                format,
+            } => {
                 let export_format = match format.to_lowercase().as_str() {
                     "json" => bulk::ExportFormat::Json,
                     "csv" => bulk::ExportFormat::Csv,

@@ -50,10 +50,7 @@ pub async fn get_page_views(
 }
 
 // Get space analytics
-pub async fn get_space_analytics(
-    ctx: &ConfluenceContext<'_>,
-    space_key: &str,
-) -> Result<()> {
+pub async fn get_space_analytics(ctx: &ConfluenceContext<'_>, space_key: &str) -> Result<()> {
     // Get space content count using CQL
     let pages_cql = format!("space = \"{}\" AND type = page", space_key);
     let blogs_cql = format!("space = \"{}\" AND type = blogpost", space_key);

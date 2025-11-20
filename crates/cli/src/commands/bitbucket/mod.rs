@@ -11,9 +11,9 @@ mod permissions;
 mod pipelines;
 mod pullrequests;
 mod repos;
+pub mod utils;
 mod webhooks;
 mod workspaces;
-pub mod utils;
 
 use utils::BitbucketContext;
 
@@ -559,12 +559,14 @@ enum BulkCommands {
     },
 }
 
-pub async fn execute(args: BitbucketArgs, client: ApiClient, renderer: &OutputRenderer) -> Result<()> {
-    let workspace = args
-        .workspace
-        .ok_or_else(|| {
-            anyhow::anyhow!("Workspace must be provided (--workspace) or inferred from base URL")
-        })?;
+pub async fn execute(
+    args: BitbucketArgs,
+    client: ApiClient,
+    renderer: &OutputRenderer,
+) -> Result<()> {
+    let workspace = args.workspace.ok_or_else(|| {
+        anyhow::anyhow!("Workspace must be provided (--workspace) or inferred from base URL")
+    })?;
 
     let ctx = BitbucketContext { client, renderer };
 
@@ -620,9 +622,11 @@ pub async fn execute(args: BitbucketArgs, client: ApiClient, renderer: &OutputRe
             BranchCommands::Create { repo, branch, from } => {
                 branches::create_branch(&ctx, &workspace, &repo, &branch, &from).await
             }
-            BranchCommands::Delete { repo, branch, force } => {
-                branches::delete_branch(&ctx, &workspace, &repo, &branch, force).await
-            }
+            BranchCommands::Delete {
+                repo,
+                branch,
+                force,
+            } => branches::delete_branch(&ctx, &workspace, &repo, &branch, force).await,
             BranchCommands::Protect {
                 repo,
                 pattern,
@@ -728,9 +732,7 @@ pub async fn execute(args: BitbucketArgs, client: ApiClient, renderer: &OutputRe
             ProjectCommands::List { limit } => {
                 workspaces::list_projects(&ctx, &workspace, limit).await
             }
-            ProjectCommands::Get { key } => {
-                workspaces::get_project(&ctx, &workspace, &key).await
-            }
+            ProjectCommands::Get { key } => workspaces::get_project(&ctx, &workspace, &key).await,
             ProjectCommands::Create {
                 key,
                 name,
@@ -752,8 +754,14 @@ pub async fn execute(args: BitbucketArgs, client: ApiClient, renderer: &OutputRe
                 name,
                 description,
             } => {
-                workspaces::update_project(&ctx, &workspace, &key, name.as_deref(), description.as_deref())
-                    .await
+                workspaces::update_project(
+                    &ctx,
+                    &workspace,
+                    &key,
+                    name.as_deref(),
+                    description.as_deref(),
+                )
+                .await
             }
             ProjectCommands::Delete { key, force } => {
                 workspaces::delete_project(&ctx, &workspace, &key, force).await
@@ -810,9 +818,7 @@ pub async fn execute(args: BitbucketArgs, client: ApiClient, renderer: &OutputRe
             }
         },
         BitbucketCommands::SshKey(cmd) => match cmd {
-            SshKeyCommands::List { repo } => {
-                webhooks::list_ssh_keys(&ctx, &workspace, &repo).await
-            }
+            SshKeyCommands::List { repo } => webhooks::list_ssh_keys(&ctx, &workspace, &repo).await,
             SshKeyCommands::Add { repo, label, key } => {
                 webhooks::add_ssh_key(&ctx, &workspace, &repo, &label, &key).await
             }
@@ -837,9 +843,11 @@ pub async fn execute(args: BitbucketArgs, client: ApiClient, renderer: &OutputRe
             }
         },
         BitbucketCommands::Commit(cmd) => match cmd {
-            CommitCommands::List { repo, branch, limit } => {
-                commits::list_commits(&ctx, &workspace, &repo, branch.as_deref(), limit).await
-            }
+            CommitCommands::List {
+                repo,
+                branch,
+                limit,
+            } => commits::list_commits(&ctx, &workspace, &repo, branch.as_deref(), limit).await,
             CommitCommands::Get { repo, hash } => {
                 commits::get_commit(&ctx, &workspace, &repo, &hash).await
             }
