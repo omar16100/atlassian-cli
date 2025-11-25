@@ -20,8 +20,8 @@ use utils::BitbucketContext;
 #[derive(Args, Debug, Clone)]
 pub struct BitbucketArgs {
     /// Workspace slug (defaults to workspace configured in profile base URL host prefix).
-    #[arg(long)]
-    workspace: Option<String>,
+    #[arg(long, global = true)]
+    pub workspace: Option<String>,
 
     #[command(subcommand)]
     command: BitbucketCommands,
@@ -563,10 +563,20 @@ pub async fn execute(
     args: BitbucketArgs,
     client: ApiClient,
     renderer: &OutputRenderer,
+    inferred_workspace: Option<&str>,
 ) -> Result<()> {
-    let workspace = args.workspace.ok_or_else(|| {
-        anyhow::anyhow!("Workspace must be provided (--workspace) or inferred from base URL")
-    })?;
+    // CLI flag takes precedence, then inferred from profile
+    let workspace = args
+        .workspace
+        .as_deref()
+        .or(inferred_workspace)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Workspace required. Set --workspace flag, configure workspace in profile, \
+                 or set base_url to https://bitbucket.org/{{workspace}}"
+            )
+        })?
+        .to_string();
 
     let ctx = BitbucketContext { client, renderer };
 

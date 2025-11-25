@@ -18,3 +18,6 @@
 
 # Claude Code
 .claude/
+
+# Local todo tracking
+docs/todo.md

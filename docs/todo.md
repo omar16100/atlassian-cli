@@ -1,5 +1,15 @@
 # atlassian-cli TODO
 
+## Recent Changes (2025-11-25)
+- [x] Fix `--workspace` flag to work at any position (`global = true`)
+- [x] Replace all `atlcli` references with `atlassian-cli`
+- [x] Change config directory from `~/.atlcli/` to `~/.atlassian-cli/`
+- [x] Add auto-migration from old config directory
+- [x] Add workspace inference from profile's base_url (bitbucket.org/{workspace})
+- [x] Add `workspace` field to Profile struct
+- [x] Add separate Bitbucket token support (`ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}`)
+- [x] Document Bitbucket scoped API token requirements in README
+
 ## 0. Research & Validation
 - [ ] Interview 3–5 Jira/Confluence/Opsgenie admins to confirm must-have workflows.
 - [ ] Collect sample API payloads for each Atlassian product (Confluence, Bitbucket, JSM, Opsgenie, Bamboo, Jira admin).

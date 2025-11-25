@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "atlassian-cli-api",
@@ -145,7 +145,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-api"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -164,7 +164,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-auth"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "base64",
@@ -177,7 +177,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-bulk"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "futures",
@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-config"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "dirs",
@@ -197,11 +197,12 @@ dependencies = [
  "serde_yaml",
  "tempfile",
  "thiserror",
+ "tracing",
 ]
 
 [[package]]
 name = "atlassian-cli-output"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "clap",

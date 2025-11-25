@@ -6,6 +6,70 @@ use std::{
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use tracing::info;
+
+const NEW_CONFIG_DIR: &str = ".atlassian-cli";
+const OLD_CONFIG_DIR: &str = ".atlcli";
+const CONFIG_FILENAME: &str = "config.yaml";
+
+/// Result of config directory migration attempt.
+#[derive(Debug)]
+pub enum MigrationResult {
+    /// No migration needed (new config exists or old doesn't)
+    NotNeeded,
+    /// Migration was performed successfully
+    Migrated { from: PathBuf, to: PathBuf },
+    /// Migration failed with an error
+    Failed(String),
+}
+
+/// Check and perform migration from old config directory (~/.atlcli/) to new one (~/.atlassian-cli/).
+/// Copies config file if old exists and new doesn't. Does not delete old config.
+pub fn migrate_config_if_needed() -> MigrationResult {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return MigrationResult::NotNeeded,
+    };
+
+    let old_config = home.join(OLD_CONFIG_DIR).join(CONFIG_FILENAME);
+    let new_config = home.join(NEW_CONFIG_DIR).join(CONFIG_FILENAME);
+
+    // Only migrate if old exists AND new doesn't
+    if !old_config.exists() || new_config.exists() {
+        return MigrationResult::NotNeeded;
+    }
+
+    // Create new directory
+    let new_dir = home.join(NEW_CONFIG_DIR);
+    if let Err(e) = fs::create_dir_all(&new_dir) {
+        return MigrationResult::Failed(format!(
+            "Failed to create directory {}: {}",
+            new_dir.display(),
+            e
+        ));
+    }
+
+    // Copy config file (not move - user can clean up old manually)
+    if let Err(e) = fs::copy(&old_config, &new_config) {
+        return MigrationResult::Failed(format!(
+            "Failed to copy config from {} to {}: {}",
+            old_config.display(),
+            new_config.display(),
+            e
+        ));
+    }
+
+    info!(
+        "Migrated config from {} to {}",
+        old_config.display(),
+        new_config.display()
+    );
+
+    MigrationResult::Migrated {
+        from: old_config,
+        to: new_config,
+    }
+}
 
 /// Represents the full CLI configuration stored on disk.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -78,7 +142,7 @@ impl Config {
 
     fn default_path() -> PathBuf {
         let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        path.push(".atlcli");
+        path.push(".atlassian-cli");
         path.push("config.yaml");
         path
     }
@@ -91,6 +155,9 @@ pub struct Profile {
     pub base_url: Option<String>,
     pub email: Option<String>,
     pub api_token: Option<String>,
+    /// Bitbucket workspace slug (optional, can be inferred from base_url).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
 }
 
 #[cfg(test)]
@@ -280,6 +347,7 @@ mod tests {
             base_url: Some("https://prod.atlassian.net".to_string()),
             email: Some("admin@example.com".to_string()),
             api_token: Some("secret-token-123".to_string()),
+            ..Default::default()
         };
 
         config.profiles.insert("prod".to_string(), profile);
