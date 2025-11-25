@@ -6,10 +6,11 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use atlassian_cli_api::ApiClient;
 use atlassian_cli_auth::{token_key, CredentialStore};
-use atlassian_cli_config::Config;
+use atlassian_cli_config::{migrate_config_if_needed, Config, MigrationResult};
 use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Parser, Subcommand};
 use commands::auth::{self, AuthCommand};
+use commands::bitbucket::utils::extract_workspace_from_url;
 use tracing_subscriber::{fmt, EnvFilter};
 
 #[derive(Parser, Debug)]
@@ -59,6 +60,11 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     init_tracing(cli.debug)?;
 
+    // Perform config directory migration if needed (only when no custom path specified)
+    if cli.config.is_none() {
+        handle_migration();
+    }
+
     let config_path = cli.config.clone();
     let mut config = Config::load(config_path.as_ref())?;
     let renderer = OutputRenderer::new(cli.output);
@@ -94,7 +100,8 @@ async fn main() -> Result<()> {
                 .as_ref()
                 .expect("profile context is available for product commands");
             let client = build_bitbucket_client(profile)?;
-            commands::bitbucket::execute(args, client, &renderer).await?
+            commands::bitbucket::execute(args, client, &renderer, profile.workspace.as_deref())
+                .await?
         }
         AtlassianCommand::Jsm(args) => {
             let profile = profile_ctx
@@ -143,6 +150,24 @@ struct ActiveProfile {
     base_url: String,
     email: String,
     token: String,
+    bitbucket_token: Option<String>,
+    workspace: Option<String>,
+}
+
+fn handle_migration() {
+    match migrate_config_if_needed() {
+        MigrationResult::Migrated { from, to } => {
+            eprintln!(
+                "Config migrated from {} to {}\nThe old directory can be safely removed.",
+                from.display(),
+                to.display()
+            );
+        }
+        MigrationResult::Failed(e) => {
+            eprintln!("Warning: Config migration failed: {}", e);
+        }
+        MigrationResult::NotNeeded => {}
+    }
 }
 
 fn resolve_active_profile(
@@ -152,7 +177,7 @@ fn resolve_active_profile(
 ) -> Result<ActiveProfile> {
     let (name, profile) = config
         .resolve_profile(requested)
-        .ok_or_else(|| anyhow!("No profile configured. Run `atlcli auth login` first."))?;
+        .ok_or_else(|| anyhow!("No profile configured. Run `atlassian-cli auth login` first."))?;
 
     let base_url = profile
         .base_url
@@ -183,16 +208,32 @@ fn resolve_active_profile(
             })
             .ok_or_else(|| {
                 anyhow!(
-                    "No token found for profile '{name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlcli auth login --profile {name}`",
+                    "No token found for profile '{name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login --profile {name}`",
                     name.to_uppercase()
                 )
             })?
     };
 
+    // Bitbucket-specific token lookup: ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}
+    let bitbucket_token = {
+        let bitbucket_env_var = format!("ATLASSIAN_CLI_BITBUCKET_TOKEN_{}", name.to_uppercase());
+        std::env::var(&bitbucket_env_var)
+            .ok()
+            .filter(|t| !t.trim().is_empty())
+    };
+
+    // Resolve workspace: explicit profile config, or infer from base_url
+    let workspace = profile
+        .workspace
+        .clone()
+        .or_else(|| extract_workspace_from_url(&base_url));
+
     Ok(ActiveProfile {
         base_url,
         email,
         token,
+        bitbucket_token,
+        workspace,
     })
 }
 
@@ -202,6 +243,11 @@ fn build_product_client(profile: &ActiveProfile) -> Result<ApiClient> {
 }
 
 fn build_bitbucket_client(profile: &ActiveProfile) -> Result<ApiClient> {
+    // Use Bitbucket-specific token if set, otherwise fall back to general token
+    let token = profile
+        .bitbucket_token
+        .as_ref()
+        .unwrap_or(&profile.token);
     Ok(ApiClient::new("https://api.bitbucket.org")?
-        .with_basic_auth(profile.email.clone(), profile.token.clone()))
+        .with_basic_auth(profile.email.clone(), token.clone()))
 }

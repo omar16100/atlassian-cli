@@ -41,7 +41,7 @@ atlassian-cli/
 │   │   └── src/commands/     # jira, confluence, bitbucket, jsm, opsgenie, bamboo
 │   ├── api/                  # REST clients per product (reqwest + serde)
 │   ├── auth/                 # API token/keyring helpers
-│   ├── config/               # Profiles (~/.atlcli/config.yaml)
+│   ├── config/               # Profiles (~/.atlassian-cli/config.yaml)
 │   ├── output/               # Table/JSON/CSV/YAML renderers (tabled/serde)
 │   └── bulk/                 # Worker pools, dry-run, logs (tokio + rayon)
 ├── internal/utils/           # Shared utilities/macros
@@ -85,7 +85,7 @@ Milestones: Week 3 foundation complete; Week 6 Jira ready; Week 9 Confluence rea
 
 ## Technical Guardrails
 - Rust (stable 1.79+), Clap 4 CLI framework, Tokio + Reqwest HTTP stack, cargo-make/just-driven tooling, GitHub Actions CI.
-- Config stored at `~/.atlcli/config.yaml` with multiple profiles and keyring-backed credentials.
+- Config stored at `~/.atlassian-cli/config.yaml` with multiple profiles and keyring-backed credentials.
 - HTTP client middleware handles retries, pagination, Atlassian rate limits, and structured logging.
 - Output modes: table (default), JSON, CSV, YAML, quiet (IDs) to support scripting.
 - Bulk engine provides worker pools, dry-run mode, progress bars, and transaction logs for recovery.

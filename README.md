@@ -41,7 +41,7 @@ crates/
   cli/       # Clap-based binary entry point
   api/       # Thin HTTP client wrapper (reqwest)
   auth/      # Keyring-backed credential helpers
-  config/    # YAML profile loader (~/.atlcli/config.yaml)
+  config/    # YAML profile loader (~/.atlassian-cli/config.yaml)
   output/    # Output formatting helpers (table/json/yaml/csv/quiet)
   bulk/      # Concurrency + dry-run aware executor
 ```
@@ -69,11 +69,11 @@ crates/
      --token $ATLASSIAN_API_TOKEN \
      --default
    ```
-6. List configured profiles (reads `~/.atlcli/config.yaml` if present):
+6. List configured profiles (reads `~/.atlassian-cli/config.yaml` if present):
    ```bash
    atlassian-cli auth list
    ```
-   *Tip:* Use `cp configs/config.example.yaml ~/.atlcli/config.yaml` as a starting point before running the login command.
+   *Tip:* Use `cp configs/config.example.yaml ~/.atlassian-cli/config.yaml` as a starting point before running the login command.
 7. Try the Jira, Confluence, Bitbucket, and JSM commands (requires real data):
    ```bash
    # Jira - Issues
@@ -171,6 +171,45 @@ crates/
    cargo run -- jsm request get SD-123
    ```
 
+## Bitbucket Authentication
+
+Bitbucket requires a **separate scoped API token** from Jira/Confluence.
+
+### Why Separate Tokens?
+
+| Product | Token Type | Creation Method |
+|---------|-----------|-----------------|
+| Jira/Confluence | Regular API token | "Create API token" |
+| **Bitbucket** | Scoped API token | "Create API token with scopes" → select Bitbucket |
+
+Atlassian deprecated Bitbucket app passwords in favor of scoped API tokens. These tokens must be created specifically for Bitbucket with explicit permission scopes.
+
+### Creating a Bitbucket Token
+
+1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
+2. Click **"Create API token with scopes"** (not regular "Create API token")
+3. Select **Bitbucket** as the app
+4. Add required scopes:
+   - `read:repository:bitbucket` - list/view repos
+   - `write:repository:bitbucket` - create/update repos
+   - `read:pullrequest:bitbucket` - view PRs
+   - `admin:repository:bitbucket` - admin operations
+5. Copy the token
+
+**Note:** Bitbucket `admin:*` scopes do NOT include `read:*` permissions - add both if needed.
+
+### Setting the Bitbucket Token
+
+```bash
+# Set Bitbucket-specific token for your profile
+export ATLASSIAN_CLI_BITBUCKET_TOKEN_WORK=your-bitbucket-scoped-token
+
+# The CLI will use this token for Bitbucket commands
+atlassian-cli bitbucket repo list --workspace myteam
+```
+
+If `ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}` is not set, Bitbucket commands fall back to the regular `ATLASSIAN_CLI_TOKEN_{PROFILE}` token.
+
 ## Developer Workflow
 - `make fmt` / `make clippy` / `make test` keep the workspace tidy using the standard Rust tooling stack (mirrored in `just fmt`, `just clippy`, etc.).
 - `make install` (or `just install`) compiles and installs the CLI locally from `crates/cli`.
@@ -223,7 +262,7 @@ GitHub Actions workflow runs on every push/PR:
 
 **Phase 1 - Foundation** (100% complete)
 - ✅ Cargo workspace with modular crate structure
-- ✅ Config loader with profile support (~/.atlcli/config.yaml)
+- ✅ Config loader with profile support (~/.atlassian-cli/config.yaml)
 - ✅ API token authentication (Basic auth with email+token)
 - ✅ HTTP client with retry, rate limiting, and pagination
 - ✅ Multi-format output (table/JSON/CSV/YAML/quiet)

@@ -6,4 +6,4 @@ profiles:
   personal:
     base_url: https://example.atlassian.net
     email: you@example.com
-    # API tokens are stored securely in the system keyring via `atlcli auth login`
+    # API tokens are stored securely in the system keyring via `atlassian-cli auth login`
