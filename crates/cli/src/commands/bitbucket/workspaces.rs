@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::ApiClient;
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
@@ -297,5 +298,27 @@ pub async fn delete_project(
     tracing::info!(project_key, workspace, "Project deleted successfully");
 
     println!("✓ Project {project_key} deleted from workspace {workspace}");
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct BitbucketUser {
+    username: String,
+    display_name: String,
+    account_id: String,
+    uuid: String,
+}
+
+pub async fn whoami(client: &ApiClient) -> Result<()> {
+    let user: BitbucketUser = client
+        .get("/2.0/user")
+        .await
+        .context("Failed to fetch current user from Bitbucket API")?;
+
+    println!("Username: {}", user.username);
+    println!("Display Name: {}", user.display_name);
+    println!("Account ID: {}", user.account_id);
+    println!("UUID: {}", user.uuid);
+
     Ok(())
 }

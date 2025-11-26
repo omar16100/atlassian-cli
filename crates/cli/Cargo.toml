@@ -34,6 +34,7 @@ csv = "1.4.0"
 urlencoding = "2.1.3"
 reqwest = { workspace = true, features = ["multipart"] }
 chrono.workspace = true
+rpassword = "7"
 
 [dev-dependencies]
 wiremock.workspace = true
