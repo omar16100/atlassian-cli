@@ -10,7 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 authors = ["atlassian-cli contributors"]
 license = "MIT"
@@ -38,7 +38,6 @@ anyhow = "1.0"
 thiserror = "1.0"
 
 # Auth & Config
-keyring = { version = "3.6", features = ["apple-native", "windows-native", "linux-native"] }
 base64 = "0.22"
 
 # Logging
