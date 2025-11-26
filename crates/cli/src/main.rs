@@ -257,10 +257,7 @@ fn build_product_client(profile: &ActiveProfile) -> Result<ApiClient> {
 
 fn build_bitbucket_client(profile: &ActiveProfile) -> Result<ApiClient> {
     // Use Bitbucket-specific token if set, otherwise fall back to general token
-    let token = profile
-        .bitbucket_token
-        .as_ref()
-        .unwrap_or(&profile.token);
+    let token = profile.bitbucket_token.as_ref().unwrap_or(&profile.token);
     Ok(ApiClient::new("https://api.bitbucket.org")?
         .with_basic_auth(profile.email.clone(), token.clone()))
 }
