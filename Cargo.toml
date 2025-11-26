@@ -38,7 +38,7 @@ anyhow = "1.0"
 thiserror = "1.0"
 
 # Auth & Config
-keyring = "3.6"
+keyring = { version = "3.6", features = ["apple-native", "windows-native", "linux-native"] }
 base64 = "0.22"
 
 # Logging
