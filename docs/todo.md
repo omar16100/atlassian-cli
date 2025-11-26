@@ -10,6 +10,34 @@
 - [x] Add separate Bitbucket token support (`ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}`)
 - [x] Document Bitbucket scoped API token requirements in README
 
+### Pipeline Improvements (2025-11-25)
+- [x] Add `--sort` flag for pipeline list (e.g., `-created_on` for newest first)
+- [x] Add `--recent N` shorthand for most recent pipelines
+- [x] Add `--branch` filter for pipeline list
+- [x] Add `--all` flag for fetching all pages (real pagination)
+- [x] Add `--steps` flag to show pipeline step status with icons
+- [x] Add `pipeline watch` command for live updates
+- [x] Expand Bitbucket token env vars: `ATLASSIAN_BITBUCKET_TOKEN`, `BITBUCKET_TOKEN`
+- [x] Fix JSON output stability (guard stray println for non-table formats)
+
+### Pipeline Bugfixes (2025-11-25)
+- [x] Fix pagination bug: `--limit 200` now correctly fetches multiple pages
+- [x] Add build number resolution: `get 404` resolves #404 to UUID
+- [x] Add sort field validation with clear error messages
+- [x] Add `build_request_path` helper for pagination
+- [x] Fix `steps_summary` in watch JSON output
+- [x] Add unit tests for new helper functions
+
+### Pipeline Bugfixes Round 2 (2025-11-25)
+- [x] Fix branch filter: use `q=target.ref_name="<branch>"` instead of plain param
+- [x] Fix build number resolution: direct `q=build_number=<n>` filter + pagination fallback
+- [x] Fix `--limit 0` to be treated as unlimited (same as `--all`)
+
+### Pipeline Bugfixes Round 3 (2025-11-25)
+- [x] Fix build number resolver: use `-created_on` (newest first) + 10 page budget (1000 max)
+- [x] Expand sort validation: add `updated_on`, `build_number` variants
+- [x] Add pipeline integration tests (branch filter, build number, pagination)
+
 ## 0. Research & Validation
 - [ ] Interview 3–5 Jira/Confluence/Opsgenie admins to confirm must-have workflows.
 - [ ] Collect sample API payloads for each Atlassian product (Confluence, Bitbucket, JSM, Opsgenie, Bamboo, Jira admin).
