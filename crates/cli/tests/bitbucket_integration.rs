@@ -1,5 +1,5 @@
 use atlassian_cli_api::ApiClient;
-use wiremock::matchers::{method, path, query_param};
+use wiremock::matchers::{method, path, query_param, query_param_contains};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
@@ -498,4 +498,112 @@ async fn test_bitbucket_error_handling() {
         client.get("/2.0/repositories/myworkspace/notfound").await;
 
     assert!(response.is_err());
+}
+
+// ============================================================================
+// Pipeline Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_pipeline_list_with_branch_filter() {
+    let mock_server = MockServer::start().await;
+
+    // Verify request uses q= filter syntax for branch filtering
+    Mock::given(method("GET"))
+        .and(path("/2.0/repositories/myworkspace/myrepo/pipelines"))
+        .and(query_param_contains("q", "target.ref_name"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "values": [
+                {
+                    "uuid": "{123e4567-e89b-12d3-a456-426614174000}",
+                    "build_number": 42,
+                    "state": {"name": "COMPLETED", "result": {"name": "SUCCESSFUL"}},
+                    "target": {"ref_name": "main", "type": "pipeline_ref_target"}
+                }
+            ],
+            "next": null
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    // The actual request would come from list_pipelines, but we test the API layer
+    let response: Result<serde_json::Value, _> = client
+        .get("/2.0/repositories/myworkspace/myrepo/pipelines?q=target.ref_name%3D%22main%22&pagelen=100&sort=-created_on")
+        .await;
+
+    assert!(response.is_ok());
+    let result = response.unwrap();
+    assert_eq!(result["values"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn test_pipeline_get_by_build_number_direct_filter() {
+    let mock_server = MockServer::start().await;
+
+    // Mock the direct q=build_number filter
+    Mock::given(method("GET"))
+        .and(path("/2.0/repositories/myworkspace/myrepo/pipelines"))
+        .and(query_param_contains("q", "build_number"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "values": [
+                {
+                    "uuid": "{abc-def-123}",
+                    "build_number": 404,
+                    "state": {"name": "COMPLETED", "result": {"name": "SUCCESSFUL"}},
+                    "target": {"ref_name": "main"}
+                }
+            ],
+            "next": null
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: Result<serde_json::Value, _> = client
+        .get("/2.0/repositories/myworkspace/myrepo/pipelines?q=build_number%3D404&pagelen=1")
+        .await;
+
+    assert!(response.is_ok());
+    let result = response.unwrap();
+    let values = result["values"].as_array().unwrap();
+    assert_eq!(values.len(), 1);
+    assert_eq!(values[0]["build_number"], 404);
+    assert_eq!(values[0]["uuid"], "{abc-def-123}");
+}
+
+#[tokio::test]
+async fn test_pipeline_list_pagination() {
+    let mock_server = MockServer::start().await;
+
+    // First page
+    Mock::given(method("GET"))
+        .and(path("/2.0/repositories/myworkspace/myrepo/pipelines"))
+        .and(query_param("pagelen", "100"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "values": [
+                {"uuid": "{uuid-1}", "build_number": 100, "state": {"name": "COMPLETED"}}
+            ],
+            "next": "https://api.bitbucket.org/2.0/repositories/myworkspace/myrepo/pipelines?page=2"
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: Result<serde_json::Value, _> = client
+        .get("/2.0/repositories/myworkspace/myrepo/pipelines?pagelen=100&sort=-created_on")
+        .await;
+
+    assert!(response.is_ok());
+    let result = response.unwrap();
+    assert!(result["next"].is_string()); // Verify pagination link exists
 }

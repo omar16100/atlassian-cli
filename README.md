@@ -200,15 +200,30 @@ Atlassian deprecated Bitbucket app passwords in favor of scoped API tokens. Thes
 
 ### Setting the Bitbucket Token
 
+The CLI checks these environment variables in order:
+
+| Priority | Variable | Description |
+|----------|----------|-------------|
+| 1 | `ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}` | Profile-specific Bitbucket token |
+| 2 | `ATLASSIAN_BITBUCKET_TOKEN` | Generic Bitbucket token |
+| 3 | `BITBUCKET_TOKEN` | Simple fallback |
+| 4 | `ATLASSIAN_CLI_TOKEN_{PROFILE}` | Falls back to regular token |
+
 ```bash
-# Set Bitbucket-specific token for your profile
+# Option 1: Profile-specific (recommended for multiple profiles)
 export ATLASSIAN_CLI_BITBUCKET_TOKEN_WORK=your-bitbucket-scoped-token
+
+# Option 2: Generic Bitbucket token (simpler for single profile)
+export ATLASSIAN_BITBUCKET_TOKEN=your-bitbucket-scoped-token
+
+# Option 3: Simple fallback
+export BITBUCKET_TOKEN=your-bitbucket-scoped-token
 
 # The CLI will use this token for Bitbucket commands
 atlassian-cli bitbucket repo list --workspace myteam
 ```
 
-If `ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}` is not set, Bitbucket commands fall back to the regular `ATLASSIAN_CLI_TOKEN_{PROFILE}` token.
+If no Bitbucket-specific token is found, commands fall back to the regular `ATLASSIAN_CLI_TOKEN_{PROFILE}` token.
 
 ## Developer Workflow
 - `make fmt` / `make clippy` / `make test` keep the workspace tidy using the standard Rust tooling stack (mirrored in `just fmt`, `just clippy`, etc.).

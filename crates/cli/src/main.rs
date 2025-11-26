@@ -214,12 +214,25 @@ fn resolve_active_profile(
             })?
     };
 
-    // Bitbucket-specific token lookup: ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}
+    // Bitbucket-specific token lookup (in priority order):
+    // 1. ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}
+    // 2. ATLASSIAN_BITBUCKET_TOKEN
+    // 3. BITBUCKET_TOKEN
     let bitbucket_token = {
-        let bitbucket_env_var = format!("ATLASSIAN_CLI_BITBUCKET_TOKEN_{}", name.to_uppercase());
-        std::env::var(&bitbucket_env_var)
+        let profile_env_var = format!("ATLASSIAN_CLI_BITBUCKET_TOKEN_{}", name.to_uppercase());
+        std::env::var(&profile_env_var)
             .ok()
             .filter(|t| !t.trim().is_empty())
+            .or_else(|| {
+                std::env::var("ATLASSIAN_BITBUCKET_TOKEN")
+                    .ok()
+                    .filter(|t| !t.trim().is_empty())
+            })
+            .or_else(|| {
+                std::env::var("BITBUCKET_TOKEN")
+                    .ok()
+                    .filter(|t| !t.trim().is_empty())
+            })
     };
 
     // Resolve workspace: explicit profile config, or infer from base_url
