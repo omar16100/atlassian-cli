@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use atlassian_cli_api::ApiClient;
-use atlassian_cli_auth::{token_key, CredentialStore};
+use atlassian_cli_auth::token_key;
 use atlassian_cli_config::{migrate_config_if_needed, Config, MigrationResult};
 use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Parser, Subcommand};
@@ -68,16 +68,11 @@ async fn main() -> Result<()> {
     let config_path = cli.config.clone();
     let mut config = Config::load(config_path.as_ref())?;
     let renderer = OutputRenderer::new(cli.output);
-    let credential_store = CredentialStore::new("atlassian-cli");
 
     let profile_ctx = if matches!(cli.command, AtlassianCommand::Auth(_)) {
         None
     } else {
-        Some(resolve_active_profile(
-            &config,
-            cli.profile.as_deref(),
-            &credential_store,
-        )?)
+        Some(resolve_active_profile(&config, cli.profile.as_deref())?)
     };
 
     match cli.command {
@@ -120,14 +115,7 @@ async fn main() -> Result<()> {
         AtlassianCommand::Opsgenie(args) => commands::opsgenie::execute(args).await?,
         AtlassianCommand::Bamboo(args) => commands::bamboo::execute(args).await?,
         AtlassianCommand::Auth(command) => {
-            auth::handle(
-                command,
-                &mut config,
-                config_path.as_deref(),
-                &credential_store,
-                &renderer,
-            )
-            .await?
+            auth::handle(command, &mut config, config_path.as_deref(), &renderer).await?
         }
     }
 
@@ -173,11 +161,7 @@ fn handle_migration() {
     }
 }
 
-fn resolve_active_profile(
-    config: &Config,
-    requested: Option<&str>,
-    store: &CredentialStore,
-) -> Result<ActiveProfile> {
+fn resolve_active_profile(config: &Config, requested: Option<&str>) -> Result<ActiveProfile> {
     let (name, profile) = config
         .resolve_profile(requested)
         .ok_or_else(|| anyhow!("No profile configured. Run `atlassian-cli auth login` first."))?;
@@ -191,7 +175,7 @@ fn resolve_active_profile(
         .clone()
         .ok_or_else(|| anyhow!("Profile '{name}' is missing an email."))?;
 
-    // Multi-tier token lookup: profile-specific env var → generic env var → keyring
+    // Multi-tier token lookup: env var → credentials file
     let token = {
         // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
         let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", name.to_uppercase());
@@ -205,9 +189,9 @@ fn resolve_active_profile(
                     .filter(|t| !t.trim().is_empty())
             })
             .or_else(|| {
-                // 3. Try keyring as fallback
+                // 3. Try credentials file
                 let secret_key = token_key(name);
-                store.get_secret(&secret_key).ok().flatten()
+                atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
             })
             .ok_or_else(|| {
                 anyhow!(

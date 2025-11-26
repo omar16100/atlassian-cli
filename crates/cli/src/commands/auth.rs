@@ -1,15 +1,15 @@
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
-use atlassian_cli_auth::{token_key, CredentialStore};
+use atlassian_cli_auth::token_key;
 use atlassian_cli_config::Config;
 use atlassian_cli_output::OutputRenderer;
 use clap::{Args, Subcommand};
 use serde::Serialize;
 use url::Url;
 
-/// Multi-tier token lookup: env var → keyring → credentials file
-fn get_token(profile_name: &str, store: &CredentialStore) -> Option<String> {
+/// Multi-tier token lookup: env var → credentials file
+fn get_token(profile_name: &str) -> Option<String> {
     // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
     let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", profile_name.to_uppercase());
     std::env::var(&profile_env_var)
@@ -22,16 +22,9 @@ fn get_token(profile_name: &str, store: &CredentialStore) -> Option<String> {
                 .filter(|t| !t.trim().is_empty())
         })
         .or_else(|| {
-            // 3. Try keyring
+            // 3. Try credentials file
             let secret_key = token_key(profile_name);
-            store.get_secret(&secret_key).ok().flatten()
-        })
-        .or_else(|| {
-            // 4. Try credentials file as fallback
-            let secret_key = token_key(profile_name);
-            atlassian_cli_auth::get_file_secret(&secret_key)
-                .ok()
-                .flatten()
+            atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
         })
 }
 
@@ -96,24 +89,18 @@ pub async fn handle(
     command: AuthCommand,
     config: &mut Config,
     config_path: Option<&Path>,
-    store: &CredentialStore,
     renderer: &OutputRenderer,
 ) -> Result<()> {
     match command {
-        AuthCommand::Login(args) => login(args, config, config_path, store),
-        AuthCommand::Logout(args) => logout(args, config, config_path, store),
-        AuthCommand::List => list_profiles(config, store, renderer),
-        AuthCommand::Whoami(args) => whoami(args, config, store),
-        AuthCommand::Test(args) => test_auth(args, config, store).await,
+        AuthCommand::Login(args) => login(args, config, config_path),
+        AuthCommand::Logout(args) => logout(args, config, config_path),
+        AuthCommand::List => list_profiles(config, renderer),
+        AuthCommand::Whoami(args) => whoami(args, config).await,
+        AuthCommand::Test(args) => test_auth(args, config).await,
     }
 }
 
-fn login(
-    args: LoginArgs,
-    config: &mut Config,
-    config_path: Option<&Path>,
-    store: &CredentialStore,
-) -> Result<()> {
+fn login(args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -> Result<()> {
     if args.profile.trim().is_empty() {
         return Err(anyhow!("Profile name cannot be empty"));
     }
@@ -132,21 +119,14 @@ fn login(
     let profile_entry = config.profiles.entry(args.profile.clone()).or_default();
     profile_entry.base_url = Some(base_url.to_string());
     profile_entry.email = Some(args.email.clone());
-    profile_entry.api_token = None; // tokens are stored in the keyring
+    profile_entry.api_token = None;
 
     if args.default || config.default_profile.is_none() {
         config.default_profile = Some(args.profile.clone());
     }
 
     let secret_key = token_key(&args.profile);
-
-    // Store in keyring (primary)
-    if let Err(e) = store.set_secret(&secret_key, &token) {
-        tracing::warn!("Failed to store token in keyring: {e}");
-    }
-
-    // Store in credentials file (fallback)
-    atlassian_cli_auth::set_file_secret(&secret_key, &token)
+    atlassian_cli_auth::set_secret(&secret_key, &token)
         .context("Failed to store token in credentials file")?;
 
     config
@@ -161,26 +141,14 @@ fn login(
     Ok(())
 }
 
-fn logout(
-    args: LogoutArgs,
-    config: &mut Config,
-    config_path: Option<&Path>,
-    store: &CredentialStore,
-) -> Result<()> {
+fn logout(args: LogoutArgs, config: &mut Config, config_path: Option<&Path>) -> Result<()> {
     let _profile = config
         .profiles
         .get(&args.profile)
         .ok_or_else(|| anyhow!("Profile '{}' does not exist", args.profile))?;
 
     let secret_key = token_key(&args.profile);
-
-    // Delete from keyring
-    if let Err(e) = store.delete_secret(&secret_key) {
-        tracing::warn!("Failed to delete token from keyring: {e}");
-    }
-
-    // Delete from credentials file
-    if let Err(e) = atlassian_cli_auth::delete_file_secret(&secret_key) {
+    if let Err(e) = atlassian_cli_auth::delete_secret(&secret_key) {
         tracing::warn!("Failed to delete token from credentials file: {e}");
     }
 
@@ -203,11 +171,7 @@ fn logout(
     Ok(())
 }
 
-fn list_profiles(
-    config: &Config,
-    store: &CredentialStore,
-    renderer: &OutputRenderer,
-) -> Result<()> {
+fn list_profiles(config: &Config, renderer: &OutputRenderer) -> Result<()> {
     #[derive(Serialize)]
     struct Row<'a> {
         name: &'a str,
@@ -220,7 +184,7 @@ fn list_profiles(
     let mut rows = Vec::new();
     for (name, profile) in &config.profiles {
         let base_url = profile.base_url.as_deref().unwrap_or("");
-        let has_token = get_token(name, store).is_some();
+        let has_token = get_token(name).is_some();
         let row = Row {
             name,
             base_url,
@@ -245,7 +209,9 @@ fn list_profiles(
 fn read_token_from_stdin() -> Result<String> {
     use std::io::{self, Write};
 
-    println!("You can get the API token from: https://id.atlassian.com/manage-profile/security/api-tokens");
+    println!(
+        "You can get the API token from: https://id.atlassian.com/manage-profile/security/api-tokens"
+    );
     print!("Enter API token: ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
@@ -253,7 +219,7 @@ fn read_token_from_stdin() -> Result<String> {
     Ok(token.trim().to_owned())
 }
 
-fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<()> {
+async fn whoami(args: WhoamiArgs, config: &Config) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
@@ -264,7 +230,7 @@ fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<
         .context("Profile missing base_url")?;
     let email = profile.email.as_deref().context("Profile missing email")?;
 
-    let token = get_token(profile_name, store).ok_or_else(|| {
+    let token = get_token(profile_name).ok_or_else(|| {
         anyhow!(
             "No token found for profile '{profile_name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login`",
             profile_name.to_uppercase()
@@ -273,13 +239,10 @@ fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<
 
     let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 
-    let runtime = tokio::runtime::Runtime::new()?;
-    let user_data: serde_json::Value = runtime.block_on(async {
-        client
-            .get("/rest/api/3/myself")
-            .await
-            .context("Failed to fetch user information from Jira API")
-    })?;
+    let user_data: serde_json::Value = client
+        .get("/rest/api/3/myself")
+        .await
+        .context("Failed to fetch user information from Jira API")?;
 
     println!("Profile: {}", profile_name);
     println!(
@@ -299,7 +262,7 @@ fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<
     Ok(())
 }
 
-async fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result<()> {
+async fn test_auth(args: TestArgs, config: &Config) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
@@ -310,7 +273,7 @@ async fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> 
         .context("Profile missing base_url")?;
     let email = profile.email.as_deref().context("Profile missing email")?;
 
-    let token = get_token(profile_name, store).ok_or_else(|| {
+    let token = get_token(profile_name).ok_or_else(|| {
         anyhow!(
             "No token found for profile '{profile_name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login`",
             profile_name.to_uppercase()

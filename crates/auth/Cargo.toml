@@ -6,7 +6,6 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-keyring.workspace = true
 base64.workspace = true
 serde.workspace = true
 serde_json.workspace = true
