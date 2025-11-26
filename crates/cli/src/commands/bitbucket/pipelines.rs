@@ -355,6 +355,7 @@ async fn fetch_pipeline(
 // Command Implementations
 // ============================================================================
 
+#[allow(clippy::too_many_arguments)]
 pub async fn list_pipelines(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
