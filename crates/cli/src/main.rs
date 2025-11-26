@@ -119,13 +119,16 @@ async fn main() -> Result<()> {
         }
         AtlassianCommand::Opsgenie(args) => commands::opsgenie::execute(args).await?,
         AtlassianCommand::Bamboo(args) => commands::bamboo::execute(args).await?,
-        AtlassianCommand::Auth(command) => auth::handle(
-            command,
-            &mut config,
-            config_path.as_deref(),
-            &credential_store,
-            &renderer,
-        )?,
+        AtlassianCommand::Auth(command) => {
+            auth::handle(
+                command,
+                &mut config,
+                config_path.as_deref(),
+                &credential_store,
+                &renderer,
+            )
+            .await?
+        }
     }
 
     Ok(())
