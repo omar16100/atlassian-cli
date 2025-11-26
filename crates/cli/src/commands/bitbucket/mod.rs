@@ -370,15 +370,31 @@ enum PipelineCommands {
     List {
         /// Repository slug.
         repo: String,
+        /// Maximum number of results.
         #[arg(long, default_value_t = 25)]
         limit: usize,
+        /// Sort field (prefix with - for desc): created_on, -created_on.
+        #[arg(long)]
+        sort: Option<String>,
+        /// Show N most recent pipelines (shorthand for --sort=-created_on --limit=N).
+        #[arg(long)]
+        recent: Option<usize>,
+        /// Filter by branch name.
+        #[arg(long)]
+        branch: Option<String>,
+        /// Fetch all pages (ignores --limit).
+        #[arg(long)]
+        all: bool,
     },
     /// Get pipeline details.
     Get {
         /// Repository slug.
         repo: String,
-        /// Pipeline UUID.
+        /// Pipeline UUID or build number.
         uuid: String,
+        /// Show pipeline steps with status.
+        #[arg(long)]
+        steps: bool,
     },
     /// Trigger a new pipeline.
     Trigger {
@@ -406,6 +422,19 @@ enum PipelineCommands {
         pipeline_uuid: String,
         /// Step UUID.
         step_uuid: String,
+    },
+    /// Watch a running pipeline until completion.
+    Watch {
+        /// Repository slug.
+        repo: String,
+        /// Pipeline UUID or build number.
+        uuid: String,
+        /// Poll interval in seconds.
+        #[arg(long, default_value_t = 5)]
+        interval: u64,
+        /// Show pipeline steps with status.
+        #[arg(long)]
+        steps: bool,
     },
 }
 
@@ -778,11 +807,28 @@ pub async fn execute(
             }
         },
         BitbucketCommands::Pipeline(cmd) => match cmd {
-            PipelineCommands::List { repo, limit } => {
-                pipelines::list_pipelines(&ctx, &workspace, &repo, limit).await
+            PipelineCommands::List {
+                repo,
+                limit,
+                sort,
+                recent,
+                branch,
+                all,
+            } => {
+                pipelines::list_pipelines(
+                    &ctx,
+                    &workspace,
+                    &repo,
+                    limit,
+                    sort.as_deref(),
+                    recent,
+                    branch.as_deref(),
+                    all,
+                )
+                .await
             }
-            PipelineCommands::Get { repo, uuid } => {
-                pipelines::get_pipeline(&ctx, &workspace, &repo, &uuid).await
+            PipelineCommands::Get { repo, uuid, steps } => {
+                pipelines::get_pipeline(&ctx, &workspace, &repo, &uuid, steps).await
             }
             PipelineCommands::Trigger {
                 repo,
@@ -800,6 +846,12 @@ pub async fn execute(
                 pipelines::get_pipeline_logs(&ctx, &workspace, &repo, &pipeline_uuid, &step_uuid)
                     .await
             }
+            PipelineCommands::Watch {
+                repo,
+                uuid,
+                interval,
+                steps,
+            } => pipelines::watch_pipeline(&ctx, &workspace, &repo, &uuid, interval, steps).await,
         },
         BitbucketCommands::Webhook(cmd) => match cmd {
             WebhookCommands::List { repo } => {
