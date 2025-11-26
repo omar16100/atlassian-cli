@@ -29,7 +29,9 @@ fn get_token(profile_name: &str, store: &CredentialStore) -> Option<String> {
         .or_else(|| {
             // 4. Try credentials file as fallback
             let secret_key = token_key(profile_name);
-            atlassian_cli_auth::get_file_secret(&secret_key).ok().flatten()
+            atlassian_cli_auth::get_file_secret(&secret_key)
+                .ok()
+                .flatten()
         })
 }
 
