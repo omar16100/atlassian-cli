@@ -72,6 +72,9 @@ enum BitbucketCommands {
     /// Bulk operations.
     #[command(subcommand)]
     Bulk(BulkCommands),
+
+    /// Show current authenticated Bitbucket user.
+    Whoami,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -594,6 +597,11 @@ pub async fn execute(
     renderer: &OutputRenderer,
     inferred_workspace: Option<&str>,
 ) -> Result<()> {
+    // Whoami doesn't require workspace
+    if matches!(args.command, BitbucketCommands::Whoami) {
+        return workspaces::whoami(&client).await;
+    }
+
     // CLI flag takes precedence, then inferred from profile
     let workspace = args
         .workspace
@@ -930,5 +938,6 @@ pub async fn execute(
                 dry_run,
             } => bulk::delete_merged_branches(&ctx, &workspace, &repo, exclude, dry_run).await,
         },
+        BitbucketCommands::Whoami => unreachable!("handled above"),
     }
 }

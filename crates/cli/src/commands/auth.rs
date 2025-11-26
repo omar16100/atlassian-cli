@@ -8,7 +8,7 @@ use clap::{Args, Subcommand};
 use serde::Serialize;
 use url::Url;
 
-/// Multi-tier token lookup: profile-specific env var → generic env var → keyring
+/// Multi-tier token lookup: env var → keyring → credentials file
 fn get_token(profile_name: &str, store: &CredentialStore) -> Option<String> {
     // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
     let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", profile_name.to_uppercase());
@@ -22,9 +22,14 @@ fn get_token(profile_name: &str, store: &CredentialStore) -> Option<String> {
                 .filter(|t| !t.trim().is_empty())
         })
         .or_else(|| {
-            // 3. Try keyring as fallback
+            // 3. Try keyring
             let secret_key = token_key(profile_name);
             store.get_secret(&secret_key).ok().flatten()
+        })
+        .or_else(|| {
+            // 4. Try credentials file as fallback
+            let secret_key = token_key(profile_name);
+            atlassian_cli_auth::get_file_secret(&secret_key).ok().flatten()
         })
 }
 
@@ -85,7 +90,7 @@ pub struct LogoutArgs {
     pub remove_profile: bool,
 }
 
-pub fn handle(
+pub async fn handle(
     command: AuthCommand,
     config: &mut Config,
     config_path: Option<&Path>,
@@ -97,7 +102,7 @@ pub fn handle(
         AuthCommand::Logout(args) => logout(args, config, config_path, store),
         AuthCommand::List => list_profiles(config, store, renderer),
         AuthCommand::Whoami(args) => whoami(args, config, store),
-        AuthCommand::Test(args) => test_auth(args, config, store),
+        AuthCommand::Test(args) => test_auth(args, config, store).await,
     }
 }
 
@@ -132,9 +137,15 @@ fn login(
     }
 
     let secret_key = token_key(&args.profile);
-    store
-        .set_secret(&secret_key, &token)
-        .context("Failed to store token in keyring")?;
+
+    // Store in keyring (primary)
+    if let Err(e) = store.set_secret(&secret_key, &token) {
+        tracing::warn!("Failed to store token in keyring: {e}");
+    }
+
+    // Store in credentials file (fallback)
+    atlassian_cli_auth::set_file_secret(&secret_key, &token)
+        .context("Failed to store token in credentials file")?;
 
     config
         .save(config_path)
@@ -160,9 +171,16 @@ fn logout(
         .ok_or_else(|| anyhow!("Profile '{}' does not exist", args.profile))?;
 
     let secret_key = token_key(&args.profile);
-    store
-        .delete_secret(&secret_key)
-        .context("Failed to delete token from keyring")?;
+
+    // Delete from keyring
+    if let Err(e) = store.delete_secret(&secret_key) {
+        tracing::warn!("Failed to delete token from keyring: {e}");
+    }
+
+    // Delete from credentials file
+    if let Err(e) = atlassian_cli_auth::delete_file_secret(&secret_key) {
+        tracing::warn!("Failed to delete token from credentials file: {e}");
+    }
 
     if args.remove_profile {
         config.profiles.remove(&args.profile);
@@ -225,15 +243,12 @@ fn list_profiles(
 fn read_token_from_stdin() -> Result<String> {
     use std::io::{self, Write};
 
+    println!("You can get the API token from: https://id.atlassian.com/manage-profile/security/api-tokens");
     print!("Enter API token: ");
     io::stdout().flush().context("Failed to flush stdout")?;
 
-    let mut line = String::new();
-    io::stdin()
-        .read_line(&mut line)
-        .context("Failed to read from stdin")?;
-
-    Ok(line.trim().to_owned())
+    let token = rpassword::read_password().context("Failed to read token")?;
+    Ok(token.trim().to_owned())
 }
 
 fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<()> {
@@ -282,7 +297,7 @@ fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<
     Ok(())
 }
 
-fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result<()> {
+async fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
@@ -304,13 +319,10 @@ fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result
 
     let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 
-    let runtime = tokio::runtime::Runtime::new()?;
-    let result: Result<serde_json::Value> = runtime.block_on(async {
-        client
-            .get("/rest/api/3/myself")
-            .await
-            .context("Authentication test failed")
-    });
+    let result: Result<serde_json::Value> = client
+        .get("/rest/api/3/myself")
+        .await
+        .context("Authentication test failed");
 
     match result {
         Ok(_) => {

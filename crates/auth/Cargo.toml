@@ -13,3 +13,4 @@ serde_json.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+dirs = "5"
