@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Authentication library for Atlassian CLI"
 
 [dependencies]
 base64.workspace = true
