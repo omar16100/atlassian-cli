@@ -270,11 +270,13 @@ async fn resolve_pipeline_identifier(
     }
 
     // Fallback: paginate newest-first with page budget
-    tracing::debug!(build_num, "Direct filter failed, falling back to pagination");
-    let mut next_url: Option<String> = None;
-    let base_path = format!(
-        "/2.0/repositories/{workspace}/{repo_slug}/pipelines?sort=-created_on&pagelen=100"
+    tracing::debug!(
+        build_num,
+        "Direct filter failed, falling back to pagination"
     );
+    let mut next_url: Option<String> = None;
+    let base_path =
+        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines?sort=-created_on&pagelen=100");
     const MAX_PAGES: usize = 10; // Budget: 1000 pipelines max
 
     for _page in 0..MAX_PAGES {
@@ -304,7 +306,9 @@ async fn resolve_pipeline_identifier(
         }
     }
 
-    anyhow::bail!("Pipeline #{build_num} not found in recent 1000 pipelines. Use UUID for older builds.")
+    anyhow::bail!(
+        "Pipeline #{build_num} not found in recent 1000 pipelines. Use UUID for older builds."
+    )
 }
 
 // ============================================================================
@@ -317,7 +321,8 @@ async fn fetch_steps(
     repo_slug: &str,
     pipeline_uuid: &str,
 ) -> Result<Vec<StepInfo>> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
+    let path =
+        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
     let response: StepList = ctx
         .client
         .get(&path)
@@ -382,7 +387,14 @@ pub async fn list_pipelines(
     let page_size = 100; // Max allowed by Bitbucket API
 
     loop {
-        let path = build_request_path(&next_url, workspace, repo_slug, page_size, effective_sort, branch);
+        let path = build_request_path(
+            &next_url,
+            workspace,
+            repo_slug,
+            page_size,
+            effective_sort,
+            branch,
+        );
 
         let response: PipelineList = ctx
             .client
@@ -394,9 +406,7 @@ pub async fn list_pipelines(
         next_url = response.next;
 
         // Stop if: no more pages OR reached limit (when not unlimited)
-        let reached_limit = max_items
-            .map(|m| all_pipelines.len() >= m)
-            .unwrap_or(false);
+        let reached_limit = max_items.map(|m| all_pipelines.len() >= m).unwrap_or(false);
         if next_url.is_none() || reached_limit {
             break;
         }
@@ -436,12 +446,7 @@ pub async fn list_pipelines(
         return Ok(());
     }
 
-    tracing::debug!(
-        workspace,
-        repo_slug,
-        count = rows.len(),
-        "Listed pipelines"
-    );
+    tracing::debug!(workspace, repo_slug, count = rows.len(), "Listed pipelines");
 
     ctx.renderer.render(&rows)
 }
