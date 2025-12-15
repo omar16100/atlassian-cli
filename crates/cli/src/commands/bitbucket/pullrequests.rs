@@ -381,10 +381,7 @@ pub async fn decline_pull_request(
     render_success(
         ctx.renderer,
         &format!("✅ Pull request #{pr_id} declined: {}", pr.title),
-        &MutationResult::with_id(
-            format!("Pull request #{pr_id} declined"),
-            pr_id.to_string(),
-        ),
+        &MutationResult::with_id(format!("Pull request #{pr_id} declined"), pr_id.to_string()),
     )
 }
 

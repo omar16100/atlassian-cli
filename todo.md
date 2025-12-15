@@ -1,5 +1,15 @@
 # Changes Made
 
+## 2025-12-15 (v7) - Add cargo-release for automated version bumping
+- Added `cargo-release` configuration to workspace Cargo.toml
+  - `shared-version = true` - all crates share the same version
+  - `tag-name = "v{{version}}"` - creates tags like `v0.1.8`
+  - `pre-release-commit-message = "chore: bump version to {{version}}"`
+- Added `[package.metadata.release] release = false` to internal crates (api, auth, config, output, bulk)
+- Added `[package.metadata.release] release = true` to CLI crate
+- Usage: `cargo release patch --execute` (or `minor`, `major`)
+- Files modified: `Cargo.toml`, `crates/*/Cargo.toml`
+
 ## 2025-12-15 (v6) - Code Review Fixes
 - Fixed progress bar panic risk in `crates/bulk/src/lib.rs:267`
   - Changed `.unwrap()` to `.unwrap_or_else()` with fallback to `ProgressStyle::default_bar()`
