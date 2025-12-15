@@ -1,6 +1,14 @@
 # atlassian-cli
 
-Rust-based multi-product Atlassian Cloud CLI. The current skeleton sets up the workspace, shared crates, and placeholder commands so execution flow, config loading, and output rendering are ready for product-specific implementations.
+> Unified CLI for Jira, Confluence, Bitbucket & JSM
+
+Automate your entire Atlassian Cloud stack from the terminal. Bulk operations,
+dry-run mode, multiple output formats (JSON/CSV/YAML/table), and profile-based
+multi-instance support.
+
+[![CI](https://github.com/omar16100/atlassian-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/omar16100/atlassian-cli/actions)
+[![crates.io](https://img.shields.io/crates/v/atlassian-cli.svg)](https://crates.io/crates/atlassian-cli)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Installation
 
