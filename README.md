@@ -125,58 +125,58 @@ crates/
    atlassian-cli bitbucket --workspace myteam repo get api-service
    atlassian-cli bitbucket --workspace myteam repo create newrepo --name "New Repo" --private
    atlassian-cli bitbucket --workspace myteam repo update api-service --description "Updated description"
-   cargo run -- bitbucket --workspace myteam repo delete oldrepo --force
+   atlassian-cli bitbucket --workspace myteam repo delete oldrepo --force
 
    # Bitbucket - Branches
-   cargo run -- bitbucket --workspace myteam branch list api-service
-   cargo run -- bitbucket --workspace myteam branch create api-service feature/new --from main
-   cargo run -- bitbucket --workspace myteam branch delete api-service feature/old --force
-   cargo run -- bitbucket --workspace myteam branch protect api-service --pattern "main" --kind restrict_merges --approvals 2
-   cargo run -- bitbucket --workspace myteam branch restrictions api-service
+   atlassian-cli bitbucket --workspace myteam branch list api-service
+   atlassian-cli bitbucket --workspace myteam branch create api-service feature/new --from main
+   atlassian-cli bitbucket --workspace myteam branch delete api-service feature/old --force
+   atlassian-cli bitbucket --workspace myteam branch protect api-service --pattern "main" --kind restrict_merges --approvals 2
+   atlassian-cli bitbucket --workspace myteam branch restrictions api-service
 
    # Bitbucket - Pull Requests
-   cargo run -- bitbucket --workspace myteam pr list api-service --state OPEN --limit 5
-   cargo run -- bitbucket --workspace myteam pr get api-service 123
-   cargo run -- bitbucket --workspace myteam pr create api-service --title "Add feature" --source feature/new --destination main
-   cargo run -- bitbucket --workspace myteam pr update api-service 123 --title "Updated title"
-   cargo run -- bitbucket --workspace myteam pr approve api-service 123
-   cargo run -- bitbucket --workspace myteam pr merge api-service 123 --strategy merge_commit
-   cargo run -- bitbucket --workspace myteam pr comments api-service 123
-   cargo run -- bitbucket --workspace myteam pr comment api-service 123 --text "Looks good!"
+   atlassian-cli bitbucket --workspace myteam pr list api-service --state OPEN --limit 5
+   atlassian-cli bitbucket --workspace myteam pr get api-service 123
+   atlassian-cli bitbucket --workspace myteam pr create api-service --title "Add feature" --source feature/new --destination main
+   atlassian-cli bitbucket --workspace myteam pr update api-service 123 --title "Updated title"
+   atlassian-cli bitbucket --workspace myteam pr approve api-service 123
+   atlassian-cli bitbucket --workspace myteam pr merge api-service 123 --strategy merge_commit
+   atlassian-cli bitbucket --workspace myteam pr comments api-service 123
+   atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Looks good!"
 
    # Bitbucket - Workspaces & Projects
-   cargo run -- bitbucket workspace list --limit 10
-   cargo run -- bitbucket workspace get myteam
-   cargo run -- bitbucket --workspace myteam project list
-   cargo run -- bitbucket --workspace myteam project create PROJ --name "My Project" --private
-   cargo run -- bitbucket --workspace myteam project delete PROJ --force
+   atlassian-cli bitbucket workspace list --limit 10
+   atlassian-cli bitbucket workspace get myteam
+   atlassian-cli bitbucket --workspace myteam project list
+   atlassian-cli bitbucket --workspace myteam project create PROJ --name "My Project" --private
+   atlassian-cli bitbucket --workspace myteam project delete PROJ --force
 
    # Bitbucket - Pipelines
-   cargo run -- bitbucket --workspace myteam pipeline list api-service
-   cargo run -- bitbucket --workspace myteam pipeline trigger api-service --ref-name main
-   cargo run -- bitbucket --workspace myteam pipeline stop api-service {uuid}
+   atlassian-cli bitbucket --workspace myteam pipeline list api-service
+   atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main
+   atlassian-cli bitbucket --workspace myteam pipeline stop api-service {uuid}
 
    # Bitbucket - Webhooks & SSH Keys
-   cargo run -- bitbucket --workspace myteam webhook list api-service
-   cargo run -- bitbucket --workspace myteam webhook create api-service --url https://example.com/hook --events repo:push
-   cargo run -- bitbucket --workspace myteam ssh-key list api-service
-   cargo run -- bitbucket --workspace myteam ssh-key add api-service --label deploy --key "ssh-rsa ..."
+   atlassian-cli bitbucket --workspace myteam webhook list api-service
+   atlassian-cli bitbucket --workspace myteam webhook create api-service --url https://example.com/hook --events repo:push
+   atlassian-cli bitbucket --workspace myteam ssh-key list api-service
+   atlassian-cli bitbucket --workspace myteam ssh-key add api-service --label deploy --key "ssh-rsa ..."
 
    # Bitbucket - Permissions & Commits
-   cargo run -- bitbucket --workspace myteam permission list api-service
-   cargo run -- bitbucket --workspace myteam permission grant api-service --user-uuid {uuid} --permission write
-   cargo run -- bitbucket --workspace myteam commit list api-service --branch main
-   cargo run -- bitbucket --workspace myteam commit diff api-service abc123
-   cargo run -- bitbucket --workspace myteam commit browse api-service --commit main --path src/
+   atlassian-cli bitbucket --workspace myteam permission list api-service
+   atlassian-cli bitbucket --workspace myteam permission grant api-service --user-uuid {uuid} --permission write
+   atlassian-cli bitbucket --workspace myteam commit list api-service --branch main
+   atlassian-cli bitbucket --workspace myteam commit diff api-service abc123
+   atlassian-cli bitbucket --workspace myteam commit browse api-service --commit main --path src/
 
    # Bitbucket - Bulk Operations
-   cargo run -- bitbucket --workspace myteam bulk archive-repos --days 180 --dry-run
-   cargo run -- bitbucket --workspace myteam bulk delete-branches api-service --exclude feature/keep --dry-run
+   atlassian-cli bitbucket --workspace myteam bulk archive-repos --days 180 --dry-run
+   atlassian-cli bitbucket --workspace myteam bulk delete-branches api-service --exclude feature/keep --dry-run
 
    # JSM
-   cargo run -- jsm servicedesk list --limit 10
-   cargo run -- jsm request list --limit 10
-   cargo run -- jsm request get SD-123
+   atlassian-cli jsm servicedesk list --limit 10
+   atlassian-cli jsm request list --limit 10
+   atlassian-cli jsm request get SD-123
    ```
 
 ## Bitbucket Authentication
