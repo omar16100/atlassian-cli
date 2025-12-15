@@ -142,7 +142,8 @@ async fn list_service_desks(ctx: &JsmContext<'_>, limit: usize) -> Result<()> {
         .collect();
 
     if rows.is_empty() {
-        tracing::info!("No service desks returned.");
+        tracing::info!("No service desks found");
+        println!("No service desks found");
         return Ok(());
     }
 
@@ -269,7 +270,8 @@ async fn list_requests(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!("No requests returned.");
+        tracing::info!("No requests found");
+        println!("No requests found");
         return Ok(());
     }
 

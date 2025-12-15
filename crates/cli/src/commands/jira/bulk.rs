@@ -6,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::utils::JiraContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // Bulk transition issues
 pub async fn bulk_transition(
@@ -19,7 +20,7 @@ pub async fn bulk_transition(
     let issue_keys = search_issue_keys(ctx, jql).await?;
 
     if issue_keys.is_empty() {
-        println!("No issues matched the JQL query");
+        println!("No issues found matching query");
         return Ok(());
     }
 
@@ -55,8 +56,11 @@ pub async fn bulk_transition(
         })
         .await?;
 
-    println!("✅ Bulk transition completed");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        "✅ Bulk transition completed",
+        &MutationResult::new("Bulk transition completed"),
+    )
 }
 
 // Bulk assign issues
@@ -70,7 +74,7 @@ pub async fn bulk_assign(
     let issue_keys = search_issue_keys(ctx, jql).await?;
 
     if issue_keys.is_empty() {
-        println!("No issues matched the JQL query");
+        println!("No issues found matching query");
         return Ok(());
     }
 
@@ -104,8 +108,11 @@ pub async fn bulk_assign(
         })
         .await?;
 
-    println!("✅ Bulk assign completed");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        "✅ Bulk assign completed",
+        &MutationResult::new("Bulk assign completed"),
+    )
 }
 
 // Bulk label operations
@@ -120,7 +127,7 @@ pub async fn bulk_label(
     let issue_keys = search_issue_keys(ctx, jql).await?;
 
     if issue_keys.is_empty() {
-        println!("No issues matched the JQL query");
+        println!("No issues found matching query");
         return Ok(());
     }
 
@@ -180,8 +187,11 @@ pub async fn bulk_label(
         })
         .await?;
 
-    println!("✅ Bulk label operation completed");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        "✅ Bulk label operation completed",
+        &MutationResult::new("Bulk label operation completed"),
+    )
 }
 
 // Bulk export issues
@@ -217,7 +227,7 @@ pub async fn bulk_export(
         .context("Failed to search issues")?;
 
     if response.issues.is_empty() {
-        println!("No issues matched the JQL query");
+        println!("No issues found matching query");
         return Ok(());
     }
 
@@ -361,8 +371,11 @@ pub async fn bulk_import(
         })
         .await?;
 
-    println!("✅ Bulk import completed");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        "✅ Bulk import completed",
+        &MutationResult::new("Bulk import completed"),
+    )
 }
 
 // Helper functions

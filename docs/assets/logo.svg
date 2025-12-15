@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 32" fill="none">
+  <defs>
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#e5e5e5"/>
+      <stop offset="100%" style="stop-color:#a3a3a3"/>
+    </linearGradient>
+    <linearGradient id="cursorGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4aa"/>
+      <stop offset="100%" style="stop-color:#0066ff"/>
+    </linearGradient>
+  </defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600&amp;display=swap');
+    .logo-text { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; fill: url(#textGradient); }
+    .cursor { fill: url(#cursorGradient); animation: blink 1s infinite; }
+    @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+  </style>
+  <text x="4" y="22" class="logo-text">atlassian-cli</text>
+  <rect x="166" y="6" width="3" height="18" rx="1" class="cursor"/>
+</svg>

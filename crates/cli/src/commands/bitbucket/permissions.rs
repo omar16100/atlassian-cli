@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::utils::BitbucketContext;
+use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct PermissionList {
@@ -78,7 +79,8 @@ pub async fn list_repo_permissions(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(workspace, repo_slug, "No permissions found for repository");
+        tracing::info!(workspace, repo_slug, "No permissions found");
+        println!("No permissions found");
         return Ok(());
     }
 
@@ -109,8 +111,11 @@ pub async fn grant_repo_permission(
         "Permission granted successfully"
     );
 
-    println!("✓ Granted {permission} permission to user {user_uuid} on {workspace}/{repo_slug}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Granted {permission} permission to user {user_uuid} on {workspace}/{repo_slug}"),
+        &MutationResult::new(format!("Granted {permission} permission to user {user_uuid}")),
+    )
 }
 
 pub async fn revoke_repo_permission(
@@ -131,6 +136,9 @@ pub async fn revoke_repo_permission(
         "Permission revoked successfully"
     );
 
-    println!("✓ Revoked permission from user {user_uuid} on {workspace}/{repo_slug}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Revoked permission from user {user_uuid} on {workspace}/{repo_slug}"),
+        &MutationResult::new(format!("Revoked permission from user {user_uuid}")),
+    )
 }

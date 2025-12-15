@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::utils::ConfluenceContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // List spaces
 pub async fn list_spaces(
@@ -119,8 +120,11 @@ pub async fn create_space(
         .context("Failed to create space")?;
 
     tracing::info!(id = %response.id, key = %response.key, "Space created successfully");
-    println!("✅ Created space: {} ({})", response.name, response.key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Created space: {} ({})", response.name, response.key),
+        &MutationResult::with_id(format!("Created space: {}", response.name), &response.key),
+    )
 }
 
 // Update space
@@ -159,8 +163,11 @@ pub async fn update_space(
         .with_context(|| format!("Failed to update space {}", space_id))?;
 
     tracing::info!(%space_id, "Space updated successfully");
-    println!("✅ Updated space: {}", space_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated space: {space_id}"),
+        &MutationResult::with_id(format!("Updated space: {space_id}"), space_id),
+    )
 }
 
 // Delete space
@@ -180,8 +187,11 @@ pub async fn delete_space(ctx: &ConfluenceContext<'_>, space_id: &str, force: bo
         .with_context(|| format!("Failed to delete space {}", space_id))?;
 
     tracing::info!(%space_id, "Space deleted successfully");
-    println!("✅ Deleted space: {}", space_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted space: {space_id}"),
+        &MutationResult::with_id(format!("Deleted space: {space_id}"), space_id),
+    )
 }
 
 // Get space permissions

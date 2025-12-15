@@ -75,6 +75,11 @@ impl ApiClient {
         self.base_url.as_str()
     }
 
+    /// Returns a reference to the underlying HTTP client for raw requests (e.g., multipart uploads).
+    pub fn http_client(&self) -> &Client {
+        &self.client
+    }
+
     pub async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         self.request(Method::GET, path, Option::<&()>::None).await
     }

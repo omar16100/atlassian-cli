@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::fs;
 
 use super::utils::JiraContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // Role Management Functions
 
@@ -188,8 +189,11 @@ pub async fn delete_field(ctx: &JiraContext<'_>, id: &str) -> Result<()> {
         .with_context(|| format!("Failed to delete field {id}"))?;
 
     tracing::info!(%id, "Custom field deleted successfully");
-    println!("✅ Deleted custom field: {}", id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted custom field: {id}"),
+        &MutationResult::with_id(format!("Deleted custom field: {id}"), id),
+    )
 }
 
 // Workflow Management Functions
@@ -265,11 +269,13 @@ pub async fn export_workflow(
     let json_str = serde_json::to_string_pretty(&workflow)?;
 
     if let Some(path) = output {
-        fs::write(path, json_str)?;
-        println!("✅ Exported workflow {} to {}", name, path);
+        fs::write(path, &json_str)?;
+        render_success(
+            ctx.renderer,
+            &format!("✅ Exported workflow {name} to {path}"),
+            &MutationResult::new(format!("Exported workflow {name} to {path}")),
+        )
     } else {
-        println!("{}", json_str);
+        ctx.renderer.render(&workflow)
     }
-
-    Ok(())
 }

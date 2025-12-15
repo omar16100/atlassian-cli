@@ -38,6 +38,7 @@ rpassword = "7"
 
 [dev-dependencies]
 wiremock.workspace = true
+tempfile = "3.13"
 
 [package.metadata.dist]
 # Homebrew tap repository (format: owner/repo)

@@ -2,13 +2,22 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::path::PathBuf;
+use tracing::warn;
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 
+/// Bitbucket API base URL.
+pub const BITBUCKET_API_URL: &str = "https://api.bitbucket.org";
+
 /// Helper to construct a key for profile secrets.
 pub fn token_key(profile: &str) -> String {
     profile.to_string()
+}
+
+/// Helper to construct a key for Bitbucket profile secrets.
+pub fn bitbucket_token_key(profile: &str) -> String {
+    format!("{}_bitbucket", profile)
 }
 
 fn credentials_path() -> Option<PathBuf> {
@@ -24,7 +33,10 @@ pub fn set_secret(account: &str, secret: &str) -> Result<()> {
 
     let mut creds: HashMap<String, String> = if path.exists() {
         let content = fs::read_to_string(&path)?;
-        serde_json::from_str(&content).unwrap_or_default()
+        serde_json::from_str(&content).unwrap_or_else(|e| {
+            warn!("Failed to parse credentials file: {}", e);
+            HashMap::new()
+        })
     } else {
         HashMap::new()
     };
@@ -75,7 +87,10 @@ pub fn delete_secret(account: &str) -> Result<()> {
         return Ok(());
     }
     let content = fs::read_to_string(&path)?;
-    let mut creds: HashMap<String, String> = serde_json::from_str(&content).unwrap_or_default();
+    let mut creds: HashMap<String, String> = serde_json::from_str(&content).unwrap_or_else(|e| {
+        warn!("Failed to parse credentials file: {}", e);
+        HashMap::new()
+    });
     creds.remove(account);
 
     #[cfg(unix)]
@@ -102,4 +117,26 @@ pub fn delete_secret(account: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_token_key() {
+        assert_eq!(token_key("work"), "work");
+        assert_eq!(token_key("my-profile"), "my-profile");
+    }
+
+    #[test]
+    fn test_bitbucket_token_key() {
+        assert_eq!(bitbucket_token_key("work"), "work_bitbucket");
+        assert_eq!(bitbucket_token_key("my-profile"), "my-profile_bitbucket");
+    }
+
+    #[test]
+    fn test_bitbucket_api_url() {
+        assert_eq!(BITBUCKET_API_URL, "https://api.bitbucket.org");
+    }
 }

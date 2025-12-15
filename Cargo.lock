@@ -136,6 +136,7 @@ dependencies = [
  "rpassword",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -174,6 +175,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

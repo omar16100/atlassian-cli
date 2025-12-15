@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
 use super::utils::BitbucketContext;
+use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct WorkspaceList {
@@ -67,7 +68,8 @@ pub async fn list_workspaces(ctx: &BitbucketContext<'_>, limit: usize) -> Result
         .collect();
 
     if rows.is_empty() {
-        tracing::info!("No workspaces returned");
+        tracing::info!("No workspaces found");
+        println!("No workspaces found");
         return Ok(());
     }
 
@@ -136,7 +138,8 @@ pub async fn list_projects(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(workspace, "No projects returned for workspace");
+        tracing::info!(workspace, "No projects found");
+        println!("No projects found");
         return Ok(());
     }
 
@@ -296,9 +299,11 @@ pub async fn delete_project(
     })?;
 
     tracing::info!(project_key, workspace, "Project deleted successfully");
-
-    println!("✓ Project {project_key} deleted from workspace {workspace}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Project {project_key} deleted from workspace {workspace}"),
+        &MutationResult::with_id(format!("Project {project_key} deleted from workspace {workspace}"), project_key),
+    )
 }
 
 #[derive(Deserialize)]

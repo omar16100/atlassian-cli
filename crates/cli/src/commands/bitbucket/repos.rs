@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
 use super::utils::BitbucketContext;
+use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct RepoList {
@@ -70,10 +71,8 @@ pub async fn list_repos(ctx: &BitbucketContext<'_>, workspace: &str, limit: usiz
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(
-            workspace,
-            "No repositories returned for workspace; check permissions."
-        );
+        tracing::info!(workspace, "No repositories found");
+        println!("No repositories found");
         return Ok(());
     }
 
@@ -254,7 +253,9 @@ pub async fn delete_repo(
         .with_context(|| format!("Failed to delete repository {workspace}/{slug}"))?;
 
     tracing::info!(slug, workspace, "Repository deleted successfully");
-
-    println!("✓ Repository {workspace}/{slug} deleted");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Repository {workspace}/{slug} deleted"),
+        &MutationResult::with_id(format!("Repository {workspace}/{slug} deleted"), slug),
+    )
 }

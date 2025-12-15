@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 use atlassian_cli_api::ApiClient;
-use atlassian_cli_auth::token_key;
+use atlassian_cli_auth::BITBUCKET_API_URL;
 use atlassian_cli_config::{migrate_config_if_needed, Config, MigrationResult};
 use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Parser, Subcommand};
@@ -69,40 +69,26 @@ async fn main() -> Result<()> {
     let mut config = Config::load(config_path.as_ref())?;
     let renderer = OutputRenderer::new(cli.output);
 
-    let profile_ctx = if matches!(cli.command, AtlassianCommand::Auth(_)) {
-        None
-    } else {
-        Some(resolve_active_profile(&config, cli.profile.as_deref())?)
-    };
-
     match cli.command {
         AtlassianCommand::Jira(args) => {
-            let profile = profile_ctx
-                .as_ref()
-                .expect("profile context is available for product commands");
-            let client = build_product_client(profile)?;
+            let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
+            let client = build_product_client(&profile)?;
             commands::jira::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Confluence(args) => {
-            let profile = profile_ctx
-                .as_ref()
-                .expect("profile context is available for product commands");
-            let client = build_product_client(profile)?;
+            let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
+            let client = build_product_client(&profile)?;
             commands::confluence::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Bitbucket(args) => {
-            let profile = profile_ctx
-                .as_ref()
-                .expect("profile context is available for product commands");
-            let client = build_bitbucket_client(profile)?;
+            let profile = resolve_profile_for_bitbucket(&config, cli.profile.as_deref())?;
+            let client = build_bitbucket_client(&profile)?;
             commands::bitbucket::execute(args, client, &renderer, profile.workspace.as_deref())
                 .await?
         }
         AtlassianCommand::Jsm(args) => {
-            let profile = profile_ctx
-                .as_ref()
-                .expect("profile context is available for product commands");
-            let client = build_product_client(profile)?;
+            let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
+            let client = build_product_client(&profile)?;
             commands::jsm::execute(
                 args,
                 commands::jsm::JsmContext {
@@ -137,11 +123,23 @@ fn init_tracing(debug: bool) -> Result<()> {
         .map_err(|err| anyhow!("failed to initialize logger: {err}"))
 }
 
-struct ActiveProfile {
-    base_url: String,
+/// Shared profile fields used by all Atlassian products.
+struct BaseProfile {
+    name: String,
     email: String,
+}
+
+/// Profile for Jira/Confluence/JSM commands (requires base_url and token).
+struct ProductProfile {
+    base: BaseProfile,
+    base_url: String,
     token: String,
-    bitbucket_token: Option<String>,
+}
+
+/// Profile for Bitbucket commands (only requires email and bitbucket token).
+struct BitbucketProfile {
+    base: BaseProfile,
+    token: String,
     workspace: Option<String>,
 }
 
@@ -161,90 +159,85 @@ fn handle_migration() {
     }
 }
 
-fn resolve_active_profile(config: &Config, requested: Option<&str>) -> Result<ActiveProfile> {
+/// Resolve base profile fields (name + email) shared by all commands.
+fn resolve_base_profile<'a>(config: &'a Config, requested: Option<&'a str>) -> Result<(BaseProfile, &'a atlassian_cli_config::Profile)> {
     let (name, profile) = config
         .resolve_profile(requested)
         .ok_or_else(|| anyhow!("No profile configured. Run `atlassian-cli auth login` first."))?;
 
-    let base_url = profile
-        .base_url
-        .clone()
-        .ok_or_else(|| anyhow!("Profile '{name}' is missing a base_url."))?;
     let email = profile
         .email
         .clone()
         .ok_or_else(|| anyhow!("Profile '{name}' is missing an email."))?;
 
-    // Multi-tier token lookup: env var → credentials file
-    let token = {
-        // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
-        let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", name.to_uppercase());
-        std::env::var(&profile_env_var)
-            .ok()
-            .filter(|t| !t.trim().is_empty())
-            .or_else(|| {
-                // 2. Check generic env var: ATLASSIAN_API_TOKEN
-                std::env::var("ATLASSIAN_API_TOKEN")
-                    .ok()
-                    .filter(|t| !t.trim().is_empty())
-            })
-            .or_else(|| {
-                // 3. Try credentials file
-                let secret_key = token_key(name);
-                atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
-            })
-            .ok_or_else(|| {
+    Ok((BaseProfile { name: name.to_string(), email }, profile))
+}
+
+/// Resolve profile for Jira/Confluence/JSM commands.
+/// Requires base_url and Jira/Confluence token.
+fn resolve_profile_for_product(config: &Config, requested: Option<&str>) -> Result<ProductProfile> {
+    let (base, profile) = resolve_base_profile(config, requested)?;
+
+    let base_url = profile
+        .base_url
+        .clone()
+        .ok_or_else(|| anyhow!("Profile '{}' is missing a base_url. Run `atlassian-cli auth login --base-url <URL>`", base.name))?;
+
+    let token = auth::get_token(&base.name).ok_or_else(|| {
+        anyhow!(
+            "No token found for profile '{}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login --profile {}`",
+            base.name,
+            base.name.to_uppercase(),
+            base.name
+        )
+    })?;
+
+    Ok(ProductProfile { base, base_url, token })
+}
+
+/// Resolve profile for Bitbucket commands.
+/// Only requires email and Bitbucket token (falls back to general token).
+fn resolve_profile_for_bitbucket(config: &Config, requested: Option<&str>) -> Result<BitbucketProfile> {
+    let (base, profile) = resolve_base_profile(config, requested)?;
+
+    // Try Bitbucket-specific token first, then fall back to general token
+    let token = auth::get_bitbucket_token(&base.name)
+        .or_else(|| auth::get_token(&base.name))
+        .ok_or_else(|| {
+            let has_jira_token = auth::get_token(&base.name).is_some();
+            if has_jira_token {
+                // Has Jira token but no Bitbucket token - suggest adding Bitbucket auth
                 anyhow!(
-                    "No token found for profile '{name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login --profile {name}`",
-                    name.to_uppercase()
+                    "Profile '{}' has no Bitbucket token (only Jira/Confluence token found). \
+                    Run `atlassian-cli auth login --bitbucket --profile {}`",
+                    base.name,
+                    base.name
                 )
-            })?
-    };
+            } else {
+                // No tokens at all
+                anyhow!(
+                    "No token found for profile '{}'. Run `atlassian-cli auth login --bitbucket --profile {}`",
+                    base.name,
+                    base.name
+                )
+            }
+        })?;
 
-    // Bitbucket-specific token lookup (in priority order):
-    // 1. ATLASSIAN_CLI_BITBUCKET_TOKEN_{PROFILE}
-    // 2. ATLASSIAN_BITBUCKET_TOKEN
-    // 3. BITBUCKET_TOKEN
-    let bitbucket_token = {
-        let profile_env_var = format!("ATLASSIAN_CLI_BITBUCKET_TOKEN_{}", name.to_uppercase());
-        std::env::var(&profile_env_var)
-            .ok()
-            .filter(|t| !t.trim().is_empty())
-            .or_else(|| {
-                std::env::var("ATLASSIAN_BITBUCKET_TOKEN")
-                    .ok()
-                    .filter(|t| !t.trim().is_empty())
-            })
-            .or_else(|| {
-                std::env::var("BITBUCKET_TOKEN")
-                    .ok()
-                    .filter(|t| !t.trim().is_empty())
-            })
-    };
-
-    // Resolve workspace: explicit profile config, or infer from base_url
+    // Resolve workspace: explicit profile config, or infer from base_url if present
     let workspace = profile
         .workspace
         .clone()
-        .or_else(|| extract_workspace_from_url(&base_url));
+        .or_else(|| profile.base_url.as_ref().and_then(|url| extract_workspace_from_url(url)));
 
-    Ok(ActiveProfile {
-        base_url,
-        email,
-        token,
-        bitbucket_token,
-        workspace,
-    })
+    Ok(BitbucketProfile { base, token, workspace })
 }
 
-fn build_product_client(profile: &ActiveProfile) -> Result<ApiClient> {
+fn build_product_client(profile: &ProductProfile) -> Result<ApiClient> {
     Ok(ApiClient::new(&profile.base_url)?
-        .with_basic_auth(profile.email.clone(), profile.token.clone()))
+        .with_basic_auth(profile.base.email.clone(), profile.token.clone()))
 }
 
-fn build_bitbucket_client(profile: &ActiveProfile) -> Result<ApiClient> {
-    // Use Bitbucket-specific token if set, otherwise fall back to general token
-    let token = profile.bitbucket_token.as_ref().unwrap_or(&profile.token);
-    Ok(ApiClient::new("https://api.bitbucket.org")?
-        .with_basic_auth(profile.email.clone(), token.clone()))
+fn build_bitbucket_client(profile: &BitbucketProfile) -> Result<ApiClient> {
+    Ok(ApiClient::new(BITBUCKET_API_URL)?
+        .with_basic_auth(profile.base.email.clone(), profile.token.clone()))
 }

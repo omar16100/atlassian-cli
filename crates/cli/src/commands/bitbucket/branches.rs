@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
 use super::utils::BitbucketContext;
+use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct BranchList {
@@ -97,7 +98,8 @@ pub async fn list_branches(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(workspace, repo_slug, "No branches returned for repository");
+        tracing::info!(workspace, repo_slug, "No branches found");
+        println!("No branches found");
         return Ok(());
     }
 
@@ -225,8 +227,11 @@ pub async fn delete_branch(
         "Branch deleted successfully"
     );
 
-    println!("✓ Branch {branch_name} deleted from {workspace}/{repo_slug}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Branch {branch_name} deleted from {workspace}/{repo_slug}"),
+        &MutationResult::with_id(format!("Branch {branch_name} deleted from {workspace}/{repo_slug}"), branch_name),
+    )
 }
 
 pub async fn protect_branch(
@@ -296,8 +301,11 @@ pub async fn unprotect_branch(
         "Branch protection removed successfully"
     );
 
-    println!("✓ Branch protection {restriction_id} removed from {workspace}/{repo_slug}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Branch protection {restriction_id} removed from {workspace}/{repo_slug}"),
+        &MutationResult::with_id(format!("Branch protection removed from {workspace}/{repo_slug}"), &restriction_id.to_string()),
+    )
 }
 
 pub async fn list_restrictions(
@@ -338,8 +346,9 @@ pub async fn list_restrictions(
         tracing::info!(
             workspace,
             repo_slug,
-            "No branch restrictions for repository"
+            "No branch restrictions found"
         );
+        println!("No branch restrictions found");
         return Ok(());
     }
 

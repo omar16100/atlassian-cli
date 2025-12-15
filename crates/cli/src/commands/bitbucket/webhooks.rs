@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::utils::BitbucketContext;
+use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct WebhookList {
@@ -69,7 +70,8 @@ pub async fn list_webhooks(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(workspace, repo_slug, "No webhooks found for repository");
+        tracing::info!(workspace, repo_slug, "No webhooks found");
+        println!("No webhooks found");
         return Ok(());
     }
 
@@ -146,8 +148,11 @@ pub async fn delete_webhook(
         "Webhook deleted successfully"
     );
 
-    println!("✓ Webhook {webhook_uuid} deleted from {workspace}/{repo_slug}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Webhook {webhook_uuid} deleted from {workspace}/{repo_slug}"),
+        &MutationResult::with_id(format!("Webhook deleted from {workspace}/{repo_slug}"), webhook_uuid),
+    )
 }
 
 pub async fn list_ssh_keys(
@@ -188,7 +193,8 @@ pub async fn list_ssh_keys(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(workspace, repo_slug, "No SSH keys found for repository");
+        tracing::info!(workspace, repo_slug, "No SSH keys found");
+        println!("No SSH keys found");
         return Ok(());
     }
 
@@ -222,8 +228,11 @@ pub async fn add_ssh_key(
         "SSH key added successfully"
     );
 
-    println!("✓ SSH key '{label}' added to {workspace}/{repo_slug}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ SSH key '{label}' added to {workspace}/{repo_slug}"),
+        &MutationResult::new(format!("SSH key '{label}' added to {workspace}/{repo_slug}")),
+    )
 }
 
 pub async fn delete_ssh_key(
@@ -244,6 +253,9 @@ pub async fn delete_ssh_key(
         "SSH key deleted successfully"
     );
 
-    println!("✓ SSH key {key_uuid} deleted from {workspace}/{repo_slug}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ SSH key {key_uuid} deleted from {workspace}/{repo_slug}"),
+        &MutationResult::with_id(format!("SSH key deleted from {workspace}/{repo_slug}"), key_uuid),
+    )
 }
