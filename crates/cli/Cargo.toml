@@ -40,6 +40,9 @@ rpassword = "7"
 wiremock.workspace = true
 tempfile = "3.13"
 
+[package.metadata.release]
+release = true
+
 [package.metadata.dist]
 # Homebrew tap repository (format: owner/repo)
 tap = "omar16100/homebrew-atlassian-cli"

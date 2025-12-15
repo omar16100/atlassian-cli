@@ -383,7 +383,7 @@ pub async fn decline_pull_request(
         &format!("✅ Pull request #{pr_id} declined: {}", pr.title),
         &MutationResult::with_id(
             format!("Pull request #{pr_id} declined"),
-            &pr_id.to_string(),
+            pr_id.to_string(),
         ),
     )
 }
@@ -449,7 +449,7 @@ pub async fn unapprove_pull_request(
         &format!("✅ Approval removed from pull request #{pr_id}"),
         &MutationResult::with_id(
             format!("Approval removed from pull request #{pr_id}"),
-            &pr_id.to_string(),
+            pr_id.to_string(),
         ),
     )
 }
@@ -522,7 +522,7 @@ pub async fn add_pr_comment(
         &format!("✅ Comment added to pull request #{pr_id}"),
         &MutationResult::with_id(
             format!("Comment added to pull request #{pr_id}"),
-            &pr_id.to_string(),
+            pr_id.to_string(),
         ),
     )
 }
@@ -552,7 +552,7 @@ pub async fn add_pr_reviewers(
         &format!("✅ Reviewers added to pull request #{pr_id}"),
         &MutationResult::with_id(
             format!("Reviewers added to pull request #{pr_id}"),
-            &pr_id.to_string(),
+            pr_id.to_string(),
         ),
     )
 }
