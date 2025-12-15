@@ -15,3 +15,6 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 futures.workspace = true
+
+[package.metadata.release]
+release = false

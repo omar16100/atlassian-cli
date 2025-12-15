@@ -22,3 +22,6 @@ async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
 async-stream.workspace = true
+
+[package.metadata.release]
+release = false

@@ -309,7 +309,7 @@ pub async fn unprotect_branch(
         &format!("✅ Branch protection {restriction_id} removed from {workspace}/{repo_slug}"),
         &MutationResult::with_id(
             format!("Branch protection removed from {workspace}/{repo_slug}"),
-            &restriction_id.to_string(),
+            restriction_id.to_string(),
         ),
     )
 }
