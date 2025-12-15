@@ -160,7 +160,10 @@ fn handle_migration() {
 }
 
 /// Resolve base profile fields (name + email) shared by all commands.
-fn resolve_base_profile<'a>(config: &'a Config, requested: Option<&'a str>) -> Result<(BaseProfile, &'a atlassian_cli_config::Profile)> {
+fn resolve_base_profile<'a>(
+    config: &'a Config,
+    requested: Option<&'a str>,
+) -> Result<(BaseProfile, &'a atlassian_cli_config::Profile)> {
     let (name, profile) = config
         .resolve_profile(requested)
         .ok_or_else(|| anyhow!("No profile configured. Run `atlassian-cli auth login` first."))?;
@@ -170,7 +173,13 @@ fn resolve_base_profile<'a>(config: &'a Config, requested: Option<&'a str>) -> R
         .clone()
         .ok_or_else(|| anyhow!("Profile '{name}' is missing an email."))?;
 
-    Ok((BaseProfile { name: name.to_string(), email }, profile))
+    Ok((
+        BaseProfile {
+            name: name.to_string(),
+            email,
+        },
+        profile,
+    ))
 }
 
 /// Resolve profile for Jira/Confluence/JSM commands.
@@ -178,10 +187,12 @@ fn resolve_base_profile<'a>(config: &'a Config, requested: Option<&'a str>) -> R
 fn resolve_profile_for_product(config: &Config, requested: Option<&str>) -> Result<ProductProfile> {
     let (base, profile) = resolve_base_profile(config, requested)?;
 
-    let base_url = profile
-        .base_url
-        .clone()
-        .ok_or_else(|| anyhow!("Profile '{}' is missing a base_url. Run `atlassian-cli auth login --base-url <URL>`", base.name))?;
+    let base_url = profile.base_url.clone().ok_or_else(|| {
+        anyhow!(
+            "Profile '{}' is missing a base_url. Run `atlassian-cli auth login --base-url <URL>`",
+            base.name
+        )
+    })?;
 
     let token = auth::get_token(&base.name).ok_or_else(|| {
         anyhow!(
@@ -192,12 +203,19 @@ fn resolve_profile_for_product(config: &Config, requested: Option<&str>) -> Resu
         )
     })?;
 
-    Ok(ProductProfile { base, base_url, token })
+    Ok(ProductProfile {
+        base,
+        base_url,
+        token,
+    })
 }
 
 /// Resolve profile for Bitbucket commands.
 /// Only requires email and Bitbucket token (falls back to general token).
-fn resolve_profile_for_bitbucket(config: &Config, requested: Option<&str>) -> Result<BitbucketProfile> {
+fn resolve_profile_for_bitbucket(
+    config: &Config,
+    requested: Option<&str>,
+) -> Result<BitbucketProfile> {
     let (base, profile) = resolve_base_profile(config, requested)?;
 
     // Try Bitbucket-specific token first, then fall back to general token
@@ -224,12 +242,18 @@ fn resolve_profile_for_bitbucket(config: &Config, requested: Option<&str>) -> Re
         })?;
 
     // Resolve workspace: explicit profile config, or infer from base_url if present
-    let workspace = profile
-        .workspace
-        .clone()
-        .or_else(|| profile.base_url.as_ref().and_then(|url| extract_workspace_from_url(url)));
+    let workspace = profile.workspace.clone().or_else(|| {
+        profile
+            .base_url
+            .as_ref()
+            .and_then(|url| extract_workspace_from_url(url))
+    });
 
-    Ok(BitbucketProfile { base, token, workspace })
+    Ok(BitbucketProfile {
+        base,
+        token,
+        workspace,
+    })
 }
 
 fn build_product_client(profile: &ProductProfile) -> Result<ApiClient> {

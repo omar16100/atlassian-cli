@@ -152,7 +152,10 @@ pub async fn update_webhook(
     render_success(
         ctx.renderer,
         &format!("✅ Updated webhook: {webhook_id}"),
-        &MutationResult::with_id(format!("Updated webhook: {webhook_id}"), &webhook_id.to_string()),
+        &MutationResult::with_id(
+            format!("Updated webhook: {webhook_id}"),
+            &webhook_id.to_string(),
+        ),
     )
 }
 
@@ -186,7 +189,10 @@ pub async fn delete_webhook(ctx: &JiraContext<'_>, webhook_id: i64, force: bool)
     render_success(
         ctx.renderer,
         &format!("✅ Deleted webhook: {webhook_id}"),
-        &MutationResult::with_id(format!("Deleted webhook: {webhook_id}"), &webhook_id.to_string()),
+        &MutationResult::with_id(
+            format!("Deleted webhook: {webhook_id}"),
+            &webhook_id.to_string(),
+        ),
     )
 }
 
@@ -205,6 +211,9 @@ pub async fn test_webhook(ctx: &JiraContext<'_>, webhook_id: i64) -> Result<()> 
     render_success(
         ctx.renderer,
         &format!("✅ Test payload sent to webhook: {webhook_id}"),
-        &MutationResult::with_id(format!("Test payload sent to webhook: {webhook_id}"), &webhook_id.to_string()),
+        &MutationResult::with_id(
+            format!("Test payload sent to webhook: {webhook_id}"),
+            &webhook_id.to_string(),
+        ),
     )
 }

@@ -302,7 +302,10 @@ pub async fn delete_project(
     render_success(
         ctx.renderer,
         &format!("✅ Project {project_key} deleted from workspace {workspace}"),
-        &MutationResult::with_id(format!("Project {project_key} deleted from workspace {workspace}"), project_key),
+        &MutationResult::with_id(
+            format!("Project {project_key} deleted from workspace {workspace}"),
+            project_key,
+        ),
     )
 }
 

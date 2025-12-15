@@ -96,7 +96,9 @@ pub async fn upload_attachment(
     // Note: This uses the raw reqwest client for multipart upload
     let base_url = ctx.client.base_url();
 
-    let mut request = ctx.client.http_client()
+    let mut request = ctx
+        .client
+        .http_client()
         .post(format!(
             "{}/wiki/rest/api/content/{}/child/attachment",
             base_url, page_id
@@ -124,7 +126,10 @@ pub async fn upload_attachment(
     render_success(
         ctx.renderer,
         &format!("✅ Uploaded attachment '{file_name}' to page {page_id}"),
-        &MutationResult::with_id(format!("Uploaded attachment '{file_name}' to page {page_id}"), page_id),
+        &MutationResult::with_id(
+            format!("Uploaded attachment '{file_name}' to page {page_id}"),
+            page_id,
+        ),
     )
 }
 
@@ -151,7 +156,10 @@ pub async fn download_attachment(
     // Download the file
     let base_url = ctx.client.base_url();
 
-    let mut request = ctx.client.http_client().get(format!("{}{}", base_url, attachment.download_link));
+    let mut request = ctx
+        .client
+        .http_client()
+        .get(format!("{}{}", base_url, attachment.download_link));
 
     // Apply authentication
     request = ctx.client.apply_auth(request);
@@ -206,6 +214,9 @@ pub async fn delete_attachment(
     render_success(
         ctx.renderer,
         &format!("✅ Deleted attachment: {attachment_id}"),
-        &MutationResult::with_id(format!("Deleted attachment: {attachment_id}"), attachment_id),
+        &MutationResult::with_id(
+            format!("Deleted attachment: {attachment_id}"),
+            attachment_id,
+        ),
     )
 }

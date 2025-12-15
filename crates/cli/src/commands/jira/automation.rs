@@ -158,7 +158,10 @@ pub async fn update_rule(
     render_success(
         ctx.renderer,
         &format!("✅ Updated automation rule: {rule_id}"),
-        &MutationResult::with_id(format!("Updated automation rule: {rule_id}"), &rule_id.to_string()),
+        &MutationResult::with_id(
+            format!("Updated automation rule: {rule_id}"),
+            &rule_id.to_string(),
+        ),
     )
 }
 
@@ -177,7 +180,10 @@ pub async fn enable_rule(ctx: &JiraContext<'_>, rule_id: i64) -> Result<()> {
     render_success(
         ctx.renderer,
         &format!("✅ Enabled automation rule: {rule_id}"),
-        &MutationResult::with_id(format!("Enabled automation rule: {rule_id}"), &rule_id.to_string()),
+        &MutationResult::with_id(
+            format!("Enabled automation rule: {rule_id}"),
+            &rule_id.to_string(),
+        ),
     )
 }
 
@@ -196,7 +202,10 @@ pub async fn disable_rule(ctx: &JiraContext<'_>, rule_id: i64) -> Result<()> {
     render_success(
         ctx.renderer,
         &format!("✅ Disabled automation rule: {rule_id}"),
-        &MutationResult::with_id(format!("Disabled automation rule: {rule_id}"), &rule_id.to_string()),
+        &MutationResult::with_id(
+            format!("Disabled automation rule: {rule_id}"),
+            &rule_id.to_string(),
+        ),
     )
 }
 
@@ -222,7 +231,10 @@ pub async fn delete_rule(ctx: &JiraContext<'_>, rule_id: i64, force: bool) -> Re
     render_success(
         ctx.renderer,
         &format!("✅ Deleted automation rule: {rule_id}"),
-        &MutationResult::with_id(format!("Deleted automation rule: {rule_id}"), &rule_id.to_string()),
+        &MutationResult::with_id(
+            format!("Deleted automation rule: {rule_id}"),
+            &rule_id.to_string(),
+        ),
     )
 }
 

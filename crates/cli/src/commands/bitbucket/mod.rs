@@ -80,7 +80,9 @@ enum BitbucketCommands {
 #[derive(Subcommand, Debug, Clone)]
 enum RepoCommands {
     /// List repositories inside a workspace.
-    #[command(long_about = "List repositories inside a workspace.\n\nExamples:\n  bb repo list\n  bb repo list --limit 50\n  bb repo list --workspace my-team")]
+    #[command(
+        long_about = "List repositories inside a workspace.\n\nExamples:\n  bb repo list\n  bb repo list --limit 50\n  bb repo list --workspace my-team"
+    )]
     List {
         #[arg(long, default_value_t = 25)]
         limit: usize,
@@ -92,7 +94,9 @@ enum RepoCommands {
         slug: String,
     },
     /// Create a new repository.
-    #[command(long_about = "Create a new repository.\n\nExamples:\n  bb repo create my-new-repo\n  bb repo create my-repo --name \"My Repository\" --description \"Project repo\" --private")]
+    #[command(
+        long_about = "Create a new repository.\n\nExamples:\n  bb repo create my-new-repo\n  bb repo create my-repo --name \"My Repository\" --description \"Project repo\" --private"
+    )]
     Create {
         /// Repository slug (URL-friendly name, e.g., my-repo)
         slug: String,
