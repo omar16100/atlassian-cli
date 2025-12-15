@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>atlassian-cli | Atlassian Cloud as Code</title>
+    <meta name="description" content="One CLI for Jira, Confluence, Bitbucket & JSM. Automate your entire Atlassian stack from the command line.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="atlassian-cli | Atlassian Cloud as Code">
+    <meta property="og:description" content="One CLI for Jira, Confluence, Bitbucket & JSM">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://atlassiancli.com">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="#install" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-container">
+            <div class="hero-badge">Open Source CLI</div>
+            <h1 class="hero-title">Atlassian Cloud<br><span class="hero-highlight">as Code</span></h1>
+            <p class="hero-subtitle">One CLI for Jira, Confluence, Bitbucket & JSM.<br>Automate your entire stack from the terminal.</p>
+
+            <!-- Terminal Demo -->
+            <div class="terminal">
+                <div class="terminal-header">
+                    <div class="terminal-buttons">
+                        <span class="terminal-btn red"></span>
+                        <span class="terminal-btn yellow"></span>
+                        <span class="terminal-btn green"></span>
+                    </div>
+                    <span class="terminal-title">terminal</span>
+                </div>
+                <div class="terminal-body">
+                    <div class="terminal-line" data-delay="0">
+                        <span class="terminal-prompt">$</span>
+                        <span class="terminal-text" data-text="atlassian-cli jira search --jql &quot;project = DEV&quot;"></span>
+                    </div>
+                    <div class="terminal-line" data-delay="2000">
+                        <span class="terminal-prompt">$</span>
+                        <span class="terminal-text" data-text="atlassian-cli confluence bulk export --cql &quot;space = DOCS&quot;"></span>
+                    </div>
+                    <div class="terminal-line" data-delay="4000">
+                        <span class="terminal-prompt">$</span>
+                        <span class="terminal-text" data-text="atlassian-cli bitbucket pr merge --auto-complete"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="hero-cta">
+                <code class="install-cmd" data-copy="brew install omar16100/tap/atlassian-cli">
+                    <span>brew install omar16100/tap/atlassian-cli</span>
+                    <button class="copy-btn" aria-label="Copy to clipboard">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                    </button>
+                </code>
+            </div>
+        </div>
+    </section>
+
+    <!-- Products Section -->
+    <section class="products" id="products">
+        <div class="container">
+            <h2 class="section-title">Full Product Coverage</h2>
+            <p class="section-subtitle">First-class support for your entire Atlassian Cloud stack</p>
+
+            <div class="products-grid">
+                <!-- Jira -->
+                <div class="product-card">
+                    <div class="product-icon jira">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M27.4 14.6L17.4 4.6c-.8-.8-2-.8-2.8 0L4.6 14.6c-.8.8-.8 2 0 2.8l10 10c.8.8 2 .8 2.8 0l10-10c.8-.8.8-2 0-2.8zM16 20.2L11.8 16 16 11.8 20.2 16 16 20.2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="product-name">Jira</h3>
+                    <ul class="product-features">
+                        <li>Search, create, update issues</li>
+                        <li>Bulk transitions with dry-run</li>
+                        <li>Automation rules management</li>
+                        <li>Webhooks & audit logs</li>
+                    </ul>
+                </div>
+
+                <!-- Confluence -->
+                <div class="product-card">
+                    <div class="product-icon confluence">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M4 23.2c-.4.6-.3 1.4.3 1.8l6.6 4.8c.6.4 1.4.3 1.8-.3 2.4-3.4 5-5 8.2-5 2.4 0 4.6.8 6.8 2.4.6.4 1.4.3 1.8-.3l4.2-5.8c.4-.6.3-1.4-.3-1.8-4.2-3.2-9-4.8-14.2-4.8-7.4 0-12.6 4.2-15.2 9z"/>
+                            <path d="M28 8.8c.4-.6.3-1.4-.3-1.8l-6.6-4.8c-.6-.4-1.4-.3-1.8.3-2.4 3.4-5 5-8.2 5-2.4 0-4.6-.8-6.8-2.4-.6-.4-1.4-.3-1.8.3L.3 11.2c-.4.6-.3 1.4.3 1.8 4.2 3.2 9 4.8 14.2 4.8 7.4 0 12.6-4.2 15.2-9z"/>
+                        </svg>
+                    </div>
+                    <h3 class="product-name">Confluence</h3>
+                    <ul class="product-features">
+                        <li>Space & page management</li>
+                        <li>CQL-based search</li>
+                        <li>Bulk export & backup</li>
+                        <li>Attachment handling</li>
+                    </ul>
+                </div>
+
+                <!-- Bitbucket -->
+                <div class="product-card">
+                    <div class="product-icon bitbucket">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M2 4a1 1 0 00-1 1.1l3.9 23.8a1.3 1.3 0 001.3 1.1h19.8a1 1 0 001-.8L31 5.1A1 1 0 0030 4H2zm17.3 16.6h-6.6L11.2 13h9.6l-1.5 7.6z"/>
+                        </svg>
+                    </div>
+                    <h3 class="product-name">Bitbucket</h3>
+                    <ul class="product-features">
+                        <li>Repository management</li>
+                        <li>Pull request workflows</li>
+                        <li>Branch protection</li>
+                        <li>Pipeline operations</li>
+                    </ul>
+                </div>
+
+                <!-- JSM -->
+                <div class="product-card">
+                    <div class="product-icon jsm">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
+                            <path d="M16 2C8.3 2 2 8.3 2 16s6.3 14 14 14 14-6.3 14-14S23.7 2 16 2zm0 25c-6.1 0-11-4.9-11-11S9.9 5 16 5s11 4.9 11 11-4.9 11-11 11z"/>
+                            <path d="M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 13c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5z"/>
+                        </svg>
+                    </div>
+                    <h3 class="product-name">JSM</h3>
+                    <ul class="product-features">
+                        <li>Service desk operations</li>
+                        <li>Request management</li>
+                        <li>Customer portal access</li>
+                        <li>SLA tracking</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <h2 class="section-title">Built for Automation</h2>
+            <p class="section-subtitle">Designed for scripts, pipelines, and runbooks</p>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Safe by Default</h3>
+                    <p class="feature-desc">Dry-run mode previews changes before execution. Confirmation prompts protect against accidents.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Multi-Format Output</h3>
+                    <p class="feature-desc">Table, JSON, CSV, YAML, or quiet mode. Pipe to jq, export to spreadsheets, or integrate with any tool.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Secure Credentials</h3>
+                    <p class="feature-desc">File-based storage with 600 permissions. Profile support for multiple instances. No keychain dependency.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Bulk Operations</h3>
+                    <p class="feature-desc">Concurrent execution with progress tracking. Process thousands of items with rate-limit handling.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">CI/CD Ready</h3>
+                    <p class="feature-desc">Works with GitHub Actions, GitLab CI, Jenkins, and any pipeline. Exit codes and machine-readable output.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Fast & Lightweight</h3>
+                    <p class="feature-desc">Native Rust binary. Single executable, no runtime dependencies. Low memory footprint.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Examples Section -->
+    <section class="examples" id="examples">
+        <div class="container">
+            <h2 class="section-title">Real-World Runbooks</h2>
+            <p class="section-subtitle">Production-ready automation scripts</p>
+
+            <div class="examples-tabs">
+                <button class="tab-btn active" data-tab="jira">Jira</button>
+                <button class="tab-btn" data-tab="confluence">Confluence</button>
+                <button class="tab-btn" data-tab="bitbucket">Bitbucket</button>
+            </div>
+
+            <div class="examples-content">
+                <!-- Jira Example -->
+                <div class="example-panel active" id="tab-jira">
+                    <div class="example-header">
+                        <h4>Bulk Transition Issues</h4>
+                        <button class="copy-btn" data-copy-target="code-jira" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-jira"><code><span class="comment"># Preview issues to transition (dry-run)</span>
+atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
+  --transition <span class="string">"Done"</span> \
+  --dry-run
+
+<span class="comment"># Execute the transition</span>
+atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
+  --transition <span class="string">"Done"</span> \
+  --profile prod</code></pre>
+                </div>
+
+                <!-- Confluence Example -->
+                <div class="example-panel" id="tab-confluence">
+                    <div class="example-header">
+                        <h4>Backup Space with Attachments</h4>
+                        <button class="copy-btn" data-copy-target="code-confluence" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-confluence"><code><span class="comment"># Export all pages from a space</span>
+atlassian-cli confluence bulk export \
+  --cql <span class="string">"space = DOCS AND type = page"</span> \
+  --output pages.json \
+  --format json
+
+<span class="comment"># Get space metadata</span>
+atlassian-cli confluence space get DOCS --output json
+
+<span class="comment"># List attachments for a page</span>
+atlassian-cli confluence attachment list 123456</code></pre>
+                </div>
+
+                <!-- Bitbucket Example -->
+                <div class="example-panel" id="tab-bitbucket">
+                    <div class="example-header">
+                        <h4>PR Automation Workflow</h4>
+                        <button class="copy-btn" data-copy-target="code-bitbucket" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-bitbucket"><code><span class="comment"># List open pull requests</span>
+atlassian-cli bitbucket pr list \
+  --workspace myteam \
+  --repo api-service \
+  --state OPEN
+
+<span class="comment"># Approve and merge a PR</span>
+atlassian-cli bitbucket pr approve myteam api-service 42
+atlassian-cli bitbucket pr merge myteam api-service 42 \
+  --strategy squash
+
+<span class="comment"># Protect main branch</span>
+atlassian-cli bitbucket branch protect main --approvals 2</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Install Section -->
+    <section class="install" id="install">
+        <div class="container">
+            <h2 class="section-title">Get Started</h2>
+            <p class="section-subtitle">Install in seconds, configure once</p>
+
+            <div class="install-grid">
+                <!-- Homebrew -->
+                <div class="install-card">
+                    <h4 class="install-method">Homebrew</h4>
+                    <p class="install-desc">macOS & Linux</p>
+                    <div class="install-code" data-copy="brew install omar16100/tap/atlassian-cli">
+                        <code>brew install omar16100/tap/atlassian-cli</code>
+                        <button class="copy-btn" aria-label="Copy">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cargo -->
+                <div class="install-card">
+                    <h4 class="install-method">Cargo</h4>
+                    <p class="install-desc">Rust toolchain</p>
+                    <div class="install-code" data-copy="cargo install atlassian-cli">
+                        <code>cargo install atlassian-cli</code>
+                        <button class="copy-btn" aria-label="Copy">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Binary -->
+                <div class="install-card">
+                    <h4 class="install-method">Binary</h4>
+                    <p class="install-desc">GitHub Releases</p>
+                    <a href="https://github.com/omar16100/atlassian-cli/releases" target="_blank" rel="noopener" class="install-link">
+                        Download latest release
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Quick Config -->
+            <div class="config-section">
+                <h4>Configure</h4>
+                <pre class="code-block"><code><span class="comment"># Add your first profile</span>
+atlassian-cli auth login \
+  --email <span class="string">you@company.com</span> \
+  --instance <span class="string">your-domain.atlassian.net</span>
+
+<span class="comment"># Verify it works</span>
+atlassian-cli jira search --jql <span class="string">"assignee = currentUser()"</span></code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.1.7</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">Copied!</div>
+
+    <script src="script.js"></script>
+</body>
+</html>

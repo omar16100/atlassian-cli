@@ -264,7 +264,10 @@ impl BulkExecutor {
             ProgressStyle::with_template(
                 "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}",
             )
-            .unwrap()
+            .unwrap_or_else(|e| {
+                warn!("Invalid progress template: {}, using default", e);
+                ProgressStyle::default_bar()
+            })
             .progress_chars("#>-")
             .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ "),
         );

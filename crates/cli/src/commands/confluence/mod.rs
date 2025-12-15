@@ -54,6 +54,7 @@ enum ConfluenceCommands {
 #[derive(Subcommand, Debug, Clone)]
 enum SpaceCommands {
     /// List spaces
+    #[command(long_about = "List spaces.\n\nExamples:\n  confluence space list\n  confluence space list --limit 50\n  confluence space list --space-type global")]
     List {
         /// Maximum number of results
         #[arg(long)]
@@ -63,13 +64,15 @@ enum SpaceCommands {
         space_type: Option<String>,
     },
     /// Get space details
+    #[command(long_about = "Get space details.\n\nExamples:\n  confluence space get TEAM")]
     Get {
-        /// Space key
+        /// Space key (e.g., TEAM)
         key: String,
     },
     /// Create a new space
+    #[command(long_about = "Create a new space.\n\nExamples:\n  confluence space create --key TEAM --name \"Team Space\"\n  confluence space create --key DOCS --name \"Documentation\" --description \"Project docs\"")]
     Create {
-        /// Space key
+        /// Space key (e.g., TEAM)
         #[arg(long)]
         key: String,
         /// Space name
@@ -328,6 +331,7 @@ enum AttachmentCommands {
 #[derive(Subcommand, Debug, Clone)]
 enum SearchCommands {
     /// Search using CQL
+    #[command(long_about = "Search using CQL (Confluence Query Language).\n\nExamples:\n  confluence search cql 'space = TEAM AND type = page'\n  confluence search cql 'label = important' --limit 50")]
     Cql {
         /// CQL query
         query: String,
@@ -336,6 +340,7 @@ enum SearchCommands {
         limit: Option<usize>,
     },
     /// Text search
+    #[command(long_about = "Full text search.\n\nExamples:\n  confluence search text 'meeting notes'\n  confluence search text 'project update' --limit 20")]
     Text {
         /// Search query
         query: String,
@@ -344,8 +349,9 @@ enum SearchCommands {
         limit: Option<usize>,
     },
     /// Search in space
+    #[command(long_about = "Search within a specific space.\n\nExamples:\n  confluence search in-space TEAM 'release notes'\n  confluence search in-space DOCS 'api reference' --limit 10")]
     InSpace {
-        /// Space key
+        /// Space key (e.g., TEAM)
         space: String,
         /// Search query
         query: String,
@@ -354,21 +360,22 @@ enum SearchCommands {
         limit: Option<usize>,
     },
     /// Search using filter parameters
+    #[command(long_about = "Search using filter parameters.\n\nExamples:\n  confluence search params --space TEAM --type page\n  confluence search params --creator @me --label important")]
     Params {
         /// Filter by space key
-        #[arg(short = 's', long)]
+        #[arg(long)]
         space: Option<String>,
 
         /// Filter by content type (page, blogpost, attachment)
-        #[arg(short = 't', long)]
+        #[arg(long)]
         r#type: Option<String>,
 
         /// Filter by creator (use @me for current user)
-        #[arg(short = 'c', long)]
+        #[arg(long)]
         creator: Option<String>,
 
         /// Filter by label (repeatable)
-        #[arg(short = 'l', long, num_args = 0..)]
+        #[arg(long, num_args = 0..)]
         label: Vec<String>,
 
         /// Search in title
@@ -384,7 +391,7 @@ enum SearchCommands {
         show_query: bool,
 
         /// Maximum number of results
-        #[arg(long, default_value_t = 50)]
+        #[arg(long, default_value_t = 25)]
         limit: usize,
     },
 }

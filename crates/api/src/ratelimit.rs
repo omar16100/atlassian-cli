@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
 use reqwest::Response;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
+use tokio::time::timeout;
 use tracing::{debug, warn};
 
 #[derive(Clone)]
@@ -27,7 +29,10 @@ impl RateLimiter {
     }
 
     pub async fn update_from_response(&self, response: &Response) {
-        let mut state = self.state.lock().await;
+        let Ok(mut state) = timeout(Duration::from_secs(5), self.state.lock()).await else {
+            warn!("Rate limiter lock timeout, skipping update");
+            return;
+        };
 
         if let Some(limit) = response.headers().get("x-ratelimit-limit") {
             if let Ok(s) = limit.to_str() {
@@ -69,7 +74,10 @@ impl RateLimiter {
     }
 
     pub async fn check_limit(&self) -> Option<u64> {
-        let state = self.state.lock().await;
+        let Ok(state) = timeout(Duration::from_secs(5), self.state.lock()).await else {
+            warn!("Rate limiter lock timeout, skipping check");
+            return None;
+        };
 
         if let Some(remaining) = state.remaining {
             if remaining == 0 {
@@ -88,7 +96,14 @@ impl RateLimiter {
     }
 
     pub async fn get_info(&self) -> RateLimitInfo {
-        let state = self.state.lock().await;
+        let Ok(state) = timeout(Duration::from_secs(5), self.state.lock()).await else {
+            warn!("Rate limiter lock timeout, returning empty info");
+            return RateLimitInfo {
+                limit: None,
+                remaining: None,
+                reset_at: None,
+            };
+        };
         RateLimitInfo {
             limit: state.limit,
             remaining: state.remaining,

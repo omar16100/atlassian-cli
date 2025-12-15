@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 use std::fs;
 
 use super::utils::JiraContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // List automation rules
 pub async fn list_rules(ctx: &JiraContext<'_>) -> Result<()> {
@@ -154,8 +155,11 @@ pub async fn update_rule(
         .with_context(|| format!("Failed to update automation rule {rule_id}"))?;
 
     tracing::info!(%rule_id, "Automation rule updated successfully");
-    println!("✅ Updated automation rule: {}", rule_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated automation rule: {rule_id}"),
+        &MutationResult::with_id(format!("Updated automation rule: {rule_id}"), &rule_id.to_string()),
+    )
 }
 
 // Enable automation rule
@@ -170,8 +174,11 @@ pub async fn enable_rule(ctx: &JiraContext<'_>, rule_id: i64) -> Result<()> {
         .with_context(|| format!("Failed to enable automation rule {rule_id}"))?;
 
     tracing::info!(%rule_id, "Automation rule enabled successfully");
-    println!("✅ Enabled automation rule: {}", rule_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Enabled automation rule: {rule_id}"),
+        &MutationResult::with_id(format!("Enabled automation rule: {rule_id}"), &rule_id.to_string()),
+    )
 }
 
 // Disable automation rule
@@ -186,8 +193,11 @@ pub async fn disable_rule(ctx: &JiraContext<'_>, rule_id: i64) -> Result<()> {
         .with_context(|| format!("Failed to disable automation rule {rule_id}"))?;
 
     tracing::info!(%rule_id, "Automation rule disabled successfully");
-    println!("✅ Disabled automation rule: {}", rule_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Disabled automation rule: {rule_id}"),
+        &MutationResult::with_id(format!("Disabled automation rule: {rule_id}"), &rule_id.to_string()),
+    )
 }
 
 // Delete automation rule
@@ -209,8 +219,11 @@ pub async fn delete_rule(ctx: &JiraContext<'_>, rule_id: i64, force: bool) -> Re
         .with_context(|| format!("Failed to delete automation rule {rule_id}"))?;
 
     tracing::info!(%rule_id, "Automation rule deleted successfully");
-    println!("✅ Deleted automation rule: {}", rule_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted automation rule: {rule_id}"),
+        &MutationResult::with_id(format!("Deleted automation rule: {rule_id}"), &rule_id.to_string()),
+    )
 }
 
 // Export automation rule

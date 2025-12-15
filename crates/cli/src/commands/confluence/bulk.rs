@@ -6,6 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::utils::ConfluenceContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // Bulk delete pages
 pub async fn bulk_delete_pages(
@@ -17,7 +18,7 @@ pub async fn bulk_delete_pages(
     let page_ids = search_page_ids(ctx, cql).await?;
 
     if page_ids.is_empty() {
-        println!("No pages matched the CQL query");
+        println!("No pages found matching query");
         return Ok(());
     }
 
@@ -48,8 +49,11 @@ pub async fn bulk_delete_pages(
         })
         .await?;
 
-    println!("✅ Bulk delete completed");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        "✅ Bulk delete completed",
+        &MutationResult::new("Bulk delete completed"),
+    )
 }
 
 // Bulk add labels
@@ -63,7 +67,7 @@ pub async fn bulk_add_labels(
     let page_ids = search_page_ids(ctx, cql).await?;
 
     if page_ids.is_empty() {
-        println!("No pages matched the CQL query");
+        println!("No pages found matching query");
         return Ok(());
     }
 
@@ -104,8 +108,11 @@ pub async fn bulk_add_labels(
         })
         .await?;
 
-    println!("✅ Bulk label operation completed");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        "✅ Bulk label operation completed",
+        &MutationResult::new("Bulk label operation completed"),
+    )
 }
 
 // Bulk export pages
@@ -137,7 +144,7 @@ pub async fn bulk_export_pages(
         .context("Failed to search pages")?;
 
     if response.results.is_empty() {
-        println!("No pages matched the CQL query");
+        println!("No pages found matching query");
         return Ok(());
     }
 
@@ -174,8 +181,11 @@ pub async fn bulk_export_pages(
         }
     }
 
-    println!("✅ Exported {} pages to {}", pages.len(), output.display());
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Exported {} pages to {}", pages.len(), output.display()),
+        &MutationResult::new(format!("Exported {} pages to {}", pages.len(), output.display())),
+    )
 }
 
 // Helper function to search for page IDs using CQL
@@ -209,6 +219,10 @@ async fn search_page_ids(ctx: &ConfluenceContext<'_>, cql: &str) -> Result<Vec<S
     if response.results.len() >= MAX_RESULTS {
         tracing::warn!(
             "Search returned maximum results ({}). Some pages may be excluded. Consider using more specific CQL.",
+            MAX_RESULTS
+        );
+        eprintln!(
+            "⚠️  Results limited to {}. Some pages may be excluded. Use more specific CQL query.",
             MAX_RESULTS
         );
     }

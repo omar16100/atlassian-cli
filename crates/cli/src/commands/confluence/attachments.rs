@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::utils::ConfluenceContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // List attachments
 pub async fn list_attachments(ctx: &ConfluenceContext<'_>, page_id: &str) -> Result<()> {
@@ -94,9 +95,8 @@ pub async fn upload_attachment(
 
     // Note: This uses the raw reqwest client for multipart upload
     let base_url = ctx.client.base_url();
-    let http_client = reqwest::Client::new();
 
-    let mut request = http_client
+    let mut request = ctx.client.http_client()
         .post(format!(
             "{}/wiki/rest/api/content/{}/child/attachment",
             base_url, page_id
@@ -121,8 +121,11 @@ pub async fn upload_attachment(
     }
 
     tracing::info!(%page_id, file = %file_name, "Attachment uploaded successfully");
-    println!("✅ Uploaded attachment '{}' to page {}", file_name, page_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Uploaded attachment '{file_name}' to page {page_id}"),
+        &MutationResult::with_id(format!("Uploaded attachment '{file_name}' to page {page_id}"), page_id),
+    )
 }
 
 // Download attachment
@@ -147,9 +150,8 @@ pub async fn download_attachment(
 
     // Download the file
     let base_url = ctx.client.base_url();
-    let http_client = reqwest::Client::new();
 
-    let mut request = http_client.get(format!("{}{}", base_url, attachment.download_link));
+    let mut request = ctx.client.http_client().get(format!("{}{}", base_url, attachment.download_link));
 
     // Apply authentication
     request = ctx.client.apply_auth(request);
@@ -201,6 +203,9 @@ pub async fn delete_attachment(
         .with_context(|| format!("Failed to delete attachment {}", attachment_id))?;
 
     tracing::info!(%attachment_id, "Attachment deleted successfully");
-    println!("✅ Deleted attachment: {}", attachment_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted attachment: {attachment_id}"),
+        &MutationResult::with_id(format!("Deleted attachment: {attachment_id}"), attachment_id),
+    )
 }

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::utils::JiraContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // List webhooks
 pub async fn list_webhooks(ctx: &JiraContext<'_>) -> Result<()> {
@@ -148,8 +149,11 @@ pub async fn update_webhook(
         .with_context(|| format!("Failed to update webhook {webhook_id}"))?;
 
     tracing::info!(%webhook_id, "Webhook updated successfully");
-    println!("✅ Updated webhook: {}", webhook_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated webhook: {webhook_id}"),
+        &MutationResult::with_id(format!("Updated webhook: {webhook_id}"), &webhook_id.to_string()),
+    )
 }
 
 // Enable webhook
@@ -179,8 +183,11 @@ pub async fn delete_webhook(ctx: &JiraContext<'_>, webhook_id: i64, force: bool)
         .with_context(|| format!("Failed to delete webhook {webhook_id}"))?;
 
     tracing::info!(%webhook_id, "Webhook deleted successfully");
-    println!("✅ Deleted webhook: {}", webhook_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted webhook: {webhook_id}"),
+        &MutationResult::with_id(format!("Deleted webhook: {webhook_id}"), &webhook_id.to_string()),
+    )
 }
 
 // Test webhook (send a test payload)
@@ -195,6 +202,9 @@ pub async fn test_webhook(ctx: &JiraContext<'_>, webhook_id: i64) -> Result<()> 
         .with_context(|| format!("Failed to test webhook {webhook_id}"))?;
 
     tracing::info!(%webhook_id, "Webhook test sent successfully");
-    println!("✅ Test payload sent to webhook: {}", webhook_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Test payload sent to webhook: {webhook_id}"),
+        &MutationResult::with_id(format!("Test payload sent to webhook: {webhook_id}"), &webhook_id.to_string()),
+    )
 }

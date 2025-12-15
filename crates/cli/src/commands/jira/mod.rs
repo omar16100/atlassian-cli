@@ -23,7 +23,55 @@ pub struct JiraArgs {
 
 #[derive(Subcommand, Debug, Clone)]
 enum JiraCommands {
+    /// Issue operations (search, get, create, update, delete, etc.)
+    #[command(subcommand)]
+    Issue(IssueCommands),
+
+    /// Manage projects
+    #[command(subcommand)]
+    Project(ProjectCommands),
+
+    /// Manage components
+    #[command(subcommand)]
+    Components(ComponentCommands),
+
+    /// Manage versions/releases
+    #[command(subcommand)]
+    Versions(VersionCommands),
+
+    /// Manage project roles
+    #[command(subcommand)]
+    Roles(RoleCommands),
+
+    /// Manage custom fields
+    #[command(subcommand)]
+    Fields(FieldCommands),
+
+    /// Manage workflows
+    #[command(subcommand)]
+    Workflows(WorkflowCommands),
+
+    /// Bulk operations
+    #[command(subcommand)]
+    Bulk(BulkCommands),
+
+    /// Manage automation rules
+    #[command(subcommand)]
+    Automation(AutomationCommands),
+
+    /// Manage webhooks
+    #[command(subcommand)]
+    Webhooks(WebhookCommands),
+
+    /// Audit log access
+    #[command(subcommand)]
+    Audit(AuditCommands),
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum IssueCommands {
     /// Search issues using JQL or filter parameters
+    #[command(long_about = "Search issues using JQL or filter parameters.\n\nExamples:\n  jira issue search --project PROJ --status Open\n  jira issue search --assignee @me --priority High\n  jira issue search --jql 'project = PROJ AND status = Open ORDER BY created DESC'\n  jira issue search --status Open --status \"In Progress\" --limit 50")]
     Search {
         /// Raw JQL query (conflicts with filter flags)
         #[arg(long, conflicts_with_all = ["assignee", "status", "priority", "label", "type", "project", "text"])]
@@ -31,27 +79,27 @@ enum JiraCommands {
 
         // Filter flags (only when --jql not used)
         /// Filter by assignee (use @me for current user)
-        #[arg(short = 'a', long)]
+        #[arg(long)]
         assignee: Option<String>,
 
         /// Filter by status (repeatable)
-        #[arg(short = 's', long, num_args = 0..)]
+        #[arg(long, num_args = 0..)]
         status: Vec<String>,
 
         /// Filter by priority
-        #[arg(short = 'y', long)]
+        #[arg(long)]
         priority: Option<String>,
 
         /// Filter by label (repeatable)
-        #[arg(short = 'l', long, num_args = 0..)]
+        #[arg(long, num_args = 0..)]
         label: Vec<String>,
 
         /// Filter by issue type
-        #[arg(short = 't', long)]
+        #[arg(long)]
         r#type: Option<String>,
 
         /// Filter by project
-        #[arg(short = 'p', long)]
+        #[arg(long)]
         project: Option<String>,
 
         /// Free text search in summary
@@ -63,7 +111,7 @@ enum JiraCommands {
         show_query: bool,
 
         /// Maximum number of issues to return
-        #[arg(long, default_value_t = 50)]
+        #[arg(long, default_value_t = 25)]
         limit: usize,
     },
 
@@ -74,23 +122,24 @@ enum JiraCommands {
     },
 
     /// Create a new issue
+    #[command(long_about = "Create a new issue.\n\nExamples:\n  jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High")]
     Create {
-        /// Project key
+        /// Project key (e.g., PROJ)
         #[arg(long)]
         project: String,
-        /// Issue type (e.g. Task, Bug, Story)
+        /// Issue type (e.g., Task, Bug, Story)
         #[arg(long)]
         issue_type: String,
         /// Issue summary
         #[arg(long)]
         summary: String,
-        /// Issue description
+        /// Issue description (Atlassian Document Format or plain text)
         #[arg(long)]
         description: Option<String>,
         /// Assignee account ID or email
         #[arg(long)]
         assignee: Option<String>,
-        /// Priority name (e.g. High, Medium, Low)
+        /// Priority name (e.g., High, Medium, Low)
         #[arg(long)]
         priority: Option<String>,
     },
@@ -154,46 +203,6 @@ enum JiraCommands {
     /// Manage issue comments
     #[command(subcommand)]
     Comments(CommentCommands),
-
-    /// Manage projects
-    #[command(subcommand)]
-    Project(ProjectCommands),
-
-    /// Manage components
-    #[command(subcommand)]
-    Components(ComponentCommands),
-
-    /// Manage versions/releases
-    #[command(subcommand)]
-    Versions(VersionCommands),
-
-    /// Manage project roles
-    #[command(subcommand)]
-    Roles(RoleCommands),
-
-    /// Manage custom fields
-    #[command(subcommand)]
-    Fields(FieldCommands),
-
-    /// Manage workflows
-    #[command(subcommand)]
-    Workflows(WorkflowCommands),
-
-    /// Bulk operations
-    #[command(subcommand)]
-    Bulk(BulkCommands),
-
-    /// Manage automation rules
-    #[command(subcommand)]
-    Automation(AutomationCommands),
-
-    /// Manage webhooks
-    #[command(subcommand)]
-    Webhooks(WebhookCommands),
-
-    /// Audit log access
-    #[command(subcommand)]
-    Audit(AuditCommands),
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -766,99 +775,103 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
     let ctx = JiraContext { client, renderer };
 
     match args.command {
-        JiraCommands::Search {
-            jql,
-            assignee,
-            status,
-            priority,
-            label,
-            r#type,
-            project,
-            text,
-            show_query,
-            limit,
-        } => {
-            issues::search_issues(
-                &ctx,
-                jql.as_deref(),
-                assignee.as_deref(),
-                &status,
-                priority.as_deref(),
-                &label,
-                r#type.as_deref(),
-                project.as_deref(),
-                text.as_deref(),
+        JiraCommands::Issue(cmd) => match cmd {
+            IssueCommands::Search {
+                jql,
+                assignee,
+                status,
+                priority,
+                label,
+                r#type,
+                project,
+                text,
                 show_query,
                 limit,
-            )
-            .await
-        }
-        JiraCommands::Get { key } => issues::view_issue(&ctx, &key).await,
-        JiraCommands::Create {
-            project,
-            issue_type,
-            summary,
-            description,
-            assignee,
-            priority,
-        } => {
-            issues::create_issue(
-                &ctx,
-                &project,
-                &issue_type,
-                &summary,
-                description.as_deref(),
-                assignee.as_deref(),
-                priority.as_deref(),
-            )
-            .await
-        }
-        JiraCommands::Update {
-            key,
-            summary,
-            description,
-            priority,
-        } => {
-            issues::update_issue(
-                &ctx,
-                &key,
-                summary.as_deref(),
-                description.as_deref(),
-                priority.as_deref(),
-            )
-            .await
-        }
-        JiraCommands::Delete { key, force } => issues::delete_issue(&ctx, &key, force).await,
-        JiraCommands::Transition { key, transition } => {
-            issues::transition_issue(&ctx, &key, &transition).await
-        }
-        JiraCommands::Assign { key, assignee } => issues::assign_issue(&ctx, &key, &assignee).await,
-        JiraCommands::Unassign { key } => issues::unassign_issue(&ctx, &key).await,
-        JiraCommands::Watchers(cmd) => match cmd {
-            WatcherCommands::List { key } => issues::list_watchers(&ctx, &key).await,
-            WatcherCommands::Add { key, user } => issues::add_watcher(&ctx, &key, &user).await,
-            WatcherCommands::Remove { key, user } => {
-                issues::remove_watcher(&ctx, &key, &user).await
+            } => {
+                issues::search_issues(
+                    &ctx,
+                    jql.as_deref(),
+                    assignee.as_deref(),
+                    &status,
+                    priority.as_deref(),
+                    &label,
+                    r#type.as_deref(),
+                    project.as_deref(),
+                    text.as_deref(),
+                    show_query,
+                    limit,
+                )
+                .await
             }
-        },
-        JiraCommands::Links(cmd) => match cmd {
-            LinkCommands::List { key } => issues::list_links(&ctx, &key).await,
-            LinkCommands::Create {
-                from,
-                to,
-                link_type,
-            } => issues::create_link(&ctx, &from, &to, &link_type).await,
-            LinkCommands::Delete { link_id } => issues::delete_link(&ctx, &link_id).await,
-        },
-        JiraCommands::Comments(cmd) => match cmd {
-            CommentCommands::List { key } => issues::list_comments(&ctx, &key).await,
-            CommentCommands::Add { key, body } => issues::add_comment(&ctx, &key, &body).await,
-            CommentCommands::Update { comment_id, body } => {
-                issues::update_comment(&ctx, &comment_id, &body).await
+            IssueCommands::Get { key } => issues::view_issue(&ctx, &key).await,
+            IssueCommands::Create {
+                project,
+                issue_type,
+                summary,
+                description,
+                assignee,
+                priority,
+            } => {
+                issues::create_issue(
+                    &ctx,
+                    &project,
+                    &issue_type,
+                    &summary,
+                    description.as_deref(),
+                    assignee.as_deref(),
+                    priority.as_deref(),
+                )
+                .await
             }
-            CommentCommands::Delete { comment_id } => {
-                issues::delete_comment(&ctx, &comment_id).await
+            IssueCommands::Update {
+                key,
+                summary,
+                description,
+                priority,
+            } => {
+                issues::update_issue(
+                    &ctx,
+                    &key,
+                    summary.as_deref(),
+                    description.as_deref(),
+                    priority.as_deref(),
+                )
+                .await
             }
+            IssueCommands::Delete { key, force } => issues::delete_issue(&ctx, &key, force).await,
+            IssueCommands::Transition { key, transition } => {
+                issues::transition_issue(&ctx, &key, &transition).await
+            }
+            IssueCommands::Assign { key, assignee } => {
+                issues::assign_issue(&ctx, &key, &assignee).await
+            }
+            IssueCommands::Unassign { key } => issues::unassign_issue(&ctx, &key).await,
+            IssueCommands::Watchers(watcher_cmd) => match watcher_cmd {
+                WatcherCommands::List { key } => issues::list_watchers(&ctx, &key).await,
+                WatcherCommands::Add { key, user } => issues::add_watcher(&ctx, &key, &user).await,
+                WatcherCommands::Remove { key, user } => {
+                    issues::remove_watcher(&ctx, &key, &user).await
+                }
+            },
+            IssueCommands::Links(link_cmd) => match link_cmd {
+                LinkCommands::List { key } => issues::list_links(&ctx, &key).await,
+                LinkCommands::Create {
+                    from,
+                    to,
+                    link_type,
+                } => issues::create_link(&ctx, &from, &to, &link_type).await,
+                LinkCommands::Delete { link_id } => issues::delete_link(&ctx, &link_id).await,
+            },
+            IssueCommands::Comments(comment_cmd) => match comment_cmd {
+                CommentCommands::List { key } => issues::list_comments(&ctx, &key).await,
+                CommentCommands::Add { key, body } => issues::add_comment(&ctx, &key, &body).await,
+                CommentCommands::Update { comment_id, body } => {
+                    issues::update_comment(&ctx, &comment_id, &body).await
+                }
+                CommentCommands::Delete { comment_id } => {
+                    issues::delete_comment(&ctx, &comment_id).await
+                }
+            },
         },
         JiraCommands::Project(cmd) => match cmd {
             ProjectCommands::List => projects::list_projects(&ctx).await,

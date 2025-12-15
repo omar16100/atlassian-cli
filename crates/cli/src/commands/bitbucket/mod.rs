@@ -80,23 +80,29 @@ enum BitbucketCommands {
 #[derive(Subcommand, Debug, Clone)]
 enum RepoCommands {
     /// List repositories inside a workspace.
+    #[command(long_about = "List repositories inside a workspace.\n\nExamples:\n  bb repo list\n  bb repo list --limit 50\n  bb repo list --workspace my-team")]
     List {
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
     /// Show repository metadata.
-    Get { slug: String },
-    /// Create a new repository.
-    Create {
-        /// Repository slug (URL-friendly name).
+    #[command(long_about = "Show repository metadata.\n\nExamples:\n  bb repo get my-repo")]
+    Get {
+        /// Repository slug (e.g., my-repo)
         slug: String,
-        /// Repository display name.
+    },
+    /// Create a new repository.
+    #[command(long_about = "Create a new repository.\n\nExamples:\n  bb repo create my-new-repo\n  bb repo create my-repo --name \"My Repository\" --description \"Project repo\" --private")]
+    Create {
+        /// Repository slug (URL-friendly name, e.g., my-repo)
+        slug: String,
+        /// Repository display name
         #[arg(long)]
         name: Option<String>,
-        /// Repository description.
+        /// Repository description
         #[arg(long)]
         description: Option<String>,
-        /// Make repository private.
+        /// Make repository private
         #[arg(long)]
         private: bool,
         /// Project key to associate with.
@@ -388,6 +394,9 @@ enum PipelineCommands {
         /// Fetch all pages (ignores --limit).
         #[arg(long)]
         all: bool,
+        /// Show step summary for each pipeline (adds N API calls).
+        #[arg(long)]
+        steps: bool,
     },
     /// Get pipeline details.
     Get {
@@ -438,6 +447,13 @@ enum PipelineCommands {
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
+    },
+    /// List steps for a pipeline.
+    Steps {
+        /// Repository slug.
+        repo: String,
+        /// Pipeline UUID or build number.
+        uuid: String,
     },
 }
 
@@ -822,6 +838,7 @@ pub async fn execute(
                 recent,
                 branch,
                 all,
+                steps,
             } => {
                 pipelines::list_pipelines(
                     &ctx,
@@ -832,6 +849,7 @@ pub async fn execute(
                     recent,
                     branch.as_deref(),
                     all,
+                    steps,
                 )
                 .await
             }
@@ -860,6 +878,9 @@ pub async fn execute(
                 interval,
                 steps,
             } => pipelines::watch_pipeline(&ctx, &workspace, &repo, &uuid, interval, steps).await,
+            PipelineCommands::Steps { repo, uuid } => {
+                pipelines::list_steps(&ctx, &workspace, &repo, &uuid).await
+            }
         },
         BitbucketCommands::Webhook(cmd) => match cmd {
             WebhookCommands::List { repo } => {

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::utils::JiraContext;
+use crate::commands::common::{render_success, MutationResult};
 use crate::query::JqlBuilder;
 
 // Issue CRUD Operations
@@ -92,7 +93,8 @@ pub async fn search_issues(
         .context("Failed to execute search")?;
 
     if response.issues.is_empty() {
-        tracing::info!("No issues matched the provided JQL.");
+        tracing::info!("No issues found");
+        println!("No issues found");
         return Ok(());
     }
 
@@ -237,8 +239,11 @@ pub async fn create_issue(
         .context("Failed to create issue")?;
 
     tracing::info!(key = %response.key, id = %response.id, "Issue created successfully");
-    println!("✅ Created issue: {}", response.key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Created issue: {}", response.key),
+        &MutationResult::with_id(format!("Created issue: {}", response.key), &response.key),
+    )
 }
 
 pub async fn update_issue(
@@ -280,14 +285,19 @@ pub async fn update_issue(
         .with_context(|| format!("Failed to update issue {key}"))?;
 
     tracing::info!(%key, "Issue updated successfully");
-    println!("✅ Updated issue: {}", key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated issue: {key}"),
+        &MutationResult::with_id(format!("Updated issue: {key}"), key),
+    )
 }
 
 pub async fn delete_issue(ctx: &JiraContext<'_>, key: &str, force: bool) -> Result<()> {
     if !force {
-        println!("⚠️  About to delete issue: {}", key);
-        println!("Use --force to confirm deletion");
+        println!(
+            "⚠️  This will permanently delete issue {}. Use --force to confirm.",
+            key
+        );
         return Ok(());
     }
 
@@ -298,8 +308,11 @@ pub async fn delete_issue(ctx: &JiraContext<'_>, key: &str, force: bool) -> Resu
         .with_context(|| format!("Failed to delete issue {key}"))?;
 
     tracing::info!(%key, "Issue deleted successfully");
-    println!("✅ Deleted issue: {}", key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted issue: {key}"),
+        &MutationResult::with_id(format!("Deleted issue: {key}"), key),
+    )
 }
 
 pub async fn transition_issue(ctx: &JiraContext<'_>, key: &str, transition: &str) -> Result<()> {
@@ -338,8 +351,11 @@ pub async fn transition_issue(ctx: &JiraContext<'_>, key: &str, transition: &str
         .with_context(|| format!("Failed to transition issue {key}"))?;
 
     tracing::info!(%key, transition = %target.name, "Issue transitioned successfully");
-    println!("✅ Transitioned {} to: {}", key, target.name);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Transitioned {key} to: {}", target.name),
+        &MutationResult::with_id(format!("Transitioned to: {}", target.name), key),
+    )
 }
 
 pub async fn assign_issue(ctx: &JiraContext<'_>, key: &str, assignee: &str) -> Result<()> {
@@ -354,8 +370,11 @@ pub async fn assign_issue(ctx: &JiraContext<'_>, key: &str, assignee: &str) -> R
         .with_context(|| format!("Failed to assign issue {key}"))?;
 
     tracing::info!(%key, %assignee, "Issue assigned successfully");
-    println!("✅ Assigned {} to: {}", key, assignee);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Assigned {key} to: {assignee}"),
+        &MutationResult::with_id(format!("Assigned to: {assignee}"), key),
+    )
 }
 
 pub async fn unassign_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
@@ -370,8 +389,11 @@ pub async fn unassign_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         .with_context(|| format!("Failed to unassign issue {key}"))?;
 
     tracing::info!(%key, "Issue unassigned successfully");
-    println!("✅ Unassigned: {}", key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Unassigned: {key}"),
+        &MutationResult::with_id(format!("Unassigned: {key}"), key),
+    )
 }
 
 // Watcher operations
@@ -429,8 +451,11 @@ pub async fn add_watcher(ctx: &JiraContext<'_>, key: &str, user: &str) -> Result
         .with_context(|| format!("Failed to add watcher to {key}"))?;
 
     tracing::info!(%key, %user, "Watcher added successfully");
-    println!("✅ Added watcher to {}: {}", key, user);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Added watcher to {key}: {user}"),
+        &MutationResult::with_id(format!("Added watcher: {user}"), key),
+    )
 }
 
 pub async fn remove_watcher(ctx: &JiraContext<'_>, key: &str, user: &str) -> Result<()> {
@@ -443,8 +468,11 @@ pub async fn remove_watcher(ctx: &JiraContext<'_>, key: &str, user: &str) -> Res
         .with_context(|| format!("Failed to remove watcher from {key}"))?;
 
     tracing::info!(%key, %user, "Watcher removed successfully");
-    println!("✅ Removed watcher from {}: {}", key, user);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Removed watcher from {key}: {user}"),
+        &MutationResult::with_id(format!("Removed watcher: {user}"), key),
+    )
 }
 
 // Link operations
@@ -483,8 +511,11 @@ pub async fn create_link(
         .context("Failed to create issue link")?;
 
     tracing::info!(%from, %to, %link_type, "Issue link created successfully");
-    println!("✅ Linked {} to {} ({})", from, to, link_type);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Linked {from} to {to} ({link_type})"),
+        &MutationResult::new(format!("Linked {from} to {to} ({link_type})")),
+    )
 }
 
 pub async fn delete_link(ctx: &JiraContext<'_>, link_id: &str) -> Result<()> {
@@ -495,8 +526,11 @@ pub async fn delete_link(ctx: &JiraContext<'_>, link_id: &str) -> Result<()> {
         .with_context(|| format!("Failed to delete link {link_id}"))?;
 
     tracing::info!(%link_id, "Issue link deleted successfully");
-    println!("✅ Deleted link: {}", link_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted link: {link_id}"),
+        &MutationResult::with_id(format!("Deleted link: {link_id}"), link_id),
+    )
 }
 
 // Comment operations
@@ -573,8 +607,11 @@ pub async fn add_comment(ctx: &JiraContext<'_>, key: &str, body: &str) -> Result
         .with_context(|| format!("Failed to add comment to {key}"))?;
 
     tracing::info!(%key, "Comment added successfully");
-    println!("✅ Added comment to: {}", key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Added comment to: {key}"),
+        &MutationResult::with_id(format!("Added comment to: {key}"), key),
+    )
 }
 
 pub async fn update_comment(ctx: &JiraContext<'_>, comment_id: &str, body: &str) -> Result<()> {
@@ -598,8 +635,11 @@ pub async fn update_comment(ctx: &JiraContext<'_>, comment_id: &str, body: &str)
         .with_context(|| format!("Failed to update comment {comment_id}"))?;
 
     tracing::info!(%comment_id, "Comment updated successfully");
-    println!("✅ Updated comment: {}", comment_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated comment: {comment_id}"),
+        &MutationResult::with_id(format!("Updated comment: {comment_id}"), comment_id),
+    )
 }
 
 pub async fn delete_comment(ctx: &JiraContext<'_>, comment_id: &str) -> Result<()> {
@@ -610,8 +650,11 @@ pub async fn delete_comment(ctx: &JiraContext<'_>, comment_id: &str) -> Result<(
         .with_context(|| format!("Failed to delete comment {comment_id}"))?;
 
     tracing::info!(%comment_id, "Comment deleted successfully");
-    println!("✅ Deleted comment: {}", comment_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted comment: {comment_id}"),
+        &MutationResult::with_id(format!("Deleted comment: {comment_id}"), comment_id),
+    )
 }
 
 // Issue-related data structures

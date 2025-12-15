@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::utils::JiraContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // Project Operations
 
@@ -59,7 +60,8 @@ pub async fn list_projects(ctx: &JiraContext<'_>) -> Result<()> {
         .collect();
 
     if rows.is_empty() {
-        tracing::info!("No projects returned for this account.");
+        tracing::info!("No projects found");
+        println!("No projects found");
         return Ok(());
     }
 
@@ -157,8 +159,11 @@ pub async fn create_project(
         .context("Failed to create project")?;
 
     tracing::info!(key = %response.key, id = %response.id, "Project created successfully");
-    println!("✅ Created project: {}", response.key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Created project: {}", response.key),
+        &MutationResult::with_id(format!("Created project: {}", response.key), &response.key),
+    )
 }
 
 pub async fn update_project(
@@ -191,14 +196,19 @@ pub async fn update_project(
         .with_context(|| format!("Failed to update project {key}"))?;
 
     tracing::info!(%key, "Project updated successfully");
-    println!("✅ Updated project: {}", key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated project: {key}"),
+        &MutationResult::with_id(format!("Updated project: {key}"), key),
+    )
 }
 
 pub async fn delete_project(ctx: &JiraContext<'_>, key: &str, force: bool) -> Result<()> {
     if !force {
-        println!("⚠️  About to delete project: {}", key);
-        println!("Use --force to confirm deletion");
+        println!(
+            "⚠️  This will permanently delete project {}. Use --force to confirm.",
+            key
+        );
         return Ok(());
     }
 
@@ -209,8 +219,11 @@ pub async fn delete_project(ctx: &JiraContext<'_>, key: &str, force: bool) -> Re
         .with_context(|| format!("Failed to delete project {key}"))?;
 
     tracing::info!(%key, "Project deleted successfully");
-    println!("✅ Deleted project: {}", key);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted project: {key}"),
+        &MutationResult::with_id(format!("Deleted project: {key}"), key),
+    )
 }
 
 // Component Management Functions
@@ -378,8 +391,11 @@ pub async fn update_component(
         .with_context(|| format!("Failed to update component {id}"))?;
 
     tracing::info!(%id, "Component updated successfully");
-    println!("✅ Updated component: {}", id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated component: {id}"),
+        &MutationResult::with_id(format!("Updated component: {id}"), id),
+    )
 }
 
 pub async fn delete_component(ctx: &JiraContext<'_>, id: &str) -> Result<()> {
@@ -390,8 +406,11 @@ pub async fn delete_component(ctx: &JiraContext<'_>, id: &str) -> Result<()> {
         .with_context(|| format!("Failed to delete component {id}"))?;
 
     tracing::info!(%id, "Component deleted successfully");
-    println!("✅ Deleted component: {}", id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted component: {id}"),
+        &MutationResult::with_id(format!("Deleted component: {id}"), id),
+    )
 }
 
 // Version Management Functions
@@ -575,8 +594,11 @@ pub async fn update_version(
         .with_context(|| format!("Failed to update version {id}"))?;
 
     tracing::info!(%id, "Version updated successfully");
-    println!("✅ Updated version: {}", id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated version: {id}"),
+        &MutationResult::with_id(format!("Updated version: {id}"), id),
+    )
 }
 
 pub async fn delete_version(ctx: &JiraContext<'_>, id: &str) -> Result<()> {
@@ -587,8 +609,11 @@ pub async fn delete_version(ctx: &JiraContext<'_>, id: &str) -> Result<()> {
         .with_context(|| format!("Failed to delete version {id}"))?;
 
     tracing::info!(%id, "Version deleted successfully");
-    println!("✅ Deleted version: {}", id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted version: {id}"),
+        &MutationResult::with_id(format!("Deleted version: {id}"), id),
+    )
 }
 
 pub async fn merge_versions(ctx: &JiraContext<'_>, from: &str, to: &str) -> Result<()> {
@@ -604,6 +629,9 @@ pub async fn merge_versions(ctx: &JiraContext<'_>, from: &str, to: &str) -> Resu
         .with_context(|| format!("Failed to merge version {from} to {to}"))?;
 
     tracing::info!(%from, %to, "Versions merged successfully");
-    println!("✅ Merged version {} into {}", from, to);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Merged version {from} into {to}"),
+        &MutationResult::new(format!("Merged version {from} into {to}")),
+    )
 }

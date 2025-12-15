@@ -137,6 +137,7 @@ pub async fn list_commits(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No commits found");
+        println!("No commits found");
         return Ok(());
     }
 
@@ -226,7 +227,8 @@ pub async fn get_commit_diff(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(commit_hash, workspace, repo_slug, "No changes in commit");
+        tracing::info!(commit_hash, workspace, repo_slug, "No changes found");
+        println!("No changes found");
         return Ok(());
     }
 
@@ -275,6 +277,7 @@ pub async fn browse_source(
             repo_slug,
             "No files found"
         );
+        println!("No files found");
         return Ok(());
     }
 

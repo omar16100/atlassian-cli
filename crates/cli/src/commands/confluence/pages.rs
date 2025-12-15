@@ -5,6 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::utils::ConfluenceContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // List pages
 pub async fn list_pages(
@@ -127,8 +128,11 @@ pub async fn create_page(
         .context("Failed to create page")?;
 
     tracing::info!(id = %response.id, title = %response.title, "Page created successfully");
-    println!("✅ Created page: {} (ID: {})", response.title, response.id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Created page: {} (ID: {})", response.title, response.id),
+        &MutationResult::with_id(format!("Created page: {}", response.title), &response.id),
+    )
 }
 
 // Update page
@@ -181,8 +185,11 @@ pub async fn update_page(
         .with_context(|| format!("Failed to update page {}", page_id))?;
 
     tracing::info!(%page_id, "Page updated successfully");
-    println!("✅ Updated page: {}", page_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated page: {page_id}"),
+        &MutationResult::with_id(format!("Updated page: {page_id}"), page_id),
+    )
 }
 
 // Delete page
@@ -202,8 +209,11 @@ pub async fn delete_page(ctx: &ConfluenceContext<'_>, page_id: &str, force: bool
         .with_context(|| format!("Failed to delete page {}", page_id))?;
 
     tracing::info!(%page_id, "Page deleted successfully");
-    println!("✅ Deleted page: {}", page_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted page: {page_id}"),
+        &MutationResult::with_id(format!("Deleted page: {page_id}"), page_id),
+    )
 }
 
 // List page versions
@@ -264,8 +274,11 @@ pub async fn add_page_label(ctx: &ConfluenceContext<'_>, page_id: &str, label: &
         .with_context(|| format!("Failed to add label to page {}", page_id))?;
 
     tracing::info!(%page_id, %label, "Label added successfully");
-    println!("✅ Added label '{}' to page {}", label, page_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Added label '{label}' to page {page_id}"),
+        &MutationResult::with_id(format!("Added label '{label}' to page {page_id}"), page_id),
+    )
 }
 
 // Remove page label
@@ -284,8 +297,11 @@ pub async fn remove_page_label(
         .with_context(|| format!("Failed to remove label from page {}", page_id))?;
 
     tracing::info!(%page_id, %label, "Label removed successfully");
-    println!("✅ Removed label '{}' from page {}", label, page_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Removed label '{label}' from page {page_id}"),
+        &MutationResult::with_id(format!("Removed label '{label}' from page {page_id}"), page_id),
+    )
 }
 
 // List page comments
@@ -356,8 +372,11 @@ pub async fn add_page_comment(
         .with_context(|| format!("Failed to add comment to page {}", page_id))?;
 
     tracing::info!(page_id = %page_id, comment_id = %response.id, "Comment added successfully");
-    println!("✅ Added comment to page {} (ID: {})", page_id, response.id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Added comment to page {page_id} (ID: {})", response.id),
+        &MutationResult::with_id(format!("Added comment to page {page_id}"), &response.id),
+    )
 }
 
 // Get page restrictions
@@ -602,8 +621,11 @@ pub async fn update_blogpost(
         .with_context(|| format!("Failed to update blog post {}", blogpost_id))?;
 
     tracing::info!(%blogpost_id, "Blog post updated successfully");
-    println!("✅ Updated blog post: {}", blogpost_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Updated blog post: {blogpost_id}"),
+        &MutationResult::with_id(format!("Updated blog post: {blogpost_id}"), blogpost_id),
+    )
 }
 
 // Delete blog post
@@ -627,6 +649,9 @@ pub async fn delete_blogpost(
         .with_context(|| format!("Failed to delete blog post {}", blogpost_id))?;
 
     tracing::info!(%blogpost_id, "Blog post deleted successfully");
-    println!("✅ Deleted blog post: {}", blogpost_id);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Deleted blog post: {blogpost_id}"),
+        &MutationResult::with_id(format!("Deleted blog post: {blogpost_id}"), blogpost_id),
+    )
 }

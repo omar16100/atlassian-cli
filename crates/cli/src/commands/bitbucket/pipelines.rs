@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
 use super::utils::BitbucketContext;
+use crate::commands::common::{render_success, MutationResult};
 
 // ============================================================================
 // API Response Structs
@@ -70,6 +71,12 @@ struct PipelineStep {
     name: Option<String>,
     #[serde(default)]
     state: Option<StepState>,
+    #[serde(default)]
+    started_on: Option<String>,
+    #[serde(default)]
+    completed_on: Option<String>,
+    #[serde(default)]
+    duration_in_seconds: Option<u64>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -95,6 +102,8 @@ struct PipelineRow {
     ref_name: String,
     target_type: String,
     created: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    steps_summary: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -113,8 +122,17 @@ struct PipelineView {
 
 #[derive(Serialize, Clone)]
 struct StepInfo {
+    uuid: String,
     name: String,
     status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    started: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    completed: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    duration: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logs_url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -180,6 +198,19 @@ fn format_elapsed(start: Instant) -> String {
         format!("{:02}:{:02}:{:02}", hours, mins % 60, secs % 60)
     } else {
         format!("{:02}:{:02}", mins, secs % 60)
+    }
+}
+
+fn format_duration_secs(seconds: u64) -> String {
+    let mins = seconds / 60;
+    let secs = seconds % 60;
+    let hours = mins / 60;
+    if hours > 0 {
+        format!("{}h {}m {}s", hours, mins % 60, secs)
+    } else if mins > 0 {
+        format!("{}m {}s", mins, secs)
+    } else {
+        format!("{}s", secs)
     }
 }
 
@@ -320,6 +351,7 @@ async fn fetch_steps(
     workspace: &str,
     repo_slug: &str,
     pipeline_uuid: &str,
+    include_details: bool,
 ) -> Result<Vec<StepInfo>> {
     let path =
         format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
@@ -329,12 +361,39 @@ async fn fetch_steps(
         .await
         .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
+    let clean_pipeline_uuid = pipeline_uuid.trim_matches('{').trim_matches('}');
     Ok(response
         .values
         .iter()
-        .map(|step| StepInfo {
-            name: step.name.clone().unwrap_or_else(|| step.uuid.clone()),
-            status: get_step_status(step),
+        .map(|step| {
+            let clean_step_uuid = step.uuid.trim_matches('{').trim_matches('}');
+            StepInfo {
+                uuid: step.uuid.clone(),
+                name: step.name.clone().unwrap_or_else(|| step.uuid.clone()),
+                status: get_step_status(step),
+                started: if include_details {
+                    step.started_on.clone()
+                } else {
+                    None
+                },
+                completed: if include_details {
+                    step.completed_on.clone()
+                } else {
+                    None
+                },
+                duration: if include_details {
+                    step.duration_in_seconds.map(format_duration_secs)
+                } else {
+                    None
+                },
+                logs_url: if include_details {
+                    Some(format!(
+                        "https://bitbucket.org/{workspace}/{repo_slug}/pipelines/results/{clean_pipeline_uuid}/steps/{clean_step_uuid}"
+                    ))
+                } else {
+                    None
+                },
+            }
         })
         .collect())
 }
@@ -365,6 +424,7 @@ pub async fn list_pipelines(
     recent: Option<usize>,
     branch: Option<&str>,
     fetch_all: bool,
+    show_steps: bool,
 ) -> Result<()> {
     // Handle --recent shorthand
     let (effective_limit, effective_sort) = if let Some(n) = recent {
@@ -420,9 +480,23 @@ pub async fn list_pipelines(
         }
     }
 
+    // Fetch steps for each pipeline if requested
+    let step_summaries: Vec<Option<String>> = if show_steps {
+        let mut summaries = Vec::with_capacity(all_pipelines.len());
+        for pipeline in &all_pipelines {
+            let steps = fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false).await;
+            let summary = steps.ok().filter(|s| !s.is_empty()).map(|s| format_steps_summary(&s));
+            summaries.push(summary);
+        }
+        summaries
+    } else {
+        vec![None; all_pipelines.len()]
+    };
+
     let rows: Vec<PipelineRow> = all_pipelines
         .iter()
-        .map(|pipeline| PipelineRow {
+        .zip(step_summaries.into_iter())
+        .map(|(pipeline, steps_summary)| PipelineRow {
             build_number: pipeline
                 .build_number
                 .map(|n| n.to_string())
@@ -439,11 +513,13 @@ pub async fn list_pipelines(
                 .and_then(|t| t.target_type.clone())
                 .unwrap_or_default(),
             created: pipeline.created_on.clone().unwrap_or_default(),
+            steps_summary,
         })
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(workspace, repo_slug, "No pipelines found for repository");
+        tracing::info!(workspace, repo_slug, "No pipelines found");
+        println!("No pipelines found");
         return Ok(());
     }
 
@@ -464,7 +540,7 @@ pub async fn get_pipeline(
     let pipeline = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
 
     let steps = if show_steps {
-        Some(fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid).await?)
+        Some(fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, true).await?)
     } else {
         None
     };
@@ -574,24 +650,11 @@ pub async fn stop_pipeline(
         "Pipeline stopped successfully"
     );
 
-    // Only print human-readable message for table output
-    if ctx.renderer.format() == OutputFormat::Table {
-        println!("✓ Pipeline {pipeline_uuid} stopped on {workspace}/{repo_slug}");
-    } else {
-        #[derive(Serialize)]
-        struct StopResult {
-            success: bool,
-            pipeline_uuid: String,
-            message: String,
-        }
-        ctx.renderer.render(&StopResult {
-            success: true,
-            pipeline_uuid: pipeline_uuid.to_string(),
-            message: format!("Pipeline stopped on {workspace}/{repo_slug}"),
-        })?;
-    }
-
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Pipeline {pipeline_uuid} stopped on {workspace}/{repo_slug}"),
+        &MutationResult::with_id(format!("Pipeline stopped on {workspace}/{repo_slug}"), pipeline_uuid),
+    )
 }
 
 pub async fn get_pipeline_logs(
@@ -630,6 +693,30 @@ pub async fn get_pipeline_logs(
     }
 }
 
+pub async fn list_steps(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pipeline_id: &str,
+) -> Result<()> {
+    // Resolve build number to UUID if needed
+    let pipeline_uuid = resolve_pipeline_identifier(ctx, workspace, repo_slug, pipeline_id).await?;
+
+    tracing::debug!(pipeline_uuid, workspace, repo_slug, "Listing pipeline steps");
+
+    let steps = fetch_steps(ctx, workspace, repo_slug, &pipeline_uuid, true).await?;
+
+    if steps.is_empty() {
+        tracing::info!(pipeline_uuid, "No steps found");
+        println!("No steps found");
+        return Ok(());
+    }
+
+    tracing::debug!(pipeline_uuid, count = steps.len(), "Listed pipeline steps");
+
+    ctx.renderer.render(&steps)
+}
+
 pub async fn watch_pipeline(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -653,7 +740,7 @@ pub async fn watch_pipeline(
         let status = get_pipeline_status(&pipeline);
 
         let steps = if show_steps {
-            Some(fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid).await?)
+            Some(fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false).await?)
         } else {
             None
         };
@@ -765,16 +852,31 @@ mod tests {
     fn test_format_steps_summary() {
         let steps = vec![
             StepInfo {
+                uuid: "{uuid1}".to_string(),
                 name: "Clone".to_string(),
                 status: "SUCCESSFUL".to_string(),
+                started: None,
+                completed: None,
+                duration: None,
+                logs_url: None,
             },
             StepInfo {
+                uuid: "{uuid2}".to_string(),
                 name: "Build".to_string(),
                 status: "IN_PROGRESS".to_string(),
+                started: None,
+                completed: None,
+                duration: None,
+                logs_url: None,
             },
             StepInfo {
+                uuid: "{uuid3}".to_string(),
                 name: "Deploy".to_string(),
                 status: "PENDING".to_string(),
+                started: None,
+                completed: None,
+                duration: None,
+                logs_url: None,
             },
         ];
         let summary = format_steps_summary(&steps);
@@ -788,6 +890,16 @@ mod tests {
         // Can't easily test time-dependent function, but verify it compiles
         let start = Instant::now();
         let _elapsed = format_elapsed(start);
+    }
+
+    #[test]
+    fn test_format_duration_secs() {
+        assert_eq!(format_duration_secs(0), "0s");
+        assert_eq!(format_duration_secs(45), "45s");
+        assert_eq!(format_duration_secs(60), "1m 0s");
+        assert_eq!(format_duration_secs(90), "1m 30s");
+        assert_eq!(format_duration_secs(3600), "1h 0m 0s");
+        assert_eq!(format_duration_secs(3661), "1h 1m 1s");
     }
 
     #[test]

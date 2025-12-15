@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
 use super::utils::BitbucketContext;
+use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct PullRequestList {
@@ -127,7 +128,8 @@ pub async fn list_pull_requests(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(workspace, slug, "No pull requests returned for repository");
+        tracing::info!(workspace, slug, "No pull requests found");
+        println!("No pull requests found");
         return Ok(());
     }
 
@@ -376,8 +378,11 @@ pub async fn decline_pull_request(
         "Pull request declined successfully"
     );
 
-    println!("✓ Pull request #{pr_id} declined: {}", pr.title);
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Pull request #{pr_id} declined: {}", pr.title),
+        &MutationResult::with_id(format!("Pull request #{pr_id} declined"), &pr_id.to_string()),
+    )
 }
 
 pub async fn approve_pull_request(
@@ -412,7 +417,7 @@ pub async fn approve_pull_request(
     );
 
     println!(
-        "✓ Pull request #{pr_id} approved by {}",
+        "✅ Pull request #{pr_id} approved by {}",
         approval.user.display_name
     );
     Ok(())
@@ -436,8 +441,11 @@ pub async fn unapprove_pull_request(
         "Pull request approval removed successfully"
     );
 
-    println!("✓ Approval removed from pull request #{pr_id}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Approval removed from pull request #{pr_id}"),
+        &MutationResult::with_id(format!("Approval removed from pull request #{pr_id}"), &pr_id.to_string()),
+    )
 }
 
 pub async fn list_pr_comments(
@@ -476,7 +484,8 @@ pub async fn list_pr_comments(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(pr_id, workspace, repo_slug, "No comments on pull request");
+        tracing::info!(pr_id, workspace, repo_slug, "No comments found");
+        println!("No comments found");
         return Ok(());
     }
 
@@ -502,9 +511,11 @@ pub async fn add_pr_comment(
     })?;
 
     tracing::info!(comment_id = comment.id, pr_id, "Comment added successfully");
-
-    println!("✓ Comment added to pull request #{pr_id}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Comment added to pull request #{pr_id}"),
+        &MutationResult::with_id(format!("Comment added to pull request #{pr_id}"), &pr_id.to_string()),
+    )
 }
 
 pub async fn add_pr_reviewers(
@@ -527,8 +538,11 @@ pub async fn add_pr_reviewers(
         tracing::info!(uuid, pr_id, "Reviewer added successfully");
     }
 
-    println!("✓ Reviewers added to pull request #{pr_id}");
-    Ok(())
+    render_success(
+        ctx.renderer,
+        &format!("✅ Reviewers added to pull request #{pr_id}"),
+        &MutationResult::with_id(format!("Reviewers added to pull request #{pr_id}"), &pr_id.to_string()),
+    )
 }
 
 pub async fn get_pr_diff(
