@@ -1,40 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "simple",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
   "packages": {
     ".": {
-      "component": "atlassian-cli",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         {
           "type": "toml",
           "path": "Cargo.toml",
           "jsonpath": "$.workspace.package.version"
-        },
-        {
-          "type": "toml",
-          "path": "crates/cli/Cargo.toml",
-          "jsonpath": "$.dependencies.atlassian-cli-api.version"
-        },
-        {
-          "type": "toml",
-          "path": "crates/cli/Cargo.toml",
-          "jsonpath": "$.dependencies.atlassian-cli-auth.version"
-        },
-        {
-          "type": "toml",
-          "path": "crates/cli/Cargo.toml",
-          "jsonpath": "$.dependencies.atlassian-cli-config.version"
-        },
-        {
-          "type": "toml",
-          "path": "crates/cli/Cargo.toml",
-          "jsonpath": "$.dependencies.atlassian-cli-output.version"
-        },
-        {
-          "type": "toml",
-          "path": "crates/cli/Cargo.toml",
-          "jsonpath": "$.dependencies.atlassian-cli-bulk.version"
         }
       ]
     }
