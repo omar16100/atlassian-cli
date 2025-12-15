@@ -113,8 +113,12 @@ pub async fn grant_repo_permission(
 
     render_success(
         ctx.renderer,
-        &format!("✅ Granted {permission} permission to user {user_uuid} on {workspace}/{repo_slug}"),
-        &MutationResult::new(format!("Granted {permission} permission to user {user_uuid}")),
+        &format!(
+            "✅ Granted {permission} permission to user {user_uuid} on {workspace}/{repo_slug}"
+        ),
+        &MutationResult::new(format!(
+            "Granted {permission} permission to user {user_uuid}"
+        )),
     )
 }
 

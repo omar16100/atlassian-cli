@@ -113,9 +113,14 @@ profiles:
     // at profile resolution with "missing base_url" error
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
-            "--config", config_path.to_str().unwrap(),
-            "bitbucket", "repo", "list"
+            "run",
+            "--quiet",
+            "--",
+            "--config",
+            config_path.to_str().unwrap(),
+            "bitbucket",
+            "repo",
+            "list",
         ])
         .env("ATLASSIAN_CLI_BITBUCKET_TOKEN_BBONLY", "fake-token")
         .output()
@@ -151,9 +156,14 @@ profiles:
 
     let output = Command::new("cargo")
         .args([
-            "run", "--quiet", "--",
-            "--config", config_path.to_str().unwrap(),
-            "jira", "issue", "search"
+            "run",
+            "--quiet",
+            "--",
+            "--config",
+            config_path.to_str().unwrap(),
+            "jira",
+            "issue",
+            "search",
         ])
         .env("ATLASSIAN_CLI_TOKEN_NOBASEURL", "fake-token")
         .output()

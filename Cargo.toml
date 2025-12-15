@@ -60,3 +60,10 @@ wiremock = "0.6"
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+# cargo-release configuration
+[workspace.metadata.release]
+shared-version = true
+tag-name = "v{{version}}"
+tag-message = "Release {{version}}"
+pre-release-commit-message = "chore: bump version to {{version}}"

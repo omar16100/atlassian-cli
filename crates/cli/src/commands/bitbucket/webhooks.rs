@@ -151,7 +151,10 @@ pub async fn delete_webhook(
     render_success(
         ctx.renderer,
         &format!("✅ Webhook {webhook_uuid} deleted from {workspace}/{repo_slug}"),
-        &MutationResult::with_id(format!("Webhook deleted from {workspace}/{repo_slug}"), webhook_uuid),
+        &MutationResult::with_id(
+            format!("Webhook deleted from {workspace}/{repo_slug}"),
+            webhook_uuid,
+        ),
     )
 }
 
@@ -231,7 +234,9 @@ pub async fn add_ssh_key(
     render_success(
         ctx.renderer,
         &format!("✅ SSH key '{label}' added to {workspace}/{repo_slug}"),
-        &MutationResult::new(format!("SSH key '{label}' added to {workspace}/{repo_slug}")),
+        &MutationResult::new(format!(
+            "SSH key '{label}' added to {workspace}/{repo_slug}"
+        )),
     )
 }
 
@@ -256,6 +261,9 @@ pub async fn delete_ssh_key(
     render_success(
         ctx.renderer,
         &format!("✅ SSH key {key_uuid} deleted from {workspace}/{repo_slug}"),
-        &MutationResult::with_id(format!("SSH key deleted from {workspace}/{repo_slug}"), key_uuid),
+        &MutationResult::with_id(
+            format!("SSH key deleted from {workspace}/{repo_slug}"),
+            key_uuid,
+        ),
     )
 }

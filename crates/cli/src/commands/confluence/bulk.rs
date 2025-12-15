@@ -184,7 +184,11 @@ pub async fn bulk_export_pages(
     render_success(
         ctx.renderer,
         &format!("✅ Exported {} pages to {}", pages.len(), output.display()),
-        &MutationResult::new(format!("Exported {} pages to {}", pages.len(), output.display())),
+        &MutationResult::new(format!(
+            "Exported {} pages to {}",
+            pages.len(),
+            output.display()
+        )),
     )
 }
 

@@ -300,7 +300,10 @@ pub async fn remove_page_label(
     render_success(
         ctx.renderer,
         &format!("✅ Removed label '{label}' from page {page_id}"),
-        &MutationResult::with_id(format!("Removed label '{label}' from page {page_id}"), page_id),
+        &MutationResult::with_id(
+            format!("Removed label '{label}' from page {page_id}"),
+            page_id,
+        ),
     )
 }
 

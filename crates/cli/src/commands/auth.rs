@@ -423,12 +423,13 @@ async fn test_auth(args: TestArgs, config: &Config) -> Result<()> {
 
 async fn test_jira_auth(profile_name: &str, email: &str, base_url: &str) -> Result<()> {
     let token = get_token(profile_name).ok_or_else(|| {
-        anyhow!(
-            "No Jira token found for profile '{profile_name}'. Run `atlassian-cli auth login`"
-        )
+        anyhow!("No Jira token found for profile '{profile_name}'. Run `atlassian-cli auth login`")
     })?;
 
-    println!("Testing Jira authentication for profile '{}'...", profile_name);
+    println!(
+        "Testing Jira authentication for profile '{}'...",
+        profile_name
+    );
 
     let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 

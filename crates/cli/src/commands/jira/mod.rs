@@ -71,7 +71,9 @@ enum JiraCommands {
 #[derive(Subcommand, Debug, Clone)]
 enum IssueCommands {
     /// Search issues using JQL or filter parameters
-    #[command(long_about = "Search issues using JQL or filter parameters.\n\nExamples:\n  jira issue search --project PROJ --status Open\n  jira issue search --assignee @me --priority High\n  jira issue search --jql 'project = PROJ AND status = Open ORDER BY created DESC'\n  jira issue search --status Open --status \"In Progress\" --limit 50")]
+    #[command(
+        long_about = "Search issues using JQL or filter parameters.\n\nExamples:\n  jira issue search --project PROJ --status Open\n  jira issue search --assignee @me --priority High\n  jira issue search --jql 'project = PROJ AND status = Open ORDER BY created DESC'\n  jira issue search --status Open --status \"In Progress\" --limit 50"
+    )]
     Search {
         /// Raw JQL query (conflicts with filter flags)
         #[arg(long, conflicts_with_all = ["assignee", "status", "priority", "label", "type", "project", "text"])]
@@ -122,7 +124,9 @@ enum IssueCommands {
     },
 
     /// Create a new issue
-    #[command(long_about = "Create a new issue.\n\nExamples:\n  jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High")]
+    #[command(
+        long_about = "Create a new issue.\n\nExamples:\n  jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High"
+    )]
     Create {
         /// Project key (e.g., PROJ)
         #[arg(long)]

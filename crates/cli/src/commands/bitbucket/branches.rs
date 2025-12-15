@@ -230,7 +230,10 @@ pub async fn delete_branch(
     render_success(
         ctx.renderer,
         &format!("✅ Branch {branch_name} deleted from {workspace}/{repo_slug}"),
-        &MutationResult::with_id(format!("Branch {branch_name} deleted from {workspace}/{repo_slug}"), branch_name),
+        &MutationResult::with_id(
+            format!("Branch {branch_name} deleted from {workspace}/{repo_slug}"),
+            branch_name,
+        ),
     )
 }
 
@@ -304,7 +307,10 @@ pub async fn unprotect_branch(
     render_success(
         ctx.renderer,
         &format!("✅ Branch protection {restriction_id} removed from {workspace}/{repo_slug}"),
-        &MutationResult::with_id(format!("Branch protection removed from {workspace}/{repo_slug}"), &restriction_id.to_string()),
+        &MutationResult::with_id(
+            format!("Branch protection removed from {workspace}/{repo_slug}"),
+            &restriction_id.to_string(),
+        ),
     )
 }
 
@@ -343,11 +349,7 @@ pub async fn list_restrictions(
         .collect();
 
     if rows.is_empty() {
-        tracing::info!(
-            workspace,
-            repo_slug,
-            "No branch restrictions found"
-        );
+        tracing::info!(workspace, repo_slug, "No branch restrictions found");
         println!("No branch restrictions found");
         return Ok(());
     }

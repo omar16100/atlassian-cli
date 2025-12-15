@@ -485,7 +485,10 @@ pub async fn list_pipelines(
         let mut summaries = Vec::with_capacity(all_pipelines.len());
         for pipeline in &all_pipelines {
             let steps = fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false).await;
-            let summary = steps.ok().filter(|s| !s.is_empty()).map(|s| format_steps_summary(&s));
+            let summary = steps
+                .ok()
+                .filter(|s| !s.is_empty())
+                .map(|s| format_steps_summary(&s));
             summaries.push(summary);
         }
         summaries
@@ -653,7 +656,10 @@ pub async fn stop_pipeline(
     render_success(
         ctx.renderer,
         &format!("✅ Pipeline {pipeline_uuid} stopped on {workspace}/{repo_slug}"),
-        &MutationResult::with_id(format!("Pipeline stopped on {workspace}/{repo_slug}"), pipeline_uuid),
+        &MutationResult::with_id(
+            format!("Pipeline stopped on {workspace}/{repo_slug}"),
+            pipeline_uuid,
+        ),
     )
 }
 
@@ -702,7 +708,12 @@ pub async fn list_steps(
     // Resolve build number to UUID if needed
     let pipeline_uuid = resolve_pipeline_identifier(ctx, workspace, repo_slug, pipeline_id).await?;
 
-    tracing::debug!(pipeline_uuid, workspace, repo_slug, "Listing pipeline steps");
+    tracing::debug!(
+        pipeline_uuid,
+        workspace,
+        repo_slug,
+        "Listing pipeline steps"
+    );
 
     let steps = fetch_steps(ctx, workspace, repo_slug, &pipeline_uuid, true).await?;
 
