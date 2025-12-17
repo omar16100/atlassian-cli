@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.9](https://github.com/omar16100/atlassian-cli/compare/v0.1.8...v0.1.9) (2025-12-17)
+
+
+### Features
+
+* add pipeline enhancements - git context detection, status command, rerun, and variables ([675be8a](https://github.com/omar16100/atlassian-cli/commit/675be8aad4f921e1c7125935ae9fe6090199b1b3))
+
+
+### Bug Fixes
+
+* apply cargo fmt formatting ([25018a0](https://github.com/omar16100/atlassian-cli/commit/25018a03d57cce058f28e1edb4eaceef4148c76c))
+
 ## [0.1.8](https://github.com/omar16100/atlassian-cli/compare/v0.1.7...v0.1.8) (2025-12-15)
 
 
