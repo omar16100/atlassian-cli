@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "atlassian-cli-api",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-api"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -166,7 +166,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-auth"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "base64",
@@ -180,7 +180,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-bulk"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "futures",
@@ -192,7 +192,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-config"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "dirs",
@@ -205,7 +205,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-output"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "clap",

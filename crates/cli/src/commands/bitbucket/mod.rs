@@ -7,6 +7,7 @@ use clap::{Args, Subcommand};
 mod branches;
 mod bulk;
 mod commits;
+mod git;
 mod permissions;
 mod pipelines;
 mod pullrequests;
@@ -22,6 +23,10 @@ pub struct BitbucketArgs {
     /// Workspace slug (defaults to workspace configured in profile base URL host prefix).
     #[arg(long, global = true)]
     pub workspace: Option<String>,
+
+    /// Repository slug (auto-detected from git remote if not specified).
+    #[arg(long, global = true)]
+    pub repo: Option<String>,
 
     #[command(subcommand)]
     command: BitbucketCommands,
@@ -381,8 +386,8 @@ enum ProjectCommands {
 enum PipelineCommands {
     /// List pipelines.
     List {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
         /// Maximum number of results.
         #[arg(long, default_value_t = 25)]
         limit: usize,
@@ -404,8 +409,8 @@ enum PipelineCommands {
     },
     /// Get pipeline details.
     Get {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
         /// Pipeline UUID or build number.
         uuid: String,
         /// Show pipeline steps with status.
@@ -414,26 +419,32 @@ enum PipelineCommands {
     },
     /// Trigger a new pipeline.
     Trigger {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
         /// Branch or tag name.
         #[arg(long)]
         ref_name: String,
         /// Reference type (branch or tag).
         #[arg(long, default_value = "branch")]
         ref_type: String,
+        /// Pipeline variables in KEY=VALUE format (can be repeated).
+        #[arg(long = "var")]
+        variables: Vec<String>,
+        /// Mark all variables as secured.
+        #[arg(long, default_value_t = false)]
+        secured: bool,
     },
     /// Stop a running pipeline.
     Stop {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
         /// Pipeline UUID.
         uuid: String,
     },
     /// Get pipeline logs.
     Logs {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
         /// Pipeline UUID.
         pipeline_uuid: String,
         /// Step UUID.
@@ -441,8 +452,8 @@ enum PipelineCommands {
     },
     /// Watch a running pipeline until completion.
     Watch {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
         /// Pipeline UUID or build number.
         uuid: String,
         /// Poll interval in seconds.
@@ -454,10 +465,31 @@ enum PipelineCommands {
     },
     /// List steps for a pipeline.
     Steps {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
         /// Pipeline UUID or build number.
         uuid: String,
+    },
+    /// Get latest pipeline status (JSON output, smart exit codes).
+    Status {
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
+        /// Show pipeline steps with status.
+        #[arg(long)]
+        steps: bool,
+    },
+    /// Re-run a pipeline with the same commit.
+    Rerun {
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
+        /// Pipeline UUID or build number.
+        pipeline_id: String,
+        /// Pipeline variables in KEY=VALUE format (can be repeated).
+        #[arg(long = "var")]
+        variables: Vec<String>,
+        /// Mark all variables as secured.
+        #[arg(long, default_value_t = false)]
+        secured: bool,
     },
 }
 
@@ -622,18 +654,31 @@ pub async fn execute(
         return workspaces::whoami(&client).await;
     }
 
-    // CLI flag takes precedence, then inferred from profile
+    // Detect git context for auto-detection
+    let git_ctx = git::detect_git_context();
+
+    // CLI flag takes precedence, then git context, then inferred from profile
     let workspace = args
         .workspace
         .as_deref()
+        .or(git_ctx.workspace.as_deref())
         .or(inferred_workspace)
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "Workspace required. Set --workspace flag, configure workspace in profile, \
-                 or set base_url to https://bitbucket.org/{{workspace}}"
+                "Workspace required. Options:\n\
+                 1. Use --workspace flag\n\
+                 2. Run in git directory with Bitbucket remote\n\
+                 3. Configure workspace in profile"
             )
         })?
         .to_string();
+
+    // Global repo slug resolution
+    let global_repo = args
+        .repo
+        .as_deref()
+        .or(git_ctx.repo_slug.as_deref())
+        .map(|s| s.to_string());
 
     let ctx = BitbucketContext { client, renderer };
 
@@ -844,10 +889,21 @@ pub async fn execute(
                 all,
                 steps,
             } => {
+                let repo_slug = repo
+                    .as_deref()
+                    .or(global_repo.as_deref())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "Repository required. Options:\n\
+                             1. Use --repo flag\n\
+                             2. Run in git directory with Bitbucket remote\n\
+                             3. Pass repo as positional argument"
+                        )
+                    })?;
                 pipelines::list_pipelines(
                     &ctx,
                     &workspace,
-                    &repo,
+                    repo_slug,
                     limit,
                     sort.as_deref(),
                     recent,
@@ -858,22 +914,47 @@ pub async fn execute(
                 .await
             }
             PipelineCommands::Get { repo, uuid, steps } => {
-                pipelines::get_pipeline(&ctx, &workspace, &repo, &uuid, steps).await
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::get_pipeline(&ctx, &workspace, repo_slug, &uuid, steps).await
             }
             PipelineCommands::Trigger {
                 repo,
                 ref_name,
                 ref_type,
-            } => pipelines::trigger_pipeline(&ctx, &workspace, &repo, &ref_name, &ref_type).await,
+                variables,
+                secured,
+            } => {
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::trigger_pipeline(
+                    &ctx,
+                    &workspace,
+                    repo_slug,
+                    &ref_name,
+                    &ref_type,
+                    variables,
+                    secured,
+                )
+                .await
+            }
             PipelineCommands::Stop { repo, uuid } => {
-                pipelines::stop_pipeline(&ctx, &workspace, &repo, &uuid).await
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::stop_pipeline(&ctx, &workspace, repo_slug, &uuid).await
             }
             PipelineCommands::Logs {
                 repo,
                 pipeline_uuid,
                 step_uuid,
             } => {
-                pipelines::get_pipeline_logs(&ctx, &workspace, &repo, &pipeline_uuid, &step_uuid)
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::get_pipeline_logs(&ctx, &workspace, repo_slug, &pipeline_uuid, &step_uuid)
                     .await
             }
             PipelineCommands::Watch {
@@ -881,9 +962,34 @@ pub async fn execute(
                 uuid,
                 interval,
                 steps,
-            } => pipelines::watch_pipeline(&ctx, &workspace, &repo, &uuid, interval, steps).await,
+            } => {
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::watch_pipeline(&ctx, &workspace, repo_slug, &uuid, interval, steps).await
+            }
             PipelineCommands::Steps { repo, uuid } => {
-                pipelines::list_steps(&ctx, &workspace, &repo, &uuid).await
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::list_steps(&ctx, &workspace, repo_slug, &uuid).await
+            }
+            PipelineCommands::Status { repo, steps } => {
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::pipeline_status(&ctx, &workspace, repo_slug, steps).await
+            }
+            PipelineCommands::Rerun {
+                repo,
+                pipeline_id,
+                variables,
+                secured,
+            } => {
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+                pipelines::rerun_pipeline(&ctx, &workspace, repo_slug, &pipeline_id, variables, secured).await
             }
         },
         BitbucketCommands::Webhook(cmd) => match cmd {
