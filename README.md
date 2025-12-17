@@ -99,6 +99,13 @@ crates/
    atlassian-cli jira components list --project DEV
    atlassian-cli jira versions list --project DEV
 
+   # Jira - Roles
+   atlassian-cli jira roles list --project DEV
+   atlassian-cli jira roles get --project DEV --role-id 10002
+   atlassian-cli jira roles actors --project DEV --role-id 10002
+   atlassian-cli jira roles add-actor --project DEV --role-id 10002 --user user@example.com
+   atlassian-cli jira roles remove-actor --project DEV --role-id 10002 --user user@example.com
+
    # Jira - Custom Fields & Workflows
    atlassian-cli jira fields list
    atlassian-cli jira workflows list
@@ -114,11 +121,60 @@ crates/
    atlassian-cli jira webhooks list
    atlassian-cli jira audit list --from 2025-01-01 --limit 100
 
-   # Confluence
-   atlassian-cli confluence search --cql "space = DEV and type = page" --limit 5
+   # Confluence - Search
+   atlassian-cli confluence search cql --cql "space = DEV and type = page" --limit 5
+   atlassian-cli confluence search text --query "meeting notes" --limit 10
+   atlassian-cli confluence search in-space --space DEV --query "api docs"
+
+   # Confluence - Spaces
    atlassian-cli confluence space list --limit 10
-   atlassian-cli confluence page get --id 12345
+   atlassian-cli confluence space get DEV
+   atlassian-cli confluence space create --key DOCS --name "Documentation" --description "Team docs"
+   atlassian-cli confluence space update DEV --name "Development Space"
+   atlassian-cli confluence space delete OLD --force
+   atlassian-cli confluence space permissions DEV
+   atlassian-cli confluence space add-permission DEV --principal user@example.com --operation read
+
+   # Confluence - Pages
    atlassian-cli confluence page list --space DEV --limit 25
+   atlassian-cli confluence page get --id 12345
+   atlassian-cli confluence page create --space DEV --title "New Page" --body "<p>Content</p>"
+   atlassian-cli confluence page update --id 12345 --title "Updated Title"
+   atlassian-cli confluence page delete --id 12345
+   atlassian-cli confluence page versions --id 12345
+   atlassian-cli confluence page add-label --id 12345 --label documentation
+   atlassian-cli confluence page remove-label --id 12345 --label outdated
+   atlassian-cli confluence page comments --id 12345
+   atlassian-cli confluence page add-comment --id 12345 --body "Great work!"
+   atlassian-cli confluence page get-restrictions --id 12345
+   atlassian-cli confluence page add-restriction --id 12345 --operation update --user user@example.com
+   atlassian-cli confluence page remove-restriction --id 12345 --operation update --user user@example.com
+
+   # Confluence - Blog Posts
+   atlassian-cli confluence blog list --space DEV --limit 10
+   atlassian-cli confluence blog get --id 67890
+   atlassian-cli confluence blog create --space DEV --title "Sprint Recap" --body "<p>Summary</p>"
+   atlassian-cli confluence blog update --id 67890 --title "Updated Recap"
+   atlassian-cli confluence blog delete --id 67890
+
+   # Confluence - Attachments
+   atlassian-cli confluence attachment list --page-id 12345
+   atlassian-cli confluence attachment get --id 11111
+   atlassian-cli confluence attachment upload --page-id 12345 --file ./diagram.png
+   atlassian-cli confluence attachment download --id 11111 --output ./download.png
+   atlassian-cli confluence attachment delete --id 11111
+
+   # Confluence - Bulk Operations
+   atlassian-cli confluence bulk delete --space OLD --dry-run
+   atlassian-cli confluence bulk add-labels --cql "space = DEV" --labels docs,reviewed --dry-run
+   atlassian-cli confluence bulk export --space DEV --output backup.json --format json
+
+   # Confluence - Analytics
+   atlassian-cli confluence analytics page-views --id 12345 --from 2025-01-01
+   atlassian-cli confluence analytics space-stats --space DEV
+
+   # Bitbucket - User Info
+   atlassian-cli bitbucket whoami
 
    # Bitbucket - Repositories
    atlassian-cli bitbucket --workspace myteam repo list --limit 10
@@ -256,6 +312,7 @@ cargo test -p atlassian-cli-bulk
 cargo test --test cli_integration
 cargo test --test jira_integration
 cargo test --test bitbucket_integration
+cargo test --test confluence_integration
 
 # Run tests with output
 cargo test -- --nocapture
@@ -266,10 +323,12 @@ cargo test -- --nocapture
 - **Config crate**: 12 tests covering profile management, YAML parsing, and error handling
 - **Output crate**: 22 tests for all output formats (table/JSON/CSV/YAML/quiet)
 - **Bulk crate**: 10 tests for concurrency, dry-run, error handling, and progress tracking
-- **CLI integration tests**: 7 tests validating CLI commands and help output
-- **Jira integration tests**: 11 tests with wiremock for issues, projects, audit, webhooks, and error handling
-- **Bitbucket integration tests**: 14 tests for repos, branches, PRs, approvals, and branch protection
-- **Total**: 76 passing tests
+- **Auth crate**: 3 tests for credential helpers
+- **CLI integration tests**: 17 tests validating CLI commands and help output
+- **Jira integration tests**: 9 tests with wiremock for issues, projects, audit, webhooks, and error handling
+- **Bitbucket integration tests**: 15 tests for repos, branches, PRs, approvals, and branch protection
+- **Confluence integration tests**: 11 tests for spaces, pages, search, and bulk operations
+- **Total**: 99 passing tests
 
 ### CI/CD
 
@@ -304,7 +363,8 @@ GitHub Actions workflow runs on every push/PR:
 - ✅ Automation rules (list/get/create/update/enable/disable)
 - ✅ Webhooks (full CRUD + test)
 - ✅ Audit log access (list/export)
-- ✅ Integration tests with API mocking (11 tests)
+- ✅ Role management (list/get/actors/add-actor/remove-actor)
+- ✅ Integration tests with API mocking (9 tests)
 
 **Phase 4 - Bitbucket CLI** (100% complete)
 - ✅ Repository CRUD operations (list/get/create/update/delete)
@@ -320,16 +380,25 @@ GitHub Actions workflow runs on every push/PR:
 - ✅ Repository permissions (list/grant/revoke)
 - ✅ Commit operations (list/get/diff/browse)
 - ✅ Bulk operations (archive stale repos, delete merged branches)
-- ✅ Integration tests with API mocking (14 tests)
+- ✅ User info (whoami)
+- ✅ Integration tests with API mocking (15 tests)
+
+**Phase 3 - Confluence CLI** (100% complete)
+- ✅ Space operations (list/get/create/update/delete/permissions)
+- ✅ Page management (CRUD, versions, labels, comments, restrictions)
+- ✅ Blog posts (list/get/create/update/delete)
+- ✅ Attachments (list/get/upload/download/delete)
+- ✅ Search (CQL, text, in-space)
+- ✅ Bulk operations (delete, add-labels, export)
+- ✅ Analytics (page-views, space-stats)
+- ✅ Integration tests with API mocking (11 tests)
 
 **Additional Products** (Partial)
 - ✅ JSM CLI: Service desk and request operations
-- ⏳ Confluence CLI: Basic structure
 - ⏳ Opsgenie CLI: Placeholder
 - ⏳ Bamboo CLI: Placeholder
 
 ### Next Steps
-- Complete Phase 3: Confluence CLI full implementation
 - Complete Phase 5: JSM CLI (organizations, SLA, Insight assets)
 - Complete Phase 6: Opsgenie CLI
 - Complete Phase 7: Bamboo CLI

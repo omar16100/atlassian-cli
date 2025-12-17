@@ -889,17 +889,14 @@ pub async fn execute(
                 all,
                 steps,
             } => {
-                let repo_slug = repo
-                    .as_deref()
-                    .or(global_repo.as_deref())
-                    .ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "Repository required. Options:\n\
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Repository required. Options:\n\
                              1. Use --repo flag\n\
                              2. Run in git directory with Bitbucket remote\n\
                              3. Pass repo as positional argument"
-                        )
-                    })?;
+                    )
+                })?;
                 pipelines::list_pipelines(
                     &ctx,
                     &workspace,
@@ -930,13 +927,7 @@ pub async fn execute(
                     anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
                 })?;
                 pipelines::trigger_pipeline(
-                    &ctx,
-                    &workspace,
-                    repo_slug,
-                    &ref_name,
-                    &ref_type,
-                    variables,
-                    secured,
+                    &ctx, &workspace, repo_slug, &ref_name, &ref_type, variables, secured,
                 )
                 .await
             }
@@ -954,8 +945,14 @@ pub async fn execute(
                 let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
                     anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
                 })?;
-                pipelines::get_pipeline_logs(&ctx, &workspace, repo_slug, &pipeline_uuid, &step_uuid)
-                    .await
+                pipelines::get_pipeline_logs(
+                    &ctx,
+                    &workspace,
+                    repo_slug,
+                    &pipeline_uuid,
+                    &step_uuid,
+                )
+                .await
             }
             PipelineCommands::Watch {
                 repo,
@@ -989,7 +986,15 @@ pub async fn execute(
                 let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
                     anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
                 })?;
-                pipelines::rerun_pipeline(&ctx, &workspace, repo_slug, &pipeline_id, variables, secured).await
+                pipelines::rerun_pipeline(
+                    &ctx,
+                    &workspace,
+                    repo_slug,
+                    &pipeline_id,
+                    variables,
+                    secured,
+                )
+                .await
             }
         },
         BitbucketCommands::Webhook(cmd) => match cmd {

@@ -269,10 +269,7 @@ fn parse_variables(vars: Vec<String>, secured: bool) -> Result<Vec<PipelineVaria
         let parts: Vec<&str> = var_str.splitn(2, '=').collect();
 
         if parts.len() != 2 {
-            anyhow::bail!(
-                "Invalid variable format '{}'. Expected KEY=VALUE",
-                var_str
-            );
+            anyhow::bail!("Invalid variable format '{}'. Expected KEY=VALUE", var_str);
         }
 
         let key = parts[0].trim();
@@ -801,11 +798,10 @@ pub async fn pipeline_status(
     // Fetch single most recent pipeline
     let path = build_request_path(&None, workspace, repo_slug, 1, "-created_on", None);
 
-    let response: PipelineList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to fetch pipeline status for {workspace}/{repo_slug}"))?;
+    let response: PipelineList =
+        ctx.client.get(&path).await.with_context(|| {
+            format!("Failed to fetch pipeline status for {workspace}/{repo_slug}")
+        })?;
 
     if response.values.is_empty() {
         tracing::info!(workspace, repo_slug, "No pipelines found");
@@ -879,12 +875,7 @@ pub async fn rerun_pipeline(
     // Fetch original pipeline
     let original = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
 
-    tracing::info!(
-        pipeline_id,
-        workspace,
-        repo_slug,
-        "Re-running pipeline"
-    );
+    tracing::info!(pipeline_id, workspace, repo_slug, "Re-running pipeline");
 
     // Extract commit hash or fallback to ref_name
     let mut payload = if let Some(commit_hash) = original
@@ -1248,7 +1239,10 @@ mod tests {
         let vars = vec!["NOEQUALS".to_string()];
         let result = parse_variables(vars, false);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Expected KEY=VALUE"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Expected KEY=VALUE"));
     }
 
     #[test]
@@ -1256,7 +1250,10 @@ mod tests {
         let vars = vec!["=value".to_string()];
         let result = parse_variables(vars, false);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("key cannot be empty"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("key cannot be empty"));
     }
 
     #[test]

@@ -130,18 +130,12 @@ mod tests {
 
     #[test]
     fn test_parse_github_remote() {
-        assert_eq!(
-            parse_git_remote("https://github.com/user/repo.git"),
-            None
-        );
+        assert_eq!(parse_git_remote("https://github.com/user/repo.git"), None);
     }
 
     #[test]
     fn test_parse_non_bitbucket_ssh() {
-        assert_eq!(
-            parse_git_remote("git@github.com:user/repo.git"),
-            None
-        );
+        assert_eq!(parse_git_remote("git@github.com:user/repo.git"), None);
     }
 
     #[test]
