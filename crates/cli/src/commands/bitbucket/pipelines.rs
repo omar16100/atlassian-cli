@@ -57,6 +57,14 @@ struct Target {
     ref_name: Option<String>,
     #[serde(rename = "type", default)]
     target_type: Option<String>,
+    #[serde(default)]
+    commit: Option<CommitInfo>,
+}
+
+#[derive(Deserialize, Clone)]
+struct CommitInfo {
+    #[serde(default)]
+    hash: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -139,6 +147,23 @@ struct StepInfo {
 struct LogsView {
     url: String,
     note: String,
+}
+
+#[derive(Serialize)]
+struct PipelineStatusOutput {
+    build_number: i64,
+    state: String,
+    ref_name: String,
+    created: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    steps: Option<Vec<StepInfo>>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+struct PipelineVariable {
+    key: String,
+    value: String,
+    secured: bool,
 }
 
 // ============================================================================
@@ -235,6 +260,36 @@ fn validate_sort_field(sort: &str) -> Result<()> {
         );
     }
     Ok(())
+}
+
+fn parse_variables(vars: Vec<String>, secured: bool) -> Result<Vec<PipelineVariable>> {
+    let mut variables = Vec::new();
+
+    for var_str in vars {
+        let parts: Vec<&str> = var_str.splitn(2, '=').collect();
+
+        if parts.len() != 2 {
+            anyhow::bail!(
+                "Invalid variable format '{}'. Expected KEY=VALUE",
+                var_str
+            );
+        }
+
+        let key = parts[0].trim();
+        let value = parts[1]; // Don't trim value - preserve whitespace
+
+        if key.is_empty() {
+            anyhow::bail!("Variable key cannot be empty in '{}'", var_str);
+        }
+
+        variables.push(PipelineVariable {
+            key: key.to_string(),
+            value: value.to_string(),
+            secured,
+        });
+    }
+
+    Ok(variables)
 }
 
 fn build_request_path(
@@ -582,14 +637,22 @@ pub async fn trigger_pipeline(
     repo_slug: &str,
     ref_name: &str,
     ref_type: &str,
+    variable_strings: Vec<String>,
+    secured: bool,
 ) -> Result<()> {
-    let payload = serde_json::json!({
+    let mut payload = serde_json::json!({
         "target": {
             "ref_name": ref_name,
             "ref_type": ref_type,
             "type": "pipeline_ref_target"
         }
     });
+
+    // Add variables if provided
+    if !variable_strings.is_empty() {
+        let variables = parse_variables(variable_strings.clone(), secured)?;
+        payload["variables"] = serde_json::to_value(variables)?;
+    }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/");
     let pipeline: Pipeline = ctx.client.post(&path, &payload).await.with_context(|| {
@@ -601,6 +664,7 @@ pub async fn trigger_pipeline(
         ref_name,
         workspace,
         repo_slug,
+        variables_count = variable_strings.len(),
         "Pipeline triggered successfully"
     );
 
@@ -726,6 +790,189 @@ pub async fn list_steps(
     tracing::debug!(pipeline_uuid, count = steps.len(), "Listed pipeline steps");
 
     ctx.renderer.render(&steps)
+}
+
+pub async fn pipeline_status(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    show_steps: bool,
+) -> Result<()> {
+    // Fetch single most recent pipeline
+    let path = build_request_path(&None, workspace, repo_slug, 1, "-created_on", None);
+
+    let response: PipelineList = ctx
+        .client
+        .get(&path)
+        .await
+        .with_context(|| format!("Failed to fetch pipeline status for {workspace}/{repo_slug}"))?;
+
+    if response.values.is_empty() {
+        tracing::info!(workspace, repo_slug, "No pipelines found");
+        // Output empty JSON and return success
+        println!("{{}}");
+        return Ok(());
+    }
+
+    let pipeline = &response.values[0];
+
+    // Build status output
+    let steps_data = if show_steps {
+        fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, true)
+            .await
+            .ok()
+    } else {
+        None
+    };
+
+    let status = get_pipeline_status(pipeline);
+    let status_output = PipelineStatusOutput {
+        build_number: pipeline.build_number.unwrap_or(0),
+        state: status.clone(),
+        ref_name: pipeline
+            .target
+            .as_ref()
+            .and_then(|t| t.ref_name.clone())
+            .unwrap_or_default(),
+        created: pipeline.created_on.clone().unwrap_or_default(),
+        steps: steps_data,
+    };
+
+    // Force JSON output regardless of --output flag
+    let json = serde_json::to_string_pretty(&status_output)?;
+    println!("{}", json);
+
+    // Determine exit code based on state
+    let exit_code = match status.to_uppercase().as_str() {
+        "SUCCESSFUL" | "COMPLETED" => 0,
+        "FAILED" | "ERROR" | "STOPPED" | "EXPIRED" => 1,
+        "PENDING" | "IN_PROGRESS" => 2,
+        _ => 0,
+    };
+
+    tracing::debug!(
+        workspace,
+        repo_slug,
+        state = %status,
+        exit_code,
+        "Pipeline status"
+    );
+
+    if exit_code != 0 {
+        std::process::exit(exit_code);
+    }
+
+    Ok(())
+}
+
+pub async fn rerun_pipeline(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pipeline_id: &str,
+    variable_strings: Vec<String>,
+    secured: bool,
+) -> Result<()> {
+    // Resolve build number to UUID if needed
+    let pipeline_uuid = resolve_pipeline_identifier(ctx, workspace, repo_slug, pipeline_id).await?;
+
+    // Fetch original pipeline
+    let original = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
+
+    tracing::info!(
+        pipeline_id,
+        workspace,
+        repo_slug,
+        "Re-running pipeline"
+    );
+
+    // Extract commit hash or fallback to ref_name
+    let mut payload = if let Some(commit_hash) = original
+        .target
+        .as_ref()
+        .and_then(|t| t.commit.as_ref())
+        .and_then(|c| c.hash.as_ref())
+    {
+        // Trigger with commit target
+        serde_json::json!({
+            "target": {
+                "commit": {
+                    "type": "commit",
+                    "hash": commit_hash
+                },
+                "type": "pipeline_commit_target"
+            }
+        })
+    } else {
+        // Fallback to ref_name if no commit info
+        let ref_name = original
+            .target
+            .as_ref()
+            .and_then(|t| t.ref_name.as_ref())
+            .ok_or_else(|| anyhow::anyhow!("Pipeline has no commit or ref info"))?;
+
+        let ref_type = original
+            .target
+            .as_ref()
+            .and_then(|t| t.target_type.as_ref())
+            .map(|s| s.as_str())
+            .unwrap_or("branch");
+
+        serde_json::json!({
+            "target": {
+                "ref_name": ref_name,
+                "ref_type": ref_type,
+                "type": "pipeline_ref_target"
+            }
+        })
+    };
+
+    // Add variables if provided
+    if !variable_strings.is_empty() {
+        let variables = parse_variables(variable_strings.clone(), secured)?;
+        payload["variables"] = serde_json::to_value(variables)?;
+    }
+
+    // Trigger new pipeline
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/");
+    let new_pipeline: Pipeline = ctx.client.post(&path, &payload).await.with_context(|| {
+        format!("Failed to re-run pipeline {pipeline_id} on {workspace}/{repo_slug}")
+    })?;
+
+    tracing::info!(
+        original_id = pipeline_id,
+        new_build_number = new_pipeline.build_number,
+        variables_count = variable_strings.len(),
+        "Pipeline re-run triggered"
+    );
+
+    // Return same format as trigger_pipeline
+    #[derive(Serialize)]
+    struct Triggered {
+        uuid: String,
+        build_number: String,
+        state: String,
+        ref_name: String,
+        rerun_from: String,
+    }
+
+    let state = get_pipeline_status(&new_pipeline);
+    let triggered = Triggered {
+        uuid: new_pipeline.uuid,
+        build_number: new_pipeline
+            .build_number
+            .map(|n| n.to_string())
+            .unwrap_or_default(),
+        state,
+        ref_name: new_pipeline
+            .target
+            .as_ref()
+            .and_then(|t| t.ref_name.clone())
+            .unwrap_or_default(),
+        rerun_from: pipeline_id.to_string(),
+    };
+
+    ctx.renderer.render(&triggered)
 }
 
 pub async fn watch_pipeline(
@@ -970,5 +1217,73 @@ mod tests {
         let steps: Vec<StepInfo> = vec![];
         let summary = format_steps_summary(&steps);
         assert!(summary.is_empty());
+    }
+
+    #[test]
+    fn test_parse_variables_valid() {
+        let vars = vec!["ENV=prod".to_string(), "DEBUG=true".to_string()];
+        let result = parse_variables(vars, false).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].key, "ENV");
+        assert_eq!(result[0].value, "prod");
+        assert!(!result[0].secured);
+    }
+
+    #[test]
+    fn test_parse_variables_with_equals_in_value() {
+        let vars = vec!["URL=http://example.com?foo=bar".to_string()];
+        let result = parse_variables(vars, false).unwrap();
+        assert_eq!(result[0].value, "http://example.com?foo=bar");
+    }
+
+    #[test]
+    fn test_parse_variables_secured() {
+        let vars = vec!["SECRET=value".to_string()];
+        let result = parse_variables(vars, true).unwrap();
+        assert!(result[0].secured);
+    }
+
+    #[test]
+    fn test_parse_variables_invalid_format() {
+        let vars = vec!["NOEQUALS".to_string()];
+        let result = parse_variables(vars, false);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Expected KEY=VALUE"));
+    }
+
+    #[test]
+    fn test_parse_variables_empty_key() {
+        let vars = vec!["=value".to_string()];
+        let result = parse_variables(vars, false);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("key cannot be empty"));
+    }
+
+    #[test]
+    fn test_parse_variables_preserves_whitespace_in_value() {
+        let vars = vec!["MSG= spaces  everywhere ".to_string()];
+        let result = parse_variables(vars, false).unwrap();
+        assert_eq!(result[0].value, " spaces  everywhere ");
+    }
+
+    #[test]
+    fn test_target_with_commit_deserializes() {
+        let json = r#"{
+            "ref_name": "main",
+            "type": "pipeline_ref_target",
+            "commit": {"hash": "abc123"}
+        }"#;
+        let target: Target = serde_json::from_str(json).unwrap();
+        assert_eq!(target.commit.unwrap().hash.unwrap(), "abc123");
+    }
+
+    #[test]
+    fn test_target_without_commit_deserializes() {
+        let json = r#"{
+            "ref_name": "main",
+            "type": "pipeline_ref_target"
+        }"#;
+        let target: Target = serde_json::from_str(json).unwrap();
+        assert!(target.commit.is_none());
     }
 }
