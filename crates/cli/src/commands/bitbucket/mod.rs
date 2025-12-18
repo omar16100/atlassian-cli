@@ -707,7 +707,10 @@ pub async fn execute(
             let mut error_msg = String::from("Workspace required.\n\n");
 
             // Add current directory
-            error_msg.push_str(&format!("Current directory: {}\n", git::get_current_directory()));
+            error_msg.push_str(&format!(
+                "Current directory: {}\n",
+                git::get_current_directory()
+            ));
 
             // Add git branch or commit SHA
             if let Some(branch) = git::detect_current_branch() {
@@ -735,7 +738,9 @@ pub async fn execute(
                     }
                 }
                 error_msg.push_str("\nExample:\n");
-                error_msg.push_str("  atlassian-cli bb pipeline list --workspace <workspace> --repo <repo>\n");
+                error_msg.push_str(
+                    "  atlassian-cli bb pipeline list --workspace <workspace> --repo <repo>\n",
+                );
             }
 
             anyhow::anyhow!(error_msg)
@@ -972,24 +977,32 @@ pub async fn execute(
 
                 // Handle --pr flag
                 let effective_branch = if let Some(pr_id) = pr {
-                    let pr_info = pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
+                    let pr_info =
+                        pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
 
                     // Check if PR is from a fork
                     if pullrequests::is_from_fork(&pr_info, &workspace, repo_slug) {
-                        eprintln!("Warning: PR #{} is from a fork (workspace: {}/{})",
-                            pr_id, pr_info.source_workspace, pr_info.source_repo);
+                        eprintln!(
+                            "Warning: PR #{} is from a fork (workspace: {}/{})",
+                            pr_id, pr_info.source_workspace, pr_info.source_repo
+                        );
                         eprintln!("Showing pipelines from the source repository's branch");
                     }
 
                     // Warn if PR is closed
-                    if matches!(pr_info.state.to_uppercase().as_str(), "DECLINED" | "SUPERSEDED") {
+                    if matches!(
+                        pr_info.state.to_uppercase().as_str(),
+                        "DECLINED" | "SUPERSEDED"
+                    ) {
                         eprintln!("Warning: PR #{} is {}", pr_id, pr_info.state);
                         eprintln!("Showing pipelines for branch: {}", pr_info.source_branch);
                     }
 
                     // --pr takes precedence over --branch
                     if branch.is_some() {
-                        eprintln!("Warning: Both --pr and --branch specified, using PR source branch");
+                        eprintln!(
+                            "Warning: Both --pr and --branch specified, using PR source branch"
+                        );
                     }
 
                     Some(pr_info.source_branch)
@@ -1031,7 +1044,11 @@ pub async fn execute(
                 })?;
                 pipelines::get_pipeline(&ctx, &workspace, repo_slug, &uuid, steps).await
             }
-            PipelineCommands::Latest { repo, branch, steps } => {
+            PipelineCommands::Latest {
+                repo,
+                branch,
+                steps,
+            } => {
                 let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
                     anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
                 })?;
@@ -1044,8 +1061,12 @@ pub async fn execute(
                 };
 
                 let branch = effective_branch.ok_or_else(|| {
-                    let mut error_msg = String::from("Cannot detect branch for latest pipeline.\n\n");
-                    error_msg.push_str(&format!("Current directory: {}\n", git::get_current_directory()));
+                    let mut error_msg =
+                        String::from("Cannot detect branch for latest pipeline.\n\n");
+                    error_msg.push_str(&format!(
+                        "Current directory: {}\n",
+                        git::get_current_directory()
+                    ));
                     if let Some(sha) = git::get_current_commit_sha() {
                         error_msg.push_str(&format!("Git status: Detached HEAD at {}\n", sha));
                     }
@@ -1062,15 +1083,16 @@ pub async fn execute(
                     &ctx,
                     &workspace,
                     repo_slug,
-                    1,  // limit
-                    Some("-created_on"),  // sort
-                    None,  // recent
-                    Some(branch.as_str()),  // branch filter
-                    None,  // since
-                    None,  // before
-                    false,  // all
-                    steps,  // steps
-                ).await
+                    1,                     // limit
+                    Some("-created_on"),   // sort
+                    None,                  // recent
+                    Some(branch.as_str()), // branch filter
+                    None,                  // since
+                    None,                  // before
+                    false,                 // all
+                    steps,                 // steps
+                )
+                .await
             }
             PipelineCommands::Trigger {
                 repo,
@@ -1156,7 +1178,8 @@ pub async fn execute(
                 // Determine which pipeline to rerun
                 let effective_pipeline_id = if let Some(pr_id) = pr {
                     // Handle --pr flag
-                    let pr_info = pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
+                    let pr_info =
+                        pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
 
                     // Error if PR is from a fork
                     if pullrequests::is_from_fork(&pr_info, &workspace, repo_slug) {
@@ -1184,15 +1207,15 @@ pub async fn execute(
                     // If --failed-only, check for failed steps
                     if failed_only {
                         let has_failed = pipelines::pipeline_has_failed_steps(
-                            &ctx,
-                            &workspace,
-                            repo_slug,
-                            &latest,
+                            &ctx, &workspace, repo_slug, &latest,
                         )
                         .await?;
 
                         if !has_failed {
-                            println!("Skipping rerun: No failed steps in latest pipeline for PR #{}", pr_id);
+                            println!(
+                                "Skipping rerun: No failed steps in latest pipeline for PR #{}",
+                                pr_id
+                            );
                             return Ok(());
                         }
                     }

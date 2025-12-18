@@ -152,10 +152,7 @@ pub fn detect_current_branch() -> Option<String> {
         return None;
     }
 
-    let branch = String::from_utf8(output.stdout)
-        .ok()?
-        .trim()
-        .to_string();
+    let branch = String::from_utf8(output.stdout).ok()?.trim().to_string();
 
     // Empty string indicates detached HEAD
     if branch.is_empty() {
@@ -176,10 +173,7 @@ pub fn get_current_commit_sha() -> Option<String> {
         return None;
     }
 
-    let sha = String::from_utf8(output.stdout)
-        .ok()?
-        .trim()
-        .to_string();
+    let sha = String::from_utf8(output.stdout).ok()?.trim().to_string();
 
     if sha.is_empty() {
         None
@@ -187,7 +181,6 @@ pub fn get_current_commit_sha() -> Option<String> {
         Some(sha)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
