@@ -1298,9 +1298,9 @@ pub async fn pipeline_has_failed_steps(
         .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
     Ok(response.values.iter().any(|step| {
-        step.state.as_ref().is_some_and(|state| {
-            matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR")
-        })
+        step.state
+            .as_ref()
+            .is_some_and(|state| matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR"))
     }))
 }
 
