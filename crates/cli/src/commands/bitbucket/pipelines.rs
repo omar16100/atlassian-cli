@@ -814,13 +814,13 @@ pub async fn get_pipeline_logs(
 
     // Filter by step name pattern if specified
     if let Some(pattern) = step_name_pattern {
-        steps_to_show.retain(|s| s.name.as_ref().map_or(false, |n| n.contains(pattern)));
+        steps_to_show.retain(|s| s.name.as_ref().is_some_and(|n| n.contains(pattern)));
     }
 
     // Filter by failed steps only if specified
     if failed_only {
         steps_to_show.retain(|s| {
-            s.state.as_ref().map_or(false, |state| {
+            s.state.as_ref().is_some_and(|state| {
                 matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR")
             })
         });
@@ -1298,7 +1298,7 @@ pub async fn pipeline_has_failed_steps(
         .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
     Ok(response.values.iter().any(|step| {
-        step.state.as_ref().map_or(false, |state| {
+        step.state.as_ref().is_some_and(|state| {
             matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR")
         })
     }))
