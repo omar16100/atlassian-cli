@@ -797,7 +797,8 @@ pub async fn get_pipeline_logs(
     );
 
     // Fetch all pipeline steps
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
+    let path =
+        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
     let response: StepList = ctx
         .client
         .get(&path)
@@ -813,19 +814,14 @@ pub async fn get_pipeline_logs(
 
     // Filter by step name pattern if specified
     if let Some(pattern) = step_name_pattern {
-        steps_to_show.retain(|s| {
-            s.name.as_ref().map_or(false, |n| n.contains(pattern))
-        });
+        steps_to_show.retain(|s| s.name.as_ref().map_or(false, |n| n.contains(pattern)));
     }
 
     // Filter by failed steps only if specified
     if failed_only {
         steps_to_show.retain(|s| {
             s.state.as_ref().map_or(false, |state| {
-                matches!(
-                    state.name.to_uppercase().as_str(),
-                    "FAILED" | "ERROR"
-                )
+                matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR")
             })
         });
     }
@@ -845,10 +841,7 @@ pub async fn get_pipeline_logs(
 
         // Check if step was skipped
         if let Some(state) = step_state {
-            if matches!(
-                state.name.to_uppercase().as_str(),
-                "NOT_RUN" | "SKIPPED"
-            ) {
+            if matches!(state.name.to_uppercase().as_str(), "NOT_RUN" | "SKIPPED") {
                 if ctx.renderer.format() == OutputFormat::Table {
                     println!("⏭  Step '{}' was skipped - no logs available", step_name);
                 }
@@ -873,7 +866,10 @@ pub async fn get_pipeline_logs(
                     continue;
                 }
                 return Err(e).with_context(|| {
-                    format!("Failed to fetch logs for step {} ({})", step_name, step.uuid)
+                    format!(
+                        "Failed to fetch logs for step {} ({})",
+                        step_name, step.uuid
+                    )
                 });
             }
         };
@@ -970,7 +966,16 @@ pub async fn pipeline_status(
     show_steps: bool,
 ) -> Result<()> {
     // Fetch single most recent pipeline
-    let path = build_request_path(&None, workspace, repo_slug, 1, "-created_on", None, None, None);
+    let path = build_request_path(
+        &None,
+        workspace,
+        repo_slug,
+        1,
+        "-created_on",
+        None,
+        None,
+        None,
+    );
 
     let response: PipelineList =
         ctx.client.get(&path).await.with_context(|| {
@@ -1255,11 +1260,11 @@ pub async fn find_latest_pipeline_for_branch(
         &None,
         workspace,
         repo_slug,
-        1,  // limit
-        "-created_on",  // sort
+        1,             // limit
+        "-created_on", // sort
         Some(branch),
-        None,  // since
-        None,  // before
+        None, // since
+        None, // before
     );
 
     let response: PipelineList = ctx
@@ -1268,9 +1273,11 @@ pub async fn find_latest_pipeline_for_branch(
         .await
         .with_context(|| format!("Failed to fetch pipelines for branch {branch}"))?;
 
-    let pipeline = response.values.into_iter().next().ok_or_else(|| {
-        anyhow::anyhow!("No pipelines found for branch {}", branch)
-    })?;
+    let pipeline = response
+        .values
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("No pipelines found for branch {}", branch))?;
 
     Ok(pipeline.uuid)
 }
@@ -1282,7 +1289,8 @@ pub async fn pipeline_has_failed_steps(
     repo_slug: &str,
     pipeline_uuid: &str,
 ) -> Result<bool> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
+    let path =
+        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
     let response: StepList = ctx
         .client
         .get(&path)
@@ -1291,10 +1299,7 @@ pub async fn pipeline_has_failed_steps(
 
     Ok(response.values.iter().any(|step| {
         step.state.as_ref().map_or(false, |state| {
-            matches!(
-                state.name.to_uppercase().as_str(),
-                "FAILED" | "ERROR"
-            )
+            matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR")
         })
     }))
 }
@@ -1408,7 +1413,16 @@ mod tests {
 
     #[test]
     fn test_build_request_path_initial() {
-        let path = build_request_path(&None, "myworkspace", "myrepo", 100, "-created_on", None, None, None);
+        let path = build_request_path(
+            &None,
+            "myworkspace",
+            "myrepo",
+            100,
+            "-created_on",
+            None,
+            None,
+            None,
+        );
         assert!(path.contains("/2.0/repositories/myworkspace/myrepo/pipelines?"));
         assert!(path.contains("pagelen=100"));
         assert!(path.contains("sort=-created_on"));
@@ -1435,7 +1449,16 @@ mod tests {
     fn test_build_request_path_next_page() {
         let next_url =
             Some("https://api.bitbucket.org/2.0/repositories/ws/repo/pipelines?page=2".to_string());
-        let path = build_request_path(&next_url, "ws", "repo", 100, "-created_on", None, None, None);
+        let path = build_request_path(
+            &next_url,
+            "ws",
+            "repo",
+            100,
+            "-created_on",
+            None,
+            None,
+            None,
+        );
         assert_eq!(path, "/2.0/repositories/ws/repo/pipelines?page=2");
     }
 

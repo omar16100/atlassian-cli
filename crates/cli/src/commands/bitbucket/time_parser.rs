@@ -61,7 +61,10 @@ fn try_parse_relative(expr: &str) -> Result<Option<String>> {
 
     // Parse the numeric value
     let value: i64 = value_str.parse().map_err(|_| {
-        anyhow!("Invalid relative duration: '{}' - numeric part must be an integer", expr)
+        anyhow!(
+            "Invalid relative duration: '{}' - numeric part must be an integer",
+            expr
+        )
     })?;
 
     // Reject zero or negative durations
@@ -146,7 +149,10 @@ mod tests {
     fn test_reject_invalid_format() {
         let result = parse_time_expression("not-a-time");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Invalid time expression"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid time expression"));
     }
 
     #[test]
@@ -159,7 +165,10 @@ mod tests {
     fn test_reject_non_numeric_value() {
         let result = parse_time_expression("abch");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("numeric part must be an integer"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("numeric part must be an integer"));
     }
 
     #[test]
