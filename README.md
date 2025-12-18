@@ -67,6 +67,10 @@ crates/
 4. Run the CLI help to inspect current subcommands:
    ```bash
    atlassian-cli --help
+   atlassian-cli jira --help
+   atlassian-cli confluence --help
+   atlassian-cli bitbucket --help  # or use 'bb' alias
+   atlassian-cli bb --help
    ```
 5. Add a profile and API token:
    ```bash
@@ -173,6 +177,10 @@ crates/
    atlassian-cli confluence analytics page-views --id 12345 --from 2025-01-01
    atlassian-cli confluence analytics space-stats --space DEV
 
+   # Bitbucket Commands
+   # Note: You can use 'bb' as a shorthand alias for 'bitbucket' in all commands below
+   # Examples: atlassian-cli bb whoami  OR  atlassian-cli bitbucket whoami
+
    # Bitbucket - User Info
    atlassian-cli bitbucket whoami
 
@@ -234,6 +242,27 @@ crates/
    atlassian-cli jsm request list --limit 10
    atlassian-cli jsm request get SD-123
    ```
+
+## Command Aliases
+
+For convenience, the following command aliases are available:
+
+| Full Command | Alias | Description |
+|-------------|-------|-------------|
+| `bitbucket` | `bb`  | Bitbucket commands |
+
+Example usage:
+```bash
+# Full command
+atlassian-cli bitbucket pipeline list --workspace myworkspace
+
+# Using alias (shorter and faster to type)
+atlassian-cli bb pipeline list --workspace myworkspace
+
+# Both commands work identically
+atlassian-cli bitbucket repo list --workspace myteam
+atlassian-cli bb repo list --workspace myteam
+```
 
 ## Bitbucket Authentication
 

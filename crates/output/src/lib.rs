@@ -7,6 +7,10 @@ use serde_json::Value;
 use tabled::builder::Builder;
 use tabled::settings::Style;
 
+pub mod colors;
+
+pub use colors::StatusFormatter;
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum, Default)]
 pub enum OutputFormat {
     #[default]

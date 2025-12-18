@@ -144,12 +144,6 @@ struct StepInfo {
 }
 
 #[derive(Serialize)]
-struct LogsView {
-    url: String,
-    note: String,
-}
-
-#[derive(Serialize)]
 struct PipelineStatusOutput {
     build_number: i64,
     state: String,
@@ -182,6 +176,18 @@ fn get_status_icon(status: &str) -> &'static str {
     }
 }
 
+fn format_status_for_display(status: &str, use_colors: bool) -> String {
+    use atlassian_cli_output::StatusFormatter;
+
+    let icon = get_status_icon(status);
+    if use_colors {
+        let formatter = StatusFormatter::new();
+        formatter.format(status, icon)
+    } else {
+        format!("{} {}", status, icon)
+    }
+}
+
 fn get_step_status(step: &PipelineStep) -> String {
     step.state
         .as_ref()
@@ -206,10 +212,24 @@ fn is_terminal_state(status: &str) -> bool {
     )
 }
 
-fn format_steps_summary(steps: &[StepInfo]) -> String {
+fn format_steps_summary(steps: &[StepInfo], use_colors: bool) -> String {
+    use atlassian_cli_output::StatusFormatter;
+    let formatter = if use_colors {
+        StatusFormatter::new()
+    } else {
+        StatusFormatter::with_colors(false)
+    };
+
     steps
         .iter()
-        .map(|s| format!("{} {}", s.name, get_status_icon(&s.status)))
+        .map(|s| {
+            let icon = get_status_icon(&s.status);
+            if use_colors {
+                format!("{} {}", s.name, formatter.format(&s.status, icon))
+            } else {
+                format!("{} {} {}", s.name, s.status, icon)
+            }
+        })
         .collect::<Vec<_>>()
         .join(" | ")
 }
@@ -296,6 +316,8 @@ fn build_request_path(
     page_size: usize,
     sort: &str,
     branch: Option<&str>,
+    since: Option<&str>,
+    before: Option<&str>,
 ) -> String {
     if let Some(url) = next_url {
         url.strip_prefix("https://api.bitbucket.org")
@@ -305,10 +327,32 @@ fn build_request_path(
         let mut query = form_urlencoded::Serializer::new(String::new());
         query.append_pair("pagelen", &page_size.to_string());
         query.append_pair("sort", sort);
+
+        // Build combined filters with AND logic
+        let mut filters = Vec::new();
+
         if let Some(b) = branch.filter(|s| !s.is_empty()) {
-            // Bitbucket requires q= filter syntax for filtering by branch
-            query.append_pair("q", &format!("target.ref_name=\"{}\"", b));
+            filters.push(format!("target.ref_name=\"{}\"", b));
         }
+
+        if let Some(s) = since {
+            filters.push(format!("created_on >= \"{}\"", s));
+        }
+
+        if let Some(b) = before {
+            filters.push(format!("created_on < \"{}\"", b));
+        }
+
+        // Combine filters with AND, wrap in parentheses if multiple
+        if !filters.is_empty() {
+            let q = if filters.len() > 1 {
+                format!("({})", filters.join(" AND "))
+            } else {
+                filters[0].clone()
+            };
+            query.append_pair("q", &q);
+        }
+
         format!(
             "/2.0/repositories/{workspace}/{repo_slug}/pipelines?{}",
             query.finish()
@@ -475,6 +519,8 @@ pub async fn list_pipelines(
     sort: Option<&str>,
     recent: Option<usize>,
     branch: Option<&str>,
+    since: Option<&str>,
+    before: Option<&str>,
     fetch_all: bool,
     show_steps: bool,
 ) -> Result<()> {
@@ -507,6 +553,8 @@ pub async fn list_pipelines(
             page_size,
             effective_sort,
             branch,
+            since,
+            before,
         );
 
         let response: PipelineList = ctx
@@ -533,6 +581,7 @@ pub async fn list_pipelines(
     }
 
     // Fetch steps for each pipeline if requested
+    let use_colors = ctx.renderer.format() == OutputFormat::Table;
     let step_summaries: Vec<Option<String>> = if show_steps {
         let mut summaries = Vec::with_capacity(all_pipelines.len());
         for pipeline in &all_pipelines {
@@ -540,35 +589,37 @@ pub async fn list_pipelines(
             let summary = steps
                 .ok()
                 .filter(|s| !s.is_empty())
-                .map(|s| format_steps_summary(&s));
+                .map(|s| format_steps_summary(&s, use_colors));
             summaries.push(summary);
         }
         summaries
     } else {
         vec![None; all_pipelines.len()]
     };
-
     let rows: Vec<PipelineRow> = all_pipelines
         .iter()
         .zip(step_summaries.into_iter())
-        .map(|(pipeline, steps_summary)| PipelineRow {
-            build_number: pipeline
-                .build_number
-                .map(|n| n.to_string())
-                .unwrap_or_default(),
-            state: get_pipeline_status(pipeline),
-            ref_name: pipeline
-                .target
-                .as_ref()
-                .and_then(|t| t.ref_name.clone())
-                .unwrap_or_default(),
-            target_type: pipeline
-                .target
-                .as_ref()
-                .and_then(|t| t.target_type.clone())
-                .unwrap_or_default(),
-            created: pipeline.created_on.clone().unwrap_or_default(),
-            steps_summary,
+        .map(|(pipeline, steps_summary)| {
+            let status = get_pipeline_status(pipeline);
+            PipelineRow {
+                build_number: pipeline
+                    .build_number
+                    .map(|n| n.to_string())
+                    .unwrap_or_default(),
+                state: format_status_for_display(&status, use_colors),
+                ref_name: pipeline
+                    .target
+                    .as_ref()
+                    .and_then(|t| t.ref_name.clone())
+                    .unwrap_or_default(),
+                target_type: pipeline
+                    .target
+                    .as_ref()
+                    .and_then(|t| t.target_type.clone())
+                    .unwrap_or_default(),
+                created: pipeline.created_on.clone().unwrap_or_default(),
+                steps_summary,
+            }
         })
         .collect();
 
@@ -601,11 +652,13 @@ pub async fn get_pipeline(
     };
 
     // Only include steps_summary if steps is non-empty
+    let use_colors = ctx.renderer.format() == OutputFormat::Table;
     let steps_summary = steps
         .as_ref()
         .filter(|s| !s.is_empty())
-        .map(|s| format_steps_summary(s));
-    let state = get_pipeline_status(&pipeline);
+        .map(|s| format_steps_summary(s, use_colors));
+    let status = get_pipeline_status(&pipeline);
+    let state = format_status_for_display(&status, use_colors);
 
     let view = PipelineView {
         uuid: pipeline.uuid,
@@ -724,40 +777,161 @@ pub async fn stop_pipeline(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn get_pipeline_logs(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
     repo_slug: &str,
     pipeline_uuid: &str,
-    step_uuid: &str,
+    step_uuid: Option<&str>,
+    step_name_pattern: Option<&str>,
+    grep_pattern: Option<&str>,
+    ignore_case: bool,
+    failed_only: bool,
 ) -> Result<()> {
     tracing::info!(
         pipeline_uuid,
-        step_uuid,
         workspace,
         repo_slug,
-        "Fetching pipeline logs"
+        "Fetching pipeline logs with filters"
     );
 
-    let url = format!(
-        "https://bitbucket.org/{workspace}/{repo_slug}/pipelines/results/{}/steps/{}",
-        pipeline_uuid.trim_matches('{').trim_matches('}'),
-        step_uuid.trim_matches('{').trim_matches('}')
-    );
+    // Fetch all pipeline steps
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
+    let response: StepList = ctx
+        .client
+        .get(&path)
+        .await
+        .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
-    // Return structured output for JSON/YAML/CSV, human-readable for table
-    if ctx.renderer.format() == OutputFormat::Table || ctx.renderer.format() == OutputFormat::Quiet
-    {
-        println!("Pipeline logs for step {step_uuid}:");
-        println!("View at: {url}");
-        println!("\nNote: Use the web interface to view full logs with syntax highlighting");
-        Ok(())
-    } else {
-        ctx.renderer.render(&LogsView {
-            url,
-            note: "Use the web interface to view full logs with syntax highlighting".to_string(),
-        })
+    let mut steps_to_show: Vec<&PipelineStep> = response.values.iter().collect();
+
+    // Filter by step UUID if specified
+    if let Some(uuid) = step_uuid {
+        steps_to_show.retain(|s| s.uuid == uuid);
     }
+
+    // Filter by step name pattern if specified
+    if let Some(pattern) = step_name_pattern {
+        steps_to_show.retain(|s| {
+            s.name.as_ref().map_or(false, |n| n.contains(pattern))
+        });
+    }
+
+    // Filter by failed steps only if specified
+    if failed_only {
+        steps_to_show.retain(|s| {
+            s.state.as_ref().map_or(false, |state| {
+                matches!(
+                    state.name.to_uppercase().as_str(),
+                    "FAILED" | "ERROR"
+                )
+            })
+        });
+    }
+
+    if steps_to_show.is_empty() {
+        println!("No steps matched the filter criteria");
+        return Ok(());
+    }
+
+    // Prepare output for structured formats
+    let mut all_logs = Vec::new();
+
+    // Process each step
+    for step in steps_to_show {
+        let step_name = step.name.as_deref().unwrap_or("unnamed");
+        let step_state = step.state.as_ref();
+
+        // Check if step was skipped
+        if let Some(state) = step_state {
+            if matches!(
+                state.name.to_uppercase().as_str(),
+                "NOT_RUN" | "SKIPPED"
+            ) {
+                if ctx.renderer.format() == OutputFormat::Table {
+                    println!("⏭  Step '{}' was skipped - no logs available", step_name);
+                }
+                continue;
+            }
+        }
+
+        // Fetch logs for this step
+        let log_path = format!(
+            "/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/{}/log",
+            step.uuid
+        );
+
+        let log_content = match ctx.client.get_text(&log_path).await {
+            Ok(content) => content,
+            Err(e) => {
+                // Handle 404 as skipped step
+                if e.to_string().contains("404") || e.to_string().contains("Not Found") {
+                    if ctx.renderer.format() == OutputFormat::Table {
+                        println!("⏭  Step '{}' has no logs available yet", step_name);
+                    }
+                    continue;
+                }
+                return Err(e).with_context(|| {
+                    format!("Failed to fetch logs for step {} ({})", step_name, step.uuid)
+                });
+            }
+        };
+
+        // Apply grep filter if specified
+        let filtered_lines: Vec<&str> = if let Some(pattern) = grep_pattern {
+            log_content
+                .lines()
+                .filter(|line| {
+                    if ignore_case {
+                        line.to_lowercase().contains(&pattern.to_lowercase())
+                    } else {
+                        line.contains(pattern)
+                    }
+                })
+                .collect()
+        } else {
+            log_content.lines().collect()
+        };
+
+        let state_name = step_state.map(|s| s.name.as_str()).unwrap_or("UNKNOWN");
+
+        // Output based on format
+        match ctx.renderer.format() {
+            OutputFormat::Table | OutputFormat::Quiet => {
+                // Stream directly to stdout for table/quiet mode
+                println!("\n=== Step: {} ({}) ===", step_name, state_name);
+                for line in filtered_lines {
+                    println!("{}", line);
+                }
+            }
+            _ => {
+                // Collect for structured output
+                all_logs.push(serde_json::json!({
+                    "step_uuid": step.uuid,
+                    "step_name": step_name,
+                    "step_status": state_name,
+                    "log_lines": filtered_lines,
+                    "filtered_count": if grep_pattern.is_some() {
+                        Some(filtered_lines.len())
+                    } else {
+                        None
+                    },
+                    "total_lines": log_content.lines().count(),
+                }));
+            }
+        }
+    }
+
+    // Render structured output for JSON/YAML/CSV
+    if !matches!(
+        ctx.renderer.format(),
+        OutputFormat::Table | OutputFormat::Quiet
+    ) {
+        ctx.renderer.render(&all_logs)?;
+    }
+
+    Ok(())
 }
 
 pub async fn list_steps(
@@ -796,7 +970,7 @@ pub async fn pipeline_status(
     show_steps: bool,
 ) -> Result<()> {
     // Fetch single most recent pipeline
-    let path = build_request_path(&None, workspace, repo_slug, 1, "-created_on", None);
+    let path = build_request_path(&None, workspace, repo_slug, 1, "-created_on", None, None, None);
 
     let response: PipelineList =
         ctx.client.get(&path).await.with_context(|| {
@@ -1011,7 +1185,8 @@ pub async fn watch_pipeline(
             let icon = get_status_icon(&status);
 
             if let Some(ref step_list) = steps {
-                let summary = format_steps_summary(step_list);
+                // Always use colors for watch command in table mode
+                let summary = format_steps_summary(step_list, is_table);
                 print!(
                     "{} {} {} ({}) [{}] {}",
                     build_num, status, icon, ref_name, elapsed, summary
@@ -1035,11 +1210,11 @@ pub async fn watch_pipeline(
                 let icon = get_status_icon(&status);
                 println!("\n{icon} Pipeline completed with status: {status}");
             } else {
-                // For JSON/YAML/CSV: render final state once
+                // For JSON/YAML/CSV: render final state once (no colors)
                 let steps_summary = steps
                     .as_ref()
                     .filter(|s| !s.is_empty())
-                    .map(|s| format_steps_summary(s));
+                    .map(|s| format_steps_summary(s, false));
                 let view = PipelineView {
                     uuid: pipeline.uuid,
                     build_number: pipeline
@@ -1066,6 +1241,62 @@ pub async fn watch_pipeline(
     }
 
     Ok(())
+}
+
+/// Find the latest pipeline for a given branch
+/// Returns the pipeline UUID
+pub async fn find_latest_pipeline_for_branch(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    branch: &str,
+) -> Result<String> {
+    let path = build_request_path(
+        &None,
+        workspace,
+        repo_slug,
+        1,  // limit
+        "-created_on",  // sort
+        Some(branch),
+        None,  // since
+        None,  // before
+    );
+
+    let response: PipelineList = ctx
+        .client
+        .get(&path)
+        .await
+        .with_context(|| format!("Failed to fetch pipelines for branch {branch}"))?;
+
+    let pipeline = response.values.into_iter().next().ok_or_else(|| {
+        anyhow::anyhow!("No pipelines found for branch {}", branch)
+    })?;
+
+    Ok(pipeline.uuid)
+}
+
+/// Check if a pipeline has failed steps
+pub async fn pipeline_has_failed_steps(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pipeline_uuid: &str,
+) -> Result<bool> {
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
+    let response: StepList = ctx
+        .client
+        .get(&path)
+        .await
+        .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
+
+    Ok(response.values.iter().any(|step| {
+        step.state.as_ref().map_or(false, |state| {
+            matches!(
+                state.name.to_uppercase().as_str(),
+                "FAILED" | "ERROR"
+            )
+        })
+    }))
 }
 
 // ============================================================================
@@ -1128,10 +1359,13 @@ mod tests {
                 logs_url: None,
             },
         ];
-        let summary = format_steps_summary(&steps);
-        assert!(summary.contains("Clone ✅"));
-        assert!(summary.contains("Build 🔄"));
-        assert!(summary.contains("Deploy ⏳"));
+        let summary = format_steps_summary(&steps, false);
+        assert!(summary.contains("Clone"));
+        assert!(summary.contains("✅"));
+        assert!(summary.contains("Build"));
+        assert!(summary.contains("🔄"));
+        assert!(summary.contains("Deploy"));
+        assert!(summary.contains("⏳"));
     }
 
     #[test]
@@ -1174,7 +1408,7 @@ mod tests {
 
     #[test]
     fn test_build_request_path_initial() {
-        let path = build_request_path(&None, "myworkspace", "myrepo", 100, "-created_on", None);
+        let path = build_request_path(&None, "myworkspace", "myrepo", 100, "-created_on", None, None, None);
         assert!(path.contains("/2.0/repositories/myworkspace/myrepo/pipelines?"));
         assert!(path.contains("pagelen=100"));
         assert!(path.contains("sort=-created_on"));
@@ -1189,6 +1423,8 @@ mod tests {
             100,
             "-created_on",
             Some("main"),
+            None,
+            None,
         );
         // Should use q= filter syntax: q=target.ref_name%3D%22main%22
         assert!(path.contains("q=target.ref_name"));
@@ -1199,14 +1435,55 @@ mod tests {
     fn test_build_request_path_next_page() {
         let next_url =
             Some("https://api.bitbucket.org/2.0/repositories/ws/repo/pipelines?page=2".to_string());
-        let path = build_request_path(&next_url, "ws", "repo", 100, "-created_on", None);
+        let path = build_request_path(&next_url, "ws", "repo", 100, "-created_on", None, None, None);
         assert_eq!(path, "/2.0/repositories/ws/repo/pipelines?page=2");
+    }
+
+    #[test]
+    fn test_build_request_path_with_time_filters() {
+        let path = build_request_path(
+            &None,
+            "myworkspace",
+            "myrepo",
+            100,
+            "-created_on",
+            None,
+            Some("2024-01-01T00:00:00Z"),
+            Some("2024-12-31T23:59:59Z"),
+        );
+        // Should contain both time filters with AND logic and parentheses
+        assert!(path.contains("created_on"));
+        assert!(path.contains("%3E%3D")); // URL-encoded >=
+        assert!(path.contains("%3C")); // URL-encoded <
+        assert!(path.contains("2024-01-01"));
+        assert!(path.contains("2024-12-31"));
+        assert!(path.contains("AND"));
+    }
+
+    #[test]
+    fn test_build_request_path_with_branch_and_time() {
+        let path = build_request_path(
+            &None,
+            "myworkspace",
+            "myrepo",
+            100,
+            "-created_on",
+            Some("main"),
+            Some("2024-01-01T00:00:00Z"),
+            None,
+        );
+        // Should combine branch and time filters with parentheses
+        assert!(path.contains("target.ref_name"));
+        assert!(path.contains("created_on"));
+        assert!(path.contains("AND"));
+        assert!(path.contains("%28")); // URL-encoded (
+        assert!(path.contains("%29")); // URL-encoded )
     }
 
     #[test]
     fn test_steps_empty_returns_empty_summary() {
         let steps: Vec<StepInfo> = vec![];
-        let summary = format_steps_summary(&steps);
+        let summary = format_steps_summary(&steps, false);
         assert!(summary.is_empty());
     }
 
