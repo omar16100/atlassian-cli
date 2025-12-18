@@ -309,15 +309,19 @@ fn parse_variables(vars: Vec<String>, secured: bool) -> Result<Vec<PipelineVaria
     Ok(variables)
 }
 
+struct PipelineFilters<'a> {
+    branch: Option<&'a str>,
+    since: Option<&'a str>,
+    before: Option<&'a str>,
+}
+
 fn build_request_path(
     next_url: &Option<String>,
     workspace: &str,
     repo_slug: &str,
     page_size: usize,
     sort: &str,
-    branch: Option<&str>,
-    since: Option<&str>,
-    before: Option<&str>,
+    filters: PipelineFilters,
 ) -> String {
     if let Some(url) = next_url {
         url.strip_prefix("https://api.bitbucket.org")
@@ -329,26 +333,26 @@ fn build_request_path(
         query.append_pair("sort", sort);
 
         // Build combined filters with AND logic
-        let mut filters = Vec::new();
+        let mut filter_clauses = Vec::new();
 
-        if let Some(b) = branch.filter(|s| !s.is_empty()) {
-            filters.push(format!("target.ref_name=\"{}\"", b));
+        if let Some(b) = filters.branch.filter(|s| !s.is_empty()) {
+            filter_clauses.push(format!("target.ref_name=\"{}\"", b));
         }
 
-        if let Some(s) = since {
-            filters.push(format!("created_on >= \"{}\"", s));
+        if let Some(s) = filters.since {
+            filter_clauses.push(format!("created_on >= \"{}\"", s));
         }
 
-        if let Some(b) = before {
-            filters.push(format!("created_on < \"{}\"", b));
+        if let Some(b) = filters.before {
+            filter_clauses.push(format!("created_on < \"{}\"", b));
         }
 
         // Combine filters with AND, wrap in parentheses if multiple
-        if !filters.is_empty() {
-            let q = if filters.len() > 1 {
-                format!("({})", filters.join(" AND "))
+        if !filter_clauses.is_empty() {
+            let q = if filter_clauses.len() > 1 {
+                format!("({})", filter_clauses.join(" AND "))
             } else {
-                filters[0].clone()
+                filter_clauses[0].clone()
             };
             query.append_pair("q", &q);
         }
@@ -552,9 +556,11 @@ pub async fn list_pipelines(
             repo_slug,
             page_size,
             effective_sort,
-            branch,
-            since,
-            before,
+            PipelineFilters {
+                branch,
+                since,
+                before,
+            },
         );
 
         let response: PipelineList = ctx
@@ -972,9 +978,11 @@ pub async fn pipeline_status(
         repo_slug,
         1,
         "-created_on",
-        None,
-        None,
-        None,
+        PipelineFilters {
+            branch: None,
+            since: None,
+            before: None,
+        },
     );
 
     let response: PipelineList =
@@ -1262,9 +1270,11 @@ pub async fn find_latest_pipeline_for_branch(
         repo_slug,
         1,             // limit
         "-created_on", // sort
-        Some(branch),
-        None, // since
-        None, // before
+        PipelineFilters {
+            branch: Some(branch),
+            since: None,
+            before: None,
+        },
     );
 
     let response: PipelineList = ctx
@@ -1419,9 +1429,11 @@ mod tests {
             "myrepo",
             100,
             "-created_on",
-            None,
-            None,
-            None,
+            PipelineFilters {
+                branch: None,
+                since: None,
+                before: None,
+            },
         );
         assert!(path.contains("/2.0/repositories/myworkspace/myrepo/pipelines?"));
         assert!(path.contains("pagelen=100"));
@@ -1436,9 +1448,11 @@ mod tests {
             "myrepo",
             100,
             "-created_on",
-            Some("main"),
-            None,
-            None,
+            PipelineFilters {
+                branch: Some("main"),
+                since: None,
+                before: None,
+            },
         );
         // Should use q= filter syntax: q=target.ref_name%3D%22main%22
         assert!(path.contains("q=target.ref_name"));
@@ -1455,9 +1469,11 @@ mod tests {
             "repo",
             100,
             "-created_on",
-            None,
-            None,
-            None,
+            PipelineFilters {
+                branch: None,
+                since: None,
+                before: None,
+            },
         );
         assert_eq!(path, "/2.0/repositories/ws/repo/pipelines?page=2");
     }
@@ -1470,9 +1486,11 @@ mod tests {
             "myrepo",
             100,
             "-created_on",
-            None,
-            Some("2024-01-01T00:00:00Z"),
-            Some("2024-12-31T23:59:59Z"),
+            PipelineFilters {
+                branch: None,
+                since: Some("2024-01-01T00:00:00Z"),
+                before: Some("2024-12-31T23:59:59Z"),
+            },
         );
         // Should contain both time filters with AND logic and parentheses
         assert!(path.contains("created_on"));
@@ -1491,9 +1509,11 @@ mod tests {
             "myrepo",
             100,
             "-created_on",
-            Some("main"),
-            Some("2024-01-01T00:00:00Z"),
-            None,
+            PipelineFilters {
+                branch: Some("main"),
+                since: Some("2024-01-01T00:00:00Z"),
+                before: None,
+            },
         );
         // Should combine branch and time filters with parentheses
         assert!(path.contains("target.ref_name"));
