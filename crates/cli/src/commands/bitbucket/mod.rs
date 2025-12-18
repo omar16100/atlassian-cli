@@ -12,6 +12,7 @@ mod permissions;
 mod pipelines;
 mod pullrequests;
 mod repos;
+mod time_parser;
 pub mod utils;
 mod webhooks;
 mod workspaces;
@@ -400,6 +401,15 @@ enum PipelineCommands {
         /// Filter by branch name.
         #[arg(long)]
         branch: Option<String>,
+        /// Filter pipelines created after this time (inclusive). Examples: 24h, 7d, 2024-01-01T00:00:00Z
+        #[arg(long)]
+        since: Option<String>,
+        /// Filter pipelines created before this time (exclusive). Examples: 7d, 2024-12-01T00:00:00Z
+        #[arg(long)]
+        before: Option<String>,
+        /// Filter by pull request number (uses PR's source branch).
+        #[arg(long)]
+        pr: Option<i64>,
         /// Fetch all pages (ignores --limit).
         #[arg(long)]
         all: bool,
@@ -413,6 +423,17 @@ enum PipelineCommands {
         repo: Option<String>,
         /// Pipeline UUID or build number.
         uuid: String,
+        /// Show pipeline steps with status.
+        #[arg(long)]
+        steps: bool,
+    },
+    /// Get latest pipeline for current or specified branch.
+    Latest {
+        /// Repository slug (auto-detected from git remote if not specified).
+        repo: Option<String>,
+        /// Branch name (auto-detected from current branch if not specified).
+        #[arg(long)]
+        branch: Option<String>,
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
@@ -447,8 +468,20 @@ enum PipelineCommands {
         repo: Option<String>,
         /// Pipeline UUID.
         pipeline_uuid: String,
-        /// Step UUID.
-        step_uuid: String,
+        /// Step UUID (optional - shows all steps if not specified).
+        step_uuid: Option<String>,
+        /// Filter by step name pattern.
+        #[arg(long)]
+        step: Option<String>,
+        /// Grep pattern to filter log lines.
+        #[arg(long)]
+        grep: Option<String>,
+        /// Case-insensitive grep.
+        #[arg(long, short = 'i')]
+        ignore_case: bool,
+        /// Show only failed steps.
+        #[arg(long)]
+        failed_only: bool,
     },
     /// Watch a running pipeline until completion.
     Watch {
@@ -482,8 +515,14 @@ enum PipelineCommands {
     Rerun {
         /// Repository slug (auto-detected from git remote if not specified).
         repo: Option<String>,
-        /// Pipeline UUID or build number.
-        pipeline_id: String,
+        /// Pipeline UUID or build number (optional when using --pr).
+        pipeline_id: Option<String>,
+        /// Re-run from pull request (uses PR's source branch).
+        #[arg(long)]
+        pr: Option<i64>,
+        /// Only re-run if there are failed steps (requires --pr).
+        #[arg(long, requires = "pr")]
+        failed_only: bool,
         /// Pipeline variables in KEY=VALUE format (can be repeated).
         #[arg(long = "var")]
         variables: Vec<String>,
@@ -664,12 +703,42 @@ pub async fn execute(
         .or(git_ctx.workspace.as_deref())
         .or(inferred_workspace)
         .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Workspace required. Options:\n\
-                 1. Use --workspace flag\n\
-                 2. Run in git directory with Bitbucket remote\n\
-                 3. Configure workspace in profile"
-            )
+            // Build detailed error message with git context
+            let mut error_msg = String::from("Workspace required.\n\n");
+
+            // Add current directory
+            error_msg.push_str(&format!("Current directory: {}\n", git::get_current_directory()));
+
+            // Add git branch or commit SHA
+            if let Some(branch) = git::detect_current_branch() {
+                error_msg.push_str(&format!("Detected branch: {}\n", branch));
+            } else if let Some(sha) = git::get_current_commit_sha() {
+                error_msg.push_str(&format!("Git status: Detached HEAD at {}\n", sha));
+            }
+
+            error_msg.push_str("\nOptions:\n");
+            error_msg.push_str("  1. Use --workspace flag\n");
+            error_msg.push_str("  2. Run in git directory with Bitbucket remote\n");
+            error_msg.push_str("  3. Configure workspace in profile\n");
+
+            // Show git remotes if available
+            let remotes = git::get_all_remotes();
+            if !remotes.is_empty() {
+                error_msg.push_str("\nFound git remotes:\n");
+                for (name, url) in &remotes {
+                    error_msg.push_str(&format!("  {} -> {}\n", name, url));
+                    // Try to parse workspace/repo from URL
+                    if let Some((ws, repo)) = git::parse_git_remote(url) {
+                        error_msg.push_str(&format!("    (workspace: {}, repo: {})\n", ws, repo));
+                    } else {
+                        error_msg.push_str("    (not a Bitbucket remote)\n");
+                    }
+                }
+                error_msg.push_str("\nExample:\n");
+                error_msg.push_str("  atlassian-cli bb pipeline list --workspace <workspace> --repo <repo>\n");
+            }
+
+            anyhow::anyhow!(error_msg)
         })?
         .to_string();
 
@@ -886,6 +955,9 @@ pub async fn execute(
                 sort,
                 recent,
                 branch,
+                since,
+                before,
+                pr,
                 all,
                 steps,
             } => {
@@ -897,6 +969,47 @@ pub async fn execute(
                              3. Pass repo as positional argument"
                     )
                 })?;
+
+                // Handle --pr flag
+                let effective_branch = if let Some(pr_id) = pr {
+                    let pr_info = pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
+
+                    // Check if PR is from a fork
+                    if pullrequests::is_from_fork(&pr_info, &workspace, repo_slug) {
+                        eprintln!("Warning: PR #{} is from a fork (workspace: {}/{})",
+                            pr_id, pr_info.source_workspace, pr_info.source_repo);
+                        eprintln!("Showing pipelines from the source repository's branch");
+                    }
+
+                    // Warn if PR is closed
+                    if matches!(pr_info.state.to_uppercase().as_str(), "DECLINED" | "SUPERSEDED") {
+                        eprintln!("Warning: PR #{} is {}", pr_id, pr_info.state);
+                        eprintln!("Showing pipelines for branch: {}", pr_info.source_branch);
+                    }
+
+                    // --pr takes precedence over --branch
+                    if branch.is_some() {
+                        eprintln!("Warning: Both --pr and --branch specified, using PR source branch");
+                    }
+
+                    Some(pr_info.source_branch)
+                } else {
+                    branch.clone()
+                };
+
+                // Parse time expressions if provided
+                let parsed_since = if let Some(s) = since {
+                    Some(time_parser::parse_time_expression(&s)?)
+                } else {
+                    None
+                };
+
+                let parsed_before = if let Some(b) = before {
+                    Some(time_parser::parse_time_expression(&b)?)
+                } else {
+                    None
+                };
+
                 pipelines::list_pipelines(
                     &ctx,
                     &workspace,
@@ -904,7 +1017,9 @@ pub async fn execute(
                     limit,
                     sort.as_deref(),
                     recent,
-                    branch.as_deref(),
+                    effective_branch.as_deref(),
+                    parsed_since.as_deref(),
+                    parsed_before.as_deref(),
                     all,
                     steps,
                 )
@@ -915,6 +1030,47 @@ pub async fn execute(
                     anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
                 })?;
                 pipelines::get_pipeline(&ctx, &workspace, repo_slug, &uuid, steps).await
+            }
+            PipelineCommands::Latest { repo, branch, steps } => {
+                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
+                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
+                })?;
+
+                // Prefer explicit --branch over auto-detected
+                let effective_branch = if let Some(b) = branch {
+                    Some(b.clone())
+                } else {
+                    git::detect_current_branch()
+                };
+
+                let branch = effective_branch.ok_or_else(|| {
+                    let mut error_msg = String::from("Cannot detect branch for latest pipeline.\n\n");
+                    error_msg.push_str(&format!("Current directory: {}\n", git::get_current_directory()));
+                    if let Some(sha) = git::get_current_commit_sha() {
+                        error_msg.push_str(&format!("Git status: Detached HEAD at {}\n", sha));
+                    }
+                    error_msg.push_str("\nOptions:\n");
+                    error_msg.push_str("  1. Use --branch flag to specify branch\n");
+                    error_msg.push_str("  2. Checkout a branch: git checkout main\n");
+                    error_msg.push_str("\nExample:\n");
+                    error_msg.push_str("  atlassian-cli bb pipeline latest --branch main\n");
+                    anyhow::anyhow!(error_msg)
+                })?;
+
+                // Call list_pipelines with limit=1 to get latest
+                pipelines::list_pipelines(
+                    &ctx,
+                    &workspace,
+                    repo_slug,
+                    1,  // limit
+                    Some("-created_on"),  // sort
+                    None,  // recent
+                    Some(branch.as_str()),  // branch filter
+                    None,  // since
+                    None,  // before
+                    false,  // all
+                    steps,  // steps
+                ).await
             }
             PipelineCommands::Trigger {
                 repo,
@@ -941,6 +1097,10 @@ pub async fn execute(
                 repo,
                 pipeline_uuid,
                 step_uuid,
+                step,
+                grep,
+                ignore_case,
+                failed_only,
             } => {
                 let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
                     anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
@@ -950,7 +1110,11 @@ pub async fn execute(
                     &workspace,
                     repo_slug,
                     &pipeline_uuid,
-                    &step_uuid,
+                    step_uuid.as_deref(),
+                    step.as_deref(),
+                    grep.as_deref(),
+                    ignore_case,
+                    failed_only,
                 )
                 .await
             }
@@ -980,17 +1144,71 @@ pub async fn execute(
             PipelineCommands::Rerun {
                 repo,
                 pipeline_id,
+                pr,
+                failed_only,
                 variables,
                 secured,
             } => {
                 let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
                     anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
                 })?;
+
+                // Determine which pipeline to rerun
+                let effective_pipeline_id = if let Some(pr_id) = pr {
+                    // Handle --pr flag
+                    let pr_info = pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
+
+                    // Error if PR is from a fork
+                    if pullrequests::is_from_fork(&pr_info, &workspace, repo_slug) {
+                        anyhow::bail!(
+                            "Error: PR #{} is from a fork (workspace: {}/{})\n\n\
+                            Cannot access pipelines from forked repositories.\n\
+                            To rerun, use --branch with the source branch name:\n  \
+                            atlassian-cli bb pipeline rerun --branch {}",
+                            pr_id,
+                            pr_info.source_workspace,
+                            pr_info.source_repo,
+                            pr_info.source_branch
+                        );
+                    }
+
+                    // Find latest pipeline for PR branch
+                    let latest = pipelines::find_latest_pipeline_for_branch(
+                        &ctx,
+                        &workspace,
+                        repo_slug,
+                        &pr_info.source_branch,
+                    )
+                    .await?;
+
+                    // If --failed-only, check for failed steps
+                    if failed_only {
+                        let has_failed = pipelines::pipeline_has_failed_steps(
+                            &ctx,
+                            &workspace,
+                            repo_slug,
+                            &latest,
+                        )
+                        .await?;
+
+                        if !has_failed {
+                            println!("Skipping rerun: No failed steps in latest pipeline for PR #{}", pr_id);
+                            return Ok(());
+                        }
+                    }
+
+                    latest
+                } else if let Some(id) = pipeline_id {
+                    id.clone()
+                } else {
+                    anyhow::bail!("Either --pr or pipeline_id is required");
+                };
+
                 pipelines::rerun_pipeline(
                     &ctx,
                     &workspace,
                     repo_slug,
-                    &pipeline_id,
+                    &effective_pipeline_id,
                     variables,
                     secured,
                 )

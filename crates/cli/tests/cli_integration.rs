@@ -28,6 +28,8 @@ fn test_cli_help() {
     assert!(stdout.contains("jira"));
     assert!(stdout.contains("confluence"));
     assert!(stdout.contains("bitbucket"));
+    // Verify alias is shown in help (visible_alias shows as [alias: bb])
+    assert!(stdout.contains("bb") || stdout.contains("[alias"));
 }
 
 #[test]
@@ -88,6 +90,65 @@ fn test_invalid_command() {
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("unrecognized subcommand") || stderr.contains("error:"));
+}
+
+#[test]
+fn test_bb_alias_works() {
+    // Test that 'bb' alias executes the same as 'bitbucket'
+    let bb_output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "bb", "--help"])
+        .output()
+        .expect("Failed to execute bb alias");
+
+    let bitbucket_output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "bitbucket", "--help"])
+        .output()
+        .expect("Failed to execute bitbucket command");
+
+    assert!(bb_output.status.success());
+    assert!(bitbucket_output.status.success());
+
+    // Both should produce similar help output for bitbucket subcommands
+    let bb_help = String::from_utf8_lossy(&bb_output.stdout);
+    let bitbucket_help = String::from_utf8_lossy(&bitbucket_output.stdout);
+
+    // Verify both show Bitbucket subcommands
+    assert!(bb_help.contains("repo") || bb_help.contains("Repo"));
+    assert!(bb_help.contains("pipeline") || bb_help.contains("Pipeline"));
+    assert!(bitbucket_help.contains("repo") || bitbucket_help.contains("Repo"));
+    assert!(bitbucket_help.contains("pipeline") || bitbucket_help.contains("Pipeline"));
+}
+
+#[test]
+fn test_bitbucket_alias_backwards_compatible() {
+    // Ensure 'bitbucket' and 'bb' behave identically (backward compatibility)
+    let bitbucket_output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "bitbucket", "whoami"])
+        .env("ATLASSIAN_CLI_PROFILE", "nonexistent")
+        .output()
+        .expect("Failed to execute bitbucket whoami");
+
+    let bb_output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "bb", "whoami"])
+        .env("ATLASSIAN_CLI_PROFILE", "nonexistent")
+        .output()
+        .expect("Failed to execute bb whoami");
+
+    // Both should fail in the same way (no parsing errors, identical behavior)
+    assert_eq!(
+        bitbucket_output.status.success(),
+        bb_output.status.success(),
+        "Both commands should have identical exit status"
+    );
+
+    let bitbucket_stderr = String::from_utf8_lossy(&bitbucket_output.stderr);
+    let bb_stderr = String::from_utf8_lossy(&bb_output.stderr);
+
+    // Both should produce similar error messages (profile/auth related)
+    assert_eq!(
+        bitbucket_stderr, bb_stderr,
+        "Both commands should produce identical error messages"
+    );
 }
 
 /// Regression test: Bitbucket-only profiles (no base_url) should not fail with "missing base_url" error.

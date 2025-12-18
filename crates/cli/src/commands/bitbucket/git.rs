@@ -1,3 +1,4 @@
+use std::env;
 use std::process::Command;
 use url::Url;
 
@@ -59,7 +60,7 @@ pub fn detect_git_context() -> GitContext {
 /// Supports:
 /// - HTTPS: https://bitbucket.org/{workspace}/{repo}.git
 /// - SSH: git@bitbucket.org:{workspace}/{repo}.git
-fn parse_git_remote(url: &str) -> Option<(String, String)> {
+pub fn parse_git_remote(url: &str) -> Option<(String, String)> {
     // Try SSH format first: git@bitbucket.org:workspace/repo.git
     if url.starts_with("git@bitbucket.org:") {
         let path = url.strip_prefix("git@bitbucket.org:")?;
@@ -91,6 +92,102 @@ fn parse_path_segments(path: &str) -> Option<(String, String)> {
     }
     None
 }
+
+/// Get all git remotes with their URLs
+/// Returns a vector of (remote_name, remote_url) tuples
+pub fn get_all_remotes() -> Vec<(String, String)> {
+    let output = match Command::new("git").args(["remote", "-v"]).output() {
+        Ok(output) if output.status.success() => output,
+        _ => {
+            tracing::debug!("Failed to get git remotes");
+            return vec![];
+        }
+    };
+
+    let output_str = match String::from_utf8(output.stdout) {
+        Ok(s) => s,
+        Err(_) => {
+            tracing::debug!("Invalid UTF-8 in git remotes output");
+            return vec![];
+        }
+    };
+
+    let mut remotes = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    for line in output_str.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let name = parts[0].to_string();
+            let url = parts[1].to_string();
+
+            // Only add each remote once (git remote -v shows fetch and push)
+            let key = (name.clone(), url.clone());
+            if seen.insert(key) {
+                remotes.push((name, url));
+            }
+        }
+    }
+
+    remotes
+}
+
+/// Get the current working directory path
+pub fn get_current_directory() -> String {
+    env::current_dir()
+        .ok()
+        .and_then(|p| p.to_str().map(String::from))
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// Detect the current git branch
+/// Returns None if in detached HEAD state or not in a git repository
+pub fn detect_current_branch() -> Option<String> {
+    let output = Command::new("git")
+        .args(["branch", "--show-current"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let branch = String::from_utf8(output.stdout)
+        .ok()?
+        .trim()
+        .to_string();
+
+    // Empty string indicates detached HEAD
+    if branch.is_empty() {
+        None
+    } else {
+        Some(branch)
+    }
+}
+
+/// Get the current commit SHA (useful for detached HEAD state)
+pub fn get_current_commit_sha() -> Option<String> {
+    let output = Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let sha = String::from_utf8(output.stdout)
+        .ok()?
+        .trim()
+        .to_string();
+
+    if sha.is_empty() {
+        None
+    } else {
+        Some(sha)
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

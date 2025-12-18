@@ -105,6 +105,88 @@ impl ApiClient {
             .await
     }
 
+    /// Get plain text content from an endpoint.
+    /// Sets Accept: text/plain; charset=utf-8 header.
+    /// Includes retry logic and rate limiting.
+    pub async fn get_text(&self, path: &str) -> Result<String> {
+        if let Some(wait_secs) = self.rate_limiter.check_limit().await {
+            warn!(wait_secs, "Rate limit reached, waiting");
+            tokio::time::sleep(Duration::from_secs(wait_secs)).await;
+        }
+
+        let url = self.base_url.clone();
+        let joined = url
+            .join(path.strip_prefix('/').unwrap_or(path))
+            .map_err(ApiError::InvalidUrl)?;
+
+        debug!(method = "GET", url = %joined, "Sending text request");
+
+        let result = retry_with_backoff(&self.retry_config, || async {
+            let mut req = self.client.request(Method::GET, joined.clone());
+            req = self.apply_auth(req);
+            req = req.header("Accept", "text/plain; charset=utf-8");
+
+            let response = req.send().await.map_err(ApiError::RequestFailed)?;
+
+            self.rate_limiter.update_from_response(&response).await;
+
+            let status = response.status();
+
+            match status {
+                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
+                    message: "Invalid or expired credentials".to_string(),
+                }),
+                StatusCode::NOT_FOUND => {
+                    let resource = joined.path().to_string();
+                    Err(ApiError::NotFound { resource })
+                }
+                StatusCode::BAD_REQUEST => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Bad request".to_string());
+                    Err(ApiError::BadRequest { message })
+                }
+                StatusCode::TOO_MANY_REQUESTS => {
+                    let retry_after = response
+                        .headers()
+                        .get("retry-after")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(60);
+                    Err(ApiError::RateLimitExceeded { retry_after })
+                }
+                status if status.is_server_error() => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Server error".to_string());
+                    Err(ApiError::ServerError {
+                        status: status.as_u16(),
+                        message,
+                    })
+                }
+                status if status.is_success() => response.text().await.map_err(|e| {
+                    error!("Failed to read text response: {}", e);
+                    ApiError::InvalidResponse(e.to_string())
+                }),
+                _ => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| format!("Unexpected status: {}", status));
+                    Err(ApiError::ServerError {
+                        status: status.as_u16(),
+                        message,
+                    })
+                }
+            }
+        })
+        .await?;
+
+        Ok(result)
+    }
+
     pub async fn request<T: DeserializeOwned, B: Serialize + ?Sized>(
         &self,
         method: Method,

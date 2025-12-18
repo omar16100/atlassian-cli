@@ -43,6 +43,7 @@ enum AtlassianCommand {
     /// Confluence commands
     Confluence(commands::confluence::ConfluenceArgs),
     /// Bitbucket commands
+    #[command(visible_alias = "bb")]
     Bitbucket(commands::bitbucket::BitbucketArgs),
     /// Jira Service Management commands
     Jsm(commands::jsm::JsmArgs),

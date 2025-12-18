@@ -5,6 +5,15 @@ use url::form_urlencoded;
 use super::utils::BitbucketContext;
 use crate::commands::common::{render_success, MutationResult};
 
+/// Information about a pull request for pipeline operations
+#[derive(Debug, Clone)]
+pub struct PullRequestInfo {
+    pub source_branch: String,
+    pub source_workspace: String,
+    pub source_repo: String,
+    pub state: String,
+}
+
 #[derive(Deserialize)]
 struct PullRequestList {
     values: Vec<PullRequest>,
@@ -53,11 +62,19 @@ struct BranchRef {
     name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Repository {
     #[allow(dead_code)]
     #[serde(default)]
     full_name: Option<String>,
+    #[serde(default)]
+    workspace: Option<RepositoryWorkspace>,
+    name: String,
+}
+
+#[derive(Deserialize, Clone)]
+struct RepositoryWorkspace {
+    slug: String,
 }
 
 #[derive(Deserialize)]
@@ -572,4 +589,48 @@ pub async fn get_pr_diff(
     println!("\nNote: Use the web interface to view the full diff with syntax highlighting");
 
     Ok(())
+}
+
+/// Get pull request information for pipeline operations
+/// Returns source branch, workspace, repo, and PR state
+pub async fn get_pr_info(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pr_id: i64,
+) -> Result<PullRequestInfo> {
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}");
+    let pr: PullRequest = ctx
+        .client
+        .get(&path)
+        .await
+        .with_context(|| format!("Failed to fetch PR #{pr_id} from {workspace}/{repo_slug}"))?;
+
+    let source_branch = pr.source.branch.name;
+
+    // Extract source workspace and repo from the source repository
+    let (source_workspace, source_repo) = if let Some(ref repo) = pr.source.repository {
+        let ws = repo
+            .workspace
+            .as_ref()
+            .map(|w| w.slug.clone())
+            .unwrap_or_else(|| workspace.to_string());
+        let repo_name = repo.name.clone();
+        (ws, repo_name)
+    } else {
+        // If no source repository info, assume same workspace/repo (not a fork)
+        (workspace.to_string(), repo_slug.to_string())
+    };
+
+    Ok(PullRequestInfo {
+        source_branch,
+        source_workspace,
+        source_repo,
+        state: pr.state,
+    })
+}
+
+/// Check if a PR is from a fork
+pub fn is_from_fork(pr_info: &PullRequestInfo, target_workspace: &str, target_repo: &str) -> bool {
+    pr_info.source_workspace != target_workspace || pr_info.source_repo != target_repo
 }
