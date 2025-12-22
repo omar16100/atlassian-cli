@@ -204,8 +204,10 @@ mod tests {
 
     #[test]
     fn test_encrypted_credentials_serialization() {
-        let mut creds = EncryptedCredentials::default();
-        creds.salt = "test-salt".to_string();
+        let mut creds = EncryptedCredentials {
+            salt: "test-salt".to_string(),
+            ..Default::default()
+        };
         creds.credentials.insert(
             "account1".to_string(),
             EncryptedToken {
