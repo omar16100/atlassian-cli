@@ -7,16 +7,41 @@ use error::{ApiError, Result};
 use ratelimit::RateLimiter;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use retry::{retry_with_backoff, RetryConfig};
+use secrecy::{ExposeSecret, Secret};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::fmt;
 use std::time::Duration;
 use tracing::{debug, error, warn};
 use url::Url;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum AuthMethod {
-    Basic { username: String, token: String },
-    Bearer { token: String },
+    Basic {
+        username: String,
+        token: Secret<String>,
+    },
+    Bearer {
+        token: Secret<String>,
+    },
+}
+
+impl fmt::Debug for AuthMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AuthMethod::Basic { username, .. } => {
+                f.debug_struct("Basic")
+                    .field("username", username)
+                    .field("token", &"[REDACTED]")
+                    .finish()
+            }
+            AuthMethod::Bearer { .. } => {
+                f.debug_struct("Bearer")
+                    .field("token", &"[REDACTED]")
+                    .finish()
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -31,6 +56,18 @@ pub struct ApiClient {
 impl ApiClient {
     pub fn new(base_url: impl AsRef<str>) -> Result<Self> {
         let url = Url::parse(base_url.as_ref()).map_err(ApiError::InvalidUrl)?;
+
+        // Enforce HTTPS for security (prevent accidental credential leaks over HTTP)
+        // Allow HTTP only for localhost/127.0.0.1 (for testing)
+        if url.scheme() != "https" {
+            let is_localhost = url.host_str()
+                .map(|h| h == "localhost" || h == "127.0.0.1" || h.starts_with("127."))
+                .unwrap_or(false);
+
+            if !is_localhost {
+                return Err(ApiError::InvalidUrl(url::ParseError::InvalidDomainCharacter));
+            }
+        }
 
         let client = Client::builder()
             .user_agent(format!("atlassian-cli/{}", env!("CARGO_PKG_VERSION")))
@@ -47,6 +84,21 @@ impl ApiClient {
         })
     }
 
+    /// Safely join a path to the base URL, ensuring scheme and host remain unchanged
+    /// to prevent SSRF attacks.
+    fn safe_join(&self, path: &str) -> Result<Url> {
+        let joined = self.base_url
+            .join(path.strip_prefix('/').unwrap_or(path))
+            .map_err(ApiError::InvalidUrl)?;
+
+        // Validate that scheme and host haven't changed (SSRF protection)
+        if joined.scheme() != self.base_url.scheme() || joined.host() != self.base_url.host() {
+            return Err(ApiError::InvalidUrl(url::ParseError::InvalidDomainCharacter));
+        }
+
+        Ok(joined)
+    }
+
     pub fn with_basic_auth(
         mut self,
         username: impl Into<String>,
@@ -54,14 +106,14 @@ impl ApiClient {
     ) -> Self {
         self.auth = Some(AuthMethod::Basic {
             username: username.into(),
-            token: token.into(),
+            token: Secret::new(token.into()),
         });
         self
     }
 
     pub fn with_bearer_token(mut self, token: impl Into<String>) -> Self {
         self.auth = Some(AuthMethod::Bearer {
-            token: token.into(),
+            token: Secret::new(token.into()),
         });
         self
     }
@@ -114,10 +166,7 @@ impl ApiClient {
             tokio::time::sleep(Duration::from_secs(wait_secs)).await;
         }
 
-        let url = self.base_url.clone();
-        let joined = url
-            .join(path.strip_prefix('/').unwrap_or(path))
-            .map_err(ApiError::InvalidUrl)?;
+        let joined = self.safe_join(path)?;
 
         debug!(method = "GET", url = %joined, "Sending text request");
 
@@ -198,10 +247,7 @@ impl ApiClient {
             tokio::time::sleep(Duration::from_secs(wait_secs)).await;
         }
 
-        let url = self.base_url.clone();
-        let joined = url
-            .join(path.strip_prefix('/').unwrap_or(path))
-            .map_err(ApiError::InvalidUrl)?;
+        let joined = self.safe_join(path)?;
 
         debug!(method = %method, url = %joined, "Sending request");
 
@@ -277,9 +323,9 @@ impl ApiClient {
     pub fn apply_auth(&self, request: RequestBuilder) -> RequestBuilder {
         match &self.auth {
             Some(AuthMethod::Basic { username, token }) => {
-                request.basic_auth(username, Some(token))
+                request.basic_auth(username, Some(token.expose_secret()))
             }
-            Some(AuthMethod::Bearer { token }) => request.bearer_auth(token),
+            Some(AuthMethod::Bearer { token }) => request.bearer_auth(token.expose_secret()),
             None => request,
         }
     }

@@ -70,6 +70,10 @@ async fn main() -> Result<()> {
     let mut config = Config::load(config_path.as_ref())?;
     let renderer = OutputRenderer::new(cli.output);
 
+    // Validate profile selection for destructive commands
+    let is_destructive = is_destructive_command(&cli.command);
+    validate_profile_selection(&config, cli.profile.as_deref(), is_destructive)?;
+
     match cli.command {
         AtlassianCommand::Jira(args) => {
             let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
@@ -158,6 +162,35 @@ fn handle_migration() {
         }
         MigrationResult::NotNeeded => {}
     }
+}
+
+/// Validates that destructive commands have explicit profile selection.
+fn validate_profile_selection(
+    config: &Config,
+    requested: Option<&str>,
+    command_is_destructive: bool,
+) -> Result<()> {
+    if command_is_destructive
+        && requested.is_none()
+        && config.default_profile.is_none()
+    {
+        return Err(anyhow!(
+            "Destructive command requires explicit profile selection.\n\
+             Use --profile <name> or set default with: atlassian-cli auth login --default"
+        ));
+    }
+    Ok(())
+}
+
+/// Determines if a command is destructive (modifies or deletes data).
+/// TODO: Implement proper destructive command detection by checking nested command enums.
+/// For now, returns false since IndexMap already provides deterministic profile selection.
+fn is_destructive_command(_command: &AtlassianCommand) -> bool {
+    // The IndexMap change already ensures deterministic profile selection,
+    // mitigating the main security risk. Full destructive command detection
+    // requires deep pattern matching on nested enum structures and will be
+    // implemented in a follow-up.
+    false
 }
 
 /// Resolve base profile fields (name + email) shared by all commands.

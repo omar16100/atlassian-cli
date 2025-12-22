@@ -9,6 +9,24 @@ pub struct GitContext {
     pub repo_slug: Option<String>,
 }
 
+/// Redact credentials from URLs for safe logging
+/// Replaces userinfo (username/password/token) with [REDACTED]
+fn redact_url_credentials(url_str: &str) -> String {
+    // Try to parse as URL
+    if let Ok(mut url) = Url::parse(url_str) {
+        if url.username() != "" || url.password().is_some() {
+            let _ = url.set_username("");
+            let _ = url.set_password(None);
+            // Add marker that credentials were redacted
+            return url.as_str().replace("://", "://[REDACTED]@");
+        }
+        return url.to_string();
+    }
+
+    // For SSH URLs like git@host:path, just return as-is (no credentials to redact)
+    url_str.to_string()
+}
+
 /// Detect workspace and repo from git remote URL
 pub fn detect_git_context() -> GitContext {
     // Try to get origin remote URL
@@ -50,7 +68,8 @@ pub fn detect_git_context() -> GitContext {
             }
         }
         None => {
-            tracing::debug!(remote_url = %remote_url, "Not a Bitbucket remote");
+            let redacted_url = redact_url_credentials(&remote_url);
+            tracing::debug!(remote_url = %redacted_url, "Not a Bitbucket remote");
             GitContext::default()
         }
     }

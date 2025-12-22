@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use super::utils::ConfluenceContext;
 use crate::commands::common::{render_success, MutationResult};
+use crate::query::UrlParamsBuilder;
 
 // List pages
 pub async fn list_pages(
@@ -27,20 +28,21 @@ pub async fn list_pages(
         status: String,
     }
 
-    let mut query_params = Vec::new();
+    let query_string = {
+        let mut builder = UrlParamsBuilder::new();
 
-    if let Some(l) = limit {
-        query_params.push(format!("limit={}", l));
-    }
+        if let Some(l) = limit {
+            builder = builder.add("limit", &l.to_string());
+        }
 
-    if let Some(sk) = space_key {
-        query_params.push(format!("space-key={}", sk));
-    }
+        builder = builder.add_optional("space-key", space_key);
 
-    let query_string = if query_params.is_empty() {
-        String::new()
-    } else {
-        format!("?{}", query_params.join("&"))
+        let params = builder.finish();
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params)
+        }
     };
 
     let response: PagesResponse = ctx
@@ -287,11 +289,15 @@ pub async fn remove_page_label(
     page_id: &str,
     label: &str,
 ) -> Result<()> {
+    let query_string = UrlParamsBuilder::new()
+        .add("name", label)
+        .finish();
+
     let _: Value = ctx
         .client
         .delete(&format!(
-            "/wiki/rest/api/content/{}/label?name={}",
-            page_id, label
+            "/wiki/rest/api/content/{}/label?{}",
+            page_id, query_string
         ))
         .await
         .with_context(|| format!("Failed to remove label from page {}", page_id))?;
@@ -437,11 +443,16 @@ pub async fn remove_page_restriction(
     subject_type: &str,
     subject_id: &str,
 ) -> Result<()> {
+    let query_string = UrlParamsBuilder::new()
+        .add("operation", operation)
+        .add(&format!("{}.identifier", subject_type), subject_id)
+        .finish();
+
     let _: Value = ctx
         .client
         .delete(&format!(
-            "/wiki/rest/api/content/{}/restriction?operation={}&{}.identifier={}",
-            page_id, operation, subject_type, subject_id
+            "/wiki/rest/api/content/{}/restriction?{}",
+            page_id, query_string
         ))
         .await
         .with_context(|| format!("Failed to remove restriction from page {}", page_id))?;
@@ -472,20 +483,21 @@ pub async fn list_blogposts(
         status: String,
     }
 
-    let mut query_params = Vec::new();
+    let query_string = {
+        let mut builder = UrlParamsBuilder::new();
 
-    if let Some(l) = limit {
-        query_params.push(format!("limit={}", l));
-    }
+        if let Some(l) = limit {
+            builder = builder.add("limit", &l.to_string());
+        }
 
-    if let Some(sid) = space_id {
-        query_params.push(format!("space-id={}", sid));
-    }
+        builder = builder.add_optional("space-id", space_id);
 
-    let query_string = if query_params.is_empty() {
-        String::new()
-    } else {
-        format!("?{}", query_params.join("&"))
+        let params = builder.finish();
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params)
+        }
     };
 
     let response: BlogpostsResponse = ctx

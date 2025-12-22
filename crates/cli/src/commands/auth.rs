@@ -9,7 +9,7 @@ use serde::Serialize;
 use tracing::debug;
 use url::Url;
 
-/// Multi-tier token lookup: env var → credentials file
+/// Multi-tier token lookup: env var → encrypted credentials → plaintext credentials (migration fallback)
 pub fn get_token(profile_name: &str) -> Option<String> {
     // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
     let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", profile_name.to_uppercase());
@@ -23,9 +23,15 @@ pub fn get_token(profile_name: &str) -> Option<String> {
                 .filter(|t| !t.trim().is_empty())
         })
         .or_else(|| {
-            // 3. Try credentials file
+            // 3. Try encrypted credentials file
             let secret_key = token_key(profile_name);
-            atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
+            atlassian_cli_auth::get_secret_encrypted(&secret_key)
+                .ok()
+                .flatten()
+                .or_else(|| {
+                    // 4. Fallback to plaintext credentials (for migration)
+                    atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
+                })
         })
 }
 
@@ -53,9 +59,15 @@ pub fn get_bitbucket_token(profile_name: &str) -> Option<String> {
                 .filter(|t| !t.trim().is_empty())
         })
         .or_else(|| {
-            // 4. Credentials file with _bitbucket suffix
+            // 4. Try encrypted credentials file
             let secret_key = bitbucket_token_key(profile_name);
-            atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
+            atlassian_cli_auth::get_secret_encrypted(&secret_key)
+                .ok()
+                .flatten()
+                .or_else(|| {
+                    // 5. Fallback to plaintext credentials (for migration)
+                    atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
+                })
         })
 }
 
@@ -151,6 +163,16 @@ pub async fn handle(
 }
 
 fn login(args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -> Result<()> {
+    // Migrate any existing plaintext credentials to encrypted storage
+    if let Ok(count) = atlassian_cli_auth::migrate_plaintext_to_encrypted() {
+        if count > 0 {
+            tracing::info!(
+                credentials_migrated = count,
+                "Migrated plaintext credentials to encrypted storage"
+            );
+        }
+    }
+
     if args.profile.trim().is_empty() {
         return Err(anyhow!("Profile name cannot be empty"));
     }
@@ -184,6 +206,14 @@ fn login_jira_confluence(
     let base_url = Url::parse(base_url_str)
         .with_context(|| format!("Invalid Atlassian site URL: {}", base_url_str))?;
 
+    // Enforce HTTPS for security
+    if base_url.scheme() != "https" {
+        return Err(anyhow!(
+            "Only HTTPS URLs are allowed for security. Got: {}://",
+            base_url.scheme()
+        ));
+    }
+
     let profile_entry = config.profiles.entry(args.profile.clone()).or_default();
     profile_entry.base_url = Some(base_url.to_string());
     profile_entry.email = Some(args.email.clone());
@@ -194,8 +224,8 @@ fn login_jira_confluence(
     }
 
     let secret_key = token_key(&args.profile);
-    atlassian_cli_auth::set_secret(&secret_key, token)
-        .context("Failed to store token in credentials file")?;
+    atlassian_cli_auth::set_secret_encrypted(&secret_key, token)
+        .context("Failed to store token in encrypted credentials file")?;
 
     config
         .save(config_path)
@@ -231,8 +261,8 @@ fn login_bitbucket(
 
     // Store Bitbucket token with _bitbucket suffix
     let secret_key = bitbucket_token_key(&args.profile);
-    atlassian_cli_auth::set_secret(&secret_key, token)
-        .context("Failed to store Bitbucket token in credentials file")?;
+    atlassian_cli_auth::set_secret_encrypted(&secret_key, token)
+        .context("Failed to store Bitbucket token in encrypted credentials file")?;
 
     config
         .save(config_path)
@@ -255,33 +285,45 @@ fn logout(args: LogoutArgs, config: &mut Config, config_path: Option<&Path>) -> 
     if args.bitbucket {
         // Only remove Bitbucket token
         let secret_key = bitbucket_token_key(&args.profile);
-        if let Err(e) = atlassian_cli_auth::delete_secret(&secret_key) {
-            debug!("No Bitbucket token to delete: {e}");
+        // Try encrypted first, then plaintext (for migration cleanup)
+        if let Err(e) = atlassian_cli_auth::delete_secret_encrypted(&secret_key) {
+            debug!("No encrypted Bitbucket token to delete: {e}");
+            if let Err(e) = atlassian_cli_auth::delete_secret(&secret_key) {
+                debug!("No plaintext Bitbucket token to delete: {e}");
+            }
         }
         tracing::info!(profile = %args.profile, "Bitbucket credentials removed");
     } else {
         // Remove both Jira and Bitbucket tokens
         let secret_key = token_key(&args.profile);
-        if let Err(e) = atlassian_cli_auth::delete_secret(&secret_key) {
-            debug!("No Jira token to delete: {e}");
+        // Try encrypted first, then plaintext (for migration cleanup)
+        if let Err(e) = atlassian_cli_auth::delete_secret_encrypted(&secret_key) {
+            debug!("No encrypted Jira token to delete: {e}");
+            if let Err(e) = atlassian_cli_auth::delete_secret(&secret_key) {
+                debug!("No plaintext Jira token to delete: {e}");
+            }
         }
 
         let bb_secret_key = bitbucket_token_key(&args.profile);
-        if let Err(e) = atlassian_cli_auth::delete_secret(&bb_secret_key) {
-            debug!("No Bitbucket token to delete: {e}");
+        // Try encrypted first, then plaintext (for migration cleanup)
+        if let Err(e) = atlassian_cli_auth::delete_secret_encrypted(&bb_secret_key) {
+            debug!("No encrypted Bitbucket token to delete: {e}");
+            if let Err(e) = atlassian_cli_auth::delete_secret(&bb_secret_key) {
+                debug!("No plaintext Bitbucket token to delete: {e}");
+            }
         }
         tracing::info!(profile = %args.profile, "Credentials removed");
     }
 
     if args.remove_profile {
-        config.profiles.remove(&args.profile);
+        config.profiles.shift_remove(&args.profile);
         if config
             .default_profile
             .as_deref()
             .map(|name| name == args.profile)
             .unwrap_or(false)
         {
-            config.default_profile = config.profiles.keys().next().cloned();
+            config.default_profile = None;  // Force explicit re-selection
         }
     }
 
@@ -304,7 +346,13 @@ fn list_profiles(args: ListArgs, config: &Config, renderer: &OutputRenderer) -> 
     }
 
     let mut rows = Vec::new();
-    for (name, profile) in &config.profiles {
+
+    // Collect and sort profile names for deterministic, alphabetical display
+    let mut profile_names: Vec<_> = config.profiles.keys().collect();
+    profile_names.sort();
+
+    for name in profile_names {
+        let profile = &config.profiles[name];
         let has_jira_token = get_token(name).is_some();
         let has_bitbucket_token = get_bitbucket_token(name).is_some();
 

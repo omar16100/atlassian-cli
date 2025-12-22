@@ -63,7 +63,7 @@ pub async fn search_text(
     query: &str,
     limit: Option<usize>,
 ) -> Result<()> {
-    let cql = format!("text ~ \"{}\"", query);
+    let cql = CqlBuilder::new().contains("text", query).finish();
     search_cql(ctx, &cql, limit).await
 }
 
@@ -74,7 +74,10 @@ pub async fn search_in_space(
     query: &str,
     limit: Option<usize>,
 ) -> Result<()> {
-    let cql = format!("space = \"{}\" AND text ~ \"{}\"", space_key, query);
+    let cql = CqlBuilder::new()
+        .eq("space", space_key)
+        .contains("text", query)
+        .finish();
     search_cql(ctx, &cql, limit).await
 }
 

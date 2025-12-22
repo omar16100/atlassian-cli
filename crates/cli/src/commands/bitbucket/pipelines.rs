@@ -3,10 +3,11 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
-use url::form_urlencoded;
+use url::{self, form_urlencoded};
 
 use super::utils::BitbucketContext;
 use crate::commands::common::{render_success, MutationResult};
+use crate::query::FilterBuilder;
 
 // ============================================================================
 // API Response Structs
@@ -323,38 +324,45 @@ fn build_request_path(
     sort: &str,
     filters: PipelineFilters,
 ) -> String {
-    if let Some(url) = next_url {
-        url.strip_prefix("https://api.bitbucket.org")
-            .unwrap_or(url)
-            .to_string()
-    } else {
+    if let Some(url_str) = next_url {
+        // Validate server-provided URL to prevent SSRF attacks
+        if let Ok(parsed_url) = url::Url::parse(url_str) {
+            // Only accept HTTPS URLs from api.bitbucket.org
+            if parsed_url.scheme() == "https"
+                && parsed_url.host_str() == Some("api.bitbucket.org")
+            {
+                return parsed_url.path().to_string() +
+                    parsed_url.query().map(|q| format!("?{}", q)).unwrap_or_default().as_str();
+            }
+        }
+        // If validation fails, fall back to building the URL manually
+        tracing::warn!("Invalid or untrusted pagination URL from server, building manually");
+    }
+
+    {
         let mut query = form_urlencoded::Serializer::new(String::new());
         query.append_pair("pagelen", &page_size.to_string());
         query.append_pair("sort", sort);
 
-        // Build combined filters with AND logic
-        let mut filter_clauses = Vec::new();
+        // Build combined filters with AND logic using FilterBuilder
+        let mut filter_builder = FilterBuilder::new();
 
         if let Some(b) = filters.branch.filter(|s| !s.is_empty()) {
-            filter_clauses.push(format!("target.ref_name=\"{}\"", b));
+            filter_builder = filter_builder.add_eq("target.ref_name", b);
         }
 
         if let Some(s) = filters.since {
-            filter_clauses.push(format!("created_on >= \"{}\"", s));
+            filter_builder = filter_builder.add_gte("created_on", s);
         }
 
         if let Some(b) = filters.before {
-            filter_clauses.push(format!("created_on < \"{}\"", b));
+            filter_builder = filter_builder.add_lt("created_on", b);
         }
 
-        // Combine filters with AND, wrap in parentheses if multiple
-        if !filter_clauses.is_empty() {
-            let q = if filter_clauses.len() > 1 {
-                format!("({})", filter_clauses.join(" AND "))
-            } else {
-                filter_clauses[0].clone()
-            };
-            query.append_pair("q", &q);
+        // Add the filter query parameter if any filters were added
+        let filter_query = filter_builder.finish();
+        if !filter_query.is_empty() {
+            query.append_pair("q", &filter_query);
         }
 
         format!(

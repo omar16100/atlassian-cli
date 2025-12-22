@@ -17,6 +17,14 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 dirs = "5"
+# Security dependencies for credential encryption
+secrecy = "0.8"
+zeroize = "1.7"
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+machine-uid = "0.5"
+whoami = "1.5"
 
 [package.metadata.release]
 release = false
