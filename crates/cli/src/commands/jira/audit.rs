@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 
 use super::utils::JiraContext;
+use crate::query::UrlParamsBuilder;
 
 // List audit records
 pub async fn list_audit_records(
@@ -36,28 +37,23 @@ pub async fn list_audit_records(
         type_name: Option<String>,
     }
 
-    let mut query_params = Vec::new();
+    let query_string = {
+        let mut builder = UrlParamsBuilder::new();
 
-    if let Some(f) = from {
-        query_params.push(format!("from={}", f));
-    }
+        builder = builder.add_optional("from", from);
+        builder = builder.add_optional("to", to);
+        builder = builder.add_optional("filter", filter);
 
-    if let Some(t) = to {
-        query_params.push(format!("to={}", t));
-    }
+        if let Some(l) = limit {
+            builder = builder.add("limit", &l.to_string());
+        }
 
-    if let Some(flt) = filter {
-        query_params.push(format!("filter={}", flt));
-    }
-
-    if let Some(l) = limit {
-        query_params.push(format!("limit={}", l));
-    }
-
-    let query_string = if query_params.is_empty() {
-        String::new()
-    } else {
-        format!("?{}", query_params.join("&"))
+        let params = builder.finish();
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params)
+        }
     };
 
     let response: AuditResponse = ctx
@@ -108,24 +104,18 @@ pub async fn export_audit_records(
         records: Vec<serde_json::Value>,
     }
 
-    let mut query_params = Vec::new();
+    let query_string = {
+        let builder = UrlParamsBuilder::new()
+            .add_optional("from", from)
+            .add_optional("to", to)
+            .add_optional("filter", filter);
 
-    if let Some(f) = from {
-        query_params.push(format!("from={}", f));
-    }
-
-    if let Some(t) = to {
-        query_params.push(format!("to={}", t));
-    }
-
-    if let Some(flt) = filter {
-        query_params.push(format!("filter={}", flt));
-    }
-
-    let query_string = if query_params.is_empty() {
-        String::new()
-    } else {
-        format!("?{}", query_params.join("&"))
+        let params = builder.finish();
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params)
+        }
     };
 
     let response: AuditResponse = ctx

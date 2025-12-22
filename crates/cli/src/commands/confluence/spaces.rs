@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 
 use super::utils::ConfluenceContext;
 use crate::commands::common::{render_success, MutationResult};
+use crate::query::UrlParamsBuilder;
 
 // List spaces
 pub async fn list_spaces(
@@ -26,20 +27,21 @@ pub async fn list_spaces(
         status: String,
     }
 
-    let mut query_params = Vec::new();
+    let query_string = {
+        let mut builder = UrlParamsBuilder::new();
 
-    if let Some(l) = limit {
-        query_params.push(format!("limit={}", l));
-    }
+        if let Some(l) = limit {
+            builder = builder.add("limit", &l.to_string());
+        }
 
-    if let Some(st) = space_type {
-        query_params.push(format!("type={}", st));
-    }
+        builder = builder.add_optional("type", space_type);
 
-    let query_string = if query_params.is_empty() {
-        String::new()
-    } else {
-        format!("?{}", query_params.join("&"))
+        let params = builder.finish();
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params)
+        }
     };
 
     let response: SpacesResponse = ctx
@@ -74,9 +76,13 @@ pub async fn list_spaces(
 
 // Get space details
 pub async fn get_space(ctx: &ConfluenceContext<'_>, key: &str) -> Result<()> {
+    let query_string = UrlParamsBuilder::new()
+        .add("keys", key)
+        .finish();
+
     let space: Value = ctx
         .client
-        .get(&format!("/wiki/api/v2/spaces?keys={}", key))
+        .get(&format!("/wiki/api/v2/spaces?{}", query_string))
         .await
         .with_context(|| format!("Failed to get space {}", key))?;
 

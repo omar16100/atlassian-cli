@@ -1,8 +1,9 @@
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
+
+use indexmap::IndexMap;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -77,7 +78,7 @@ pub struct Config {
     #[serde(default)]
     pub default_profile: Option<String>,
     #[serde(default)]
-    pub profiles: HashMap<String, Profile>,
+    pub profiles: IndexMap<String, Profile>,
 }
 
 impl Config {
@@ -334,6 +335,88 @@ mod tests {
         assert!(profile.base_url.is_none());
         assert!(profile.email.is_none());
         assert!(profile.api_token.is_none());
+    }
+
+    #[test]
+    fn test_indexmap_preserves_insertion_order() {
+        let mut config = Config::default();
+
+        // Insert profiles in specific order
+        let profile1 = Profile {
+            base_url: Some("https://first.atlassian.net".to_string()),
+            ..Default::default()
+        };
+        config.profiles.insert("first".to_string(), profile1);
+
+        let profile2 = Profile {
+            base_url: Some("https://second.atlassian.net".to_string()),
+            ..Default::default()
+        };
+        config.profiles.insert("second".to_string(), profile2);
+
+        let profile3 = Profile {
+            base_url: Some("https://third.atlassian.net".to_string()),
+            ..Default::default()
+        };
+        config.profiles.insert("third".to_string(), profile3);
+
+        // Verify iteration order matches insertion order
+        let names: Vec<_> = config.profiles.keys().map(|s| s.as_str()).collect();
+        assert_eq!(names, vec!["first", "second", "third"]);
+    }
+
+    #[test]
+    fn test_resolve_profile_first_available_is_deterministic() {
+        // When no default is set, resolve_profile should return the first profile
+        // consistently (not randomly based on HashMap iteration)
+        let mut config = Config::default();
+
+        // Add multiple profiles
+        config.profiles.insert(
+            "alpha".to_string(),
+            Profile {
+                base_url: Some("https://alpha.atlassian.net".to_string()),
+                ..Default::default()
+            },
+        );
+        config.profiles.insert(
+            "beta".to_string(),
+            Profile {
+                base_url: Some("https://beta.atlassian.net".to_string()),
+                ..Default::default()
+            },
+        );
+        config.profiles.insert(
+            "gamma".to_string(),
+            Profile {
+                base_url: Some("https://gamma.atlassian.net".to_string()),
+                ..Default::default()
+            },
+        );
+
+        // Resolve multiple times and verify we always get the same (first inserted) profile
+        for _ in 0..10 {
+            let (name, _) = config.resolve_profile(None).unwrap();
+            assert_eq!(
+                name, "alpha",
+                "First profile should always be selected deterministically"
+            );
+        }
+    }
+
+    #[test]
+    fn test_shift_remove_preserves_order() {
+        let mut config = Config::default();
+
+        config.profiles.insert("a".to_string(), Profile::default());
+        config.profiles.insert("b".to_string(), Profile::default());
+        config.profiles.insert("c".to_string(), Profile::default());
+
+        // Remove middle element
+        config.profiles.shift_remove("b");
+
+        let names: Vec<_> = config.profiles.keys().map(|s| s.as_str()).collect();
+        assert_eq!(names, vec!["a", "c"], "Order should be preserved after removal");
     }
 
     #[test]

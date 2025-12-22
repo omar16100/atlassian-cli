@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use super::utils::ConfluenceContext;
+use crate::query::{CqlBuilder, UrlParamsBuilder};
 
 // Get page views
 pub async fn get_page_views(
@@ -14,16 +15,16 @@ pub async fn get_page_views(
         count: i64,
     }
 
-    let mut query_params = Vec::new();
+    let query_string = {
+        let params = UrlParamsBuilder::new()
+            .add_optional("fromDate", from_date)
+            .finish();
 
-    if let Some(from) = from_date {
-        query_params.push(format!("fromDate={}", from));
-    }
-
-    let query_string = if query_params.is_empty() {
-        String::new()
-    } else {
-        format!("?{}", query_params.join("&"))
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params)
+        }
     };
 
     let response: ViewsResponse = ctx
@@ -52,8 +53,14 @@ pub async fn get_page_views(
 // Get space analytics
 pub async fn get_space_analytics(ctx: &ConfluenceContext<'_>, space_key: &str) -> Result<()> {
     // Get space content count using CQL
-    let pages_cql = format!("space = \"{}\" AND type = page", space_key);
-    let blogs_cql = format!("space = \"{}\" AND type = blogpost", space_key);
+    let pages_cql = CqlBuilder::new()
+        .eq("space", space_key)
+        .eq("type", "page")
+        .finish();
+    let blogs_cql = CqlBuilder::new()
+        .eq("space", space_key)
+        .eq("type", "blogpost")
+        .finish();
 
     #[derive(Deserialize)]
     struct SearchResponse {
