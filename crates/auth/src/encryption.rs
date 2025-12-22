@@ -89,8 +89,8 @@ pub fn encrypt(plaintext: &str, key: &[u8; 32]) -> Result<(String, String)> {
         .map_err(|e| anyhow!("Encryption failed: {}", e))?;
 
     // Encode as base64 for storage
-    let nonce_b64 = BASE64.encode(&nonce_bytes);
-    let ciphertext_b64 = BASE64.encode(&ciphertext);
+    let nonce_b64 = BASE64.encode(nonce_bytes);
+    let ciphertext_b64 = BASE64.encode(ciphertext);
 
     Ok((nonce_b64, ciphertext_b64))
 }
