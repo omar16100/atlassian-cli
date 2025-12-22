@@ -11,8 +11,14 @@ fn test_cli_version() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("atlassian-cli"));
-    // Check for semver pattern (0.x.y)
-    assert!(stdout.contains("0.2."));
+    // Check version matches Cargo.toml (works with any version)
+    const EXPECTED_VERSION: &str = env!("CARGO_PKG_VERSION");
+    assert!(
+        stdout.contains(EXPECTED_VERSION),
+        "CLI should output version {}, got: {}",
+        EXPECTED_VERSION,
+        stdout
+    );
 }
 
 #[test]

@@ -1,0 +1,23 @@
+name: Security
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly Monday
+
+jobs:
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-audit cargo-deny
+      - run: cargo audit || echo "Advisory warnings found - see output above"
+      - run: cargo deny check licenses
+      - run: cargo deny check bans
+      - run: cargo deny check sources
+      - run: cargo deny check advisories

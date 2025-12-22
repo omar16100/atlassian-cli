@@ -1,0 +1,20 @@
+# Code Owners for atlassian-cli
+#
+# These owners will be automatically requested for review when someone
+# opens a pull request that modifies files they own.
+#
+# Learn more: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repo
+* @omar16100
+
+# Security-sensitive files require approval
+crates/auth/ @omar16100
+deny.toml @omar16100
+
+# CI/CD workflows
+.github/workflows/ @omar16100
+
+# Release configuration
+Cargo.toml @omar16100
+.release-please-manifest.json @omar16100

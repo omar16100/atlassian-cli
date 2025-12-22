@@ -1,5 +1,163 @@
 # Changes Made
 
+## 2025-12-22 - Week 5-6: Quality Gates & Property Testing
+- Week 5 - Branch Protection & Quality Gates:
+  - Created `.github/CODEOWNERS` for automatic review requests
+    - Default owner: @omar16100 for all files
+    - Security-sensitive: auth crate, deny.toml, CI workflows require approval
+  - Created `.github/BRANCH_PROTECTION.md` documenting required settings
+    - PR reviews required (1 approval, Code Owner approval)
+    - Status checks: fmt, clippy, test (ubuntu + macos), coverage
+    - Linear history enforced (no merge commits)
+    - Force push disabled, includes administrators
+  - Created GitHub templates:
+    - `.github/ISSUE_TEMPLATE/bug_report.md` - Bug report template
+    - `.github/ISSUE_TEMPLATE/feature_request.md` - Feature request template
+    - `.github/pull_request_template.md` - PR checklist and guidelines
+
+- Week 6 - Property Testing:
+  - Added `proptest` 1.4 to workspace dependencies
+  - Added proptest dev-dependency to CLI crate
+  - Created property tests for JQL query builder (`crates/cli/src/query/jql.rs`):
+    - `escape_never_panics`: Any string can be safely escaped
+    - `escaped_strings_are_quoted`: Escaped output always quoted
+    - `escaping_increases_or_maintains_length`: Length preservation
+    - `no_unescaped_quotes_in_output`: No injection vulnerabilities
+    - `builder_with_condition_produces_output`: Non-empty with conditions
+    - `multiple_conditions_use_and`: Proper AND joining
+    - `in_list_never_panics`: IN lists handle arbitrary values
+  - Created property tests for URL params builder (`crates/cli/src/query/url_params.rs`):
+    - `encoding_never_panics`: Any key/value can be encoded
+    - `no_unencoded_special_chars`: Special chars properly encoded
+    - `special_chars_encoded`: &, =, #, + are percent-encoded
+    - `multiple_params_separated`: Multiple params use & separator
+    - `optional_none_excluded`: None values don't appear in output
+    - `empty_builder_empty_output`: Empty builder produces empty string
+  - All 13 property tests passing (100 cases each by default)
+  - Property tests verify security against injection attacks
+
+- Files created:
+  - `.github/CODEOWNERS`
+  - `.github/BRANCH_PROTECTION.md`
+  - `.github/ISSUE_TEMPLATE/bug_report.md`
+  - `.github/ISSUE_TEMPLATE/feature_request.md`
+  - `.github/pull_request_template.md`
+
+- Files modified:
+  - `Cargo.toml` - added proptest workspace dependency
+  - `crates/cli/Cargo.toml` - added proptest dev-dependency
+  - `crates/cli/src/query/jql.rs` - added property_tests module
+  - `crates/cli/src/query/url_params.rs` - added property_tests module
+
+## 2025-12-22 - Week 3: Performance Benchmarking
+- Added criterion benchmark framework:
+  - Added `criterion` to workspace dependencies with features: html_reports, async_tokio
+  - Configured for async benchmarks and HTML report generation
+
+- Bulk operations benchmarks (`crates/bulk/benches/bulk_benchmarks.rs`):
+  - Concurrency levels: Tests performance with 1, 4, 8, 16 concurrent tasks
+  - Task counts: Benchmarks different batch sizes (10, 50, 100, 200 items)
+  - Progress bar overhead: Measures impact of progress display on performance
+  - All benchmarks use realistic async task simulation (100μs per task)
+
+- API benchmarks (`crates/api/benches/api_benchmarks.rs`):
+  - Rate limiter concurrent access: Tests mutex contention with 1-16 parallel threads
+  - Pagination logic: Benchmarks has_next() and next_start() calculations
+  - Page processing: Tests different page sizes (10, 50, 100, 500 items)
+  - Measures pagination state management overhead
+
+- Auth/encryption benchmarks (`crates/auth/benches/auth_benchmarks.rs`):
+  - Key derivation: Benchmarks Argon2 key derivation from machine ID
+  - Encryption/decryption: Tests AES-256-GCM with different payload sizes
+  - Roundtrip performance: Measures full encrypt-decrypt cycles
+  - Token sizes: Realistic benchmarks for short (32B), medium (64B), long (128B), JWT (512B) tokens
+  - Establishes baseline for security-critical operations
+
+- Benchmark configuration:
+  - Added `criterion` dev-dependency to bulk, api, and auth crates
+  - Configured `[[bench]]` targets with `harness = false` in all Cargo.toml files
+  - Benchmarks run with: `cargo bench --bench <name>`
+  - HTML reports generated in `target/criterion/`
+
+- Usage:
+  ```bash
+  cargo bench --bench bulk_benchmarks
+  cargo bench --bench api_benchmarks
+  cargo bench --bench auth_benchmarks
+  cargo bench  # Run all benchmarks
+  ```
+
+- Files created:
+  - `crates/bulk/benches/bulk_benchmarks.rs`
+  - `crates/api/benches/api_benchmarks.rs`
+  - `crates/auth/benches/auth_benchmarks.rs`
+
+- Files modified:
+  - `Cargo.toml` - added criterion workspace dependency
+  - `crates/bulk/Cargo.toml` - benchmark config
+  - `crates/api/Cargo.toml` - benchmark config
+  - `crates/auth/Cargo.toml` - benchmark config
+
+## 2025-12-22 - Week 2: Security & Coverage
+- Coverage tracking:
+  - Added `coverage` job to CI workflow in `.github/workflows/ci.yml`
+  - Uses `cargo-llvm-cov` to generate LCOV coverage reports
+  - Uploads to Codecov for tracking and visualization
+  - Runs on every PR and main branch push
+
+- Security scanning:
+  - Created `.github/workflows/security.yml` for automated security audits
+  - Runs weekly on Monday + on every PR and main push
+  - Uses `cargo-audit` for vulnerability scanning (warnings only, non-blocking)
+  - Uses `cargo-deny` for license compliance, dependency bans, and advisory checks
+
+- Cargo-deny configuration:
+  - Created `deny.toml` with license allowlist
+  - Allowed licenses: MIT, Apache-2.0, BSD-3-Clause, MPL-2.0, Unicode-3.0
+  - Configured advisory ignores for 4 unmaintained transitive dependencies:
+    - backoff 0.4.0 (RUSTSEC-2025-0012) - monitoring for replacement
+    - instant 0.1.13 (RUSTSEC-2024-0384) - dependency of backoff
+    - number_prefix 0.4.0 (RUSTSEC-2025-0119) - dependency of indicatif
+    - proc-macro-error 1.0.4 (RUSTSEC-2024-0370) - dependency of tabled
+  - Multiple versions warning level (not error)
+
+- Automated dependency updates:
+  - Created `.github/dependabot.yml` for weekly dependency updates
+  - Monitors both Rust crates and GitHub Actions
+  - Groups all production dependencies together
+  - Limits to 5 open PRs at a time
+
+- Files modified: `.github/workflows/ci.yml`, `.github/workflows/security.yml`
+- Files created: `deny.toml`, `.github/dependabot.yml`
+
+## 2025-12-22 - Week 1 Prevention: Pre-commit Hooks & CI Optimization
+- Immediate fixes (Day 1):
+  - Fixed version test in `crates/cli/tests/cli_integration.rs:15` to use `env!("CARGO_PKG_VERSION")`
+  - Synced `.release-please-manifest.json` from "0.1.9" to "0.2.0"
+  - Ran `cargo clippy --fix` and `cargo fmt` - all 187 tests passing
+
+- Pre-commit hooks with cargo-husky:
+  - Added `cargo-husky` to workspace dependencies in `Cargo.toml`
+  - Added `cargo-husky` to cli crate dev-dependencies in `crates/cli/Cargo.toml`
+  - Created `.cargo-husky/hooks/pre-commit` script with fmt, clippy, and unit test checks
+  - Hooks auto-install on `cargo build` (zero friction for contributors)
+
+- CI optimization:
+  - Replaced sequential job with parallel jobs (fmt, clippy, test) in `.github/workflows/ci.yml`
+  - Upgraded from deprecated `actions-rs/toolchain` to `dtolnay/rust-toolchain@stable`
+  - Added `Swatinem/rust-cache@v2` for dependency caching
+  - Added matrix testing (ubuntu-latest + macos-latest)
+  - Added `fail-fast: false` to show all failures
+  - Expected CI time reduction: 2-3min → 60-90s
+
+- Developer tooling:
+  - Added `pre-commit`, `quick-check`, and `ci` targets to `Makefile`
+  - Added `pre-commit`, `quick-check`, and `ci` targets to `justfile`
+  - Created `CONTRIBUTING.md` with pre-commit workflow documentation
+
+- Files modified: `crates/cli/tests/cli_integration.rs`, `.release-please-manifest.json`, `Cargo.toml`, `crates/cli/Cargo.toml`, `.github/workflows/ci.yml`, `Makefile`, `justfile`
+- Files created: `.cargo-husky/hooks/pre-commit`, `CONTRIBUTING.md`
+
 ## 2025-12-15 (v7) - Add cargo-release for automated version bumping
 - Added `cargo-release` configuration to workspace Cargo.toml
   - `shared-version = true` - all crates share the same version

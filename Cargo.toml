@@ -55,6 +55,9 @@ async-stream = "0.3"
 
 # Testing
 wiremock = "0.6"
+cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+proptest = "1.4"
 
 # The profile that 'dist' will build with
 [profile.dist]
