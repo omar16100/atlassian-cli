@@ -12,7 +12,7 @@ fn test_cli_version() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("atlassian-cli"));
     // Check for semver pattern (0.x.y)
-    assert!(stdout.contains("0.1."));
+    assert!(stdout.contains("0.2."));
 }
 
 #[test]
