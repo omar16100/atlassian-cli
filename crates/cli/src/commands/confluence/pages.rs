@@ -289,9 +289,7 @@ pub async fn remove_page_label(
     page_id: &str,
     label: &str,
 ) -> Result<()> {
-    let query_string = UrlParamsBuilder::new()
-        .add("name", label)
-        .finish();
+    let query_string = UrlParamsBuilder::new().add("name", label).finish();
 
     let _: Value = ctx
         .client

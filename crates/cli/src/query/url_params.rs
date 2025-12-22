@@ -124,9 +124,7 @@ mod tests {
     fn test_url_params_injection_attempt() {
         // Attempt to inject additional parameters
         let malicious = "value&extra_param=injected";
-        let params = UrlParamsBuilder::new()
-            .add("safe_key", malicious)
-            .finish();
+        let params = UrlParamsBuilder::new().add("safe_key", malicious).finish();
 
         // Verify the & is escaped and doesn't create a new parameter
         assert!(params.contains("%26extra_param"));

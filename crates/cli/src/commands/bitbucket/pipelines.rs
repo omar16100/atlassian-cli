@@ -328,11 +328,14 @@ fn build_request_path(
         // Validate server-provided URL to prevent SSRF attacks
         if let Ok(parsed_url) = url::Url::parse(url_str) {
             // Only accept HTTPS URLs from api.bitbucket.org
-            if parsed_url.scheme() == "https"
-                && parsed_url.host_str() == Some("api.bitbucket.org")
+            if parsed_url.scheme() == "https" && parsed_url.host_str() == Some("api.bitbucket.org")
             {
-                return parsed_url.path().to_string() +
-                    parsed_url.query().map(|q| format!("?{}", q)).unwrap_or_default().as_str();
+                return parsed_url.path().to_string()
+                    + parsed_url
+                        .query()
+                        .map(|q| format!("?{}", q))
+                        .unwrap_or_default()
+                        .as_str();
             }
         }
         // If validation fails, fall back to building the URL manually

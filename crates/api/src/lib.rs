@@ -29,17 +29,15 @@ pub enum AuthMethod {
 impl fmt::Debug for AuthMethod {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AuthMethod::Basic { username, .. } => {
-                f.debug_struct("Basic")
-                    .field("username", username)
-                    .field("token", &"[REDACTED]")
-                    .finish()
-            }
-            AuthMethod::Bearer { .. } => {
-                f.debug_struct("Bearer")
-                    .field("token", &"[REDACTED]")
-                    .finish()
-            }
+            AuthMethod::Basic { username, .. } => f
+                .debug_struct("Basic")
+                .field("username", username)
+                .field("token", &"[REDACTED]")
+                .finish(),
+            AuthMethod::Bearer { .. } => f
+                .debug_struct("Bearer")
+                .field("token", &"[REDACTED]")
+                .finish(),
         }
     }
 }
@@ -60,12 +58,15 @@ impl ApiClient {
         // Enforce HTTPS for security (prevent accidental credential leaks over HTTP)
         // Allow HTTP only for localhost/127.0.0.1 (for testing)
         if url.scheme() != "https" {
-            let is_localhost = url.host_str()
+            let is_localhost = url
+                .host_str()
                 .map(|h| h == "localhost" || h == "127.0.0.1" || h.starts_with("127."))
                 .unwrap_or(false);
 
             if !is_localhost {
-                return Err(ApiError::InvalidUrl(url::ParseError::InvalidDomainCharacter));
+                return Err(ApiError::InvalidUrl(
+                    url::ParseError::InvalidDomainCharacter,
+                ));
             }
         }
 
@@ -87,13 +88,16 @@ impl ApiClient {
     /// Safely join a path to the base URL, ensuring scheme and host remain unchanged
     /// to prevent SSRF attacks.
     fn safe_join(&self, path: &str) -> Result<Url> {
-        let joined = self.base_url
+        let joined = self
+            .base_url
             .join(path.strip_prefix('/').unwrap_or(path))
             .map_err(ApiError::InvalidUrl)?;
 
         // Validate that scheme and host haven't changed (SSRF protection)
         if joined.scheme() != self.base_url.scheme() || joined.host() != self.base_url.host() {
-            return Err(ApiError::InvalidUrl(url::ParseError::InvalidDomainCharacter));
+            return Err(ApiError::InvalidUrl(
+                url::ParseError::InvalidDomainCharacter,
+            ));
         }
 
         Ok(joined)

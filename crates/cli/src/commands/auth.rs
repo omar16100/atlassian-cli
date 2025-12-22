@@ -323,7 +323,7 @@ fn logout(args: LogoutArgs, config: &mut Config, config_path: Option<&Path>) -> 
             .map(|name| name == args.profile)
             .unwrap_or(false)
         {
-            config.default_profile = None;  // Force explicit re-selection
+            config.default_profile = None; // Force explicit re-selection
         }
     }
 

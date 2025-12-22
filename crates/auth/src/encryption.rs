@@ -47,8 +47,7 @@ impl Default for EncryptedCredentials {
 /// Derive an encryption key from machine-specific identifiers.
 /// Uses Argon2 for key derivation to resist brute-force attacks.
 pub fn derive_key() -> Result<[u8; 32]> {
-    let machine_id = machine_uid::get()
-        .map_err(|e| anyhow!("Failed to get machine ID: {}", e))?;
+    let machine_id = machine_uid::get().map_err(|e| anyhow!("Failed to get machine ID: {}", e))?;
     let username = whoami::username();
 
     // Combine machine ID and username as the password
@@ -67,9 +66,7 @@ pub fn derive_key() -> Result<[u8; 32]> {
         .map_err(|e| anyhow!("Failed to hash password: {}", e))?;
 
     // Extract the 32-byte hash
-    let hash_bytes = hash
-        .hash
-        .ok_or_else(|| anyhow!("Hash output is missing"))?;
+    let hash_bytes = hash.hash.ok_or_else(|| anyhow!("Hash output is missing"))?;
 
     let mut key = [0u8; 32];
     key.copy_from_slice(&hash_bytes.as_bytes()[..32]);
@@ -111,7 +108,11 @@ pub fn decrypt(ciphertext_b64: &str, nonce_b64: &str, key: &[u8; 32]) -> Result<
         .context("Failed to decode ciphertext from base64")?;
 
     if nonce_bytes.len() != NONCE_SIZE {
-        return Err(anyhow!("Invalid nonce size: expected {}, got {}", NONCE_SIZE, nonce_bytes.len()));
+        return Err(anyhow!(
+            "Invalid nonce size: expected {}, got {}",
+            NONCE_SIZE,
+            nonce_bytes.len()
+        ));
     }
 
     let nonce = Nonce::from_slice(&nonce_bytes);
@@ -164,7 +165,10 @@ mod tests {
         assert_ne!(nonce1, nonce2, "Nonces should be randomly generated");
 
         // Ciphertexts should be different (because nonces are different)
-        assert_ne!(ciphertext1, ciphertext2, "Ciphertexts should differ with different nonces");
+        assert_ne!(
+            ciphertext1, ciphertext2,
+            "Ciphertexts should differ with different nonces"
+        );
 
         // Both should decrypt to the same plaintext
         assert_eq!(decrypt(&ciphertext1, &nonce1, &key).unwrap(), plaintext);
