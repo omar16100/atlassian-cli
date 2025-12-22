@@ -44,27 +44,6 @@ impl FilterBuilder {
         self
     }
 
-    /// Add a greater-than filter (field>"value")
-    pub fn add_gt(mut self, field: &str, value: &str) -> Self {
-        let escaped = Self::escape_value(value);
-        self.filters.push(format!("{}>\"{}\"", field, escaped));
-        self
-    }
-
-    /// Add a less-than-or-equal filter (field<="value")
-    pub fn add_lte(mut self, field: &str, value: &str) -> Self {
-        let escaped = Self::escape_value(value);
-        self.filters.push(format!("{}<=\"{}\"", field, escaped));
-        self
-    }
-
-    /// Add a not-equal filter (field!="value")
-    pub fn add_ne(mut self, field: &str, value: &str) -> Self {
-        let escaped = Self::escape_value(value);
-        self.filters.push(format!("{}!=\"{}\"", field, escaped));
-        self
-    }
-
     /// Build the final filter string
     /// Returns empty string if no filters, single filter without parens, or multiple filters with parens and AND
     pub fn finish(self) -> String {
@@ -113,19 +92,13 @@ mod tests {
     fn test_filter_builder_all_operators() {
         let filter = FilterBuilder::new()
             .add_eq("field1", "value1")
-            .add_ne("field2", "value2")
-            .add_gt("field3", "value3")
             .add_gte("field4", "value4")
             .add_lt("field5", "value5")
-            .add_lte("field6", "value6")
             .finish();
 
         assert!(filter.contains("field1=\"value1\""));
-        assert!(filter.contains("field2!=\"value2\""));
-        assert!(filter.contains("field3>\"value3\""));
         assert!(filter.contains("field4>=\"value4\""));
         assert!(filter.contains("field5<\"value5\""));
-        assert!(filter.contains("field6<=\"value6\""));
         assert!(filter.starts_with('('));
         assert!(filter.ends_with(')'));
     }
