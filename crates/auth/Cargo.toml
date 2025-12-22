@@ -26,5 +26,12 @@ rand = "0.8"
 machine-uid = "0.5"
 whoami = "1.5"
 
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "auth_benchmarks"
+harness = false
+
 [package.metadata.release]
 release = false

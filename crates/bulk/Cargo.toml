@@ -16,5 +16,12 @@ thiserror.workspace = true
 tracing.workspace = true
 futures.workspace = true
 
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "bulk_benchmarks"
+harness = false
+
 [package.metadata.release]
 release = false

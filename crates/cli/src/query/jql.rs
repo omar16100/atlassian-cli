@@ -178,4 +178,94 @@ mod tests {
             "assignee = currentUser() AND status IN (\"Open\", \"In Progress\") AND priority = \"High\" AND label IN (\"bug\", \"backend\")"
         );
     }
+
+    #[cfg(test)]
+    mod property_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// Property: Any string can be safely escaped without panicking
+            #[test]
+            fn escape_never_panics(input in "\\PC*") {
+                let _ = JqlBuilder::escape_and_quote(&input);
+            }
+
+            /// Property: Escaped strings always start and end with quotes
+            #[test]
+            fn escaped_strings_are_quoted(input in "\\PC*") {
+                let escaped = JqlBuilder::escape_and_quote(&input);
+                prop_assert!(escaped.starts_with('"'));
+                prop_assert!(escaped.ends_with('"'));
+            }
+
+            /// Property: Escaping preserves length relationships
+            #[test]
+            fn escaping_increases_or_maintains_length(input in "\\PC*") {
+                let escaped = JqlBuilder::escape_and_quote(&input);
+                // Escaped length should be >= original + 2 (for quotes)
+                prop_assert!(escaped.len() >= input.len() + 2);
+            }
+
+            /// Property: No unescaped quotes in escaped output (except surrounding quotes)
+            #[test]
+            fn no_unescaped_quotes_in_output(input in "\\PC*") {
+                let escaped = JqlBuilder::escape_and_quote(&input);
+                let inner = &escaped[1..escaped.len()-1];
+                // Check that any quote in the inner string is escaped
+                for (i, c) in inner.chars().enumerate() {
+                    if c == '"' {
+                        // There should be a backslash before it
+                        if i > 0 {
+                            prop_assert_eq!(inner.chars().nth(i-1), Some('\\'));
+                        }
+                    }
+                }
+            }
+
+            /// Property: Builder with arbitrary fields produces non-empty output
+            #[test]
+            fn builder_with_condition_produces_output(
+                field in "[a-z]+",
+                value in "\\PC*"
+            ) {
+                let query = JqlBuilder::new().eq(&field, &value).finish();
+                prop_assert!(!query.is_empty());
+                prop_assert!(query.contains(&field));
+            }
+
+            /// Property: Multiple conditions are joined with AND
+            #[test]
+            fn multiple_conditions_use_and(
+                field1 in "[a-z]+",
+                value1 in "\\PC{0,20}",
+                field2 in "[a-z]+",
+                value2 in "\\PC{0,20}"
+            ) {
+                let query = JqlBuilder::new()
+                    .eq(&field1, &value1)
+                    .eq(&field2, &value2)
+                    .finish();
+
+                if field1 != field2 || value1 != value2 {
+                    prop_assert!(query.contains(" AND "));
+                }
+            }
+
+            /// Property: IN list with arbitrary values doesn't panic
+            #[test]
+            fn in_list_never_panics(
+                field in "[a-z]+",
+                values in prop::collection::vec("\\PC{0,20}", 0..10)
+            ) {
+                let strings: Vec<String> = values.iter().map(|s| s.to_string()).collect();
+                let query = JqlBuilder::new().in_list(&field, &strings).finish();
+
+                if !strings.is_empty() {
+                    prop_assert!(query.contains(&field));
+                    prop_assert!(query.contains(" IN ("));
+                }
+            }
+        }
+    }
 }

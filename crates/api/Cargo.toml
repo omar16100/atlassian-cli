@@ -24,5 +24,12 @@ futures.workspace = true
 async-stream.workspace = true
 secrecy = "0.8"
 
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "api_benchmarks"
+harness = false
+
 [package.metadata.release]
 release = false

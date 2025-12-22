@@ -39,6 +39,8 @@ rpassword = "7"
 [dev-dependencies]
 wiremock.workspace = true
 tempfile = "3.13"
+cargo-husky.workspace = true
+proptest.workspace = true
 
 [package.metadata.release]
 release = true
