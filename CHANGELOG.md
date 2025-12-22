@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.1](https://github.com/omar16100/atlassian-cli/compare/v0.2.0...v0.2.1) (2025-12-22)
+
+
+### Features
+
+* comprehensive quality improvements (weeks 1-6) ([f730a29](https://github.com/omar16100/atlassian-cli/commit/f730a29f0520ad26a252c9f41a556a1b75deef79))
+
+
+### Bug Fixes
+
+* remove unnecessary borrows in encryption.rs (clippy) ([9a3838e](https://github.com/omar16100/atlassian-cli/commit/9a3838e398e7800c781a62e7ad1d9ab589ee0b5a))
+* remove unused FilterBuilder methods (clippy dead_code) ([1956f22](https://github.com/omar16100/atlassian-cli/commit/1956f22b72aec9826b83ccab7d619a0a31c03cbc))
+* update version test for 0.2.0 ([9d8f463](https://github.com/omar16100/atlassian-cli/commit/9d8f4635b983849a94f8b0e68f28d2e7c8e313bc))
+* use struct initialization in test (clippy field_reassign_with_default) ([5472727](https://github.com/omar16100/atlassian-cli/commit/5472727fd508b2c33f9e5f71e48ab0ec44ef1884))
+
 ## [0.1.9](https://github.com/omar16100/atlassian-cli/compare/v0.1.8...v0.1.9) (2025-12-17)
 
 
