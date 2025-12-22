@@ -29,13 +29,13 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 
 # Output formatting
-tabled = "0.16"
-colored = "2.1"
-indicatif = "0.17"
+tabled = "0.20"
+colored = "3.0"
+indicatif = "0.18"
 
 # Error handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Auth & Config
 base64 = "0.22"
@@ -47,7 +47,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 url = "2.5"
-dirs = "5.0"
+dirs = "6.0"
 futures = "0.3"
 backoff = { version = "0.4", features = ["tokio"] }
 async-trait = "0.1"
@@ -56,7 +56,7 @@ async-stream = "0.3"
 # Testing
 wiremock = "0.6"
 cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
-criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
 proptest = "1.4"
 
 # The profile that 'dist' will build with
