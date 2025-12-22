@@ -76,9 +76,7 @@ pub async fn list_spaces(
 
 // Get space details
 pub async fn get_space(ctx: &ConfluenceContext<'_>, key: &str) -> Result<()> {
-    let query_string = UrlParamsBuilder::new()
-        .add("keys", key)
-        .finish();
+    let query_string = UrlParamsBuilder::new().add("keys", key).finish();
 
     let space: Value = ctx
         .client

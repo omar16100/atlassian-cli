@@ -177,7 +177,10 @@ mod tests {
 
         // Count the backslash-escaped quotes - should have 2 (one for each injected quote)
         let escaped_quotes = filter.matches("\\\"").count();
-        assert_eq!(escaped_quotes, 2, "Should have 2 escaped quotes from the malicious input");
+        assert_eq!(
+            escaped_quotes, 2,
+            "Should have 2 escaped quotes from the malicious input"
+        );
     }
 
     #[test]

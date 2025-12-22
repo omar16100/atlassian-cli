@@ -170,10 +170,7 @@ fn validate_profile_selection(
     requested: Option<&str>,
     command_is_destructive: bool,
 ) -> Result<()> {
-    if command_is_destructive
-        && requested.is_none()
-        && config.default_profile.is_none()
-    {
+    if command_is_destructive && requested.is_none() && config.default_profile.is_none() {
         return Err(anyhow!(
             "Destructive command requires explicit profile selection.\n\
              Use --profile <name> or set default with: atlassian-cli auth login --default"

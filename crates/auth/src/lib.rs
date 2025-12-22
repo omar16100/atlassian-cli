@@ -136,8 +136,8 @@ fn load_encrypted_credentials() -> Result<encryption::EncryptedCredentials> {
     }
 
     let content = fs::read_to_string(&path)?;
-    let creds: encryption::EncryptedCredentials = serde_json::from_str(&content)
-        .context("Failed to parse encrypted credentials file")?;
+    let creds: encryption::EncryptedCredentials =
+        serde_json::from_str(&content).context("Failed to parse encrypted credentials file")?;
 
     Ok(creds)
 }
@@ -227,8 +227,8 @@ pub fn migrate_plaintext_to_encrypted() -> Result<usize> {
 
     // Read plaintext credentials
     let content = fs::read_to_string(&plaintext_path)?;
-    let plaintext_creds: HashMap<String, String> = serde_json::from_str(&content)
-        .context("Failed to parse plaintext credentials file")?;
+    let plaintext_creds: HashMap<String, String> =
+        serde_json::from_str(&content).context("Failed to parse plaintext credentials file")?;
 
     if plaintext_creds.is_empty() {
         // Empty file, just delete it

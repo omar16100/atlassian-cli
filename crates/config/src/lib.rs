@@ -416,7 +416,11 @@ mod tests {
         config.profiles.shift_remove("b");
 
         let names: Vec<_> = config.profiles.keys().map(|s| s.as_str()).collect();
-        assert_eq!(names, vec!["a", "c"], "Order should be preserved after removal");
+        assert_eq!(
+            names,
+            vec!["a", "c"],
+            "Order should be preserved after removal"
+        );
     }
 
     #[test]
