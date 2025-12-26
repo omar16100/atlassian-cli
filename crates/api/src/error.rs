@@ -52,7 +52,15 @@ impl ApiError {
                 Some("Consider reducing request frequency or use bulk operations")
             }
             ApiError::NotFound { .. } => Some("Check if the resource ID is correct"),
-            ApiError::BadRequest { .. } => Some("Review the request parameters"),
+            ApiError::BadRequest { message } => {
+                if message.contains("Version number must be 1") {
+                    Some("This is a draft page. Use 'confluence page publish' to publish for the first time")
+                } else if message.to_lowercase().contains("version") {
+                    Some("Version conflict detected. The content may have been modified. Fetch latest and retry")
+                } else {
+                    Some("Review the request parameters")
+                }
+            }
             ApiError::Timeout { .. } => Some("Check your network connection or try again later"),
             _ => None,
         }

@@ -1,5 +1,73 @@
 # Changes Made
 
+## 2025-12-26 - Confluence Draft Publishing Fix
+
+### Bug Fixed
+- **Critical**: Fixed version handling for draft page/blog post publishing
+  - Root cause: `update_page()` and `update_blogpost()` always incremented version by 1
+  - When publishing drafts (status: "draft" → "current"), Confluence API requires version 1
+  - CLI was sending version 2, causing 400 error: "Version number must be 1 when publishing a page for the first time"
+
+### New Commands
+- `confluence page publish <PAGE_ID> --body <FILE> [--title <TITLE>] [--message <MSG>]`
+  - Publishes a draft page for the first time
+  - Requires `--body` flag with content file
+  - Validates page is actually a draft before publishing
+  - Sends version 1 as required by Confluence API
+
+- `confluence blog publish <BLOGPOST_ID> --body <FILE> [--title <TITLE>] [--message <MSG>]`
+  - Same functionality for blog posts
+
+### Enhanced Commands
+- `confluence page update` - Added new flags:
+  - `--status <current|draft>` - Target status for the page
+  - `--message <MSG>` - Version message for audit trail
+  - Smart version handling based on status transition
+
+- `confluence blog update` - Same enhancements as page update
+
+### Version Logic
+```
+draft → current: version stays at 1 (first publish)
+draft → draft: version unchanged (draft update)
+current → current: version increments by 1 (normal update)
+current → draft: error (cannot unpublish)
+```
+
+### Error Handling
+- Improved `BadRequest` suggestions in `crates/api/src/error.rs`:
+  - Detects "Version number must be 1" errors and suggests using `page publish`
+  - Detects generic version conflicts and suggests fetching latest
+
+### Files Modified
+- `crates/cli/src/commands/confluence/pages.rs` - Version logic fix, added `publish_page()`, `publish_blogpost()`
+- `crates/cli/src/commands/confluence/mod.rs` - Added `Publish` subcommands, `--status`, `--message` flags
+- `crates/api/src/error.rs` - Improved error suggestions
+- `crates/cli/tests/confluence_integration.rs` - Added 3 new tests for draft publishing
+
+### Documentation
+- `docs/26122025.md` - Full implementation plan and API reference
+
+### Tests Added
+- `test_publish_draft_page` - Verifies draft page publishes with version 1
+- `test_update_published_page_increments_version` - Verifies normal updates increment version
+- `test_publish_draft_blogpost` - Verifies draft blog post publishes with version 1
+
+## 2025-12-22 - Remove Codecov Integration
+- Removed Codecov upload from CI workflow
+  - Coverage job was generating reports successfully but upload failing (no token)
+  - Removed `codecov/codecov-action@v4` step from `.github/workflows/ci.yml`
+  - Removed entire coverage job (lines 43-57)
+  - CI time improved by ~6m31s per run
+- Updated branch protection documentation
+  - Removed `coverage` from required status checks in `.github/BRANCH_PROTECTION.md`
+  - Added comment explaining removal rationale
+- Note: Coverage can still be generated locally
+  - Developers can install: `cargo install cargo-llvm-cov`
+  - Generate HTML report: `cargo llvm-cov --workspace --html`
+  - View report: `open target/llvm-cov/html/index.html`
+- Files modified: `.github/workflows/ci.yml`, `.github/BRANCH_PROTECTION.md`, `todo.md`
+
 ## 2025-12-22 - Week 5-6: Quality Gates & Property Testing
 - Week 5 - Branch Protection & Quality Gates:
   - Created `.github/CODEOWNERS` for automatic review requests
@@ -7,7 +75,7 @@
     - Security-sensitive: auth crate, deny.toml, CI workflows require approval
   - Created `.github/BRANCH_PROTECTION.md` documenting required settings
     - PR reviews required (1 approval, Code Owner approval)
-    - Status checks: fmt, clippy, test (ubuntu + macos), coverage
+    - Status checks: fmt, clippy, test (ubuntu + macos) # coverage removed 2025-12-22
     - Linear history enforced (no merge commits)
     - Force push disabled, includes administrators
   - Created GitHub templates:
@@ -99,11 +167,12 @@
   - `crates/auth/Cargo.toml` - benchmark config
 
 ## 2025-12-22 - Week 2: Security & Coverage
-- Coverage tracking:
+- Coverage tracking (REMOVED 2025-12-22 - see removal entry above):
   - Added `coverage` job to CI workflow in `.github/workflows/ci.yml`
   - Uses `cargo-llvm-cov` to generate LCOV coverage reports
   - Uploads to Codecov for tracking and visualization
   - Runs on every PR and main branch push
+  - Status: Removed - upload was failing, no token configured
 
 - Security scanning:
   - Created `.github/workflows/security.yml` for automated security audits
