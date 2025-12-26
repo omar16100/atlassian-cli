@@ -22,7 +22,7 @@ This document describes the branch protection rules that should be configured vi
   - `clippy` (Clippy Lint)
   - `test (ubuntu-latest)` (Tests - Linux)
   - `test (macos-latest)` (Tests - macOS)
-  - `coverage` (Code Coverage)
+  # coverage removed - was failing without token
 
 **Require conversation resolution before merging**
 - ✅ Enable
@@ -50,7 +50,7 @@ This document describes the branch protection rules that should be configured vi
 ## Rationale
 
 - **PR reviews**: Prevents direct pushes, ensures code review
-- **Status checks**: All CI must pass (fmt, clippy, tests, coverage)
+- **Status checks**: All CI must pass (fmt, clippy, tests)
 - **Linear history**: Cleaner git log, easier to bisect
 - **Include administrators**: Lead by example, no shortcuts
 - **No force push**: Protects against history rewriting
