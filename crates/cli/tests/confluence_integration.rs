@@ -577,3 +577,183 @@ async fn test_bulk_add_labels() {
 
     assert!(response.is_ok());
 }
+
+// ============================================================================
+// Draft Publishing Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_publish_draft_page() {
+    let mock_server = MockServer::start().await;
+
+    // Mock: get current page (draft status)
+    Mock::given(method("GET"))
+        .and(path("/wiki/api/v2/pages/100001"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": "100001",
+            "title": "Draft Page",
+            "status": "draft",
+            "version": {"number": 1}
+        })))
+        .mount(&mock_server)
+        .await;
+
+    // Mock: publish page (PUT with version 1)
+    Mock::given(method("PUT"))
+        .and(path("/wiki/api/v2/pages/100001"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": "100001",
+            "title": "Draft Page",
+            "status": "current",
+            "version": {"number": 1, "message": "Published via CLI"}
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    // Verify we can get the draft page
+    let get_response: Result<serde_json::Value, _> = client.get("/wiki/api/v2/pages/100001").await;
+    assert!(get_response.is_ok());
+    let data = get_response.unwrap();
+    assert_eq!(data["status"], "draft");
+
+    // Publish the page with version 1 (not incremented)
+    let publish_payload = serde_json::json!({
+        "id": "100001",
+        "status": "current",
+        "title": "Draft Page",
+        "version": {"number": 1, "message": "Published via CLI"},
+        "body": {
+            "representation": "storage",
+            "value": "<p>Published content</p>"
+        }
+    });
+
+    let put_response: Result<serde_json::Value, _> = client
+        .put("/wiki/api/v2/pages/100001", &publish_payload)
+        .await;
+
+    assert!(put_response.is_ok());
+    let result = put_response.unwrap();
+    assert_eq!(result["status"], "current");
+    assert_eq!(result["version"]["number"], 1);
+}
+
+#[tokio::test]
+async fn test_update_published_page_increments_version() {
+    let mock_server = MockServer::start().await;
+
+    // Mock: get current page (published, version 3)
+    Mock::given(method("GET"))
+        .and(path("/wiki/api/v2/pages/100002"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": "100002",
+            "title": "Published Page",
+            "status": "current",
+            "version": {"number": 3}
+        })))
+        .mount(&mock_server)
+        .await;
+
+    // Mock: update page (version should be 4)
+    Mock::given(method("PUT"))
+        .and(path("/wiki/api/v2/pages/100002"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": "100002",
+            "title": "Published Page Updated",
+            "status": "current",
+            "version": {"number": 4}
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    // Verify current version
+    let get_response: Result<serde_json::Value, _> = client.get("/wiki/api/v2/pages/100002").await;
+    assert!(get_response.is_ok());
+    let data = get_response.unwrap();
+    assert_eq!(data["version"]["number"], 3);
+
+    // Update the page (version should increment to 4)
+    let update_payload = serde_json::json!({
+        "id": "100002",
+        "status": "current",
+        "title": "Published Page Updated",
+        "version": {"number": 4}
+    });
+
+    let put_response: Result<serde_json::Value, _> = client
+        .put("/wiki/api/v2/pages/100002", &update_payload)
+        .await;
+
+    assert!(put_response.is_ok());
+    let result = put_response.unwrap();
+    assert_eq!(result["version"]["number"], 4);
+}
+
+#[tokio::test]
+async fn test_publish_draft_blogpost() {
+    let mock_server = MockServer::start().await;
+
+    // Mock: get current blog post (draft status)
+    Mock::given(method("GET"))
+        .and(path("/wiki/api/v2/blogposts/300001"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": "300001",
+            "title": "Draft Blog Post",
+            "status": "draft",
+            "version": {"number": 1}
+        })))
+        .mount(&mock_server)
+        .await;
+
+    // Mock: publish blog post (PUT with version 1)
+    Mock::given(method("PUT"))
+        .and(path("/wiki/api/v2/blogposts/300001"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": "300001",
+            "title": "Draft Blog Post",
+            "status": "current",
+            "version": {"number": 1, "message": "Published via CLI"}
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    // Verify we can get the draft blog post
+    let get_response: Result<serde_json::Value, _> =
+        client.get("/wiki/api/v2/blogposts/300001").await;
+    assert!(get_response.is_ok());
+    let data = get_response.unwrap();
+    assert_eq!(data["status"], "draft");
+
+    // Publish the blog post with version 1
+    let publish_payload = serde_json::json!({
+        "id": "300001",
+        "status": "current",
+        "title": "Draft Blog Post",
+        "version": {"number": 1, "message": "Published via CLI"},
+        "body": {
+            "representation": "storage",
+            "value": "<p>Published blog content</p>"
+        }
+    });
+
+    let put_response: Result<serde_json::Value, _> = client
+        .put("/wiki/api/v2/blogposts/300001", &publish_payload)
+        .await;
+
+    assert!(put_response.is_ok());
+    let result = put_response.unwrap();
+    assert_eq!(result["status"], "current");
+    assert_eq!(result["version"]["number"], 1);
+}

@@ -143,8 +143,10 @@ pub async fn update_page(
     page_id: &str,
     title: Option<&str>,
     body_file: Option<&PathBuf>,
+    target_status: Option<&str>,
+    message: Option<&str>,
 ) -> Result<()> {
-    // Get current page first to get version
+    // Get current page first to get version and status
     let current: Value = ctx
         .client
         .get(&format!("/wiki/api/v2/pages/{}", page_id))
@@ -157,12 +159,46 @@ pub async fn update_page(
         .and_then(|n| n.as_i64())
         .unwrap_or(1);
 
+    let current_status = current
+        .get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("current");
+
+    // Determine target status (preserve current if not specified)
+    let target_status = target_status.unwrap_or(current_status);
+
+    // Calculate new version based on status transition
+    let new_version = match (current_status, target_status) {
+        ("draft", "current") => {
+            tracing::info!(%page_id, "Publishing draft page with version 1");
+            1 // First publish - MUST be 1
+        }
+        ("draft", "draft") => {
+            tracing::debug!(%page_id, version = %current_version, "Updating draft, keeping version");
+            current_version // Draft edit - no version bump needed
+        }
+        ("current", "current") => {
+            tracing::debug!(%page_id, version = %(current_version + 1), "Updating published page, incrementing version");
+            current_version + 1 // Normal update
+        }
+        ("current", "draft") => {
+            anyhow::bail!(
+                "Cannot change published page back to draft status. Page {} is already published.",
+                page_id
+            );
+        }
+        _ => current_version + 1,
+    };
+
+    let mut version_obj = json!({ "number": new_version });
+    if let Some(msg) = message {
+        version_obj["message"] = json!(msg);
+    }
+
     let mut payload = json!({
         "id": page_id,
-        "status": "current",
-        "version": {
-            "number": current_version + 1
-        }
+        "status": target_status,
+        "version": version_obj
     });
 
     if let Some(t) = title {
@@ -186,11 +222,86 @@ pub async fn update_page(
         .await
         .with_context(|| format!("Failed to update page {}", page_id))?;
 
-    tracing::info!(%page_id, "Page updated successfully");
+    tracing::info!(%page_id, status = %target_status, version = %new_version, "Page updated successfully");
     render_success(
         ctx.renderer,
-        &format!("✅ Updated page: {page_id}"),
+        &format!("✅ Updated page: {page_id} (v{new_version}, status: {target_status})"),
         &MutationResult::with_id(format!("Updated page: {page_id}"), page_id),
+    )
+}
+
+/// Publish a draft page for the first time
+pub async fn publish_page(
+    ctx: &ConfluenceContext<'_>,
+    page_id: &str,
+    title: Option<&str>,
+    body_file: &PathBuf,
+    message: Option<&str>,
+) -> Result<()> {
+    // Get current page to verify it's a draft
+    let current: Value = ctx
+        .client
+        .get(&format!("/wiki/api/v2/pages/{}", page_id))
+        .await
+        .with_context(|| format!("Failed to get page {}", page_id))?;
+
+    let current_status = current
+        .get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("current");
+
+    if current_status != "draft" {
+        anyhow::bail!(
+            "Page {} is already published (status: '{}').\nUse 'confluence page update' to update published pages.",
+            page_id,
+            current_status
+        );
+    }
+
+    let body_content = fs::read_to_string(body_file)
+        .with_context(|| format!("Failed to read body file: {}", body_file.display()))?;
+
+    let page_title = title
+        .map(|t| t.to_string())
+        .or_else(|| {
+            current
+                .get("title")
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "Untitled".to_string());
+
+    let mut version_obj = json!({ "number": 1 });
+    if let Some(msg) = message {
+        version_obj["message"] = json!(msg);
+    } else {
+        version_obj["message"] = json!("Published via CLI");
+    }
+
+    let payload = json!({
+        "id": page_id,
+        "status": "current",
+        "title": page_title,
+        "version": version_obj,
+        "body": {
+            "representation": "storage",
+            "value": body_content
+        }
+    });
+
+    tracing::info!(%page_id, title = %page_title, "Publishing draft page");
+
+    let _: Value = ctx
+        .client
+        .put(&format!("/wiki/api/v2/pages/{}", page_id), &payload)
+        .await
+        .with_context(|| format!("Failed to publish page {}", page_id))?;
+
+    tracing::info!(%page_id, "Draft page published successfully");
+    render_success(
+        ctx.renderer,
+        &format!("✅ Published page: {} (ID: {})", page_title, page_id),
+        &MutationResult::with_id(format!("Published page: {}", page_title), page_id),
     )
 }
 
@@ -590,8 +701,10 @@ pub async fn update_blogpost(
     blogpost_id: &str,
     title: Option<&str>,
     body_file: Option<&PathBuf>,
+    target_status: Option<&str>,
+    message: Option<&str>,
 ) -> Result<()> {
-    // Get current blog post first to get version
+    // Get current blog post first to get version and status
     let current: Value = ctx
         .client
         .get(&format!("/wiki/api/v2/blogposts/{}", blogpost_id))
@@ -604,12 +717,46 @@ pub async fn update_blogpost(
         .and_then(|n| n.as_i64())
         .unwrap_or(1);
 
+    let current_status = current
+        .get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("current");
+
+    // Determine target status (preserve current if not specified)
+    let target_status = target_status.unwrap_or(current_status);
+
+    // Calculate new version based on status transition
+    let new_version = match (current_status, target_status) {
+        ("draft", "current") => {
+            tracing::info!(%blogpost_id, "Publishing draft blog post with version 1");
+            1 // First publish - MUST be 1
+        }
+        ("draft", "draft") => {
+            tracing::debug!(%blogpost_id, version = %current_version, "Updating draft, keeping version");
+            current_version // Draft edit - no version bump needed
+        }
+        ("current", "current") => {
+            tracing::debug!(%blogpost_id, version = %(current_version + 1), "Updating published blog post, incrementing version");
+            current_version + 1 // Normal update
+        }
+        ("current", "draft") => {
+            anyhow::bail!(
+                "Cannot change published blog post back to draft status. Blog post {} is already published.",
+                blogpost_id
+            );
+        }
+        _ => current_version + 1,
+    };
+
+    let mut version_obj = json!({ "number": new_version });
+    if let Some(msg) = message {
+        version_obj["message"] = json!(msg);
+    }
+
     let mut payload = json!({
         "id": blogpost_id,
-        "status": "current",
-        "version": {
-            "number": current_version + 1
-        }
+        "status": target_status,
+        "version": version_obj
     });
 
     if let Some(t) = title {
@@ -633,11 +780,92 @@ pub async fn update_blogpost(
         .await
         .with_context(|| format!("Failed to update blog post {}", blogpost_id))?;
 
-    tracing::info!(%blogpost_id, "Blog post updated successfully");
+    tracing::info!(%blogpost_id, status = %target_status, version = %new_version, "Blog post updated successfully");
     render_success(
         ctx.renderer,
-        &format!("✅ Updated blog post: {blogpost_id}"),
+        &format!("✅ Updated blog post: {blogpost_id} (v{new_version}, status: {target_status})"),
         &MutationResult::with_id(format!("Updated blog post: {blogpost_id}"), blogpost_id),
+    )
+}
+
+/// Publish a draft blog post for the first time
+pub async fn publish_blogpost(
+    ctx: &ConfluenceContext<'_>,
+    blogpost_id: &str,
+    title: Option<&str>,
+    body_file: &PathBuf,
+    message: Option<&str>,
+) -> Result<()> {
+    // Get current blog post to verify it's a draft
+    let current: Value = ctx
+        .client
+        .get(&format!("/wiki/api/v2/blogposts/{}", blogpost_id))
+        .await
+        .with_context(|| format!("Failed to get blog post {}", blogpost_id))?;
+
+    let current_status = current
+        .get("status")
+        .and_then(|s| s.as_str())
+        .unwrap_or("current");
+
+    if current_status != "draft" {
+        anyhow::bail!(
+            "Blog post {} is already published (status: '{}').\nUse 'confluence blog update' to update published blog posts.",
+            blogpost_id,
+            current_status
+        );
+    }
+
+    let body_content = fs::read_to_string(body_file)
+        .with_context(|| format!("Failed to read body file: {}", body_file.display()))?;
+
+    let blogpost_title = title
+        .map(|t| t.to_string())
+        .or_else(|| {
+            current
+                .get("title")
+                .and_then(|t| t.as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "Untitled".to_string());
+
+    let mut version_obj = json!({ "number": 1 });
+    if let Some(msg) = message {
+        version_obj["message"] = json!(msg);
+    } else {
+        version_obj["message"] = json!("Published via CLI");
+    }
+
+    let payload = json!({
+        "id": blogpost_id,
+        "status": "current",
+        "title": blogpost_title,
+        "version": version_obj,
+        "body": {
+            "representation": "storage",
+            "value": body_content
+        }
+    });
+
+    tracing::info!(%blogpost_id, title = %blogpost_title, "Publishing draft blog post");
+
+    let _: Value = ctx
+        .client
+        .put(&format!("/wiki/api/v2/blogposts/{}", blogpost_id), &payload)
+        .await
+        .with_context(|| format!("Failed to publish blog post {}", blogpost_id))?;
+
+    tracing::info!(%blogpost_id, "Draft blog post published successfully");
+    render_success(
+        ctx.renderer,
+        &format!(
+            "✅ Published blog post: {} (ID: {})",
+            blogpost_title, blogpost_id
+        ),
+        &MutationResult::with_id(
+            format!("Published blog post: {}", blogpost_title),
+            blogpost_id,
+        ),
     )
 }
 

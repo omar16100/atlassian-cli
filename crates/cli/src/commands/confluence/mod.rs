@@ -167,6 +167,26 @@ enum PageCommands {
         /// New body content file (HTML storage format)
         #[arg(long)]
         body: Option<std::path::PathBuf>,
+        /// Target status: current (published) or draft
+        #[arg(long, value_parser = ["current", "draft"])]
+        status: Option<String>,
+        /// Version message for audit trail
+        #[arg(long)]
+        message: Option<String>,
+    },
+    /// Publish a draft page for the first time
+    Publish {
+        /// Page ID
+        page_id: String,
+        /// Body content file (HTML storage format) - required for publishing
+        #[arg(long)]
+        body: std::path::PathBuf,
+        /// Page title (uses existing if not specified)
+        #[arg(long)]
+        title: Option<String>,
+        /// Version message for audit trail
+        #[arg(long)]
+        message: Option<String>,
     },
     /// Delete a page
     Delete {
@@ -280,6 +300,26 @@ enum BlogCommands {
         /// New body content file (HTML storage format)
         #[arg(long)]
         body: Option<std::path::PathBuf>,
+        /// Target status: current (published) or draft
+        #[arg(long, value_parser = ["current", "draft"])]
+        status: Option<String>,
+        /// Version message for audit trail
+        #[arg(long)]
+        message: Option<String>,
+    },
+    /// Publish a draft blog post for the first time
+    Publish {
+        /// Blog post ID
+        blogpost_id: String,
+        /// Body content file (HTML storage format) - required for publishing
+        #[arg(long)]
+        body: std::path::PathBuf,
+        /// Blog post title (uses existing if not specified)
+        #[arg(long)]
+        title: Option<String>,
+        /// Version message for audit trail
+        #[arg(long)]
+        message: Option<String>,
     },
     /// Delete a blog post
     Delete {
@@ -522,7 +562,28 @@ pub async fn execute(
                 page_id,
                 title,
                 body,
-            } => pages::update_page(&ctx, &page_id, title.as_deref(), body.as_ref()).await,
+                status,
+                message,
+            } => {
+                pages::update_page(
+                    &ctx,
+                    &page_id,
+                    title.as_deref(),
+                    body.as_ref(),
+                    status.as_deref(),
+                    message.as_deref(),
+                )
+                .await
+            }
+            PageCommands::Publish {
+                page_id,
+                body,
+                title,
+                message,
+            } => {
+                pages::publish_page(&ctx, &page_id, title.as_deref(), &body, message.as_deref())
+                    .await
+            }
             PageCommands::Delete { page_id, force } => {
                 pages::delete_page(&ctx, &page_id, force).await
             }
@@ -577,7 +638,34 @@ pub async fn execute(
                 blogpost_id,
                 title,
                 body,
-            } => pages::update_blogpost(&ctx, &blogpost_id, title.as_deref(), body.as_ref()).await,
+                status,
+                message,
+            } => {
+                pages::update_blogpost(
+                    &ctx,
+                    &blogpost_id,
+                    title.as_deref(),
+                    body.as_ref(),
+                    status.as_deref(),
+                    message.as_deref(),
+                )
+                .await
+            }
+            BlogCommands::Publish {
+                blogpost_id,
+                body,
+                title,
+                message,
+            } => {
+                pages::publish_blogpost(
+                    &ctx,
+                    &blogpost_id,
+                    title.as_deref(),
+                    &body,
+                    message.as_deref(),
+                )
+                .await
+            }
             BlogCommands::Delete { blogpost_id, force } => {
                 pages::delete_blogpost(&ctx, &blogpost_id, force).await
             }
