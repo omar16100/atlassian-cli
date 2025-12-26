@@ -1,15 +1,15 @@
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 use std::fmt;
 
 /// A wrapper around a secret token that prevents accidental exposure.
-/// Uses `secrecy::Secret` to ensure tokens are never logged or displayed.
+/// Uses `secrecy::SecretString` to ensure tokens are never logged or displayed.
 /// Automatically zeroed on drop to prevent memory disclosure.
-pub struct SecretToken(Secret<String>);
+pub struct SecretToken(SecretString);
 
 impl SecretToken {
     /// Create a new SecretToken from a String.
     pub fn new(token: String) -> Self {
-        Self(Secret::new(token))
+        Self(SecretString::from(token))
     }
 
     /// Expose the secret token for use in authentication.
@@ -27,7 +27,7 @@ impl fmt::Debug for SecretToken {
 
 impl Drop for SecretToken {
     fn drop(&mut self) {
-        // Zeroizing is handled by secrecy::Secret internally
+        // Zeroizing is handled by secrecy::SecretString internally
     }
 }
 

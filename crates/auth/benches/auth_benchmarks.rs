@@ -1,5 +1,6 @@
 use atlassian_cli_auth::encryption::{decrypt, derive_key, encrypt};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 
 fn bench_key_derivation(c: &mut Criterion) {
     c.bench_function("derive_key", |b| {
