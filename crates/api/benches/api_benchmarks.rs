@@ -1,6 +1,7 @@
 use atlassian_cli_api::pagination::PagedResponse;
 use atlassian_cli_api::ratelimit::RateLimiter;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 
 fn bench_rate_limiter_concurrent_access(c: &mut Criterion) {
     let runtime = tokio::runtime::Runtime::new().unwrap();

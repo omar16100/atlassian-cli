@@ -7,7 +7,7 @@ use error::{ApiError, Result};
 use ratelimit::RateLimiter;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use retry::{retry_with_backoff, RetryConfig};
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt;
@@ -19,10 +19,10 @@ use url::Url;
 pub enum AuthMethod {
     Basic {
         username: String,
-        token: Secret<String>,
+        token: SecretString,
     },
     Bearer {
-        token: Secret<String>,
+        token: SecretString,
     },
 }
 
@@ -110,14 +110,14 @@ impl ApiClient {
     ) -> Self {
         self.auth = Some(AuthMethod::Basic {
             username: username.into(),
-            token: Secret::new(token.into()),
+            token: SecretString::from(token.into()),
         });
         self
     }
 
     pub fn with_bearer_token(mut self, token: impl Into<String>) -> Self {
         self.auth = Some(AuthMethod::Bearer {
-            token: Secret::new(token.into()),
+            token: SecretString::from(token.into()),
         });
         self
     }
