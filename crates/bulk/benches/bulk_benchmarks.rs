@@ -1,5 +1,6 @@
 use atlassian_cli_bulk::{BulkConfig, BulkExecutor};
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use std::hint::black_box;
 use std::time::Duration;
 
 async fn dummy_task(_item: usize) -> anyhow::Result<()> {

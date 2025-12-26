@@ -22,7 +22,7 @@ async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
 async-stream.workspace = true
-secrecy = "0.8"
+secrecy = "0.10"
 
 [dev-dependencies]
 criterion.workspace = true
