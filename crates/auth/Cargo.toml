@@ -16,13 +16,13 @@ anyhow.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-dirs = "5"
+dirs = "6"
 # Security dependencies for credential encryption
-secrecy = "0.8"
+secrecy = "0.10"
 zeroize = "1.7"
 aes-gcm = "0.10"
 argon2 = "0.5"
-rand = "0.8"
+rand = "0.9"
 machine-uid = "0.5"
 whoami = "1.5"
 

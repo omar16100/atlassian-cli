@@ -38,7 +38,7 @@ rpassword = "7"
 
 [dev-dependencies]
 wiremock.workspace = true
-tempfile = "3.13"
+tempfile = "3.24"
 cargo-husky.workspace = true
 proptest.workspace = true
 
