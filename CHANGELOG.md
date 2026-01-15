@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/omar16100/atlassian-cli/compare/v0.2.1...v0.2.2) (2026-01-15)
+
+
+### Features
+
+* add JSM, OpsGenie & Bamboo CLI modules ([0e3014a](https://github.com/omar16100/atlassian-cli/commit/0e3014a804fec2af43b19a6b629e1eb353d5c175))
+
 ## [0.2.1](https://github.com/omar16100/atlassian-cli/compare/v0.2.0...v0.2.1) (2025-12-26)
 
 
