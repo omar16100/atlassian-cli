@@ -94,17 +94,18 @@ async fn main() -> Result<()> {
         AtlassianCommand::Jsm(args) => {
             let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
             let client = build_product_client(&profile)?;
-            commands::jsm::execute(
-                args,
-                commands::jsm::JsmContext {
-                    client,
-                    renderer: &renderer,
-                },
-            )
-            .await?
+            commands::jsm::execute(args, client, &renderer).await?
         }
-        AtlassianCommand::Opsgenie(args) => commands::opsgenie::execute(args).await?,
-        AtlassianCommand::Bamboo(args) => commands::bamboo::execute(args).await?,
+        AtlassianCommand::Opsgenie(args) => {
+            let profile = resolve_profile_for_opsgenie(&config, cli.profile.as_deref())?;
+            let client = build_opsgenie_client(&profile)?;
+            commands::opsgenie::execute(args, client, &renderer).await?
+        }
+        AtlassianCommand::Bamboo(args) => {
+            let profile = resolve_profile_for_bamboo(&config, cli.profile.as_deref())?;
+            let client = build_bamboo_client(&profile)?;
+            commands::bamboo::execute(args, client, &renderer).await?
+        }
         AtlassianCommand::Auth(command) => {
             auth::handle(command, &mut config, config_path.as_deref(), &renderer).await?
         }
@@ -295,4 +296,101 @@ fn build_product_client(profile: &ProductProfile) -> Result<ApiClient> {
 fn build_bitbucket_client(profile: &BitbucketProfile) -> Result<ApiClient> {
     Ok(ApiClient::new(BITBUCKET_API_URL)?
         .with_basic_auth(profile.base.email.clone(), profile.token.clone()))
+}
+
+/// Profile for OpsGenie commands (requires api_key).
+struct OpsgenieProfile {
+    api_key: String,
+    region: commands::opsgenie::Region,
+}
+
+/// Resolve profile for OpsGenie commands.
+/// Requires opsgenie_api_key in the profile or OPSGENIE_API_KEY env var.
+fn resolve_profile_for_opsgenie(
+    config: &Config,
+    requested: Option<&str>,
+) -> Result<OpsgenieProfile> {
+    // Try env var first
+    if let Ok(api_key) = std::env::var("OPSGENIE_API_KEY") {
+        let region = std::env::var("OPSGENIE_REGION")
+            .ok()
+            .map(|r| match r.to_lowercase().as_str() {
+                "eu" => commands::opsgenie::Region::Eu,
+                _ => commands::opsgenie::Region::Us,
+            })
+            .unwrap_or(commands::opsgenie::Region::Us);
+
+        return Ok(OpsgenieProfile { api_key, region });
+    }
+
+    // Fall back to config profile
+    let (name, profile) = config
+        .resolve_profile(requested)
+        .ok_or_else(|| anyhow!("No profile configured. Run `atlassian-cli auth login` first."))?;
+
+    let api_key = profile.opsgenie_api_key.clone().ok_or_else(|| {
+        anyhow!(
+            "Profile '{}' is missing opsgenie_api_key. Set OPSGENIE_API_KEY env var or add opsgenie_api_key to your profile.",
+            name
+        )
+    })?;
+
+    let region = profile
+        .opsgenie_region
+        .as_ref()
+        .map(|r| match r.to_lowercase().as_str() {
+            "eu" => commands::opsgenie::Region::Eu,
+            _ => commands::opsgenie::Region::Us,
+        })
+        .unwrap_or(commands::opsgenie::Region::Us);
+
+    Ok(OpsgenieProfile { api_key, region })
+}
+
+fn build_opsgenie_client(profile: &OpsgenieProfile) -> Result<ApiClient> {
+    Ok(ApiClient::new(profile.region.base_url())?.with_genie_key(profile.api_key.clone()))
+}
+
+/// Profile for Bamboo commands.
+struct BambooProfile {
+    email: String,
+    token: String,
+    base_url: String,
+}
+
+/// Resolve profile for Bamboo commands.
+/// Uses bamboo_base_url if set, otherwise falls back to base_url.
+fn resolve_profile_for_bamboo(config: &Config, requested: Option<&str>) -> Result<BambooProfile> {
+    let (base, profile) = resolve_base_profile(config, requested)?;
+
+    // Use bamboo_base_url if set, otherwise fall back to base_url
+    let base_url = profile
+        .bamboo_base_url
+        .clone()
+        .or_else(|| profile.base_url.clone())
+        .ok_or_else(|| {
+            anyhow!(
+                "Profile '{}' is missing bamboo_base_url or base_url. Configure one in your profile.",
+                base.name
+            )
+        })?;
+
+    let token = auth::get_token(&base.name).ok_or_else(|| {
+        anyhow!(
+            "No token found for profile '{}'. Run `atlassian-cli auth login --profile {}`",
+            base.name,
+            base.name
+        )
+    })?;
+
+    Ok(BambooProfile {
+        email: base.email,
+        token,
+        base_url,
+    })
+}
+
+fn build_bamboo_client(profile: &BambooProfile) -> Result<ApiClient> {
+    Ok(ApiClient::new(&profile.base_url)?
+        .with_basic_auth(profile.email.clone(), profile.token.clone()))
 }

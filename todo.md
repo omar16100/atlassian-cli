@@ -1,5 +1,119 @@
 # Changes Made
 
+## 2026-01-15 - Bug Fixes for JSM, OpsGenie & Bamboo Modules
+
+### Double Rendering Bug Fix
+- Fixed 6 locations where `println!()` + early return broke JSON/YAML output
+- Files fixed:
+  - `crates/cli/src/commands/bamboo/projects.rs:40-45` - list_projects
+  - `crates/cli/src/commands/jsm/requests.rs:86-91` - list_requests
+  - `crates/cli/src/commands/opsgenie/alerts.rs:57-62` - list_alerts
+  - `crates/cli/src/commands/opsgenie/alerts.rs:407-412` - list_recipients
+  - `crates/cli/src/commands/opsgenie/alerts.rs:441-446` - list_logs
+  - `crates/cli/src/commands/opsgenie/alerts.rs:473-478` - list_notes
+- Now always renders via ctx.renderer.render() for consistent output format support
+
+### OpsGenie Query Parameter Bug Fix
+- Fixed `crates/cli/src/commands/opsgenie/alerts.rs:14-27`
+- When both `--query` and `--status` provided, they were overwriting each other
+- Now combines them with " AND " for proper OpsGenie query syntax
+
+## 2026-01-14 - JSM, OpsGenie & Bamboo CLI Implementation
+
+### Phase 1: JSM Enhancement (Refactored to Module)
+- Refactored `jsm.rs` → `jsm/` module directory structure
+- Created files:
+  - `mod.rs` - Main routing with full command enum definitions
+  - `utils.rs` - JsmContext, ServiceDesk, RequestType, Customer, Organization types
+  - `requesttypes.rs` - list_request_types, get_request_type
+  - `customers.rs` - list_customers, get_customer, create_customer, delete_customer
+  - `feedback.rs` - list_feedback, get_feedback
+  - `knowledgebase.rs` - list_articles, get_article
+- Full CRUD for service desk requests with transitions, comments, attachments, participants
+- Added `delete_with_body()` method to ApiClient for JSM endpoints requiring body in DELETE
+
+### Phase 2: OpsGenie Implementation (NEW)
+- Created `opsgenie/` module with EU/US region support
+- Added `GenieKey` authentication to ApiClient
+  - New `AuthMethod::GenieKey { api_key }` variant
+  - `with_genie_key()` builder method
+  - Sets `Authorization: GenieKey {key}` header
+- Created files:
+  - `utils.rs` - OpsgenieContext, Alert, Incident, Schedule, Team, Escalation, Service, Heartbeat types
+  - `alerts.rs` - list, get, create, close, acknowledge, snooze, escalate, assign, add_note, delete, list_recipients, list_logs, list_notes
+  - `incidents.rs` - list, get, create, close, resolve, reopen, add_responder, add_note, delete, list_timeline
+  - `schedules.rs` - list, get, create, delete, enable, disable, get_on_call, get_timeline, export_ical
+  - `teams.rs` - list, get, create, delete, list_members, add_member, remove_member, get_on_call
+  - `escalations.rs` - list, get, create, delete
+  - `services.rs` - list, get, create, delete
+  - `heartbeats.rs` - list, get, create, delete, enable, disable, ping
+  - `mod.rs` - Full command enum definitions and routing
+- Added config profile fields:
+  - `opsgenie_api_key: Option<String>`
+  - `opsgenie_region: Option<String>` ("us" or "eu")
+- Added `OPSGENIE_API_KEY` and `OPSGENIE_REGION` env var support with fallback to profile
+
+### Phase 3: Bamboo Implementation (NEW)
+- Created `bamboo/` module with full CI/CD operations
+- Created files:
+  - `utils.rs` - BambooContext, Project, Plan, Branch, BuildResult, Agent, DeploymentProject, Environment, Artifact types
+  - `projects.rs` - list_projects, get_project
+  - `plans.rs` - list, get, enable, disable, favorite, unfavorite
+  - `branches.rs` - list, get, create, delete, enable, disable
+  - `builds.rs` - list, get, latest, run, stop, logs, comment, add_label, remove_label
+  - `deployments.rs` - list_projects, get_project, list_environments, get_environment, list_results, trigger, list_versions
+  - `agents.rs` - list, get, enable, disable, capabilities, server_info, queue
+  - `artifacts.rs` - list, download
+  - `mod.rs` - Full command enum definitions and routing
+- Added config profile field:
+  - `bamboo_base_url: Option<String>` (falls back to base_url if not set)
+- Added `get_bytes()` method to ApiClient for binary artifact downloads
+
+### Phase 4: Cross-Cutting Concerns
+- Updated `main.rs`:
+  - `resolve_profile_for_opsgenie()` - env var first, then profile config
+  - `build_opsgenie_client()` - uses GenieKey auth
+  - `resolve_profile_for_bamboo()` - uses bamboo_base_url or base_url
+  - `build_bamboo_client()` - uses Basic auth
+- Updated `crates/config/src/lib.rs` with new profile fields
+- Updated `crates/api/src/lib.rs` with delete_with_body and GenieKey auth
+
+### Files Created
+- `crates/cli/src/commands/jsm/*.rs` (12 files)
+- `crates/cli/src/commands/opsgenie/*.rs` (9 files)
+- `crates/cli/src/commands/bamboo/*.rs` (9 files including artifacts.rs)
+
+### Files Modified
+- `crates/api/src/lib.rs` - delete_with_body, GenieKey auth
+- `crates/config/src/lib.rs` - opsgenie_api_key, opsgenie_region, bamboo_base_url
+- `crates/cli/src/main.rs` - profile resolution and client building for OpsGenie/Bamboo
+
+### Phase 5: Integration Tests
+- Created `crates/cli/tests/jsm_integration.rs` (11 tests)
+  - Service desk list/get, requests CRUD, request types, customers, comments, transitions, queues
+- Created `crates/cli/tests/opsgenie_integration.rs` (14 tests)
+  - Alerts CRUD + acknowledge/close, incidents, schedules, teams, services, heartbeats, escalations
+  - Tests GenieKey authentication header
+- Created `crates/cli/tests/bamboo_integration.rs` (22 tests)
+  - Projects, plans, branches, builds, deployments, agents, queue, server info, artifacts
+  - Full CRUD coverage for all major endpoints including artifact list/download
+
+### Test Results
+- Total: 47 new integration tests
+- JSM: 11 tests passed
+- OpsGenie: 14 tests passed
+- Bamboo: 22 tests passed
+
+## 2026-01-14 - C4 Model Architecture Documentation
+- Created `docs/c4model.md` with comprehensive C4 model documentation
+- Level 1: System Context diagram showing user, atlassian-cli, and external Atlassian APIs
+- Level 2: Container diagram showing 6 Rust crates (cli, api, auth, config, output, bulk)
+- Level 3: Component diagrams for each crate detailing internal structure
+- Level 4: Code-level class diagram showing key structs
+- Added data flow diagrams: authentication flow, bulk operation flow, request lifecycle
+- Converted all diagrams from Mermaid to ASCII art for terminal compatibility
+- Files created: `docs/c4model.md`
+
 ## 2025-12-26 - Confluence Draft Publishing Fix
 
 ### Bug Fixed
