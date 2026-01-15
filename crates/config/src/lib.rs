@@ -159,6 +159,15 @@ pub struct Profile {
     /// Bitbucket workspace slug (optional, can be inferred from base_url).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace: Option<String>,
+    /// OpsGenie API key (optional, separate from Atlassian token).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opsgenie_api_key: Option<String>,
+    /// OpsGenie region: "us" or "eu" (defaults to "us").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opsgenie_region: Option<String>,
+    /// Bamboo base URL (optional, if different from main base_url).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bamboo_base_url: Option<String>,
 }
 
 #[cfg(test)]
