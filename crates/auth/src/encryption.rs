@@ -48,7 +48,7 @@ impl Default for EncryptedCredentials {
 /// Uses Argon2 for key derivation to resist brute-force attacks.
 pub fn derive_key() -> Result<[u8; 32]> {
     let machine_id = machine_uid::get().map_err(|e| anyhow!("Failed to get machine ID: {}", e))?;
-    let username = whoami::username();
+    let username = whoami::username().unwrap_or_else(|_| "unknown".to_string());
 
     // Combine machine ID and username as the password
     let password = format!("{}:{}", machine_id, username);
