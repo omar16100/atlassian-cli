@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/omar16100/atlassian-cli/compare/v0.2.3...v0.2.4) (2026-01-19)
+
+
+### Bug Fixes
+
+* update whoami to v2.0 and handle Result API change ([48fbf0b](https://github.com/omar16100/atlassian-cli/commit/48fbf0b66a6cb44d3ce968c01b67b9e368cfd58f))
+
 ## [0.2.3](https://github.com/omar16100/atlassian-cli/compare/v0.2.2...v0.2.3) (2026-01-19)
 
 
