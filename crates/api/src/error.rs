@@ -46,7 +46,7 @@ impl ApiError {
     pub fn suggestion(&self) -> Option<&str> {
         match self {
             ApiError::AuthenticationFailed { .. } => {
-                Some("Verify your API token using: atlassian-cli auth test")
+                Some("Verify tokens with: atlassian-cli auth list\nTest auth with: atlassian-cli auth test [--bitbucket]")
             }
             ApiError::RateLimitExceeded { .. } => {
                 Some("Consider reducing request frequency or use bulk operations")

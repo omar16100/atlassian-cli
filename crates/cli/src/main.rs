@@ -58,7 +58,17 @@ enum AtlassianCommand {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("bitbucket-token") || msg.contains("bitbucket_token") {
+                eprintln!("Hint: Use `--bitbucket --token <TOKEN>` for Bitbucket auth.");
+                eprintln!("Example: atlassian-cli auth login --profile work --bitbucket --token <TOKEN> --email <EMAIL>\n");
+            }
+            e.exit();
+        }
+    };
     init_tracing(cli.debug)?;
 
     // Perform config directory migration if needed (only when no custom path specified)
@@ -258,15 +268,19 @@ fn resolve_profile_for_bitbucket(
             if has_jira_token {
                 // Has Jira token but no Bitbucket token - suggest adding Bitbucket auth
                 anyhow!(
-                    "Profile '{}' has no Bitbucket token (only Jira/Confluence token found). \
-                    Run `atlassian-cli auth login --bitbucket --profile {}`",
+                    "Profile '{}' has no Bitbucket token.\n\n\
+                    Check token status: atlassian-cli auth list\n\
+                    Look for 'has_bitbucket_token: true'\n\n\
+                    To add: atlassian-cli auth login --bitbucket --profile {} --token <TOKEN> --email <EMAIL>",
                     base.name,
                     base.name
                 )
             } else {
                 // No tokens at all
                 anyhow!(
-                    "No token found for profile '{}'. Run `atlassian-cli auth login --bitbucket --profile {}`",
+                    "No token found for profile '{}'.\n\n\
+                    Check configured profiles: atlassian-cli auth list --all\n\n\
+                    To add: atlassian-cli auth login --bitbucket --profile {} --token <TOKEN> --email <EMAIL>",
                     base.name,
                     base.name
                 )

@@ -79,6 +79,8 @@ pub enum AuthCommand {
     Logout(LogoutArgs),
     /// List configured profiles
     List(ListArgs),
+    /// Show authentication status for all services
+    Status(StatusArgs),
     /// Show current user information
     Whoami(WhoamiArgs),
     /// Test authentication for a profile
@@ -110,6 +112,20 @@ pub struct TestArgs {
 }
 
 #[derive(Args, Debug, Clone)]
+pub struct StatusArgs {
+    /// Profile to check (defaults to default profile)
+    #[arg(long)]
+    pub profile: Option<String>,
+    /// Only show configured services (hide N/A entries)
+    #[arg(long)]
+    pub configured_only: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+#[command(after_help = "EXAMPLES:\n  \
+    Jira/Confluence: atlassian-cli auth login --profile work --base-url https://example.atlassian.net --email user@example.com --token <TOKEN>\n  \
+    Bitbucket:       atlassian-cli auth login --profile work --bitbucket --email user@example.com --token <TOKEN>\n\n\
+    Note: There is no --bitbucket-token flag. Use --bitbucket --token instead.")]
 pub struct LoginArgs {
     /// Profile name to create or update.
     #[arg(long)]
@@ -157,6 +173,7 @@ pub async fn handle(
         AuthCommand::Login(args) => login(args, config, config_path),
         AuthCommand::Logout(args) => logout(args, config, config_path),
         AuthCommand::List(args) => list_profiles(args, config, renderer),
+        AuthCommand::Status(args) => auth_status(args, config, renderer).await,
         AuthCommand::Whoami(args) => whoami(args, config).await,
         AuthCommand::Test(args) => test_auth(args, config).await,
     }
@@ -543,4 +560,164 @@ async fn test_bitbucket_auth(profile_name: &str, email: &str) -> Result<()> {
             Err(e)
         }
     }
+}
+
+async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRenderer) -> Result<()> {
+    let (profile_name, profile) = config
+        .resolve_profile(args.profile.as_deref())
+        .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
+
+    let email = profile.email.as_deref().unwrap_or("");
+
+    #[derive(Serialize)]
+    struct ServiceStatus {
+        service: String,
+        status: String,
+        details: String,
+    }
+
+    let mut statuses = Vec::new();
+
+    // Check Jira/Confluence
+    let jira_status = if let Some(base_url) = profile.base_url.as_deref() {
+        if let Some(token) = get_token(profile_name) {
+            let client = atlassian_cli_api::ApiClient::new(base_url)
+                .ok()
+                .map(|c| c.with_basic_auth(email, &token));
+
+            if let Some(client) = client {
+                match client.get::<serde_json::Value>("/rest/api/3/myself").await {
+                    Ok(_) => ServiceStatus {
+                        service: "Jira/Confluence".to_string(),
+                        status: "OK".to_string(),
+                        details: base_url.to_string(),
+                    },
+                    Err(e) => ServiceStatus {
+                        service: "Jira/Confluence".to_string(),
+                        status: "FAILED".to_string(),
+                        details: format!("{}", e),
+                    },
+                }
+            } else {
+                ServiceStatus {
+                    service: "Jira/Confluence".to_string(),
+                    status: "FAILED".to_string(),
+                    details: "Invalid base URL".to_string(),
+                }
+            }
+        } else {
+            ServiceStatus {
+                service: "Jira/Confluence".to_string(),
+                status: "N/A".to_string(),
+                details: "No token configured".to_string(),
+            }
+        }
+    } else {
+        ServiceStatus {
+            service: "Jira/Confluence".to_string(),
+            status: "N/A".to_string(),
+            details: "No base_url configured".to_string(),
+        }
+    };
+    if !args.configured_only || jira_status.status != "N/A" {
+        statuses.push(jira_status);
+    }
+
+    // Check Bitbucket
+    let bb_status = if let Some(token) = get_bitbucket_token(profile_name) {
+        let client = atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)
+            .ok()
+            .map(|c| c.with_basic_auth(email, &token));
+
+        if let Some(client) = client {
+            match client.get::<serde_json::Value>("/2.0/user").await {
+                Ok(user_data) => {
+                    let username = user_data["username"].as_str().unwrap_or("unknown");
+                    ServiceStatus {
+                        service: "Bitbucket".to_string(),
+                        status: "OK".to_string(),
+                        details: format!("user: {}", username),
+                    }
+                }
+                Err(e) => ServiceStatus {
+                    service: "Bitbucket".to_string(),
+                    status: "FAILED".to_string(),
+                    details: format!("{}", e),
+                },
+            }
+        } else {
+            ServiceStatus {
+                service: "Bitbucket".to_string(),
+                status: "FAILED".to_string(),
+                details: "Client init failed".to_string(),
+            }
+        }
+    } else {
+        ServiceStatus {
+            service: "Bitbucket".to_string(),
+            status: "N/A".to_string(),
+            details: "Not configured".to_string(),
+        }
+    };
+    if !args.configured_only || bb_status.status != "N/A" {
+        statuses.push(bb_status);
+    }
+
+    // Check OpsGenie (from profile config or env var)
+    let og_status =
+        if profile.opsgenie_api_key.is_some() || std::env::var("OPSGENIE_API_KEY").is_ok() {
+            ServiceStatus {
+                service: "OpsGenie".to_string(),
+                status: "CONFIGURED".to_string(),
+                details: "API key present (use `opsgenie alert list` to test)".to_string(),
+            }
+        } else {
+            ServiceStatus {
+                service: "OpsGenie".to_string(),
+                status: "N/A".to_string(),
+                details: "Not configured".to_string(),
+            }
+        };
+    if !args.configured_only || og_status.status != "N/A" {
+        statuses.push(og_status);
+    }
+
+    // Check Bamboo
+    let bamboo_status = if profile.bamboo_base_url.is_some() || profile.base_url.is_some() {
+        if get_token(profile_name).is_some() {
+            let base_url = profile
+                .bamboo_base_url
+                .as_deref()
+                .or(profile.base_url.as_deref())
+                .unwrap_or("");
+            ServiceStatus {
+                service: "Bamboo".to_string(),
+                status: "CONFIGURED".to_string(),
+                details: format!("{} (use `bamboo plan list` to test)", base_url),
+            }
+        } else {
+            ServiceStatus {
+                service: "Bamboo".to_string(),
+                status: "N/A".to_string(),
+                details: "No token configured".to_string(),
+            }
+        }
+    } else {
+        ServiceStatus {
+            service: "Bamboo".to_string(),
+            status: "N/A".to_string(),
+            details: "Not configured".to_string(),
+        }
+    };
+    if !args.configured_only || bamboo_status.status != "N/A" {
+        statuses.push(bamboo_status);
+    }
+
+    println!("Profile: {}", profile_name);
+    if statuses.is_empty() {
+        println!("No services configured.");
+        return Ok(());
+    }
+
+    renderer.render(&statuses)
 }

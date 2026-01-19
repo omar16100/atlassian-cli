@@ -1,5 +1,54 @@
 # Changes Made
 
+## 2026-01-19 - UX Improvements
+
+### Issue 1: Auth UX - Hint for `--bitbucket-token`
+- Added clap error hook in `main.rs` to detect `--bitbucket-token` typo and suggest correct syntax
+- Added `after_help` to `LoginArgs` in `auth.rs` showing examples for Jira and Bitbucket auth
+- Files: `crates/cli/src/main.rs`, `crates/cli/src/commands/auth.rs`
+
+### Issue 2: Add `auth status` Command
+- New command: `atlassian-cli auth status [--profile <name>] [--configured-only]`
+- Shows authentication status for all services: Jira/Confluence, Bitbucket, OpsGenie, Bamboo
+- Tests actual API connectivity for Jira and Bitbucket (shows OK/FAILED/N/A)
+- OpsGenie and Bamboo show CONFIGURED status (API key present)
+- `--configured-only` flag hides N/A entries
+- File: `crates/cli/src/commands/auth.rs`
+
+### Issue 3: Pipeline Repo Auto-Detection Error Messages
+- Created `require_repo()` helper function for better error messages
+- Used across all pipeline commands (list, get, trigger, stop, logs, watch, steps, status, rerun)
+- Error now shows: "Repository required for '<cmd>'. Not in a git directory with Bitbucket remote."
+- File: `crates/cli/src/commands/bitbucket/mod.rs`
+
+### Issue 4: Build Number vs UUID - Renamed `uuid` to `pipeline_id`
+- Renamed `uuid` field to `pipeline_id` in Get, Stop, Watch, Steps commands
+- Clarifies that both build numbers and UUIDs are accepted
+- Made `resolve_pipeline_id()` public for use in Stop command
+- Files: `crates/cli/src/commands/bitbucket/mod.rs`, `crates/cli/src/commands/bitbucket/pipelines.rs`
+
+### Issue 5: Add Commit Hash to Pipeline Output
+- Added `commit` field to `PipelineRow`, `PipelineView`, `PipelineStatusOutput` structs
+- Shows short hash (7 chars) of the commit that triggered the pipeline
+- Added `get_commit_hash()` helper function
+- Visible in: `pipeline list`, `pipeline get`, `pipeline status`, `pipeline watch`
+- File: `crates/cli/src/commands/bitbucket/pipelines.rs`
+
+### Issue 6: Improve Auth Failure Error Messages
+- Improved Bitbucket auth error message to mention `auth list` command
+- Shows: "Check token status: atlassian-cli auth list"
+- Updated `AuthenticationFailed` suggestion in error.rs to mention both `auth list` and `auth test`
+- Files: `crates/cli/src/main.rs`, `crates/api/src/error.rs`
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `crates/cli/src/main.rs` | Clap error hook, improve Bitbucket auth errors |
+| `crates/cli/src/commands/auth.rs` | New Status command, LoginArgs after_help |
+| `crates/cli/src/commands/bitbucket/mod.rs` | Rename uuid→pipeline_id, require_repo helper |
+| `crates/cli/src/commands/bitbucket/pipelines.rs` | Add commit hash, resolve_pipeline_id public |
+| `crates/api/src/error.rs` | Update auth failure suggestion |
+
 ## 2026-01-15 - Bug Fixes for JSM, OpsGenie & Bamboo Modules
 
 ### Double Rendering Bug Fix

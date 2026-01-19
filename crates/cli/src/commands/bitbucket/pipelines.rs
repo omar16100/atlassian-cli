@@ -109,6 +109,7 @@ struct PipelineRow {
     build_number: String,
     state: String,
     ref_name: String,
+    commit: String,
     target_type: String,
     created: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -121,6 +122,7 @@ struct PipelineView {
     build_number: String,
     state: String,
     ref_name: String,
+    commit: String,
     created: String,
     completed: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -149,6 +151,7 @@ struct PipelineStatusOutput {
     build_number: i64,
     state: String,
     ref_name: String,
+    commit: String,
     created: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     steps: Option<Vec<StepInfo>>,
@@ -204,6 +207,16 @@ fn get_pipeline_status(pipeline: &Pipeline) -> String {
         .and_then(|s| s.result.as_ref().map(|r| r.name.clone()))
         .or_else(|| pipeline.state.as_ref().map(|s| s.name.clone()))
         .unwrap_or_else(|| "UNKNOWN".to_string())
+}
+
+fn get_commit_hash(pipeline: &Pipeline) -> String {
+    pipeline
+        .target
+        .as_ref()
+        .and_then(|t| t.commit.as_ref())
+        .and_then(|c| c.hash.as_ref())
+        .map(|h| h.chars().take(7).collect::<String>())
+        .unwrap_or_default()
 }
 
 fn is_terminal_state(status: &str) -> bool {
@@ -376,7 +389,7 @@ fn build_request_path(
 }
 
 /// Resolve pipeline identifier: build number (e.g. "404") -> UUID
-async fn resolve_pipeline_identifier(
+pub async fn resolve_pipeline_id(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
     repo_slug: &str,
@@ -629,6 +642,7 @@ pub async fn list_pipelines(
                     .as_ref()
                     .and_then(|t| t.ref_name.clone())
                     .unwrap_or_default(),
+                commit: get_commit_hash(pipeline),
                 target_type: pipeline
                     .target
                     .as_ref()
@@ -659,7 +673,7 @@ pub async fn get_pipeline(
     show_steps: bool,
 ) -> Result<()> {
     // Resolve build number to UUID if needed
-    let pipeline_uuid = resolve_pipeline_identifier(ctx, workspace, repo_slug, pipeline_id).await?;
+    let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
     let pipeline = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
 
     let steps = if show_steps {
@@ -678,7 +692,7 @@ pub async fn get_pipeline(
     let state = format_status_for_display(&status, use_colors);
 
     let view = PipelineView {
-        uuid: pipeline.uuid,
+        uuid: pipeline.uuid.clone(),
         build_number: pipeline
             .build_number
             .map(|n| n.to_string())
@@ -689,6 +703,7 @@ pub async fn get_pipeline(
             .as_ref()
             .and_then(|t| t.ref_name.clone())
             .unwrap_or_default(),
+        commit: get_commit_hash(&pipeline),
         created: pipeline.created_on.unwrap_or_default(),
         completed: pipeline.completed_on.unwrap_or_default(),
         steps,
@@ -954,7 +969,7 @@ pub async fn list_steps(
     pipeline_id: &str,
 ) -> Result<()> {
     // Resolve build number to UUID if needed
-    let pipeline_uuid = resolve_pipeline_identifier(ctx, workspace, repo_slug, pipeline_id).await?;
+    let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
 
     tracing::debug!(
         pipeline_uuid,
@@ -1028,6 +1043,7 @@ pub async fn pipeline_status(
             .as_ref()
             .and_then(|t| t.ref_name.clone())
             .unwrap_or_default(),
+        commit: get_commit_hash(pipeline),
         created: pipeline.created_on.clone().unwrap_or_default(),
         steps: steps_data,
     };
@@ -1068,7 +1084,7 @@ pub async fn rerun_pipeline(
     secured: bool,
 ) -> Result<()> {
     // Resolve build number to UUID if needed
-    let pipeline_uuid = resolve_pipeline_identifier(ctx, workspace, repo_slug, pipeline_id).await?;
+    let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
 
     // Fetch original pipeline
     let original = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
@@ -1173,7 +1189,7 @@ pub async fn watch_pipeline(
     show_steps: bool,
 ) -> Result<()> {
     // Resolve build number to UUID if needed (only once at start)
-    let pipeline_uuid = resolve_pipeline_identifier(ctx, workspace, repo_slug, pipeline_id).await?;
+    let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
 
     let start = Instant::now();
     let is_table = ctx.renderer.format() == OutputFormat::Table;
@@ -1240,7 +1256,7 @@ pub async fn watch_pipeline(
                     .filter(|s| !s.is_empty())
                     .map(|s| format_steps_summary(s, false));
                 let view = PipelineView {
-                    uuid: pipeline.uuid,
+                    uuid: pipeline.uuid.clone(),
                     build_number: pipeline
                         .build_number
                         .map(|n| n.to_string())
@@ -1251,6 +1267,7 @@ pub async fn watch_pipeline(
                         .as_ref()
                         .and_then(|t| t.ref_name.clone())
                         .unwrap_or_default(),
+                    commit: get_commit_hash(&pipeline),
                     created: pipeline.created_on.unwrap_or_default(),
                     completed: pipeline.completed_on.unwrap_or_default(),
                     steps,
