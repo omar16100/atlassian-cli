@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/omar16100/atlassian-cli/compare/v0.2.2...v0.2.3) (2026-01-19)
+
+
+### Features
+
+* UX improvements for auth and pipeline commands ([b808571](https://github.com/omar16100/atlassian-cli/commit/b8085717cd10643851e9a9bd4737182624401914))
+
 ## [0.2.2](https://github.com/omar16100/atlassian-cli/compare/v0.2.1...v0.2.2) (2026-01-15)
 
 
