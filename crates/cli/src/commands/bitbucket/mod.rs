@@ -19,6 +19,21 @@ mod workspaces;
 
 use utils::BitbucketContext;
 
+/// Helper to require a repo slug with a clear error message
+fn require_repo(
+    explicit: Option<&str>,
+    git_detected: Option<&str>,
+    cmd: &str,
+) -> anyhow::Result<String> {
+    explicit.or(git_detected).map(String::from).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Repository required for '{cmd}'.\n\n\
+             Not in a git directory with Bitbucket remote.\n\
+             Use --repo <workspace/repo-slug> or positional argument."
+        )
+    })
+}
+
 #[derive(Args, Debug, Clone)]
 pub struct BitbucketArgs {
     /// Workspace slug (defaults to workspace configured in profile base URL host prefix).
@@ -422,7 +437,7 @@ enum PipelineCommands {
         /// Repository slug (auto-detected from git remote if not specified).
         repo: Option<String>,
         /// Pipeline UUID or build number.
-        uuid: String,
+        pipeline_id: String,
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
@@ -459,8 +474,8 @@ enum PipelineCommands {
     Stop {
         /// Repository slug (auto-detected from git remote if not specified).
         repo: Option<String>,
-        /// Pipeline UUID.
-        uuid: String,
+        /// Pipeline UUID or build number.
+        pipeline_id: String,
     },
     /// Get pipeline logs.
     Logs {
@@ -488,7 +503,7 @@ enum PipelineCommands {
         /// Repository slug (auto-detected from git remote if not specified).
         repo: Option<String>,
         /// Pipeline UUID or build number.
-        uuid: String,
+        pipeline_id: String,
         /// Poll interval in seconds.
         #[arg(long, default_value_t = 5)]
         interval: u64,
@@ -501,7 +516,7 @@ enum PipelineCommands {
         /// Repository slug (auto-detected from git remote if not specified).
         repo: Option<String>,
         /// Pipeline UUID or build number.
-        uuid: String,
+        pipeline_id: String,
     },
     /// Get latest pipeline status (JSON output, smart exit codes).
     Status {
@@ -966,22 +981,16 @@ pub async fn execute(
                 all,
                 steps,
             } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "Repository required. Options:\n\
-                             1. Use --repo flag\n\
-                             2. Run in git directory with Bitbucket remote\n\
-                             3. Pass repo as positional argument"
-                    )
-                })?;
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline list")?;
 
                 // Handle --pr flag
                 let effective_branch = if let Some(pr_id) = pr {
                     let pr_info =
-                        pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
+                        pullrequests::get_pr_info(&ctx, &workspace, &repo_slug, pr_id).await?;
 
                     // Check if PR is from a fork
-                    if pullrequests::is_from_fork(&pr_info, &workspace, repo_slug) {
+                    if pullrequests::is_from_fork(&pr_info, &workspace, &repo_slug) {
                         eprintln!(
                             "Warning: PR #{} is from a fork (workspace: {}/{})",
                             pr_id, pr_info.source_workspace, pr_info.source_repo
@@ -1026,7 +1035,7 @@ pub async fn execute(
                 pipelines::list_pipelines(
                     &ctx,
                     &workspace,
-                    repo_slug,
+                    &repo_slug,
                     limit,
                     sort.as_deref(),
                     recent,
@@ -1038,20 +1047,22 @@ pub async fn execute(
                 )
                 .await
             }
-            PipelineCommands::Get { repo, uuid, steps } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
-                pipelines::get_pipeline(&ctx, &workspace, repo_slug, &uuid, steps).await
+            PipelineCommands::Get {
+                repo,
+                pipeline_id,
+                steps,
+            } => {
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline get")?;
+                pipelines::get_pipeline(&ctx, &workspace, &repo_slug, &pipeline_id, steps).await
             }
             PipelineCommands::Latest {
                 repo,
                 branch,
                 steps,
             } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline latest")?;
 
                 // Prefer explicit --branch over auto-detected
                 let effective_branch = if let Some(b) = branch {
@@ -1082,7 +1093,7 @@ pub async fn execute(
                 pipelines::list_pipelines(
                     &ctx,
                     &workspace,
-                    repo_slug,
+                    &repo_slug,
                     1,                     // limit
                     Some("-created_on"),   // sort
                     None,                  // recent
@@ -1101,19 +1112,21 @@ pub async fn execute(
                 variables,
                 secured,
             } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline trigger")?;
                 pipelines::trigger_pipeline(
-                    &ctx, &workspace, repo_slug, &ref_name, &ref_type, variables, secured,
+                    &ctx, &workspace, &repo_slug, &ref_name, &ref_type, variables, secured,
                 )
                 .await
             }
-            PipelineCommands::Stop { repo, uuid } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
-                pipelines::stop_pipeline(&ctx, &workspace, repo_slug, &uuid).await
+            PipelineCommands::Stop { repo, pipeline_id } => {
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline stop")?;
+                // Resolve build number to UUID if needed
+                let pipeline_uuid =
+                    pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &pipeline_id)
+                        .await?;
+                pipelines::stop_pipeline(&ctx, &workspace, &repo_slug, &pipeline_uuid).await
             }
             PipelineCommands::Logs {
                 repo,
@@ -1124,13 +1137,12 @@ pub async fn execute(
                 ignore_case,
                 failed_only,
             } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline logs")?;
                 pipelines::get_pipeline_logs(
                     &ctx,
                     &workspace,
-                    repo_slug,
+                    &repo_slug,
                     &pipeline_uuid,
                     step_uuid.as_deref(),
                     step.as_deref(),
@@ -1142,26 +1154,31 @@ pub async fn execute(
             }
             PipelineCommands::Watch {
                 repo,
-                uuid,
+                pipeline_id,
                 interval,
                 steps,
             } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
-                pipelines::watch_pipeline(&ctx, &workspace, repo_slug, &uuid, interval, steps).await
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline watch")?;
+                pipelines::watch_pipeline(
+                    &ctx,
+                    &workspace,
+                    &repo_slug,
+                    &pipeline_id,
+                    interval,
+                    steps,
+                )
+                .await
             }
-            PipelineCommands::Steps { repo, uuid } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
-                pipelines::list_steps(&ctx, &workspace, repo_slug, &uuid).await
+            PipelineCommands::Steps { repo, pipeline_id } => {
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline steps")?;
+                pipelines::list_steps(&ctx, &workspace, &repo_slug, &pipeline_id).await
             }
             PipelineCommands::Status { repo, steps } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
-                pipelines::pipeline_status(&ctx, &workspace, repo_slug, steps).await
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline status")?;
+                pipelines::pipeline_status(&ctx, &workspace, &repo_slug, steps).await
             }
             PipelineCommands::Rerun {
                 repo,
@@ -1171,18 +1188,17 @@ pub async fn execute(
                 variables,
                 secured,
             } => {
-                let repo_slug = repo.as_deref().or(global_repo.as_deref()).ok_or_else(|| {
-                    anyhow::anyhow!("Repository required. Use --repo flag or run in git directory")
-                })?;
+                let repo_slug =
+                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline rerun")?;
 
                 // Determine which pipeline to rerun
                 let effective_pipeline_id = if let Some(pr_id) = pr {
                     // Handle --pr flag
                     let pr_info =
-                        pullrequests::get_pr_info(&ctx, &workspace, repo_slug, pr_id).await?;
+                        pullrequests::get_pr_info(&ctx, &workspace, &repo_slug, pr_id).await?;
 
                     // Error if PR is from a fork
-                    if pullrequests::is_from_fork(&pr_info, &workspace, repo_slug) {
+                    if pullrequests::is_from_fork(&pr_info, &workspace, &repo_slug) {
                         anyhow::bail!(
                             "Error: PR #{} is from a fork (workspace: {}/{})\n\n\
                             Cannot access pipelines from forked repositories.\n\
@@ -1199,7 +1215,7 @@ pub async fn execute(
                     let latest = pipelines::find_latest_pipeline_for_branch(
                         &ctx,
                         &workspace,
-                        repo_slug,
+                        &repo_slug,
                         &pr_info.source_branch,
                     )
                     .await?;
@@ -1207,7 +1223,7 @@ pub async fn execute(
                     // If --failed-only, check for failed steps
                     if failed_only {
                         let has_failed = pipelines::pipeline_has_failed_steps(
-                            &ctx, &workspace, repo_slug, &latest,
+                            &ctx, &workspace, &repo_slug, &latest,
                         )
                         .await?;
 
@@ -1230,7 +1246,7 @@ pub async fn execute(
                 pipelines::rerun_pipeline(
                     &ctx,
                     &workspace,
-                    repo_slug,
+                    &repo_slug,
                     &effective_pipeline_id,
                     variables,
                     secured,
