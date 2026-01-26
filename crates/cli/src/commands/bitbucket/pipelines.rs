@@ -890,6 +890,14 @@ pub async fn get_pipeline_logs(
         let log_content = match ctx.client.get_text(&log_path).await {
             Ok(content) => content,
             Err(e) => {
+                // Build browser URL for fallback viewing
+                let clean_pipeline_uuid = pipeline_uuid.trim_matches(|c| c == '{' || c == '}');
+                let clean_step_uuid = step.uuid.trim_matches(|c| c == '{' || c == '}');
+                let browser_url = format!(
+                    "https://bitbucket.org/{}/{}/pipelines/results/{}/steps/{}",
+                    workspace, repo_slug, clean_pipeline_uuid, clean_step_uuid
+                );
+
                 // Handle 404 as skipped step
                 if e.to_string().contains("404") || e.to_string().contains("Not Found") {
                     if ctx.renderer.format() == OutputFormat::Table {
@@ -897,12 +905,13 @@ pub async fn get_pipeline_logs(
                     }
                     continue;
                 }
-                return Err(e).with_context(|| {
-                    format!(
-                        "Failed to fetch logs for step {} ({})",
-                        step_name, step.uuid
-                    )
-                });
+
+                return Err(anyhow::anyhow!(
+                    "Failed to fetch logs for step '{}'.\n\nView in browser: {}\n\nError: {}",
+                    step_name,
+                    browser_url,
+                    e
+                ));
             }
         };
 

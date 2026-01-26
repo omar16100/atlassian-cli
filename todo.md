@@ -1,5 +1,52 @@
 # Changes Made
 
+## 2026-01-25 - CLI UX Improvements from User Feedback
+
+### Issue 1: Rename `--output` to `--format` (global flag)
+- Renamed `--output` to `--format` to avoid conflict with subcommand `--output` file path flags
+- Made flag global with `global = true` so it works on all subcommands
+- Added short flag `-f` for convenience
+- File: `crates/cli/src/main.rs:27-29, 81`
+
+### Issue 2: Build number support for `pipeline logs`
+- Changed `pipeline_uuid` to `pipeline_id` in Logs command enum
+- Added `resolve_pipeline_id()` call before `get_pipeline_logs()`
+- Now accepts both build numbers (e.g., `335`) and UUIDs
+- File: `crates/cli/src/commands/bitbucket/mod.rs:481-485, 1131-1158`
+
+### Issue 3: Improve 406 error handling for log fetching
+- Changed Accept header from `text/plain; charset=utf-8` to `text/plain, */*;q=0.1`
+- Added explicit `StatusCode::NOT_ACCEPTABLE` (406) handling
+- File: `crates/api/src/lib.rs:202, 224-232`
+
+### Issue 4: Add browser URL to log fetch errors
+- Error messages now include browser URL for manual viewing
+- URL format: `https://bitbucket.org/{workspace}/{repo}/pipelines/results/{uuid}/steps/{step_uuid}`
+- File: `crates/cli/src/commands/bitbucket/pipelines.rs:890-913`
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `crates/cli/src/main.rs` | Rename output→format, add global=true |
+| `crates/cli/src/commands/bitbucket/mod.rs` | Logs command uses pipeline_id + resolve |
+| `crates/cli/src/commands/bitbucket/pipelines.rs` | Browser URL in error messages |
+| `crates/api/src/lib.rs` | Broader Accept header, 406 handling |
+| `crates/cli/tests/cli_integration.rs` | Updated test to use --format |
+
+## 2026-01-25 - Fix Homebrew Formula Release Workflow
+
+- Release workflow failing since v0.2.1 due to cargo-dist version mismatch
+- Dependabot bumped `actions/checkout@v4` to `@v6`, but cargo-dist expects v4
+- Regenerated `.github/workflows/release.yml` via `dist init`
+- Re-tagged v0.2.4 to trigger new release build with homebrew formula update
+- File: `.github/workflows/release.yml`
+
+## 2026-01-25 - Fix Homebrew Installation Command
+
+- Fixed incorrect Homebrew install command on website
+- Changed `omar16100/tap/atlassian-cli` → `omar16100/atlassian-cli/atlassian-cli`
+- File: `docs/index.html` (lines 86-87, 350-351)
+
 ## 2026-01-19 - UX Improvements
 
 ### Issue 1: Auth UX - Hint for `--bitbucket-token`

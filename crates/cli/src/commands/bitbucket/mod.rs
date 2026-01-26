@@ -481,8 +481,8 @@ enum PipelineCommands {
     Logs {
         /// Repository slug (auto-detected from git remote if not specified).
         repo: Option<String>,
-        /// Pipeline UUID.
-        pipeline_uuid: String,
+        /// Pipeline UUID or build number.
+        pipeline_id: String,
         /// Step UUID (optional - shows all steps if not specified).
         step_uuid: Option<String>,
         /// Filter by step name pattern.
@@ -1130,7 +1130,7 @@ pub async fn execute(
             }
             PipelineCommands::Logs {
                 repo,
-                pipeline_uuid,
+                pipeline_id,
                 step_uuid,
                 step,
                 grep,
@@ -1139,6 +1139,10 @@ pub async fn execute(
             } => {
                 let repo_slug =
                     require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline logs")?;
+                // Resolve build number to UUID if needed
+                let pipeline_uuid =
+                    pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &pipeline_id)
+                        .await?;
                 pipelines::get_pipeline_logs(
                     &ctx,
                     &workspace,
