@@ -199,7 +199,7 @@ impl ApiClient {
         let result = retry_with_backoff(&self.retry_config, || async {
             let mut req = self.client.request(Method::GET, joined.clone());
             req = self.apply_auth(req);
-            req = req.header("Accept", "text/plain; charset=utf-8");
+            req = req.header("Accept", "text/plain, */*;q=0.1");
 
             let response = req.send().await.map_err(ApiError::RequestFailed)?;
 
@@ -221,6 +221,16 @@ impl ApiClient {
                         .await
                         .unwrap_or_else(|_| "Bad request".to_string());
                     Err(ApiError::BadRequest { message })
+                }
+                StatusCode::NOT_ACCEPTABLE => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Content not acceptable".to_string());
+                    Err(ApiError::ServerError {
+                        status: 406,
+                        message,
+                    })
                 }
                 StatusCode::TOO_MANY_REQUESTS => {
                     let retry_after = response

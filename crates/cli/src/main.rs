@@ -24,9 +24,9 @@ struct Cli {
     #[arg(long)]
     config: Option<PathBuf>,
 
-    /// Output format for command results
-    #[arg(long, value_enum, default_value_t = OutputFormat::Table)]
-    output: OutputFormat,
+    /// Output format for command results (table, json, yaml, csv, quiet)
+    #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Table, global = true)]
+    format: OutputFormat,
 
     /// Enable verbose logging
     #[arg(long)]
@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
 
     let config_path = cli.config.clone();
     let mut config = Config::load(config_path.as_ref())?;
-    let renderer = OutputRenderer::new(cli.output);
+    let renderer = OutputRenderer::new(cli.format);
 
     // Validate profile selection for destructive commands
     let is_destructive = is_destructive_command(&cli.command);

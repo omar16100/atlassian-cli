@@ -79,7 +79,7 @@ fn test_auth_help() {
 #[test]
 fn test_output_format_flag() {
     let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "--output", "json", "--help"])
+        .args(["run", "--quiet", "--", "--format", "json", "--help"])
         .output()
         .expect("Failed to execute command");
 
