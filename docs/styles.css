@@ -693,6 +693,24 @@ body::before {
     color: var(--text-muted);
 }
 
+.footer-credit {
+    text-align: center;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.footer-credit a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.footer-credit a:hover {
+    color: var(--accent-cyan);
+}
+
 /* ========================================
    Toast
 ======================================== */
