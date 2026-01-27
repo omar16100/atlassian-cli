@@ -1,5 +1,10 @@
 # Changes Made
 
+## 2026-01-27 - Website Footer Credit
+- Added "Built by Omar Shabab" credit with link to omarshabab.com
+- Added `.footer-credit` styling to match existing footer aesthetic
+- Files modified: `docs/index.html`, `docs/styles.css`
+
 ## 2026-01-25 - CLI UX Improvements from User Feedback
 
 ### Issue 1: Rename `--output` to `--format` (global flag)
