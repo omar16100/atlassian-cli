@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.5](https://github.com/omar16100/atlassian-cli/compare/v0.2.4...v0.2.5) (2026-01-27)
+
+
+### Features
+
+* **website:** add footer credit for Omar Shabab ([ae0e303](https://github.com/omar16100/atlassian-cli/commit/ae0e303a02f3cb63abd5f56f506371980e584f98))
+
+
+### Bug Fixes
+
+* rename --output to --format and add build number support to logs ([ee629ad](https://github.com/omar16100/atlassian-cli/commit/ee629ad9307d61ce9b61bd1e9507f2c8ac304067))
+
 ## [0.2.4](https://github.com/omar16100/atlassian-cli/compare/v0.2.3...v0.2.4) (2026-01-19)
 
 
