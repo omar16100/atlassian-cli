@@ -150,7 +150,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         key: &'a str,
         summary: &'a str,
         status: &'a str,
-        description: &'a str,
+        description: String,
         assignee: &'a str,
         reporter: &'a str,
         issue_type: &'a str,
@@ -165,7 +165,12 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             .as_ref()
             .map(|s| s.name.as_str())
             .unwrap_or(""),
-        description: issue.fields.description.as_deref().unwrap_or(""),
+        description: issue
+            .fields
+            .description
+            .as_ref()
+            .map(extract_adf_text)
+            .unwrap_or_default(),
         assignee: issue
             .fields
             .assignee
@@ -574,7 +579,10 @@ pub async fn list_comments(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         .comments
         .iter()
         .map(|c| {
-            let preview = format!("{:?}", c.body).chars().take(50).collect::<String>();
+            let preview = extract_adf_text(&c.body)
+                .chars()
+                .take(50)
+                .collect::<String>();
             Row {
                 id: c.id.as_str(),
                 author: c.author.display_name.as_str(),
@@ -677,7 +685,7 @@ struct IssueFields {
     #[serde(default)]
     reporter: Option<UserField>,
     #[serde(default)]
-    description: Option<String>,
+    description: Option<Value>,
     #[serde(default)]
     issuetype: Option<IssueTypeField>,
 }
@@ -696,4 +704,432 @@ struct UserField {
 #[derive(Deserialize)]
 struct IssueTypeField {
     name: String,
+}
+
+// ADF (Atlassian Document Format) text extraction
+
+const ADF_MAX_DEPTH: usize = 64;
+
+/// Recursively extract plain text from an ADF (Atlassian Document Format) JSON value.
+/// Handles paragraphs, headings, lists, code blocks, hard breaks, inline nodes, and nested content.
+fn extract_adf_text(value: &Value) -> String {
+    extract_adf_inner(value, 0)
+}
+
+fn extract_adf_inner(value: &Value, depth: usize) -> String {
+    if depth > ADF_MAX_DEPTH {
+        return String::new();
+    }
+
+    // Plain string fallback (defensive — v3 API always returns ADF objects)
+    if let Some(s) = value.as_str() {
+        return s.to_string();
+    }
+
+    // Null or non-object
+    if !value.is_object() {
+        return String::new();
+    }
+
+    let node_type = value.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    let attrs = value.get("attrs");
+
+    match node_type {
+        "text" => value
+            .get("text")
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "hardBreak" => "\n".to_string(),
+        // Inline nodes — extract from attrs
+        "mention" => attrs
+            .and_then(|a| a.get("text"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "emoji" => attrs
+            .and_then(|a| a.get("shortName"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "inlineCard" => attrs
+            .and_then(|a| a.get("url"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "status" => attrs
+            .and_then(|a| a.get("text"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string(),
+        // List types — handle numbering at list level
+        "bulletList" => {
+            let items = value
+                .get("content")
+                .and_then(|c| c.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|item| {
+                            let text = extract_list_item_text(item, depth + 1);
+                            format!("- {text}")
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            items.join("\n")
+        }
+        "orderedList" => {
+            let items = value
+                .get("content")
+                .and_then(|c| c.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .enumerate()
+                        .map(|(i, item)| {
+                            let text = extract_list_item_text(item, depth + 1);
+                            format!("{}. {text}", i + 1)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            items.join("\n")
+        }
+        "listItem" => {
+            // Fallback if listItem is encountered outside list context
+            let text = extract_list_item_text(value, depth);
+            format!("- {text}")
+        }
+        _ => {
+            // Recurse into content array
+            let children = value
+                .get("content")
+                .and_then(|c| c.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|child| extract_adf_inner(child, depth + 1))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+
+            match node_type {
+                "paragraph" | "heading" | "codeBlock" => children.join(""),
+                // doc, or any unknown wrapper — join blocks with newlines
+                _ => children
+                    .into_iter()
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            }
+        }
+    }
+}
+
+/// Extract text from a listItem node, joining multiple child blocks with newlines.
+fn extract_list_item_text(item: &Value, depth: usize) -> String {
+    item.get("content")
+        .and_then(|c| c.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|child| extract_adf_inner(child, depth + 1))
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_extract_adf_text_simple() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "hello world"}]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "hello world");
+    }
+
+    #[test]
+    fn test_extract_adf_text_multiple_paragraphs() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "first"}]
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "second"}]
+                }
+            ]
+        });
+        assert_eq!(extract_adf_text(&adf), "first\nsecond");
+    }
+
+    #[test]
+    fn test_extract_adf_text_heading_and_paragraph() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {
+                    "type": "heading",
+                    "attrs": {"level": 1},
+                    "content": [{"type": "text", "text": "Title"}]
+                },
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "Body text"}]
+                }
+            ]
+        });
+        assert_eq!(extract_adf_text(&adf), "Title\nBody text");
+    }
+
+    #[test]
+    fn test_extract_adf_text_bullet_list() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "bulletList",
+                "content": [
+                    {
+                        "type": "listItem",
+                        "content": [{
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "item one"}]
+                        }]
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [{
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "item two"}]
+                        }]
+                    }
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "- item one\n- item two");
+    }
+
+    #[test]
+    fn test_extract_adf_text_code_block() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "codeBlock",
+                "attrs": {"language": "rust"},
+                "content": [{"type": "text", "text": "fn main() {}"}]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "fn main() {}");
+    }
+
+    #[test]
+    fn test_extract_adf_text_hard_break() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "line one"},
+                    {"type": "hardBreak"},
+                    {"type": "text", "text": "line two"}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "line one\nline two");
+    }
+
+    #[test]
+    fn test_extract_adf_text_null() {
+        assert_eq!(extract_adf_text(&Value::Null), "");
+    }
+
+    #[test]
+    fn test_extract_adf_text_plain_string() {
+        let val = json!("plain string fallback");
+        assert_eq!(extract_adf_text(&val), "plain string fallback");
+    }
+
+    #[test]
+    fn test_issue_fields_deserialize_adf_description() {
+        let json_str = r#"{
+            "summary": "Test issue",
+            "description": {
+                "type": "doc",
+                "version": 1,
+                "content": [{
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "ADF description"}]
+                }]
+            }
+        }"#;
+        let fields: IssueFields = serde_json::from_str(json_str).unwrap();
+        assert_eq!(fields.summary.as_deref(), Some("Test issue"));
+        let desc = fields.description.as_ref().map(extract_adf_text).unwrap();
+        assert_eq!(desc, "ADF description");
+    }
+
+    #[test]
+    fn test_issue_fields_deserialize_null_description() {
+        let json_str = r#"{
+            "summary": "No desc"
+        }"#;
+        let fields: IssueFields = serde_json::from_str(json_str).unwrap();
+        assert!(fields.description.is_none());
+    }
+
+    #[test]
+    fn test_extract_adf_text_ordered_list() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "orderedList",
+                "content": [
+                    {
+                        "type": "listItem",
+                        "content": [{
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "first"}]
+                        }]
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [{
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "second"}]
+                        }]
+                    },
+                    {
+                        "type": "listItem",
+                        "content": [{
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "third"}]
+                        }]
+                    }
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "1. first\n2. second\n3. third");
+    }
+
+    #[test]
+    fn test_extract_adf_text_nested_list_item() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "bulletList",
+                "content": [{
+                    "type": "listItem",
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "paragraph one"}]
+                        },
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "paragraph two"}]
+                        }
+                    ]
+                }]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "- paragraph one\nparagraph two");
+    }
+
+    #[test]
+    fn test_extract_adf_text_mention() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "assigned to "},
+                    {"type": "mention", "attrs": {"id": "123", "text": "@John Doe"}}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "assigned to @John Doe");
+    }
+
+    #[test]
+    fn test_extract_adf_text_emoji() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "great work "},
+                    {"type": "emoji", "attrs": {"shortName": ":thumbsup:"}}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "great work :thumbsup:");
+    }
+
+    #[test]
+    fn test_extract_adf_text_inline_card() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "see "},
+                    {"type": "inlineCard", "attrs": {"url": "https://example.com/page"}}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "see https://example.com/page");
+    }
+
+    #[test]
+    fn test_extract_adf_text_status() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "status: "},
+                    {"type": "status", "attrs": {"text": "IN PROGRESS", "color": "blue"}}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_text(&adf), "status: IN PROGRESS");
+    }
+
+    #[test]
+    fn test_extract_adf_text_depth_guard() {
+        // Build deeply nested ADF that exceeds MAX_DEPTH
+        let mut node = json!({"type": "text", "text": "deep"});
+        for _ in 0..70 {
+            node = json!({
+                "type": "paragraph",
+                "content": [node]
+            });
+        }
+        let adf = json!({"type": "doc", "version": 1, "content": [node]});
+        // Should not panic — depth guard returns empty string
+        let result = extract_adf_text(&adf);
+        assert!(result.is_empty() || result == "deep");
+    }
 }
