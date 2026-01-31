@@ -1,5 +1,38 @@
 # Changes Made
 
+## 2026-01-31 - Add Pipeline Variable/Secret Management
+
+### Feature
+Full CRUD for Bitbucket pipeline variables at 3 scopes: repository, workspace, and deployment environment.
+
+### CLI Commands
+```
+bb pipeline var list [--workspace-level | --deployment <env>]
+bb pipeline var get --key <KEY> [--workspace-level | --deployment <env>]
+bb pipeline var create --key <KEY> --value <VAL> [--secured] [--workspace-level | --deployment <env>]
+bb pipeline var update --key <KEY> --value <VAL> [--secured | --unsecured] [--workspace-level | --deployment <env>]
+bb pipeline var delete --key <KEY> --force [--workspace-level | --deployment <env>]
+bb pipeline env list
+```
+
+### Key Design Decisions
+- Tri-state `--secured`/`--unsecured` on update (neither = preserve current state)
+- Key-based operations with transparent UUID resolution
+- Environment name-to-UUID resolution (case-insensitive)
+- `delete_no_content()` in ApiClient for 204 responses
+- `type: "pipeline_variable"` in create/update payloads
+
+### Files Created
+- `crates/cli/src/commands/bitbucket/variables.rs` — data structures, CRUD functions, resolution helpers, 13 unit tests
+
+### Files Modified
+- `crates/api/src/lib.rs` — added `delete_no_content()` method
+- `crates/cli/src/commands/bitbucket/mod.rs` — added VarCommands, EnvCommands, dispatch logic
+
+### Tests
+- 13 new unit tests (URL building, deserialization, payload format, scope labels, UUID cleaning, secured display)
+- All 310 tests pass, zero clippy warnings
+
 ## 2026-01-31 - Fix `--repo` flag for pipeline commands
 
 ### Problem
@@ -86,6 +119,18 @@
 ### Tests
 - 7 new tests (3 error.rs unit tests + 4 wiremock integration tests)
 - All 226 tests pass
+
+## 2026-01-31 - Merge Dependabot Cargo Deps Bump (PR #29)
+
+### Problem
+PR #29 bumped 10 cargo dependencies (clap, tokio, reqwest, serde_json, colored, thiserror, chrono, url, whoami, indexmap). Security Audit failed because `reqwest 0.12→0.13` switched to rustls by default, pulling in `aws-lc-rs` with ISC/OpenSSL licenses and `webpki-root-certs` with CDLA-Permissive-2.0 — none in deny.toml allowlist.
+
+### Changes
+- Added `ISC`, `OpenSSL`, `CDLA-Permissive-2.0` to `deny.toml` license allowlist (all permissive, OSI-approved)
+- Removed stale `RUSTSEC-2025-0119` ignore (number_prefix no longer in dep tree after updates)
+
+### File Modified
+- `deny.toml`
 
 ## 2026-01-27 - Website Footer Credit
 - Added "Built by Omar Shabab" credit with link to omarshabab.com
