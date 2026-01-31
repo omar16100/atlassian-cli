@@ -183,6 +183,84 @@ impl ApiClient {
         self.request(Method::DELETE, path, Some(body)).await
     }
 
+    /// DELETE that expects 204 No Content (no response body).
+    pub async fn delete_no_content(&self, path: &str) -> Result<()> {
+        if let Some(wait_secs) = self.rate_limiter.check_limit().await {
+            warn!(wait_secs, "Rate limit reached, waiting");
+            tokio::time::sleep(Duration::from_secs(wait_secs)).await;
+        }
+
+        let joined = self.safe_join(path)?;
+
+        debug!(method = "DELETE", url = %joined, "Sending delete (no content) request");
+
+        retry_with_backoff(&self.retry_config, || async {
+            let mut req = self.client.request(Method::DELETE, joined.clone());
+            req = self.apply_auth(req);
+
+            let response = req.send().await.map_err(ApiError::RequestFailed)?;
+
+            self.rate_limiter.update_from_response(&response).await;
+
+            let status = response.status();
+
+            match status {
+                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
+                    message: "Invalid or expired credentials".to_string(),
+                }),
+                StatusCode::FORBIDDEN => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Access forbidden".to_string());
+                    Err(ApiError::Forbidden { message })
+                }
+                StatusCode::NOT_FOUND => {
+                    let resource = joined.path().to_string();
+                    Err(ApiError::NotFound { resource })
+                }
+                StatusCode::BAD_REQUEST => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Bad request".to_string());
+                    Err(ApiError::BadRequest { message })
+                }
+                StatusCode::TOO_MANY_REQUESTS => {
+                    let retry_after = response
+                        .headers()
+                        .get("retry-after")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(60);
+                    Err(ApiError::RateLimitExceeded { retry_after })
+                }
+                status if status.is_server_error() => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Server error".to_string());
+                    Err(ApiError::ServerError {
+                        status: status.as_u16(),
+                        message,
+                    })
+                }
+                status if status.is_success() => Ok(()),
+                _ => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| format!("Unexpected status: {}", status));
+                    Err(ApiError::ServerError {
+                        status: status.as_u16(),
+                        message,
+                    })
+                }
+            }
+        })
+        .await
+    }
+
     /// Get plain text content from an endpoint.
     /// Sets Accept: text/plain; charset=utf-8 header.
     /// Includes retry logic and rate limiting.

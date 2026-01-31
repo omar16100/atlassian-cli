@@ -14,6 +14,7 @@ mod pullrequests;
 mod repos;
 mod time_parser;
 pub mod utils;
+mod variables;
 mod webhooks;
 mod workspaces;
 
@@ -524,6 +525,145 @@ enum PipelineCommands {
         /// Mark all variables as secured.
         #[arg(long, default_value_t = false)]
         secured: bool,
+    },
+    /// Manage pipeline variables/secrets.
+    #[command(subcommand)]
+    Var(VarCommands),
+    /// Manage deployment environments.
+    #[command(subcommand)]
+    Env(EnvCommands),
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum VarCommands {
+    /// List pipeline variables.
+    #[command(
+        long_about = "List pipeline variables.\n\nExamples:\n  bb pipeline var list\n  bb pipeline var list --workspace-level\n  bb pipeline var list --deployment staging"
+    )]
+    List {
+        /// List workspace-level variables instead of repository variables.
+        #[arg(long, conflicts_with = "deployment")]
+        workspace_level: bool,
+        /// List variables for a deployment environment (name or UUID).
+        #[arg(long, conflicts_with = "workspace_level")]
+        deployment: Option<String>,
+        /// Maximum number of results.
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+    },
+    /// Get a pipeline variable by key.
+    Get {
+        /// Variable key name.
+        #[arg(long)]
+        key: String,
+        /// Get from workspace-level scope.
+        #[arg(long, conflicts_with = "deployment")]
+        workspace_level: bool,
+        /// Get from deployment environment (name or UUID).
+        #[arg(long, conflicts_with = "workspace_level")]
+        deployment: Option<String>,
+    },
+    /// Create a pipeline variable.
+    #[command(
+        long_about = "Create a pipeline variable.\n\nExamples:\n  bb pipeline var create --key MY_VAR --value hello\n  bb pipeline var create --key SECRET --value s3cr3t --secured\n  bb pipeline var create --workspace-level --key WS_VAR --value val"
+    )]
+    Create {
+        /// Variable key name.
+        #[arg(long)]
+        key: String,
+        /// Variable value.
+        #[arg(long)]
+        value: String,
+        /// Mark variable as secured (write-only, value hidden on read).
+        #[arg(long)]
+        secured: bool,
+        /// Create in workspace-level scope.
+        #[arg(long, conflicts_with = "deployment")]
+        workspace_level: bool,
+        /// Create in deployment environment (name or UUID).
+        #[arg(long, conflicts_with = "workspace_level")]
+        deployment: Option<String>,
+    },
+    /// Update a pipeline variable.
+    #[command(
+        long_about = "Update a pipeline variable.\n\nExamples:\n  bb pipeline var update --key MY_VAR --value newval\n  bb pipeline var update --key MY_VAR --value s3cr3t --secured\n  bb pipeline var update --key MY_VAR --value plaintext --unsecured"
+    )]
+    Update {
+        /// Variable key name.
+        #[arg(long)]
+        key: String,
+        /// New variable value.
+        #[arg(long)]
+        value: String,
+        /// Mark variable as secured.
+        #[arg(long, conflicts_with = "unsecured")]
+        secured: bool,
+        /// Mark variable as unsecured (removes write-only protection).
+        #[arg(long, conflicts_with = "secured")]
+        unsecured: bool,
+        /// Update in workspace-level scope.
+        #[arg(long, conflicts_with = "deployment")]
+        workspace_level: bool,
+        /// Update in deployment environment (name or UUID).
+        #[arg(long, conflicts_with = "workspace_level")]
+        deployment: Option<String>,
+    },
+    /// Delete a pipeline variable.
+    Delete {
+        /// Variable key name.
+        #[arg(long)]
+        key: String,
+        /// Delete from workspace-level scope.
+        #[arg(long, conflicts_with = "deployment")]
+        workspace_level: bool,
+        /// Delete from deployment environment (name or UUID).
+        #[arg(long, conflicts_with = "workspace_level")]
+        deployment: Option<String>,
+        /// Skip confirmation prompt.
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+impl VarCommands {
+    fn is_workspace_level(&self) -> bool {
+        match self {
+            VarCommands::List {
+                workspace_level, ..
+            }
+            | VarCommands::Get {
+                workspace_level, ..
+            }
+            | VarCommands::Create {
+                workspace_level, ..
+            }
+            | VarCommands::Update {
+                workspace_level, ..
+            }
+            | VarCommands::Delete {
+                workspace_level, ..
+            } => *workspace_level,
+        }
+    }
+
+    fn deployment(&self) -> Option<String> {
+        match self {
+            VarCommands::List { deployment, .. }
+            | VarCommands::Get { deployment, .. }
+            | VarCommands::Create { deployment, .. }
+            | VarCommands::Update { deployment, .. }
+            | VarCommands::Delete { deployment, .. } => deployment.clone(),
+        }
+    }
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum EnvCommands {
+    /// List deployment environments.
+    List {
+        /// Maximum number of results.
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
     },
 }
 
@@ -1213,6 +1353,80 @@ pub async fn execute(
                     secured,
                 )
                 .await
+            }
+            PipelineCommands::Var(var_cmd) => {
+                let scope = if var_cmd.is_workspace_level() {
+                    variables::VarScope::Workspace {
+                        workspace: workspace.clone(),
+                    }
+                } else if let Some(env_name) = var_cmd.deployment() {
+                    let repo_slug =
+                        require_repo(None, global_repo.as_deref(), "pipeline var (deployment)")?;
+                    let env_uuid = variables::resolve_environment_uuid(
+                        &ctx, &workspace, &repo_slug, &env_name,
+                    )
+                    .await?;
+                    variables::VarScope::Deployment {
+                        workspace: workspace.clone(),
+                        repo_slug,
+                        env_uuid,
+                    }
+                } else {
+                    let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline var")?;
+                    variables::VarScope::Repository {
+                        workspace: workspace.clone(),
+                        repo_slug,
+                    }
+                };
+
+                match var_cmd {
+                    VarCommands::List { limit, .. } => {
+                        variables::list_variables(&ctx, &scope, limit).await
+                    }
+                    VarCommands::Get { key, .. } => {
+                        variables::get_variable(&ctx, &scope, &key).await
+                    }
+                    VarCommands::Create {
+                        key,
+                        value,
+                        secured,
+                        ..
+                    } => variables::create_variable(&ctx, &scope, &key, &value, secured).await,
+                    VarCommands::Update {
+                        key,
+                        value,
+                        secured,
+                        unsecured,
+                        ..
+                    } => {
+                        let secured_opt = if secured {
+                            Some(true)
+                        } else if unsecured {
+                            Some(false)
+                        } else {
+                            None
+                        };
+                        variables::update_variable(&ctx, &scope, &key, &value, secured_opt).await
+                    }
+                    VarCommands::Delete { key, force, .. } => {
+                        if !force {
+                            eprintln!("Warning: This will permanently delete variable '{}'.", key);
+                            eprintln!("Use --force to skip this check.");
+                            anyhow::bail!(
+                                "Refusing to delete without --force. Use --force to confirm."
+                            );
+                        }
+                        variables::delete_variable(&ctx, &scope, &key).await
+                    }
+                }
+            }
+            PipelineCommands::Env(env_cmd) => {
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline env")?;
+                match env_cmd {
+                    EnvCommands::List { limit } => {
+                        variables::list_environments(&ctx, &workspace, &repo_slug, limit).await
+                    }
+                }
             }
         },
         BitbucketCommands::Webhook(cmd) => match cmd {
