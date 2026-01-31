@@ -1,0 +1,43 @@
+name: Publish to crates.io
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    name: Publish crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      # Publish in dependency order with delays for index propagation
+      - name: Publish atlassian-cli-config
+        run: cargo publish -p atlassian-cli-config --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Wait for index
+        run: sleep 30
+
+      - name: Publish atlassian-cli-output
+        run: cargo publish -p atlassian-cli-output --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Wait for index
+        run: sleep 30
+
+      - name: Publish atlassian-cli-auth
+        run: cargo publish -p atlassian-cli-auth --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Wait for index
+        run: sleep 30
+
+      - name: Publish atlassian-cli-api
+        run: cargo publish -p atlassian-cli-api --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Wait for index
+        run: sleep 30
+
+      - name: Publish atlassian-cli-bulk
+        run: cargo publish -p atlassian-cli-bulk --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Wait for index
+        run: sleep 30
+
+      - name: Publish atlassian-cli
+        run: cargo publish -p atlassian-cli --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
