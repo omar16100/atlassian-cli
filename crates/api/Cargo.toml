@@ -26,6 +26,9 @@ secrecy = "0.10"
 
 [dev-dependencies]
 criterion.workspace = true
+wiremock.workspace = true
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+serde_json.workspace = true
 
 [[bench]]
 name = "api_benchmarks"

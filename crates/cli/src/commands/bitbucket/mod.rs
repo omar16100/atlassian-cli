@@ -29,7 +29,7 @@ fn require_repo(
         anyhow::anyhow!(
             "Repository required for '{cmd}'.\n\n\
              Not in a git directory with Bitbucket remote.\n\
-             Use --repo <workspace/repo-slug> or positional argument."
+             Use --repo <repo-slug> to specify the repository."
         )
     })
 }
@@ -402,8 +402,6 @@ enum ProjectCommands {
 enum PipelineCommands {
     /// List pipelines.
     List {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Maximum number of results.
         #[arg(long, default_value_t = 25)]
         limit: usize,
@@ -434,8 +432,6 @@ enum PipelineCommands {
     },
     /// Get pipeline details.
     Get {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Pipeline UUID or build number.
         pipeline_id: String,
         /// Show pipeline steps with status.
@@ -444,8 +440,6 @@ enum PipelineCommands {
     },
     /// Get latest pipeline for current or specified branch.
     Latest {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Branch name (auto-detected from current branch if not specified).
         #[arg(long)]
         branch: Option<String>,
@@ -455,8 +449,6 @@ enum PipelineCommands {
     },
     /// Trigger a new pipeline.
     Trigger {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Branch or tag name.
         #[arg(long)]
         ref_name: String,
@@ -472,15 +464,11 @@ enum PipelineCommands {
     },
     /// Stop a running pipeline.
     Stop {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Pipeline UUID or build number.
         pipeline_id: String,
     },
     /// Get pipeline logs.
     Logs {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Pipeline UUID or build number.
         pipeline_id: String,
         /// Step UUID (optional - shows all steps if not specified).
@@ -500,8 +488,6 @@ enum PipelineCommands {
     },
     /// Watch a running pipeline until completion.
     Watch {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Pipeline UUID or build number.
         pipeline_id: String,
         /// Poll interval in seconds.
@@ -513,23 +499,17 @@ enum PipelineCommands {
     },
     /// List steps for a pipeline.
     Steps {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Pipeline UUID or build number.
         pipeline_id: String,
     },
     /// Get latest pipeline status (JSON output, smart exit codes).
     Status {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
     },
     /// Re-run a pipeline with the same commit.
     Rerun {
-        /// Repository slug (auto-detected from git remote if not specified).
-        repo: Option<String>,
         /// Pipeline UUID or build number (optional when using --pr).
         pipeline_id: Option<String>,
         /// Re-run from pull request (uses PR's source branch).
@@ -970,7 +950,6 @@ pub async fn execute(
         },
         BitbucketCommands::Pipeline(cmd) => match cmd {
             PipelineCommands::List {
-                repo,
                 limit,
                 sort,
                 recent,
@@ -981,8 +960,7 @@ pub async fn execute(
                 all,
                 steps,
             } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline list")?;
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline list")?;
 
                 // Handle --pr flag
                 let effective_branch = if let Some(pr_id) = pr {
@@ -1047,22 +1025,12 @@ pub async fn execute(
                 )
                 .await
             }
-            PipelineCommands::Get {
-                repo,
-                pipeline_id,
-                steps,
-            } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline get")?;
+            PipelineCommands::Get { pipeline_id, steps } => {
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline get")?;
                 pipelines::get_pipeline(&ctx, &workspace, &repo_slug, &pipeline_id, steps).await
             }
-            PipelineCommands::Latest {
-                repo,
-                branch,
-                steps,
-            } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline latest")?;
+            PipelineCommands::Latest { branch, steps } => {
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline latest")?;
 
                 // Prefer explicit --branch over auto-detected
                 let effective_branch = if let Some(b) = branch {
@@ -1106,22 +1074,19 @@ pub async fn execute(
                 .await
             }
             PipelineCommands::Trigger {
-                repo,
                 ref_name,
                 ref_type,
                 variables,
                 secured,
             } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline trigger")?;
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline trigger")?;
                 pipelines::trigger_pipeline(
                     &ctx, &workspace, &repo_slug, &ref_name, &ref_type, variables, secured,
                 )
                 .await
             }
-            PipelineCommands::Stop { repo, pipeline_id } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline stop")?;
+            PipelineCommands::Stop { pipeline_id } => {
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline stop")?;
                 // Resolve build number to UUID if needed
                 let pipeline_uuid =
                     pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &pipeline_id)
@@ -1129,7 +1094,6 @@ pub async fn execute(
                 pipelines::stop_pipeline(&ctx, &workspace, &repo_slug, &pipeline_uuid).await
             }
             PipelineCommands::Logs {
-                repo,
                 pipeline_id,
                 step_uuid,
                 step,
@@ -1137,8 +1101,7 @@ pub async fn execute(
                 ignore_case,
                 failed_only,
             } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline logs")?;
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline logs")?;
                 // Resolve build number to UUID if needed
                 let pipeline_uuid =
                     pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &pipeline_id)
@@ -1157,13 +1120,11 @@ pub async fn execute(
                 .await
             }
             PipelineCommands::Watch {
-                repo,
                 pipeline_id,
                 interval,
                 steps,
             } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline watch")?;
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline watch")?;
                 pipelines::watch_pipeline(
                     &ctx,
                     &workspace,
@@ -1174,26 +1135,22 @@ pub async fn execute(
                 )
                 .await
             }
-            PipelineCommands::Steps { repo, pipeline_id } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline steps")?;
+            PipelineCommands::Steps { pipeline_id } => {
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline steps")?;
                 pipelines::list_steps(&ctx, &workspace, &repo_slug, &pipeline_id).await
             }
-            PipelineCommands::Status { repo, steps } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline status")?;
+            PipelineCommands::Status { steps } => {
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline status")?;
                 pipelines::pipeline_status(&ctx, &workspace, &repo_slug, steps).await
             }
             PipelineCommands::Rerun {
-                repo,
                 pipeline_id,
                 pr,
                 failed_only,
                 variables,
                 secured,
             } => {
-                let repo_slug =
-                    require_repo(repo.as_deref(), global_repo.as_deref(), "pipeline rerun")?;
+                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline rerun")?;
 
                 // Determine which pipeline to rerun
                 let effective_pipeline_id = if let Some(pr_id) = pr {

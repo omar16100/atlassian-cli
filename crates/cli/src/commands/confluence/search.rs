@@ -44,6 +44,13 @@ pub async fn search_cql(
         content_type: &'a str,
     }
 
+    if response.results.is_empty() {
+        ctx.verify_auth().await?;
+        tracing::info!("No results found");
+        println!("No results found");
+        return Ok(());
+    }
+
     let rows: Vec<Row<'_>> = response
         .results
         .iter()

@@ -93,6 +93,7 @@ pub async fn search_issues(
         .context("Failed to execute search")?;
 
     if response.issues.is_empty() {
+        ctx.verify_auth().await?;
         tracing::info!("No issues found");
         println!("No issues found");
         return Ok(());

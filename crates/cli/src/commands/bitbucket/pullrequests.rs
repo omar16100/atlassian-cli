@@ -145,6 +145,7 @@ pub async fn list_pull_requests(
         .collect();
 
     if rows.is_empty() {
+        ctx.verify_auth().await?;
         tracing::info!(workspace, slug, "No pull requests found");
         println!("No pull requests found");
         return Ok(());

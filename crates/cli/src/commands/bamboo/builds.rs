@@ -46,6 +46,7 @@ pub async fn list_builds(ctx: &BambooContext<'_>, plan_key: &str, limit: usize) 
         .collect();
 
     if rows.is_empty() {
+        ctx.verify_auth().await?;
         tracing::info!("No builds found for plan {}", plan_key);
         println!("No builds found");
         return Ok(());

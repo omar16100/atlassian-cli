@@ -11,6 +11,9 @@ pub enum ApiError {
     #[error("Authentication failed: {message}")]
     AuthenticationFailed { message: String },
 
+    #[error("Access forbidden: {message}")]
+    Forbidden { message: String },
+
     #[error("Resource not found: {resource}")]
     NotFound { resource: String },
 
@@ -45,7 +48,7 @@ impl ApiError {
 
     pub fn suggestion(&self) -> Option<&str> {
         match self {
-            ApiError::AuthenticationFailed { .. } => {
+            ApiError::AuthenticationFailed { .. } | ApiError::Forbidden { .. } => {
                 Some("Verify tokens with: atlassian-cli auth list\nTest auth with: atlassian-cli auth test [--bitbucket]")
             }
             ApiError::RateLimitExceeded { .. } => {
@@ -68,3 +71,34 @@ impl ApiError {
 }
 
 pub type Result<T> = std::result::Result<T, ApiError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forbidden_has_suggestion() {
+        let err = ApiError::Forbidden {
+            message: "no access".to_string(),
+        };
+        assert!(err.suggestion().is_some());
+        assert!(err.suggestion().unwrap().contains("auth test"));
+    }
+
+    #[test]
+    fn forbidden_is_not_retryable() {
+        let err = ApiError::Forbidden {
+            message: "no access".to_string(),
+        };
+        assert!(!err.is_retryable());
+    }
+
+    #[test]
+    fn authentication_failed_has_suggestion() {
+        let err = ApiError::AuthenticationFailed {
+            message: "expired".to_string(),
+        };
+        assert!(err.suggestion().is_some());
+        assert!(err.suggestion().unwrap().contains("auth test"));
+    }
+}

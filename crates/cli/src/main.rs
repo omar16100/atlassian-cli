@@ -1,9 +1,11 @@
 mod commands;
 mod query;
 
+use std::io::IsTerminal;
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
+use atlassian_cli_api::error::ApiError;
 use atlassian_cli_api::ApiClient;
 use atlassian_cli_auth::BITBUCKET_API_URL;
 use atlassian_cli_config::{migrate_config_if_needed, Config, MigrationResult};
@@ -57,7 +59,23 @@ enum AtlassianCommand {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    if let Err(err) = run().await {
+        // Check for ApiError in the chain and display suggestion
+        for cause in err.chain() {
+            if let Some(api_err) = cause.downcast_ref::<ApiError>() {
+                if let Some(hint) = api_err.suggestion() {
+                    eprintln!("Hint: {hint}");
+                }
+                break;
+            }
+        }
+        eprintln!("Error: {err:#}");
+        std::process::exit(1);
+    }
+}
+
+async fn run() -> Result<()> {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(e) => {
@@ -135,6 +153,7 @@ fn init_tracing(debug: bool) -> Result<()> {
     fmt()
         .with_env_filter(filter)
         .with_target(false)
+        .with_ansi(std::io::stderr().is_terminal())
         .try_init()
         .map_err(|err| anyhow!("failed to initialize logger: {err}"))
 }

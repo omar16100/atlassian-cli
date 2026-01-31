@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use anyhow::Context;
 use atlassian_cli_api::ApiClient;
 use atlassian_cli_output::OutputRenderer;
 use serde::Deserialize;
@@ -8,6 +9,16 @@ use serde::Deserialize;
 pub struct BambooContext<'a> {
     pub client: ApiClient,
     pub renderer: &'a OutputRenderer,
+}
+
+impl BambooContext<'_> {
+    pub async fn verify_auth(&self) -> anyhow::Result<()> {
+        let _: serde_json::Value =
+            self.client.get("/rest/api/latest/info").await.context(
+                "Authentication may be expired or invalid. Run: atlassian-cli auth test",
+            )?;
+        Ok(())
+    }
 }
 
 /// Project from Bamboo API.
