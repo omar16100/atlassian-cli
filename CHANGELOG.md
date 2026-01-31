@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/omar16100/atlassian-cli/compare/v0.2.5...v0.2.6) (2026-01-31)
+
+
+### Bug Fixes
+
+* handle silent auth failure on empty search results and 403 responses ([1e6946b](https://github.com/omar16100/atlassian-cli/commit/1e6946ba4daefa2d92fc3115d3ca87c45a7b3cc2))
+
 ## [0.2.5](https://github.com/omar16100/atlassian-cli/compare/v0.2.4...v0.2.5) (2026-01-27)
 
 
