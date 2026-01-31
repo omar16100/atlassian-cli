@@ -211,6 +211,13 @@ impl ApiClient {
                 StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
                     message: "Invalid or expired credentials".to_string(),
                 }),
+                StatusCode::FORBIDDEN => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Access forbidden".to_string());
+                    Err(ApiError::Forbidden { message })
+                }
                 StatusCode::NOT_FOUND => {
                     let resource = joined.path().to_string();
                     Err(ApiError::NotFound { resource })
@@ -298,6 +305,13 @@ impl ApiClient {
                 StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
                     message: "Invalid or expired credentials".to_string(),
                 }),
+                StatusCode::FORBIDDEN => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Access forbidden".to_string());
+                    Err(ApiError::Forbidden { message })
+                }
                 StatusCode::NOT_FOUND => {
                     let resource = joined.path().to_string();
                     Err(ApiError::NotFound { resource })
@@ -367,6 +381,13 @@ impl ApiClient {
                 StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
                     message: "Invalid or expired credentials".to_string(),
                 }),
+                StatusCode::FORBIDDEN => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Access forbidden".to_string());
+                    Err(ApiError::Forbidden { message })
+                }
                 StatusCode::NOT_FOUND => {
                     let resource = joined.path().to_string();
                     Err(ApiError::NotFound { resource })
@@ -434,5 +455,90 @@ impl ApiClient {
 
     pub fn rate_limiter(&self) -> &RateLimiter {
         &self.rate_limiter
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn test_403_returns_forbidden() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("test"))
+            .respond_with(ResponseTemplate::new(403).set_body_string("You do not have access"))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result: error::Result<serde_json::Value> = client.get("/test").await;
+
+        match result {
+            Err(ApiError::Forbidden { message }) => {
+                assert!(message.contains("You do not have access"));
+            }
+            other => panic!("Expected Forbidden, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_401_returns_authentication_failed() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("test"))
+            .respond_with(ResponseTemplate::new(401))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result: error::Result<serde_json::Value> = client.get("/test").await;
+
+        match result {
+            Err(ApiError::AuthenticationFailed { .. }) => {}
+            other => panic!("Expected AuthenticationFailed, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_403_get_text_returns_forbidden() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("text-endpoint"))
+            .respond_with(ResponseTemplate::new(403).set_body_string("Forbidden resource"))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result = client.get_text("/text-endpoint").await;
+
+        match result {
+            Err(ApiError::Forbidden { message }) => {
+                assert!(message.contains("Forbidden resource"));
+            }
+            other => panic!("Expected Forbidden, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_403_get_bytes_returns_forbidden() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("bytes-endpoint"))
+            .respond_with(ResponseTemplate::new(403).set_body_string("Access denied"))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result = client.get_bytes("/bytes-endpoint").await;
+
+        match result {
+            Err(ApiError::Forbidden { message }) => {
+                assert!(message.contains("Access denied"));
+            }
+            other => panic!("Expected Forbidden, got: {:?}", other),
+        }
     }
 }

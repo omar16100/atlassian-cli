@@ -64,6 +64,7 @@ pub async fn list_service_desks(ctx: &JsmContext<'_>, limit: usize) -> Result<()
         .collect();
 
     if rows.is_empty() {
+        ctx.verify_auth().await?;
         tracing::info!("No service desks found");
         println!("No service desks found");
         return Ok(());

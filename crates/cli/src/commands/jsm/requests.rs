@@ -85,10 +85,13 @@ pub async fn list_requests(
         .collect();
 
     if rows.is_empty() {
+        ctx.verify_auth().await?;
         tracing::info!("No requests found");
-    } else {
-        tracing::info!("Found {} requests", rows.len());
+        println!("No requests found");
+        return Ok(());
     }
+
+    tracing::info!("Found {} requests", rows.len());
     ctx.renderer.render(&rows)
 }
 

@@ -1,5 +1,92 @@
 # Changes Made
 
+## 2026-01-31 - Fix `--repo` flag for pipeline commands
+
+### Problem
+`bb pipeline list --repo genai_images` failed — `repo` was a positional arg on each pipeline subcommand, shadowing the global `--repo` flag from `BitbucketArgs`. Also, 5 of 10 pipeline subcommands panicked on `--help` due to invalid clap positional ordering (optional `repo` before required `pipeline_id`).
+
+### Changes
+- Removed positional `repo: Option<String>` from all 10 `PipelineCommands` variants
+- Updated all 10 handler match arms to use global `--repo` via `require_repo(None, global_repo.as_deref(), ...)`
+- Updated `require_repo()` error message to reference `--repo` flag only
+
+### Result
+- `bb pipeline list --repo genai_images` now works
+- `bb --repo genai_images pipeline list` works
+- `bb pipeline list` auto-detects from git remote
+- `bb pipeline get 42` works (pipeline_id as sole positional)
+- No more `--help` panics on get/stop/logs/watch/steps
+
+### File Modified
+- `crates/cli/src/commands/bitbucket/mod.rs`
+
+## 2026-01-31 - Fix Silent Auth Failure on Search + Related Issues
+
+### Problem
+`jira issue search --assignee @me` returns "No issues found" when auth is expired. Jira's API returns HTTP 200 with empty results when permissions-based filtering removes everything. The code printed "No issues found" without validating credentials.
+
+### Changes
+
+1. **Fix ANSI in tracing output** (`crates/cli/src/main.rs`)
+   - Added `.with_ansi(std::io::stderr().is_terminal())` to tracing fmt builder
+   - Non-TTY output no longer contains ANSI escape codes
+
+2. **Add `Forbidden` variant to ApiError** (`crates/api/src/error.rs`)
+   - New `Forbidden { message: String }` variant for 403 responses
+   - Shares suggestion with `AuthenticationFailed` (points to `auth test`)
+   - Not retryable
+   - Added 3 unit tests
+
+3. **Handle 403 in API client** (`crates/api/src/lib.rs`)
+   - Added `StatusCode::FORBIDDEN` arm in `request()`, `get_text()`, `get_bytes()`
+   - Returns `ApiError::Forbidden` with response body as message
+   - Added 4 wiremock tests (403 JSON, 403 text, 403 bytes, 401 auth)
+
+4. **Display error suggestions in main** (`crates/cli/src/main.rs`)
+   - Restructured: `main()` → `run()` pattern
+   - `main()` catches errors, downcasts to `ApiError`, shows `.suggestion()` on stderr
+   - Exits with code 1 on error
+
+5. **Add `verify_auth()` to context types**
+   - `JiraContext` → `/rest/api/3/myself` (`crates/cli/src/commands/jira/utils.rs`)
+   - `JsmContext` → `/rest/api/3/myself` (`crates/cli/src/commands/jsm/utils.rs`)
+   - `ConfluenceContext` → `/wiki/rest/api/user/current` (`crates/cli/src/commands/confluence/utils.rs`)
+   - `BitbucketContext` → `/2.0/user` (`crates/cli/src/commands/bitbucket/utils.rs`)
+   - `BambooContext` → `/rest/api/latest/info` (`crates/cli/src/commands/bamboo/utils.rs`)
+
+6. **Auth check on empty results** (high-impact commands)
+   - `jira issue search` (`crates/cli/src/commands/jira/issues.rs:95`)
+   - `confluence search` (`crates/cli/src/commands/confluence/search.rs`)
+   - `bitbucket repo list` (`crates/cli/src/commands/bitbucket/repos.rs:73`)
+   - `bitbucket pr list` (`crates/cli/src/commands/bitbucket/pullrequests.rs:147`)
+   - `bamboo build list` (`crates/cli/src/commands/bamboo/builds.rs:48`)
+   - `jsm request list` (`crates/cli/src/commands/jsm/requests.rs:87`)
+   - `jsm servicedesk list` (`crates/cli/src/commands/jsm/servicedesk.rs:66`)
+
+### Files Modified
+| File | Change |
+|------|--------|
+| `crates/api/src/error.rs` | Forbidden variant + tests |
+| `crates/api/src/lib.rs` | 403 handling in 3 methods + wiremock tests |
+| `crates/api/Cargo.toml` | Added wiremock dev-dependency |
+| `crates/cli/src/main.rs` | ANSI fix, run() pattern, suggestion display |
+| `crates/cli/src/commands/jira/utils.rs` | verify_auth() |
+| `crates/cli/src/commands/jira/issues.rs` | Auth check on empty search |
+| `crates/cli/src/commands/confluence/utils.rs` | verify_auth() |
+| `crates/cli/src/commands/confluence/search.rs` | Auth check + empty handling |
+| `crates/cli/src/commands/bitbucket/utils.rs` | verify_auth() |
+| `crates/cli/src/commands/bitbucket/repos.rs` | Auth check on empty list |
+| `crates/cli/src/commands/bitbucket/pullrequests.rs` | Auth check on empty list |
+| `crates/cli/src/commands/bamboo/utils.rs` | verify_auth() |
+| `crates/cli/src/commands/bamboo/builds.rs` | Auth check on empty list |
+| `crates/cli/src/commands/jsm/utils.rs` | verify_auth() |
+| `crates/cli/src/commands/jsm/requests.rs` | Auth check on empty list |
+| `crates/cli/src/commands/jsm/servicedesk.rs` | Auth check on empty list |
+
+### Tests
+- 7 new tests (3 error.rs unit tests + 4 wiremock integration tests)
+- All 226 tests pass
+
 ## 2026-01-27 - Website Footer Credit
 - Added "Built by Omar Shabab" credit with link to omarshabab.com
 - Added `.footer-credit` styling to match existing footer aesthetic
