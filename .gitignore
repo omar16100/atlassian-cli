@@ -21,3 +21,4 @@
 
 # Local todo tracking
 docs/todo.md
+.playwright-mcp/
