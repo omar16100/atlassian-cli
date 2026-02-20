@@ -141,6 +141,9 @@ enum PageCommands {
     Get {
         /// Page ID
         page_id: String,
+        /// Output only the page body content (HTML or markdown)
+        #[arg(long)]
+        body_only: bool,
     },
     /// Create a new page
     Create {
@@ -277,6 +280,9 @@ enum BlogCommands {
     Get {
         /// Blog post ID
         blogpost_id: String,
+        /// Output only the blog post body content (HTML or markdown)
+        #[arg(long)]
+        body_only: bool,
     },
     /// Create a blog post
     Create {
@@ -551,7 +557,9 @@ pub async fn execute(
             PageCommands::List { space, limit } => {
                 pages::list_pages(&ctx, space.as_deref(), limit).await
             }
-            PageCommands::Get { page_id } => pages::get_page(&ctx, &page_id).await,
+            PageCommands::Get { page_id, body_only } => {
+                pages::get_page(&ctx, &page_id, body_only).await
+            }
             PageCommands::Create {
                 space,
                 title,
@@ -630,7 +638,10 @@ pub async fn execute(
             BlogCommands::List { space, limit } => {
                 pages::list_blogposts(&ctx, space.as_deref(), limit).await
             }
-            BlogCommands::Get { blogpost_id } => pages::get_blogpost(&ctx, &blogpost_id).await,
+            BlogCommands::Get {
+                blogpost_id,
+                body_only,
+            } => pages::get_blogpost(&ctx, &blogpost_id, body_only).await,
             BlogCommands::Create { space, title, body } => {
                 pages::create_blog(&ctx, &space, &title, body.as_ref()).await
             }

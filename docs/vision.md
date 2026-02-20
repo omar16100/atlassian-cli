@@ -40,7 +40,7 @@ atlassian-cli/
 │   │   ├── src/main.rs       # Clap root + global flags
 │   │   └── src/commands/     # jira, confluence, bitbucket, jsm, opsgenie, bamboo
 │   ├── api/                  # REST clients per product (reqwest + serde)
-│   ├── auth/                 # API token/keyring helpers
+│   ├── auth/                 # Encrypted credential storage (AES-256-GCM)
 │   ├── config/               # Profiles (~/.atlassian-cli/config.yaml)
 │   ├── output/               # Table/JSON/CSV/YAML renderers (tabled/serde)
 │   └── bulk/                 # Worker pools, dry-run, logs (tokio + rayon)
@@ -54,7 +54,7 @@ atlassian-cli/
 ## Delivery Roadmap (20 Weeks)
 1. **Phase 1 – Foundation (Weeks 1‑3)**
    - Week 1: Cargo workspace init, Clap scaffolding, config/profile loader, Makefile/justfile, CI/CD.
-   - Week 2: Auth layer (API tokens with email+token and PAT support), multi-profile manager, keyring secure storage, `atlassian-cli auth` commands.
+   - Week 2: Auth layer (API tokens with email+token, Bearer, and PAT support), multi-profile manager, encrypted credential storage, `atlassian-cli auth` commands.
    - Week 3: Shared HTTP client with retry/rate limiting, logging, error handling, pagination helpers, output formatters, unit test harness.
 2. **Phase 2 – Jira CLI (Weeks 4‑6)**  
    - Week 4: Issue CRUD/search, transitions, assignments.  
@@ -85,7 +85,7 @@ Milestones: Week 3 foundation complete; Week 6 Jira ready; Week 9 Confluence rea
 
 ## Technical Guardrails
 - Rust (stable 1.79+), Clap 4 CLI framework, Tokio + Reqwest HTTP stack, cargo-make/just-driven tooling, GitHub Actions CI.
-- Config stored at `~/.atlassian-cli/config.yaml` with multiple profiles and keyring-backed credentials.
+- Config stored at `~/.atlassian-cli/config.yaml` with multiple profiles and AES-256-GCM encrypted credentials.
 - HTTP client middleware handles retries, pagination, Atlassian rate limits, and structured logging.
 - Output modes: table (default), JSON, CSV, YAML, quiet (IDs) to support scripting.
 - Bulk engine provides worker pools, dry-run mode, progress bars, and transaction logs for recovery.

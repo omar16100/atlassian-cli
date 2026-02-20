@@ -48,7 +48,7 @@ Download the latest release for your platform from the [Releases page](https://g
 crates/
   cli/       # Clap-based binary entry point
   api/       # Thin HTTP client wrapper (reqwest)
-  auth/      # Keyring-backed credential helpers
+  auth/      # Encrypted credential storage (AES-256-GCM)
   config/    # YAML profile loader (~/.atlassian-cli/config.yaml)
   output/    # Output formatting helpers (table/json/yaml/csv/quiet)
   bulk/      # Concurrency + dry-run aware executor

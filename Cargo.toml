@@ -10,7 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.8"
+version = "0.2.9"
 edition = "2021"
 authors = ["atlassian-cli contributors"]
 license = "MIT"
@@ -52,6 +52,7 @@ futures = "0.3"
 backoff = { version = "0.4", features = ["tokio"] }
 async-trait = "0.1"
 async-stream = "0.3"
+htmd = "0.5"
 
 # Testing
 wiremock = "0.6"

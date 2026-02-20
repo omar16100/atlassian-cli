@@ -26,7 +26,7 @@ struct Cli {
     #[arg(long)]
     config: Option<PathBuf>,
 
-    /// Output format for command results (table, json, yaml, csv, quiet)
+    /// Output format for command results (table, json, yaml, csv, quiet, markdown)
     #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Table, global = true)]
     format: OutputFormat,
 
@@ -116,8 +116,14 @@ async fn run() -> Result<()> {
         AtlassianCommand::Bitbucket(args) => {
             let profile = resolve_profile_for_bitbucket(&config, cli.profile.as_deref())?;
             let client = build_bitbucket_client(&profile)?;
-            commands::bitbucket::execute(args, client, &renderer, profile.workspace.as_deref())
-                .await?
+            commands::bitbucket::execute(
+                args,
+                client,
+                &renderer,
+                profile.workspace.as_deref(),
+                profile.is_bearer,
+            )
+            .await?
         }
         AtlassianCommand::Jsm(args) => {
             let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
@@ -176,6 +182,8 @@ struct BitbucketProfile {
     base: BaseProfile,
     token: String,
     workspace: Option<String>,
+    /// true = Bearer auth (access tokens), false = Basic auth (API tokens)
+    is_bearer: bool,
 }
 
 fn handle_migration() {
@@ -273,11 +281,27 @@ fn resolve_profile_for_product(config: &Config, requested: Option<&str>) -> Resu
 
 /// Resolve profile for Bitbucket commands.
 /// Only requires email and Bitbucket token (falls back to general token).
+/// Email is optional for Bearer auth (access tokens).
 fn resolve_profile_for_bitbucket(
     config: &Config,
     requested: Option<&str>,
 ) -> Result<BitbucketProfile> {
-    let (base, profile) = resolve_base_profile(config, requested)?;
+    let (name, profile) = config
+        .resolve_profile(requested)
+        .ok_or_else(|| anyhow!("No profile configured. Run `atlassian-cli auth login` first."))?;
+
+    let is_bearer = auth::is_bitbucket_bearer(config, name);
+
+    // Email is required for Basic auth, optional for Bearer
+    let email = profile.email.clone().unwrap_or_default();
+    if !is_bearer && email.is_empty() {
+        return Err(anyhow!("Profile '{name}' is missing an email."));
+    }
+
+    let base = BaseProfile {
+        name: name.to_string(),
+        email,
+    };
 
     // Try Bitbucket-specific token first, then fall back to general token
     let token = auth::get_bitbucket_token(&base.name)
@@ -285,21 +309,23 @@ fn resolve_profile_for_bitbucket(
         .ok_or_else(|| {
             let has_jira_token = auth::get_token(&base.name).is_some();
             if has_jira_token {
-                // Has Jira token but no Bitbucket token - suggest adding Bitbucket auth
                 anyhow!(
                     "Profile '{}' has no Bitbucket token.\n\n\
                     Check token status: atlassian-cli auth list\n\
                     Look for 'has_bitbucket_token: true'\n\n\
-                    To add: atlassian-cli auth login --bitbucket --profile {} --token <TOKEN> --email <EMAIL>",
+                    To add: atlassian-cli auth login --bitbucket --profile {} --token <TOKEN> --email <EMAIL>\n\
+                    For access tokens: atlassian-cli auth login --bitbucket --bearer --profile {} --token <TOKEN>",
+                    base.name,
                     base.name,
                     base.name
                 )
             } else {
-                // No tokens at all
                 anyhow!(
                     "No token found for profile '{}'.\n\n\
                     Check configured profiles: atlassian-cli auth list --all\n\n\
-                    To add: atlassian-cli auth login --bitbucket --profile {} --token <TOKEN> --email <EMAIL>",
+                    To add: atlassian-cli auth login --bitbucket --profile {} --token <TOKEN> --email <EMAIL>\n\
+                    For access tokens: atlassian-cli auth login --bitbucket --bearer --profile {} --token <TOKEN>",
+                    base.name,
                     base.name,
                     base.name
                 )
@@ -318,6 +344,7 @@ fn resolve_profile_for_bitbucket(
         base,
         token,
         workspace,
+        is_bearer,
     })
 }
 
@@ -327,8 +354,13 @@ fn build_product_client(profile: &ProductProfile) -> Result<ApiClient> {
 }
 
 fn build_bitbucket_client(profile: &BitbucketProfile) -> Result<ApiClient> {
-    Ok(ApiClient::new(BITBUCKET_API_URL)?
-        .with_basic_auth(profile.base.email.clone(), profile.token.clone()))
+    let client = ApiClient::new(BITBUCKET_API_URL)?;
+    if profile.is_bearer {
+        tracing::debug!("Using Bearer auth for Bitbucket");
+        Ok(client.with_bearer_token(profile.token.clone()))
+    } else {
+        Ok(client.with_basic_auth(profile.base.email.clone(), profile.token.clone()))
+    }
 }
 
 /// Profile for OpsGenie commands (requires api_key).

@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;
@@ -74,7 +75,7 @@ pub async fn list_pages(
 }
 
 // Get page details
-pub async fn get_page(ctx: &ConfluenceContext<'_>, page_id: &str) -> Result<()> {
+pub async fn get_page(ctx: &ConfluenceContext<'_>, page_id: &str, body_only: bool) -> Result<()> {
     let page: Value = ctx
         .client
         .get(&format!(
@@ -83,6 +84,50 @@ pub async fn get_page(ctx: &ConfluenceContext<'_>, page_id: &str) -> Result<()> 
         ))
         .await
         .with_context(|| format!("Failed to get page {}", page_id))?;
+
+    let format = ctx.renderer.format();
+
+    if body_only {
+        let body_html = page
+            .get("body")
+            .and_then(|b| b.get("storage"))
+            .and_then(|s| s.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if format == OutputFormat::Markdown {
+            let md = htmd::convert(body_html).context("Failed to convert HTML to markdown")?;
+            println!("{}", md);
+        } else {
+            println!("{}", body_html);
+        }
+        return Ok(());
+    }
+
+    if format == OutputFormat::Markdown {
+        let title = page
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or("Untitled");
+        let id = page.get("id").and_then(|i| i.as_str()).unwrap_or("");
+        let status = page.get("status").and_then(|s| s.as_str()).unwrap_or("");
+        let body_html = page
+            .get("body")
+            .and_then(|b| b.get("storage"))
+            .and_then(|s| s.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let body_md = htmd::convert(body_html).context("Failed to convert HTML to markdown")?;
+
+        let md = format!(
+            "# {title}\n\n\
+             | Field | Value |\n\
+             | --- | --- |\n\
+             | ID | {id} |\n\
+             | Status | {status} |\n\n\
+             {body_md}"
+        );
+        return ctx.renderer.render_raw(&md);
+    }
 
     println!("{}", serde_json::to_string_pretty(&page)?);
     Ok(())
@@ -636,7 +681,11 @@ pub async fn list_blogposts(
 }
 
 // Get blog post details
-pub async fn get_blogpost(ctx: &ConfluenceContext<'_>, blogpost_id: &str) -> Result<()> {
+pub async fn get_blogpost(
+    ctx: &ConfluenceContext<'_>,
+    blogpost_id: &str,
+    body_only: bool,
+) -> Result<()> {
     let blogpost: Value = ctx
         .client
         .get(&format!(
@@ -645,6 +694,53 @@ pub async fn get_blogpost(ctx: &ConfluenceContext<'_>, blogpost_id: &str) -> Res
         ))
         .await
         .with_context(|| format!("Failed to get blog post {}", blogpost_id))?;
+
+    let format = ctx.renderer.format();
+
+    if body_only {
+        let body_html = blogpost
+            .get("body")
+            .and_then(|b| b.get("storage"))
+            .and_then(|s| s.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if format == OutputFormat::Markdown {
+            let md = htmd::convert(body_html).context("Failed to convert HTML to markdown")?;
+            println!("{}", md);
+        } else {
+            println!("{}", body_html);
+        }
+        return Ok(());
+    }
+
+    if format == OutputFormat::Markdown {
+        let title = blogpost
+            .get("title")
+            .and_then(|t| t.as_str())
+            .unwrap_or("Untitled");
+        let id = blogpost.get("id").and_then(|i| i.as_str()).unwrap_or("");
+        let status = blogpost
+            .get("status")
+            .and_then(|s| s.as_str())
+            .unwrap_or("");
+        let body_html = blogpost
+            .get("body")
+            .and_then(|b| b.get("storage"))
+            .and_then(|s| s.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let body_md = htmd::convert(body_html).context("Failed to convert HTML to markdown")?;
+
+        let md = format!(
+            "# {title}\n\n\
+             | Field | Value |\n\
+             | --- | --- |\n\
+             | ID | {id} |\n\
+             | Status | {status} |\n\n\
+             {body_md}"
+        );
+        return ctx.renderer.render_raw(&md);
+    }
 
     println!("{}", serde_json::to_string_pretty(&blogpost)?);
     Ok(())

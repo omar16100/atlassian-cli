@@ -182,7 +182,10 @@ pub async fn list_variables(
     limit: usize,
 ) -> Result<()> {
     let base_url = build_var_base_url(scope);
-    let is_table = ctx.renderer.format() == atlassian_cli_output::OutputFormat::Table;
+    let is_table = matches!(
+        ctx.renderer.format(),
+        atlassian_cli_output::OutputFormat::Table | atlassian_cli_output::OutputFormat::Markdown
+    );
 
     tracing::debug!(scope = ?scope, limit, "Listing pipeline variables");
 
@@ -232,7 +235,10 @@ pub async fn list_variables(
 }
 
 pub async fn get_variable(ctx: &BitbucketContext<'_>, scope: &VarScope, key: &str) -> Result<()> {
-    let is_table = ctx.renderer.format() == atlassian_cli_output::OutputFormat::Table;
+    let is_table = matches!(
+        ctx.renderer.format(),
+        atlassian_cli_output::OutputFormat::Table | atlassian_cli_output::OutputFormat::Markdown
+    );
 
     tracing::debug!(scope = ?scope, key, "Getting pipeline variable");
 
