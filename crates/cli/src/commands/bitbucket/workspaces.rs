@@ -317,16 +317,38 @@ struct BitbucketUser {
     uuid: String,
 }
 
-pub async fn whoami(client: &ApiClient) -> Result<()> {
-    let user: BitbucketUser = client
-        .get("/2.0/user")
-        .await
-        .context("Failed to fetch current user from Bitbucket API")?;
+pub async fn whoami(client: &ApiClient, is_bearer: bool) -> Result<()> {
+    if is_bearer {
+        // Bearer tokens (access tokens) can't use /2.0/user — show accessible workspaces
+        let data: serde_json::Value = client
+            .get("/2.0/workspaces")
+            .await
+            .context("Failed to fetch workspaces from Bitbucket API (Bearer auth)")?;
 
-    println!("Username: {}", user.username);
-    println!("Display Name: {}", user.display_name);
-    println!("Account ID: {}", user.account_id);
-    println!("UUID: {}", user.uuid);
+        println!("Auth type: Bearer (access token)");
+        println!("/2.0/user is not available for access tokens.");
+        if let Some(workspaces) = data["values"].as_array() {
+            println!("Accessible workspaces:");
+            for ws in workspaces {
+                println!(
+                    "  {} ({})",
+                    ws["slug"].as_str().unwrap_or("?"),
+                    ws["name"].as_str().unwrap_or("?")
+                );
+            }
+        }
+        Ok(())
+    } else {
+        let user: BitbucketUser = client
+            .get("/2.0/user")
+            .await
+            .context("Failed to fetch current user from Bitbucket API")?;
 
-    Ok(())
+        println!("Username: {}", user.username);
+        println!("Display Name: {}", user.display_name);
+        println!("Account ID: {}", user.account_id);
+        println!("UUID: {}", user.uuid);
+
+        Ok(())
+    }
 }

@@ -611,7 +611,10 @@ pub async fn list_pipelines(
     }
 
     // Fetch steps for each pipeline if requested
-    let use_colors = ctx.renderer.format() == OutputFormat::Table;
+    let use_colors = matches!(
+        ctx.renderer.format(),
+        OutputFormat::Table | OutputFormat::Markdown
+    );
     let step_summaries: Vec<Option<String>> = if show_steps {
         let mut summaries = Vec::with_capacity(all_pipelines.len());
         for pipeline in &all_pipelines {
@@ -683,7 +686,10 @@ pub async fn get_pipeline(
     };
 
     // Only include steps_summary if steps is non-empty
-    let use_colors = ctx.renderer.format() == OutputFormat::Table;
+    let use_colors = matches!(
+        ctx.renderer.format(),
+        OutputFormat::Table | OutputFormat::Markdown
+    );
     let steps_summary = steps
         .as_ref()
         .filter(|s| !s.is_empty())
@@ -874,7 +880,10 @@ pub async fn get_pipeline_logs(
         // Check if step was skipped
         if let Some(state) = step_state {
             if matches!(state.name.to_uppercase().as_str(), "NOT_RUN" | "SKIPPED") {
-                if ctx.renderer.format() == OutputFormat::Table {
+                if matches!(
+                    ctx.renderer.format(),
+                    OutputFormat::Table | OutputFormat::Markdown
+                ) {
                     println!("⏭  Step '{}' was skipped - no logs available", step_name);
                 }
                 continue;
@@ -900,7 +909,10 @@ pub async fn get_pipeline_logs(
 
                 // Handle 404 as skipped step
                 if e.to_string().contains("404") || e.to_string().contains("Not Found") {
-                    if ctx.renderer.format() == OutputFormat::Table {
+                    if matches!(
+                        ctx.renderer.format(),
+                        OutputFormat::Table | OutputFormat::Markdown
+                    ) {
                         println!("⏭  Step '{}' has no logs available yet", step_name);
                     }
                     continue;
@@ -935,8 +947,8 @@ pub async fn get_pipeline_logs(
 
         // Output based on format
         match ctx.renderer.format() {
-            OutputFormat::Table | OutputFormat::Quiet => {
-                // Stream directly to stdout for table/quiet mode
+            OutputFormat::Table | OutputFormat::Quiet | OutputFormat::Markdown => {
+                // Stream directly to stdout for table/quiet/markdown mode
                 println!("\n=== Step: {} ({}) ===", step_name, state_name);
                 for line in filtered_lines {
                     println!("{}", line);
@@ -963,7 +975,7 @@ pub async fn get_pipeline_logs(
     // Render structured output for JSON/YAML/CSV
     if !matches!(
         ctx.renderer.format(),
-        OutputFormat::Table | OutputFormat::Quiet
+        OutputFormat::Table | OutputFormat::Quiet | OutputFormat::Markdown
     ) {
         ctx.renderer.render(&all_logs)?;
     }
@@ -1201,7 +1213,10 @@ pub async fn watch_pipeline(
     let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
 
     let start = Instant::now();
-    let is_table = ctx.renderer.format() == OutputFormat::Table;
+    let is_table = matches!(
+        ctx.renderer.format(),
+        OutputFormat::Table | OutputFormat::Markdown
+    );
 
     if is_table {
         eprintln!("Watching pipeline... (Ctrl-C to stop)");

@@ -9,6 +9,16 @@ use serde::Serialize;
 use tracing::debug;
 use url::Url;
 
+/// Check if a profile uses Bearer auth for Bitbucket.
+pub fn is_bitbucket_bearer(config: &Config, profile_name: &str) -> bool {
+    config
+        .profiles
+        .get(profile_name)
+        .and_then(|p| p.bitbucket_token_type.as_deref())
+        .map(|t| t == "bearer")
+        .unwrap_or(false)
+}
+
 /// Multi-tier token lookup: env var → encrypted credentials → plaintext credentials (migration fallback)
 pub fn get_token(profile_name: &str) -> Option<String> {
     // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
@@ -124,8 +134,10 @@ pub struct StatusArgs {
 #[derive(Args, Debug, Clone)]
 #[command(after_help = "EXAMPLES:\n  \
     Jira/Confluence: atlassian-cli auth login --profile work --base-url https://example.atlassian.net --email user@example.com --token <TOKEN>\n  \
-    Bitbucket:       atlassian-cli auth login --profile work --bitbucket --email user@example.com --token <TOKEN>\n\n\
-    Note: There is no --bitbucket-token flag. Use --bitbucket --token instead.")]
+    Bitbucket (API token):    atlassian-cli auth login --profile work --bitbucket --email user@example.com --token <TOKEN>\n  \
+    Bitbucket (access token): atlassian-cli auth login --profile work --bitbucket --bearer --token <TOKEN>\n\n\
+    Note: App passwords are deprecated. Use Bitbucket API tokens (Basic auth) or access tokens (Bearer auth).\n  \
+    Create API tokens at: https://id.atlassian.com/manage-profile/security/api-tokens -> Select 'Bitbucket'")]
 pub struct LoginArgs {
     /// Profile name to create or update.
     #[arg(long)]
@@ -133,9 +145,9 @@ pub struct LoginArgs {
     /// Atlassian site base URL (e.g. https://example.atlassian.net). Not required for --bitbucket.
     #[arg(long, required_unless_present = "bitbucket")]
     pub base_url: Option<String>,
-    /// Account email associated with the API token.
-    #[arg(long)]
-    pub email: String,
+    /// Account email associated with the API token. Not required for --bearer.
+    #[arg(long, required_unless_present = "bearer")]
+    pub email: Option<String>,
     /// API token to store securely (falls back to ATLASSIAN_API_TOKEN env or interactive prompt).
     #[arg(long, env = "ATLASSIAN_API_TOKEN")]
     pub token: Option<String>,
@@ -145,6 +157,9 @@ pub struct LoginArgs {
     /// Login for Bitbucket (uses api.bitbucket.org, no base_url required).
     #[arg(long)]
     pub bitbucket: bool,
+    /// Use Bearer auth (for repository/workspace/project access tokens). Requires --bitbucket.
+    #[arg(long, requires = "bitbucket")]
+    pub bearer: bool,
     /// Bitbucket workspace slug (optional, for --bitbucket mode).
     #[arg(long, requires = "bitbucket")]
     pub workspace: Option<String>,
@@ -196,7 +211,7 @@ fn login(args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -> Re
 
     let token = match &args.token {
         Some(token) if !token.trim().is_empty() => token.trim().to_owned(),
-        _ => read_token_from_stdin(args.bitbucket).context("Failed to read token from prompt")?,
+        _ => read_token_from_stdin(&args).context("Failed to read token from prompt")?,
     };
     if token.is_empty() {
         return Err(anyhow!("API token cannot be empty"));
@@ -231,9 +246,14 @@ fn login_jira_confluence(
         ));
     }
 
+    let email = args
+        .email
+        .as_ref()
+        .ok_or_else(|| anyhow!("--email is required for Jira/Confluence login"))?;
+
     let profile_entry = config.profiles.entry(args.profile.clone()).or_default();
     profile_entry.base_url = Some(base_url.to_string());
-    profile_entry.email = Some(args.email.clone());
+    profile_entry.email = Some(email.clone());
     profile_entry.api_token = None;
 
     if args.default || config.default_profile.is_none() {
@@ -269,8 +289,25 @@ fn login_bitbucket(
         profile_entry.workspace = args.workspace.clone();
     }
 
-    // Ensure email is set
-    profile_entry.email = Some(args.email.clone());
+    // Set email if provided (not required for bearer tokens)
+    if let Some(email) = &args.email {
+        profile_entry.email = Some(email.clone());
+    }
+
+    // Store token type for bearer auth
+    if args.bearer {
+        profile_entry.bitbucket_token_type = Some("bearer".to_string());
+        tracing::debug!("Storing Bitbucket token with Bearer auth type");
+    } else {
+        // Ensure email is set for basic auth
+        if args.email.is_none() {
+            return Err(anyhow!(
+                "--email is required for Bitbucket Basic auth. \
+                Use --bearer for repository/workspace access tokens (no email needed)."
+            ));
+        }
+        profile_entry.bitbucket_token_type = None; // basic is default
+    }
 
     if args.default || config.default_profile.is_none() {
         config.default_profile = Some(args.profile.clone());
@@ -285,9 +322,11 @@ fn login_bitbucket(
         .save(config_path)
         .context("Unable to persist configuration file")?;
 
+    let auth_type = if args.bearer { "Bearer" } else { "Basic" };
     tracing::info!(
         profile = %args.profile,
         workspace = ?args.workspace,
+        auth_type = auth_type,
         "Bitbucket credentials saved successfully"
     );
     Ok(())
@@ -358,6 +397,7 @@ fn list_profiles(args: ListArgs, config: &Config, renderer: &OutputRenderer) -> 
         email: &'a str,
         has_jira_token: bool,
         has_bitbucket_token: bool,
+        bitbucket_auth: &'a str,
         workspace: &'a str,
         is_default: bool,
     }
@@ -378,12 +418,21 @@ fn list_profiles(args: ListArgs, config: &Config, renderer: &OutputRenderer) -> 
             continue;
         }
 
+        let bitbucket_auth = if !has_bitbucket_token {
+            ""
+        } else if is_bitbucket_bearer(config, name) {
+            "bearer"
+        } else {
+            "basic"
+        };
+
         let row = Row {
             name,
             base_url: profile.base_url.as_deref().unwrap_or(""),
             email: profile.email.as_deref().unwrap_or(""),
             has_jira_token,
             has_bitbucket_token,
+            bitbucket_auth,
             workspace: profile.workspace.as_deref().unwrap_or(""),
             is_default: config
                 .default_profile
@@ -405,13 +454,16 @@ fn list_profiles(args: ListArgs, config: &Config, renderer: &OutputRenderer) -> 
     renderer.render(&rows)
 }
 
-fn read_token_from_stdin(is_bitbucket: bool) -> Result<String> {
+fn read_token_from_stdin(args: &LoginArgs) -> Result<String> {
     use std::io::{self, Write};
 
-    if is_bitbucket {
-        println!(
-            "Create an app password at: https://bitbucket.org/account/settings/app-passwords/"
-        );
+    if args.bitbucket && args.bearer {
+        println!("Enter a repository, workspace, or project access token.");
+        println!("Create at: Repository/Workspace settings -> Access tokens");
+    } else if args.bitbucket {
+        println!("App passwords are deprecated. Use Bitbucket API tokens instead.");
+        println!("Create at: https://id.atlassian.com/manage-profile/security/api-tokens");
+        println!("  -> Click 'Create API token' -> Select 'Bitbucket' as the app -> Assign scopes");
         println!("Required scopes: Account (read), Repositories (read/write), Pull requests (read/write)");
     } else {
         println!(
@@ -473,11 +525,12 @@ async fn test_auth(args: TestArgs, config: &Config) -> Result<()> {
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
 
-    let email = profile.email.as_deref().context("Profile missing email")?;
-
     if args.bitbucket {
-        test_bitbucket_auth(profile_name, email).await
+        let is_bearer = is_bitbucket_bearer(config, profile_name);
+        let email = profile.email.as_deref().unwrap_or("");
+        test_bitbucket_auth(profile_name, email, is_bearer).await
     } else {
+        let email = profile.email.as_deref().context("Profile missing email")?;
         let base_url = profile
             .base_url
             .as_deref()
@@ -518,46 +571,87 @@ async fn test_jira_auth(profile_name: &str, email: &str, base_url: &str) -> Resu
     }
 }
 
-async fn test_bitbucket_auth(profile_name: &str, email: &str) -> Result<()> {
+async fn test_bitbucket_auth(profile_name: &str, email: &str, is_bearer: bool) -> Result<()> {
     let token = get_bitbucket_token(profile_name).ok_or_else(|| {
         anyhow!(
             "No Bitbucket token found for profile '{profile_name}'. \
             Set BITBUCKET_TOKEN or ATLASSIAN_CLI_BITBUCKET_TOKEN_{} env var, \
-            or run `atlassian-cli auth login --bitbucket`",
+            or run `atlassian-cli auth login --bitbucket`\n\n\
+            Hint: App passwords are deprecated. Use Bitbucket API tokens instead.\n\
+            Create at: https://id.atlassian.com/manage-profile/security/api-tokens\n\
+              -> Select 'Bitbucket' as the app when creating the token.",
             profile_name.to_uppercase()
         )
     })?;
 
+    let auth_type = if is_bearer { "Bearer" } else { "Basic" };
     println!(
-        "Testing Bitbucket authentication for profile '{}'...",
-        profile_name
+        "Testing Bitbucket authentication for profile '{}' ({} auth)...",
+        profile_name, auth_type
     );
 
-    let client =
-        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_basic_auth(email, &token);
+    let client = if is_bearer {
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_bearer_token(&token)
+    } else {
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_basic_auth(email, &token)
+    };
 
-    let result: Result<serde_json::Value> = client
-        .get("/2.0/user")
-        .await
-        .context("Bitbucket authentication test failed");
+    // Bearer tokens (access tokens) can't use /2.0/user — use /2.0/workspaces instead
+    if is_bearer {
+        let result: Result<serde_json::Value> = client
+            .get("/2.0/workspaces")
+            .await
+            .context("Bitbucket Bearer authentication test failed");
 
-    match result {
-        Ok(user_data) => {
-            println!("Bitbucket authentication successful!");
-            println!("   Profile: {}", profile_name);
-            println!(
-                "   Username: {}",
-                user_data["username"].as_str().unwrap_or("Unknown")
-            );
-            println!(
-                "   Display Name: {}",
-                user_data["display_name"].as_str().unwrap_or("Unknown")
-            );
-            Ok(())
+        match result {
+            Ok(data) => {
+                println!("Bitbucket authentication successful! (Bearer)");
+                println!("   Profile: {}", profile_name);
+                if let Some(workspaces) = data["values"].as_array() {
+                    for ws in workspaces.iter().take(3) {
+                        if let Some(slug) = ws["slug"].as_str() {
+                            println!("   Workspace: {}", slug);
+                        }
+                    }
+                }
+                Ok(())
+            }
+            Err(e) => {
+                println!("Bitbucket Bearer authentication failed: {}", e);
+                Err(e)
+            }
         }
-        Err(e) => {
-            println!("Bitbucket authentication failed: {}", e);
-            Err(e)
+    } else {
+        let result: Result<serde_json::Value> = client
+            .get("/2.0/user")
+            .await
+            .context("Bitbucket authentication test failed");
+
+        match result {
+            Ok(user_data) => {
+                println!("Bitbucket authentication successful!");
+                println!("   Profile: {}", profile_name);
+                println!(
+                    "   Username: {}",
+                    user_data["username"].as_str().unwrap_or("Unknown")
+                );
+                println!(
+                    "   Display Name: {}",
+                    user_data["display_name"].as_str().unwrap_or("Unknown")
+                );
+                Ok(())
+            }
+            Err(e) => {
+                println!("Bitbucket authentication failed: {}", e);
+                println!();
+                println!("Hint: App passwords are deprecated (disabled Jun 2026).");
+                println!("Use Bitbucket API tokens: https://id.atlassian.com/manage-profile/security/api-tokens");
+                println!("  -> Select 'Bitbucket' as the app when creating the token.");
+                println!();
+                println!("For repository/workspace access tokens, use --bearer flag:");
+                println!("  atlassian-cli auth login --bitbucket --bearer --token <TOKEN>");
+                Err(e)
+            }
         }
     }
 }
@@ -624,19 +718,38 @@ async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRendere
     }
 
     // Check Bitbucket
+    let bb_is_bearer = is_bitbucket_bearer(config, profile_name);
     let bb_status = if let Some(token) = get_bitbucket_token(profile_name) {
-        let client = atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)
-            .ok()
-            .map(|c| c.with_basic_auth(email, &token));
+        let client = if bb_is_bearer {
+            atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)
+                .ok()
+                .map(|c| c.with_bearer_token(&token))
+        } else {
+            atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)
+                .ok()
+                .map(|c| c.with_basic_auth(email, &token))
+        };
 
         if let Some(client) = client {
-            match client.get::<serde_json::Value>("/2.0/user").await {
-                Ok(user_data) => {
-                    let username = user_data["username"].as_str().unwrap_or("unknown");
+            // Bearer tokens can't use /2.0/user, use /2.0/workspaces instead
+            let endpoint = if bb_is_bearer {
+                "/2.0/workspaces"
+            } else {
+                "/2.0/user"
+            };
+            match client.get::<serde_json::Value>(endpoint).await {
+                Ok(data) => {
+                    let details = if bb_is_bearer {
+                        let ws_count = data["values"].as_array().map(|v| v.len()).unwrap_or(0);
+                        format!("bearer, {} workspace(s) accessible", ws_count)
+                    } else {
+                        let username = data["username"].as_str().unwrap_or("unknown");
+                        format!("user: {}", username)
+                    };
                     ServiceStatus {
                         service: "Bitbucket".to_string(),
                         status: "OK".to_string(),
-                        details: format!("user: {}", username),
+                        details,
                     }
                 }
                 Err(e) => ServiceStatus {
@@ -720,4 +833,51 @@ async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRendere
     }
 
     renderer.render(&statuses)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use atlassian_cli_config::Profile;
+
+    #[test]
+    fn test_is_bitbucket_bearer_default_is_false() {
+        let mut config = Config::default();
+        config
+            .profiles
+            .insert("test".to_string(), Profile::default());
+        assert!(!is_bitbucket_bearer(&config, "test"));
+    }
+
+    #[test]
+    fn test_is_bitbucket_bearer_when_set() {
+        let mut config = Config::default();
+        config.profiles.insert(
+            "ci".to_string(),
+            Profile {
+                bitbucket_token_type: Some("bearer".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(is_bitbucket_bearer(&config, "ci"));
+    }
+
+    #[test]
+    fn test_is_bitbucket_bearer_basic_is_false() {
+        let mut config = Config::default();
+        config.profiles.insert(
+            "work".to_string(),
+            Profile {
+                bitbucket_token_type: Some("basic".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(!is_bitbucket_bearer(&config, "work"));
+    }
+
+    #[test]
+    fn test_is_bitbucket_bearer_nonexistent_profile() {
+        let config = Config::default();
+        assert!(!is_bitbucket_bearer(&config, "nonexistent"));
+    }
 }

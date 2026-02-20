@@ -205,6 +205,77 @@ profiles:
     // The command will fail, but for the right reason (no valid credentials/API error)
 }
 
+/// Test that auth login help shows bearer flag and deprecation notice.
+#[test]
+fn test_auth_login_help_shows_bearer_flag() {
+    let output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "auth", "login", "--help"])
+        .output()
+        .expect("Failed to execute auth login help");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Should show --bearer flag
+    assert!(
+        stdout.contains("--bearer"),
+        "auth login help should mention --bearer flag. Got:\n{stdout}"
+    );
+    // Should mention deprecation
+    assert!(
+        stdout.contains("deprecated") || stdout.contains("App passwords"),
+        "auth login help should mention app password deprecation. Got:\n{stdout}"
+    );
+    // Should show both basic and bearer examples
+    assert!(
+        stdout.contains("access token"),
+        "auth login help should mention access tokens. Got:\n{stdout}"
+    );
+}
+
+/// Test that bearer-only profile (no email) works for bitbucket commands.
+#[test]
+fn test_bitbucket_bearer_profile_no_email_required() {
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let config_path = temp_dir.path().join("config.yaml");
+
+    // Bearer profile: no email, has bitbucket_token_type: bearer
+    let config_content = r#"
+default_profile: ci
+profiles:
+  ci:
+    workspace: myworkspace
+    bitbucket_token_type: bearer
+"#;
+
+    std::fs::write(&config_path, config_content).expect("Failed to write config");
+
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--quiet",
+            "--",
+            "--config",
+            config_path.to_str().unwrap(),
+            "bitbucket",
+            "repo",
+            "list",
+        ])
+        .env("ATLASSIAN_CLI_BITBUCKET_TOKEN_CI", "fake-bearer-token")
+        .output()
+        .expect("Failed to execute command");
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Should NOT fail with "missing email" error
+    assert!(
+        !stderr.contains("missing an email"),
+        "Bearer profile should not require email. Got: {stderr}"
+    );
+
+    // Expected: fails at API level (401 or connection error), not profile resolution
+}
+
 /// Test that Jira commands still require base_url (ensure we didn't break existing behavior).
 #[test]
 fn test_jira_still_requires_base_url() {

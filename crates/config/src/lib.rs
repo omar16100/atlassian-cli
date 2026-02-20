@@ -150,7 +150,7 @@ impl Config {
 }
 
 /// Minimal representation of a profile. Values are optional to support
-/// partially configured setups (e.g., when storing tokens in the keyring).
+/// partially configured setups (e.g., when storing tokens in encrypted credential files).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Profile {
     pub base_url: Option<String>,
@@ -159,6 +159,10 @@ pub struct Profile {
     /// Bitbucket workspace slug (optional, can be inferred from base_url).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace: Option<String>,
+    /// Bitbucket token authentication type: "basic" (default) or "bearer".
+    /// Bearer is used for repository/workspace/project access tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bitbucket_token_type: Option<String>,
     /// OpsGenie API key (optional, separate from Atlassian token).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opsgenie_api_key: Option<String>,
@@ -458,5 +462,77 @@ mod tests {
         let deserialized: Config = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(deserialized.default_profile, config.default_profile);
         assert_eq!(deserialized.profiles.len(), 1);
+    }
+
+    #[test]
+    fn test_profile_bitbucket_token_type_default_none() {
+        let profile = Profile::default();
+        assert!(profile.bitbucket_token_type.is_none());
+    }
+
+    #[test]
+    fn test_profile_bitbucket_token_type_bearer() {
+        let profile = Profile {
+            bitbucket_token_type: Some("bearer".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(profile.bitbucket_token_type.as_deref(), Some("bearer"));
+    }
+
+    #[test]
+    fn test_profile_bitbucket_token_type_skipped_when_none() {
+        // bitbucket_token_type should not appear in YAML when None
+        let profile = Profile {
+            email: Some("test@example.com".to_string()),
+            ..Default::default()
+        };
+        let yaml = serde_yaml::to_string(&profile).unwrap();
+        assert!(!yaml.contains("bitbucket_token_type"));
+    }
+
+    #[test]
+    fn test_profile_bitbucket_token_type_serialized_when_set() {
+        let profile = Profile {
+            email: Some("test@example.com".to_string()),
+            bitbucket_token_type: Some("bearer".to_string()),
+            ..Default::default()
+        };
+        let yaml = serde_yaml::to_string(&profile).unwrap();
+        assert!(yaml.contains("bitbucket_token_type: bearer"));
+    }
+
+    #[test]
+    fn test_profile_backwards_compat_missing_token_type() {
+        // Old config files without bitbucket_token_type should deserialize fine
+        let yaml = "email: test@example.com\nworkspace: myteam\n";
+        let profile: Profile = serde_yaml::from_str(yaml).unwrap();
+        assert!(profile.bitbucket_token_type.is_none());
+        assert_eq!(profile.email.as_deref(), Some("test@example.com"));
+        assert_eq!(profile.workspace.as_deref(), Some("myteam"));
+    }
+
+    #[test]
+    fn test_config_with_bearer_profile_roundtrip() {
+        let mut config = Config {
+            default_profile: Some("ci".to_string()),
+            ..Default::default()
+        };
+
+        let profile = Profile {
+            workspace: Some("myteam".to_string()),
+            bitbucket_token_type: Some("bearer".to_string()),
+            ..Default::default()
+        };
+        config.profiles.insert("ci".to_string(), profile);
+
+        let temp_file = NamedTempFile::new().unwrap();
+        config.save(Some(temp_file.path())).unwrap();
+        let loaded = Config::load(Some(temp_file.path())).unwrap();
+
+        let ci_profile = loaded.profiles.get("ci").unwrap();
+        assert_eq!(ci_profile.bitbucket_token_type.as_deref(), Some("bearer"));
+        assert_eq!(ci_profile.workspace.as_deref(), Some("myteam"));
+        // No email required for bearer profiles
+        assert!(ci_profile.email.is_none());
     }
 }

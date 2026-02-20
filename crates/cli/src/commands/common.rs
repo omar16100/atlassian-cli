@@ -38,7 +38,7 @@ pub fn render_success(
     result: &MutationResult,
 ) -> Result<()> {
     match renderer.format() {
-        OutputFormat::Table => {
+        OutputFormat::Table | OutputFormat::Markdown => {
             println!("{emoji_message}");
             Ok(())
         }
@@ -99,5 +99,12 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Quiet);
         let result = MutationResult::new("Deleted");
         assert!(render_success(&renderer, "✅ Deleted", &result).is_ok());
+    }
+
+    #[test]
+    fn test_render_success_markdown() {
+        let renderer = OutputRenderer::new(OutputFormat::Markdown);
+        let result = MutationResult::with_id("Created", "123");
+        assert!(render_success(&renderer, "✅ Created", &result).is_ok());
     }
 }

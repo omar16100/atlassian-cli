@@ -822,10 +822,11 @@ pub async fn execute(
     client: ApiClient,
     renderer: &OutputRenderer,
     inferred_workspace: Option<&str>,
+    is_bearer: bool,
 ) -> Result<()> {
     // Whoami doesn't require workspace
     if matches!(args.command, BitbucketCommands::Whoami) {
-        return workspaces::whoami(&client).await;
+        return workspaces::whoami(&client, is_bearer).await;
     }
 
     // Detect git context for auto-detection
@@ -889,7 +890,11 @@ pub async fn execute(
         .or(git_ctx.repo_slug.as_deref())
         .map(|s| s.to_string());
 
-    let ctx = BitbucketContext { client, renderer };
+    let ctx = BitbucketContext {
+        client,
+        renderer,
+        is_bearer,
+    };
 
     match args.command {
         BitbucketCommands::Repo(cmd) => match cmd {

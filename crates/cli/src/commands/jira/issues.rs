@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -144,6 +145,53 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         .get(&format!("/rest/api/3/issue/{key}"))
         .await
         .with_context(|| format!("Failed to fetch issue {key}"))?;
+
+    if ctx.renderer.format() == OutputFormat::Markdown {
+        let summary = issue.fields.summary.as_deref().unwrap_or("");
+        let status = issue
+            .fields
+            .status
+            .as_ref()
+            .map(|s| s.name.as_str())
+            .unwrap_or("");
+        let assignee = issue
+            .fields
+            .assignee
+            .as_ref()
+            .map(|a| a.display_name.as_str())
+            .unwrap_or("Unassigned");
+        let reporter = issue
+            .fields
+            .reporter
+            .as_ref()
+            .map(|a| a.display_name.as_str())
+            .unwrap_or("");
+        let issue_type = issue
+            .fields
+            .issuetype
+            .as_ref()
+            .map(|t| t.name.as_str())
+            .unwrap_or("");
+        let description = issue
+            .fields
+            .description
+            .as_ref()
+            .map(extract_adf_markdown)
+            .unwrap_or_default();
+
+        let md = format!(
+            "# {key}: {summary}\n\n\
+             | Field | Value |\n\
+             | --- | --- |\n\
+             | Status | {status} |\n\
+             | Type | {issue_type} |\n\
+             | Assignee | {assignee} |\n\
+             | Reporter | {reporter} |\n\n\
+             ## Description\n\n\
+             {description}"
+        );
+        return ctx.renderer.render_raw(&md);
+    }
 
     #[derive(Serialize)]
     struct IssueDetails<'a> {
@@ -838,6 +886,205 @@ fn extract_list_item_text(item: &Value, depth: usize) -> String {
         .unwrap_or_default()
 }
 
+// ADF to Markdown conversion
+
+/// Recursively convert an ADF JSON value to Markdown.
+fn extract_adf_markdown(value: &Value) -> String {
+    extract_adf_md_inner(value, 0)
+}
+
+fn extract_adf_md_inner(value: &Value, depth: usize) -> String {
+    if depth > ADF_MAX_DEPTH {
+        return String::new();
+    }
+
+    if let Some(s) = value.as_str() {
+        return s.to_string();
+    }
+
+    if !value.is_object() {
+        return String::new();
+    }
+
+    let node_type = value.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    let attrs = value.get("attrs");
+
+    match node_type {
+        "text" => {
+            let raw = value.get("text").and_then(|t| t.as_str()).unwrap_or("");
+            let marks = value.get("marks");
+            apply_marks(raw, marks)
+        }
+        "hardBreak" => "\n".to_string(),
+        "rule" => "---".to_string(),
+        // Inline nodes
+        "mention" => {
+            let name = attrs
+                .and_then(|a| a.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
+            format!("@{}", name.trim_start_matches('@'))
+        }
+        "emoji" => attrs
+            .and_then(|a| a.get("shortName"))
+            .and_then(|t| t.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "inlineCard" => {
+            let url = attrs
+                .and_then(|a| a.get("url"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
+            format!("[{url}]({url})")
+        }
+        "status" => {
+            let text = attrs
+                .and_then(|a| a.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
+            format!("`{text}`")
+        }
+        "heading" => {
+            let level = attrs
+                .and_then(|a| a.get("level"))
+                .and_then(|l| l.as_u64())
+                .unwrap_or(1) as usize;
+            let prefix = "#".repeat(level.min(6));
+            let children = collect_md_children(value, depth);
+            format!("{prefix} {children}")
+        }
+        "paragraph" => collect_md_children(value, depth),
+        "codeBlock" => {
+            let lang = attrs
+                .and_then(|a| a.get("language"))
+                .and_then(|l| l.as_str())
+                .unwrap_or("");
+            let code = collect_md_children(value, depth);
+            format!("```{lang}\n{code}\n```")
+        }
+        "blockquote" => {
+            let inner = collect_md_block_children(value, depth);
+            inner
+                .lines()
+                .map(|line| format!("> {line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
+        "bulletList" => {
+            let items = value
+                .get("content")
+                .and_then(|c| c.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .map(|item| {
+                            let text = extract_md_list_item(item, depth + 1);
+                            format!("- {text}")
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            items.join("\n")
+        }
+        "orderedList" => {
+            let items = value
+                .get("content")
+                .and_then(|c| c.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .enumerate()
+                        .map(|(i, item)| {
+                            let text = extract_md_list_item(item, depth + 1);
+                            format!("{}. {text}", i + 1)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            items.join("\n")
+        }
+        "listItem" => {
+            let text = extract_md_list_item(value, depth);
+            format!("- {text}")
+        }
+        // doc or unknown wrapper
+        _ => collect_md_block_children(value, depth),
+    }
+}
+
+/// Collect inline children (text, marks, etc.) into a single string.
+fn collect_md_children(value: &Value, depth: usize) -> String {
+    value
+        .get("content")
+        .and_then(|c| c.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|child| extract_adf_md_inner(child, depth + 1))
+                .collect::<Vec<_>>()
+                .join("")
+        })
+        .unwrap_or_default()
+}
+
+/// Collect block-level children separated by double newlines.
+fn collect_md_block_children(value: &Value, depth: usize) -> String {
+    value
+        .get("content")
+        .and_then(|c| c.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|child| extract_adf_md_inner(child, depth + 1))
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        })
+        .unwrap_or_default()
+}
+
+/// Extract markdown text from a listItem node.
+fn extract_md_list_item(item: &Value, depth: usize) -> String {
+    item.get("content")
+        .and_then(|c| c.as_array())
+        .map(|arr| {
+            arr.iter()
+                .map(|child| extract_adf_md_inner(child, depth + 1))
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
+}
+
+/// Apply ADF text marks to produce markdown formatting.
+fn apply_marks(text: &str, marks: Option<&Value>) -> String {
+    let marks_arr = match marks.and_then(|m| m.as_array()) {
+        Some(arr) if !arr.is_empty() => arr,
+        _ => return text.to_string(),
+    };
+
+    let mut result = text.to_string();
+
+    for mark in marks_arr {
+        let mark_type = mark.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        match mark_type {
+            "strong" => result = format!("**{result}**"),
+            "em" => result = format!("*{result}*"),
+            "code" => result = format!("`{result}`"),
+            "strike" => result = format!("~~{result}~~"),
+            "underline" => result = format!("_{result}_"),
+            "link" => {
+                let href = mark
+                    .get("attrs")
+                    .and_then(|a| a.get("href"))
+                    .and_then(|h| h.as_str())
+                    .unwrap_or("");
+                result = format!("[{result}]({href})");
+            }
+            _ => {}
+        }
+    }
+
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1131,5 +1378,194 @@ mod tests {
         // Should not panic — depth guard returns empty string
         let result = extract_adf_text(&adf);
         assert!(result.is_empty() || result == "deep");
+    }
+
+    // -- Markdown extraction tests --
+
+    #[test]
+    fn test_extract_adf_markdown_heading() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "heading",
+                "attrs": {"level": 2},
+                "content": [{"type": "text", "text": "Section Title"}]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "## Section Title");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_bold() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "important", "marks": [{"type": "strong"}]}]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "**important**");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_italic() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "emphasis", "marks": [{"type": "em"}]}]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "*emphasis*");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_link() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "text",
+                    "text": "click here",
+                    "marks": [{"type": "link", "attrs": {"href": "https://example.com"}}]
+                }]
+            }]
+        });
+        assert_eq!(
+            extract_adf_markdown(&adf),
+            "[click here](https://example.com)"
+        );
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_code_block() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "codeBlock",
+                "attrs": {"language": "rust"},
+                "content": [{"type": "text", "text": "fn main() {}"}]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "```rust\nfn main() {}\n```");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_bullet_list() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "bulletList",
+                "content": [
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "one"}]}]},
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "two"}]}]}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "- one\n- two");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_ordered_list() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "orderedList",
+                "content": [
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "first"}]}]},
+                    {"type": "listItem", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "second"}]}]}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "1. first\n2. second");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_inline_code() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "var_name", "marks": [{"type": "code"}]}]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "`var_name`");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_blockquote() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "blockquote",
+                "content": [{
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": "quoted text"}]
+                }]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "> quoted text");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_multiple_paragraphs() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "first"}]},
+                {"type": "paragraph", "content": [{"type": "text", "text": "second"}]}
+            ]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "first\n\nsecond");
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_mixed_marks() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [{
+                    "type": "text",
+                    "text": "bold link",
+                    "marks": [
+                        {"type": "strong"},
+                        {"type": "link", "attrs": {"href": "https://example.com"}}
+                    ]
+                }]
+            }]
+        });
+        assert_eq!(
+            extract_adf_markdown(&adf),
+            "[**bold link**](https://example.com)"
+        );
+    }
+
+    #[test]
+    fn test_extract_adf_markdown_status_node() {
+        let adf = json!({
+            "type": "doc",
+            "version": 1,
+            "content": [{
+                "type": "paragraph",
+                "content": [
+                    {"type": "text", "text": "status: "},
+                    {"type": "status", "attrs": {"text": "IN PROGRESS", "color": "blue"}}
+                ]
+            }]
+        });
+        assert_eq!(extract_adf_markdown(&adf), "status: `IN PROGRESS`");
     }
 }

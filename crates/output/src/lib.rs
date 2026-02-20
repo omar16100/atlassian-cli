@@ -19,6 +19,7 @@ pub enum OutputFormat {
     Yaml,
     Csv,
     Quiet,
+    Markdown,
 }
 
 pub struct OutputRenderer {
@@ -57,6 +58,11 @@ impl OutputRenderer {
             OutputFormat::Quiet => {
                 if !self.render_quiet(&json_value) {
                     println!("{}", serde_json::to_string_pretty(&json_value)?);
+                }
+            }
+            OutputFormat::Markdown => {
+                if !self.render_markdown_table(&json_value)? {
+                    self.render_markdown_single(&json_value)?;
                 }
             }
         }
@@ -130,6 +136,60 @@ impl OutputRenderer {
                 println!("{}", other);
                 true
             }
+        }
+    }
+
+    /// Render pre-formatted content directly to stdout (e.g. for markdown issue views).
+    pub fn render_raw(&self, content: &str) -> Result<()> {
+        println!("{content}");
+        Ok(())
+    }
+
+    fn render_markdown_table(&self, value: &Value) -> Result<bool> {
+        let (headers, rows) = match Self::coerce_rows(value) {
+            Some(data) => data,
+            None => return Ok(false),
+        };
+
+        // Header row
+        let header_line: String = headers
+            .iter()
+            .map(|h| h.replace('|', "\\|"))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        println!("| {} |", header_line);
+
+        // Separator row
+        let separator: String = headers
+            .iter()
+            .map(|_| "---")
+            .collect::<Vec<_>>()
+            .join(" | ");
+        println!("| {} |", separator);
+
+        // Data rows
+        for row in rows {
+            let cells: String = row
+                .iter()
+                .map(|c| c.replace('|', "\\|"))
+                .collect::<Vec<_>>()
+                .join(" | ");
+            println!("| {} |", cells);
+        }
+
+        Ok(true)
+    }
+
+    fn render_markdown_single(&self, value: &Value) -> Result<bool> {
+        if let Value::Object(obj) = value {
+            for (key, val) in obj {
+                let display = Self::value_to_string(val);
+                println!("**{}**: {}", key, display);
+            }
+            Ok(true)
+        } else {
+            println!("{}", serde_json::to_string_pretty(value)?);
+            Ok(true)
         }
     }
 
@@ -402,6 +462,56 @@ mod tests {
 
         let renderer = OutputRenderer::new(OutputFormat::Csv);
         let result = renderer.render(&test_data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_markdown_table() {
+        let test_data = vec![
+            TestStruct {
+                id: "1".to_string(),
+                name: "Alice".to_string(),
+                count: 10,
+            },
+            TestStruct {
+                id: "2".to_string(),
+                name: "Bob".to_string(),
+                count: 20,
+            },
+        ];
+
+        let renderer = OutputRenderer::new(OutputFormat::Markdown);
+        let result = renderer.render(&test_data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_markdown_single_object() {
+        let test_data = TestStruct {
+            id: "1".to_string(),
+            name: "Test".to_string(),
+            count: 42,
+        };
+
+        let renderer = OutputRenderer::new(OutputFormat::Markdown);
+        let result = renderer.render(&test_data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_markdown_pipe_escaping() {
+        let value = json!([
+            {"col": "a|b", "val": "x|y"}
+        ]);
+        let renderer = OutputRenderer::new(OutputFormat::Markdown);
+        // Should not panic; pipes in values should be escaped
+        assert!(renderer.render_markdown_table(&value).unwrap());
+    }
+
+    #[test]
+    fn test_render_raw() {
+        let renderer = OutputRenderer::new(OutputFormat::Markdown);
+        let result = renderer.render_raw("# Hello\n\nWorld");
         assert!(result.is_ok());
     }
 }

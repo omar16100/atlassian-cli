@@ -1,5 +1,55 @@
 # Changes Made
 
+## 2026-02-20 - Bitbucket Bearer Auth Support & App Password Deprecation
+
+### Context
+Bitbucket app passwords deprecated (creation disabled Sep 2025, all disabled Jun 2026).
+atlassian-cli only supported Basic auth in CLI paths despite API layer having Bearer support.
+
+### Changes
+
+**Priority 1: Help text & error message updates** (`crates/cli/src/commands/auth.rs`)
+- Updated `read_token_from_stdin()` — replaced app password URL with Bitbucket API token instructions
+- Updated `test_bitbucket_auth()` failure message — added deprecation hint and bearer suggestion
+- Updated `LoginArgs` after_help — added bearer example and deprecation notice
+- Updated `list_profiles()` — added `bitbucket_auth` column showing basic/bearer
+
+**Priority 2: Bearer auth support**
+- `crates/config/src/lib.rs` — Added `bitbucket_token_type: Option<String>` to `Profile` struct
+- `crates/cli/src/commands/auth.rs`:
+  - Added `--bearer` flag to `LoginArgs` (requires `--bitbucket`)
+  - Made `--email` optional (not required for `--bearer`)
+  - Added `is_bitbucket_bearer()` helper
+  - Updated `login_bitbucket()` to store token_type in profile
+  - Updated `test_bitbucket_auth()` to use `/2.0/workspaces` for bearer tokens
+  - Updated `auth_status()` to build bearer client and use correct endpoint
+- `crates/cli/src/main.rs`:
+  - Added `is_bearer` field to `BitbucketProfile`
+  - Updated `resolve_profile_for_bitbucket()` — email optional for bearer
+  - Updated `build_bitbucket_client()` — uses `with_bearer_token()` for bearer
+  - Passes `is_bearer` through to `bitbucket::execute()`
+- `crates/cli/src/commands/bitbucket/utils.rs`:
+  - Added `is_bearer` field to `BitbucketContext`
+  - Updated `verify_auth()` — uses `/2.0/workspaces` for bearer tokens
+- `crates/cli/src/commands/bitbucket/mod.rs` — passes `is_bearer` to context
+- `crates/cli/src/commands/bitbucket/workspaces.rs` — `whoami()` shows workspaces for bearer
+
+**Doc fixes**
+- `crates/config/src/lib.rs` — fixed "keyring" reference in Profile doc comment to "encrypted credential files"
+
+### Tests Added
+- Config: 6 tests for `bitbucket_token_type` (default none, bearer, skip serialization, backwards compat, roundtrip)
+- Auth: 4 tests for `is_bitbucket_bearer()` (default, bearer, basic, nonexistent)
+- CLI integration: 2 tests (bearer flag in help, bearer profile no email required)
+
+### Key Design Decisions
+- Bearer tokens use `/2.0/workspaces` instead of `/2.0/user` (access tokens are not user-scoped)
+- `--email` is optional when `--bearer` is set
+- Token type stored in profile config (not credential store) for simplicity
+- Env vars (`BITBUCKET_TOKEN`) default to whatever `bitbucket_token_type` the profile specifies
+
+---
+
 ## 2026-01-31 - Add Pipeline Variable/Secret Management
 
 ### Feature

@@ -6,11 +6,19 @@ use url::Url;
 pub struct BitbucketContext<'a> {
     pub client: ApiClient,
     pub renderer: &'a OutputRenderer,
+    /// true if using Bearer auth (access tokens), false for Basic auth
+    pub is_bearer: bool,
 }
 
 impl BitbucketContext<'_> {
     pub async fn verify_auth(&self) -> anyhow::Result<()> {
-        let _: serde_json::Value = self.client.get("/2.0/user").await.context(
+        // Bearer tokens (access tokens) can't use /2.0/user — use /2.0/workspaces
+        let endpoint = if self.is_bearer {
+            "/2.0/workspaces"
+        } else {
+            "/2.0/user"
+        };
+        let _: serde_json::Value = self.client.get(endpoint).await.context(
             "Authentication may be expired or invalid. Run: atlassian-cli auth test --bitbucket",
         )?;
         Ok(())
