@@ -147,7 +147,7 @@
                     <ul class="product-features">
                         <li>Repository management</li>
                         <li>Pull request workflows</li>
-                        <li>Branch protection</li>
+                        <li>Bearer & Basic auth</li>
                         <li>Pipeline operations</li>
                     </ul>
                 </div>
@@ -208,7 +208,7 @@
                         </svg>
                     </div>
                     <h3 class="feature-title">Secure Credentials</h3>
-                    <p class="feature-desc">File-based storage with 600 permissions. Profile support for multiple instances. No keychain dependency.</p>
+                    <p class="feature-desc">AES-256-GCM encrypted storage. Profile support for multiple instances. No keychain dependency.</p>
                 </div>
 
                 <div class="feature-card">
@@ -391,13 +391,20 @@ atlassian-cli bitbucket branch protect main --approvals 2</code></pre>
             <!-- Quick Config -->
             <div class="config-section">
                 <h4>Configure</h4>
-                <pre class="code-block"><code><span class="comment"># Add your first profile</span>
+                <pre class="code-block"><code><span class="comment"># Add a Jira/Confluence profile</span>
 atlassian-cli auth login \
-  --email <span class="string">you@company.com</span> \
-  --instance <span class="string">your-domain.atlassian.net</span>
+  --profile <span class="string">work</span> \
+  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --email <span class="string">you@company.com</span>
+
+<span class="comment"># Add a Bitbucket Bearer token profile</span>
+atlassian-cli auth login \
+  --profile <span class="string">bb-ci</span> \
+  --bitbucket --bearer \
+  --workspace <span class="string">myteam</span>
 
 <span class="comment"># Verify it works</span>
-atlassian-cli jira search --jql <span class="string">"assignee = currentUser()"</span></code></pre>
+atlassian-cli auth test --bitbucket --profile <span class="string">bb-ci</span></code></pre>
             </div>
         </div>
     </section>
@@ -408,7 +415,7 @@ atlassian-cli jira search --jql <span class="string">"assignee = currentUser()"<
             <div class="footer-content">
                 <div class="footer-left">
                     <span class="footer-logo">atlassian-cli</span>
-                    <span class="footer-version">v0.1.7</span>
+                    <span class="footer-version">v0.2.9</span>
                 </div>
                 <div class="footer-links">
                     <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
