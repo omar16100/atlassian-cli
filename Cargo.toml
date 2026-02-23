@@ -58,7 +58,7 @@ htmd = "0.5"
 wiremock = "0.6"
 cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
 criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
-proptest = "1.4"
+proptest = "1.10"
 
 # The profile that 'dist' will build with
 [profile.dist]
