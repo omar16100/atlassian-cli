@@ -30,6 +30,10 @@ struct Cli {
     #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Table, global = true)]
     format: OutputFormat,
 
+    /// Wrap JSON/YAML list output in {"data": [...], "count": N} envelope.
+    #[arg(long, global = true)]
+    envelope: bool,
+
     /// Enable verbose logging
     #[arg(long)]
     debug: bool,
@@ -96,7 +100,7 @@ async fn run() -> Result<()> {
 
     let config_path = cli.config.clone();
     let mut config = Config::load(config_path.as_ref())?;
-    let renderer = OutputRenderer::new(cli.format);
+    let renderer = OutputRenderer::new(cli.format).with_envelope(cli.envelope);
 
     // Validate profile selection for destructive commands
     let is_destructive = is_destructive_command(&cli.command);
@@ -122,6 +126,7 @@ async fn run() -> Result<()> {
                 &renderer,
                 profile.workspace.as_deref(),
                 profile.is_bearer,
+                profile.bitbucket_remote.as_deref(),
             )
             .await?
         }
@@ -184,6 +189,8 @@ struct BitbucketProfile {
     workspace: Option<String>,
     /// true = Bearer auth (access tokens), false = Basic auth (API tokens)
     is_bearer: bool,
+    /// Preferred git remote name for Bitbucket auto-detection
+    bitbucket_remote: Option<String>,
 }
 
 fn handle_migration() {
@@ -340,11 +347,14 @@ fn resolve_profile_for_bitbucket(
             .and_then(|url| extract_workspace_from_url(url))
     });
 
+    let bitbucket_remote = profile.bitbucket_remote.clone();
+
     Ok(BitbucketProfile {
         base,
         token,
         workspace,
         is_bearer,
+        bitbucket_remote,
     })
 }
 

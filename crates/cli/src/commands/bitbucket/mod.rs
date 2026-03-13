@@ -20,6 +20,16 @@ mod workspaces;
 
 use utils::BitbucketContext;
 
+/// Resolve pipeline ID from positional arg or --pipeline flag.
+fn resolve_pipeline_arg(
+    positional: Option<String>,
+    flag: Option<String>,
+) -> anyhow::Result<String> {
+    positional.or(flag).ok_or_else(|| {
+        anyhow::anyhow!("Pipeline ID required. Provide as positional arg or --pipeline <ID>")
+    })
+}
+
 /// Helper to require a repo slug with a clear error message
 fn require_repo(
     explicit: Option<&str>,
@@ -27,11 +37,32 @@ fn require_repo(
     cmd: &str,
 ) -> anyhow::Result<String> {
     explicit.or(git_detected).map(String::from).ok_or_else(|| {
-        anyhow::anyhow!(
-            "Repository required for '{cmd}'.\n\n\
-             Not in a git directory with Bitbucket remote.\n\
-             Use --repo <repo-slug> to specify the repository."
-        )
+        let mut msg = format!("Repository required for '{cmd}'.\n\n");
+        msg.push_str("Not in a git directory with Bitbucket remote.\n\n");
+
+        // Show detected remotes if available
+        let remotes = git::get_all_remotes();
+        if !remotes.is_empty() {
+            msg.push_str("Detected git remotes:\n");
+            for (name, url) in &remotes {
+                let redacted = git::redact_url(url);
+                if let Some((ws, repo)) = git::parse_git_remote(url) {
+                    msg.push_str(&format!(
+                        "  {name} -> {redacted} (workspace: {ws}, repo: {repo})\n"
+                    ));
+                } else {
+                    msg.push_str(&format!("  {name} -> {redacted} (not a Bitbucket remote)\n"));
+                }
+            }
+            msg.push('\n');
+        }
+
+        msg.push_str("Tip: use --workspace <slug> --repo <slug>, or run from a directory with a Bitbucket git remote.\n");
+        msg.push_str(&format!(
+            "\nExample:\n  atlassian-cli bb {cmd} --workspace <workspace> --repo <repo>\n"
+        ));
+
+        anyhow::anyhow!(msg)
     })
 }
 
@@ -434,7 +465,10 @@ enum PipelineCommands {
     /// Get pipeline details.
     Get {
         /// Pipeline UUID or build number.
-        pipeline_id: String,
+        pipeline_id: Option<String>,
+        /// Pipeline UUID or build number (alternative to positional).
+        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        pipeline_flag: Option<String>,
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
@@ -466,21 +500,30 @@ enum PipelineCommands {
     /// Stop a running pipeline.
     Stop {
         /// Pipeline UUID or build number.
-        pipeline_id: String,
+        pipeline_id: Option<String>,
+        /// Pipeline UUID or build number (alternative to positional).
+        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        pipeline_flag: Option<String>,
     },
     /// Get pipeline logs.
     Logs {
         /// Pipeline UUID or build number.
-        pipeline_id: String,
-        /// Step UUID (optional - shows all steps if not specified).
+        pipeline_id: Option<String>,
+        /// Pipeline UUID or build number (alternative to positional).
+        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        pipeline_flag: Option<String>,
+        /// Step UUID (positional or --step-uuid flag).
         step_uuid: Option<String>,
+        /// Step UUID (alternative to positional).
+        #[arg(long = "step-uuid", conflicts_with = "step_uuid")]
+        step_uuid_flag: Option<String>,
         /// Filter by step name pattern.
         #[arg(long)]
         step: Option<String>,
         /// Grep pattern to filter log lines.
         #[arg(long)]
         grep: Option<String>,
-        /// Case-insensitive grep.
+        /// Case-insensitive grep and step name matching.
         #[arg(long, short = 'i')]
         ignore_case: bool,
         /// Show only failed steps.
@@ -490,24 +533,39 @@ enum PipelineCommands {
     /// Watch a running pipeline until completion.
     Watch {
         /// Pipeline UUID or build number.
-        pipeline_id: String,
+        pipeline_id: Option<String>,
+        /// Pipeline UUID or build number (alternative to positional).
+        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        pipeline_flag: Option<String>,
         /// Poll interval in seconds.
         #[arg(long, default_value_t = 5)]
         interval: u64,
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
+        /// Shell command to run on pipeline completion. Receives env vars: PIPELINE_STATUS, PIPELINE_BUILD_NUMBER, PIPELINE_UUID, PIPELINE_REF_NAME.
+        #[arg(long)]
+        on_complete: Option<String>,
     },
     /// List steps for a pipeline.
     Steps {
         /// Pipeline UUID or build number.
-        pipeline_id: String,
+        pipeline_id: Option<String>,
+        /// Pipeline UUID or build number (alternative to positional).
+        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        pipeline_flag: Option<String>,
     },
     /// Get latest pipeline status (JSON output, smart exit codes).
     Status {
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
+        /// Wait for pipeline to reach terminal state before exiting.
+        #[arg(long)]
+        wait: bool,
+        /// Poll interval in seconds (used with --wait).
+        #[arg(long, default_value_t = 10)]
+        interval: u64,
     },
     /// Re-run a pipeline with the same commit.
     Rerun {
@@ -823,6 +881,7 @@ pub async fn execute(
     renderer: &OutputRenderer,
     inferred_workspace: Option<&str>,
     is_bearer: bool,
+    bitbucket_remote: Option<&str>,
 ) -> Result<()> {
     // Whoami doesn't require workspace
     if matches!(args.command, BitbucketCommands::Whoami) {
@@ -830,7 +889,7 @@ pub async fn execute(
     }
 
     // Detect git context for auto-detection
-    let git_ctx = git::detect_git_context();
+    let git_ctx = git::detect_git_context(bitbucket_remote);
 
     // CLI flag takes precedence, then git context, then inferred from profile
     let workspace = args
@@ -860,13 +919,13 @@ pub async fn execute(
             error_msg.push_str("  2. Run in git directory with Bitbucket remote\n");
             error_msg.push_str("  3. Configure workspace in profile\n");
 
-            // Show git remotes if available
+            // Show git remotes if available (redact credentials)
             let remotes = git::get_all_remotes();
             if !remotes.is_empty() {
                 error_msg.push_str("\nFound git remotes:\n");
                 for (name, url) in &remotes {
-                    error_msg.push_str(&format!("  {} -> {}\n", name, url));
-                    // Try to parse workspace/repo from URL
+                    let redacted = git::redact_url(url);
+                    error_msg.push_str(&format!("  {} -> {}\n", name, redacted));
                     if let Some((ws, repo)) = git::parse_git_remote(url) {
                         error_msg.push_str(&format!("    (workspace: {}, repo: {})\n", ws, repo));
                     } else {
@@ -1170,9 +1229,14 @@ pub async fn execute(
                 )
                 .await
             }
-            PipelineCommands::Get { pipeline_id, steps } => {
+            PipelineCommands::Get {
+                pipeline_id,
+                pipeline_flag,
+                steps,
+            } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline get")?;
-                pipelines::get_pipeline(&ctx, &workspace, &repo_slug, &pipeline_id, steps).await
+                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                pipelines::get_pipeline(&ctx, &workspace, &repo_slug, &id, steps).await
             }
             PipelineCommands::Latest { branch, steps } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline latest")?;
@@ -1230,33 +1294,37 @@ pub async fn execute(
                 )
                 .await
             }
-            PipelineCommands::Stop { pipeline_id } => {
+            PipelineCommands::Stop {
+                pipeline_id,
+                pipeline_flag,
+            } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline stop")?;
-                // Resolve build number to UUID if needed
+                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
                 let pipeline_uuid =
-                    pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &pipeline_id)
-                        .await?;
+                    pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &id).await?;
                 pipelines::stop_pipeline(&ctx, &workspace, &repo_slug, &pipeline_uuid).await
             }
             PipelineCommands::Logs {
                 pipeline_id,
+                pipeline_flag,
                 step_uuid,
+                step_uuid_flag,
                 step,
                 grep,
                 ignore_case,
                 failed_only,
             } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline logs")?;
-                // Resolve build number to UUID if needed
+                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
                 let pipeline_uuid =
-                    pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &pipeline_id)
-                        .await?;
+                    pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &id).await?;
+                let effective_step_uuid = step_uuid.or(step_uuid_flag);
                 pipelines::get_pipeline_logs(
                     &ctx,
                     &workspace,
                     &repo_slug,
                     &pipeline_uuid,
-                    step_uuid.as_deref(),
+                    effective_step_uuid.as_deref(),
                     step.as_deref(),
                     grep.as_deref(),
                     ignore_case,
@@ -1266,27 +1334,45 @@ pub async fn execute(
             }
             PipelineCommands::Watch {
                 pipeline_id,
+                pipeline_flag,
                 interval,
                 steps,
+                on_complete,
             } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline watch")?;
-                pipelines::watch_pipeline(
+                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                let final_status = pipelines::watch_pipeline(
                     &ctx,
                     &workspace,
                     &repo_slug,
-                    &pipeline_id,
+                    &id,
                     interval,
                     steps,
+                    on_complete.as_deref(),
                 )
-                .await
+                .await?;
+                let exit_code = pipelines::status_to_exit_code(&final_status);
+                if exit_code != 0 {
+                    std::process::exit(exit_code);
+                }
+                Ok(())
             }
-            PipelineCommands::Steps { pipeline_id } => {
+            PipelineCommands::Steps {
+                pipeline_id,
+                pipeline_flag,
+            } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline steps")?;
-                pipelines::list_steps(&ctx, &workspace, &repo_slug, &pipeline_id).await
+                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                pipelines::list_steps(&ctx, &workspace, &repo_slug, &id).await
             }
-            PipelineCommands::Status { steps } => {
+            PipelineCommands::Status {
+                steps,
+                wait,
+                interval,
+            } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline status")?;
-                pipelines::pipeline_status(&ctx, &workspace, &repo_slug, steps).await
+                pipelines::pipeline_status(&ctx, &workspace, &repo_slug, steps, wait, interval)
+                    .await
             }
             PipelineCommands::Rerun {
                 pipeline_id,
@@ -1512,5 +1598,38 @@ pub async fn execute(
             } => bulk::delete_merged_branches(&ctx, &workspace, &repo, exclude, dry_run).await,
         },
         BitbucketCommands::Whoami => unreachable!("handled above"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_pipeline_arg_positional() {
+        let result = resolve_pipeline_arg(Some("13".to_string()), None);
+        assert_eq!(result.unwrap(), "13");
+    }
+
+    #[test]
+    fn test_resolve_pipeline_arg_flag() {
+        let result = resolve_pipeline_arg(None, Some("42".to_string()));
+        assert_eq!(result.unwrap(), "42");
+    }
+
+    #[test]
+    fn test_resolve_pipeline_arg_positional_takes_precedence() {
+        let result = resolve_pipeline_arg(Some("13".to_string()), Some("42".to_string()));
+        assert_eq!(result.unwrap(), "13");
+    }
+
+    #[test]
+    fn test_resolve_pipeline_arg_neither() {
+        let result = resolve_pipeline_arg(None, None);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Pipeline ID required"));
     }
 }

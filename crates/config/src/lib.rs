@@ -172,6 +172,9 @@ pub struct Profile {
     /// Bamboo base URL (optional, if different from main base_url).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bamboo_base_url: Option<String>,
+    /// Preferred git remote name for Bitbucket auto-detection (default: tries origin, then first Bitbucket remote).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bitbucket_remote: Option<String>,
 }
 
 #[cfg(test)]

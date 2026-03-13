@@ -24,11 +24,27 @@ pub enum OutputFormat {
 
 pub struct OutputRenderer {
     format: OutputFormat,
+    envelope: bool,
+}
+
+/// Envelope wrapper for list outputs in JSON/YAML.
+#[derive(Serialize)]
+struct ListEnvelope<'a, T: Serialize> {
+    data: &'a [T],
+    count: usize,
 }
 
 impl OutputRenderer {
     pub fn new(format: OutputFormat) -> Self {
-        Self { format }
+        Self {
+            format,
+            envelope: false,
+        }
+    }
+
+    pub fn with_envelope(mut self, envelope: bool) -> Self {
+        self.envelope = envelope;
+        self
     }
 
     pub fn format(&self) -> OutputFormat {
@@ -68,6 +84,33 @@ impl OutputRenderer {
         }
 
         Ok(())
+    }
+
+    /// Render a list/array of items. When --envelope is enabled and format is JSON/YAML,
+    /// wraps output in `{"data": [...], "count": N}`. Otherwise renders as normal.
+    pub fn render_list<T: Serialize>(&self, items: &[T]) -> Result<()> {
+        if self.envelope {
+            match self.format {
+                OutputFormat::Json => {
+                    let envelope = ListEnvelope {
+                        data: items,
+                        count: items.len(),
+                    };
+                    println!("{}", serde_json::to_string_pretty(&envelope)?);
+                    return Ok(());
+                }
+                OutputFormat::Yaml => {
+                    let envelope = ListEnvelope {
+                        data: items,
+                        count: items.len(),
+                    };
+                    println!("{}", serde_yaml::to_string(&envelope)?);
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+        self.render(&items)
     }
 
     fn render_table(&self, value: &Value) -> Result<bool> {
@@ -513,5 +556,45 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Markdown);
         let result = renderer.render_raw("# Hello\n\nWorld");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_list_without_envelope() {
+        let data = vec![TestStruct {
+            id: "1".to_string(),
+            name: "Alice".to_string(),
+            count: 10,
+        }];
+        // Without envelope, render_list behaves like render
+        let renderer = OutputRenderer::new(OutputFormat::Table);
+        let result = renderer.render_list(&data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_list_with_envelope() {
+        let data = vec![TestStruct {
+            id: "1".to_string(),
+            name: "Alice".to_string(),
+            count: 10,
+        }];
+        let renderer = OutputRenderer::new(OutputFormat::Json).with_envelope(true);
+        // Should produce enveloped output
+        let result = renderer.render_list(&data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_render_list_empty_with_envelope() {
+        let data: Vec<TestStruct> = vec![];
+        let renderer = OutputRenderer::new(OutputFormat::Json).with_envelope(true);
+        let result = renderer.render_list(&data);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_with_envelope_setter() {
+        let renderer = OutputRenderer::new(OutputFormat::Json).with_envelope(true);
+        assert_eq!(renderer.format(), OutputFormat::Json);
     }
 }
