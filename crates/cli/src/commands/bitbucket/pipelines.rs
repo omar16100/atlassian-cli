@@ -226,6 +226,17 @@ fn is_terminal_state(status: &str) -> bool {
     )
 }
 
+/// Map pipeline status to process exit code.
+/// 0 = success, 1 = failed/stopped/error, 2 = in-progress/pending.
+pub fn status_to_exit_code(status: &str) -> i32 {
+    match status.to_uppercase().as_str() {
+        "SUCCESSFUL" | "COMPLETED" => 0,
+        "FAILED" | "ERROR" | "STOPPED" | "EXPIRED" => 1,
+        "PENDING" | "IN_PROGRESS" => 2,
+        _ => 0,
+    }
+}
+
 fn format_steps_summary(steps: &[StepInfo], use_colors: bool) -> String {
     use atlassian_cli_output::StatusFormatter;
     let formatter = if use_colors {
@@ -665,7 +676,7 @@ pub async fn list_pipelines(
 
     tracing::debug!(workspace, repo_slug, count = rows.len(), "Listed pipelines");
 
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list(&rows)
 }
 
 pub async fn get_pipeline(
@@ -852,7 +863,15 @@ pub async fn get_pipeline_logs(
 
     // Filter by step name pattern if specified
     if let Some(pattern) = step_name_pattern {
-        steps_to_show.retain(|s| s.name.as_ref().is_some_and(|n| n.contains(pattern)));
+        steps_to_show.retain(|s| {
+            s.name.as_ref().is_some_and(|n| {
+                if ignore_case {
+                    n.to_lowercase().contains(&pattern.to_lowercase())
+                } else {
+                    n.contains(pattern)
+                }
+            })
+        });
     }
 
     // Filter by failed steps only if specified
@@ -977,7 +996,7 @@ pub async fn get_pipeline_logs(
         ctx.renderer.format(),
         OutputFormat::Table | OutputFormat::Quiet | OutputFormat::Markdown
     ) {
-        ctx.renderer.render(&all_logs)?;
+        ctx.renderer.render_list(&all_logs)?;
     }
 
     Ok(())
@@ -1009,7 +1028,7 @@ pub async fn list_steps(
 
     tracing::debug!(pipeline_uuid, count = steps.len(), "Listed pipeline steps");
 
-    ctx.renderer.render(&steps)
+    ctx.renderer.render_list(&steps)
 }
 
 pub async fn pipeline_status(
@@ -1017,8 +1036,10 @@ pub async fn pipeline_status(
     workspace: &str,
     repo_slug: &str,
     show_steps: bool,
+    wait: bool,
+    interval: u64,
 ) -> Result<()> {
-    // Fetch single most recent pipeline
+    // Fetch single most recent pipeline to pin its UUID
     let path = build_request_path(
         &None,
         workspace,
@@ -1032,68 +1053,73 @@ pub async fn pipeline_status(
         },
     );
 
-    let response: PipelineList =
+    let initial_response: PipelineList =
         ctx.client.get(&path).await.with_context(|| {
             format!("Failed to fetch pipeline status for {workspace}/{repo_slug}")
         })?;
 
-    if response.values.is_empty() {
+    if initial_response.values.is_empty() {
         tracing::info!(workspace, repo_slug, "No pipelines found");
-        // Output empty JSON and return success
         println!("{{}}");
         return Ok(());
     }
 
-    let pipeline = &response.values[0];
+    // Pin the pipeline UUID so --wait doesn't drift to newer pipelines
+    let pinned_uuid = initial_response.values[0].uuid.clone();
 
-    // Build status output
-    let steps_data = if show_steps {
-        fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, true)
-            .await
-            .ok()
-    } else {
-        None
-    };
+    loop {
+        let pipeline = fetch_pipeline(ctx, workspace, repo_slug, &pinned_uuid).await?;
+        let status = get_pipeline_status(&pipeline);
 
-    let status = get_pipeline_status(pipeline);
-    let status_output = PipelineStatusOutput {
-        build_number: pipeline.build_number.unwrap_or(0),
-        state: status.clone(),
-        ref_name: pipeline
-            .target
-            .as_ref()
-            .and_then(|t| t.ref_name.clone())
-            .unwrap_or_default(),
-        commit: get_commit_hash(pipeline),
-        created: pipeline.created_on.clone().unwrap_or_default(),
-        steps: steps_data,
-    };
+        if !wait || is_terminal_state(&status) {
+            // Build status output
+            let steps_data = if show_steps {
+                fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, true)
+                    .await
+                    .ok()
+            } else {
+                None
+            };
 
-    // Force JSON output regardless of --output flag
-    let json = serde_json::to_string_pretty(&status_output)?;
-    println!("{}", json);
+            let status_output = PipelineStatusOutput {
+                build_number: pipeline.build_number.unwrap_or(0),
+                state: status.clone(),
+                ref_name: pipeline
+                    .target
+                    .as_ref()
+                    .and_then(|t| t.ref_name.clone())
+                    .unwrap_or_default(),
+                commit: get_commit_hash(&pipeline),
+                created: pipeline.created_on.clone().unwrap_or_default(),
+                steps: steps_data,
+            };
 
-    // Determine exit code based on state
-    let exit_code = match status.to_uppercase().as_str() {
-        "SUCCESSFUL" | "COMPLETED" => 0,
-        "FAILED" | "ERROR" | "STOPPED" | "EXPIRED" => 1,
-        "PENDING" | "IN_PROGRESS" => 2,
-        _ => 0,
-    };
+            let json = serde_json::to_string_pretty(&status_output)?;
+            println!("{}", json);
 
-    tracing::debug!(
-        workspace,
-        repo_slug,
-        state = %status,
-        exit_code,
-        "Pipeline status"
-    );
+            let exit_code = status_to_exit_code(&status);
+            tracing::debug!(
+                workspace,
+                repo_slug,
+                state = %status,
+                exit_code,
+                "Pipeline status"
+            );
 
-    if exit_code != 0 {
-        std::process::exit(exit_code);
+            if exit_code != 0 {
+                std::process::exit(exit_code);
+            }
+            return Ok(());
+        }
+
+        tracing::debug!(
+            pipeline_uuid = %pinned_uuid,
+            state = %status,
+            interval,
+            "Waiting for pipeline to complete"
+        );
+        tokio::time::sleep(Duration::from_secs(interval)).await;
     }
-
-    Ok(())
 }
 
 pub async fn rerun_pipeline(
@@ -1201,6 +1227,8 @@ pub async fn rerun_pipeline(
     ctx.renderer.render(&triggered)
 }
 
+/// Watch a pipeline until completion.
+/// Returns the final status string for exit code handling.
 pub async fn watch_pipeline(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -1208,7 +1236,8 @@ pub async fn watch_pipeline(
     pipeline_id: &str,
     interval: u64,
     show_steps: bool,
-) -> Result<()> {
+    on_complete: Option<&str>,
+) -> Result<String> {
     // Resolve build number to UUID if needed (only once at start)
     let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
 
@@ -1221,6 +1250,8 @@ pub async fn watch_pipeline(
     if is_table {
         eprintln!("Watching pipeline... (Ctrl-C to stop)");
     }
+
+    let final_status;
 
     loop {
         let pipeline = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
@@ -1249,7 +1280,6 @@ pub async fn watch_pipeline(
             let icon = get_status_icon(&status);
 
             if let Some(ref step_list) = steps {
-                // Always use colors for watch command in table mode
                 let summary = format_steps_summary(step_list, is_table);
                 print!(
                     "{} {} {} ({}) [{}] {}",
@@ -1262,7 +1292,6 @@ pub async fn watch_pipeline(
                 );
             }
 
-            // Flush to show immediately
             use std::io::Write;
             std::io::stdout().flush().ok();
         }
@@ -1285,7 +1314,7 @@ pub async fn watch_pipeline(
                         .build_number
                         .map(|n| n.to_string())
                         .unwrap_or_default(),
-                    state: status,
+                    state: status.clone(),
                     ref_name: pipeline
                         .target
                         .as_ref()
@@ -1299,13 +1328,48 @@ pub async fn watch_pipeline(
                 };
                 ctx.renderer.render(&view)?;
             }
+
+            // Run on-complete hook if specified
+            if let Some(cmd) = on_complete {
+                let build_number = pipeline
+                    .build_number
+                    .map(|n| n.to_string())
+                    .unwrap_or_default();
+                let ref_name = pipeline
+                    .target
+                    .as_ref()
+                    .and_then(|t| t.ref_name.clone())
+                    .unwrap_or_default();
+                tracing::info!(command = cmd, status = %status, "Running on-complete hook");
+                let output = std::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(cmd)
+                    .env("PIPELINE_STATUS", &status)
+                    .env("PIPELINE_BUILD_NUMBER", &build_number)
+                    .env("PIPELINE_UUID", &pipeline.uuid)
+                    .env("PIPELINE_REF_NAME", &ref_name)
+                    .output();
+                match output {
+                    Ok(o) if !o.status.success() => {
+                        tracing::warn!(exit_code = ?o.status.code(), "on-complete hook failed");
+                        eprintln!("Warning: on-complete hook exited with {}", o.status);
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Failed to run on-complete hook");
+                        eprintln!("Warning: Failed to run on-complete hook: {e}");
+                    }
+                    _ => {}
+                }
+            }
+
+            final_status = status;
             break;
         }
 
         tokio::time::sleep(Duration::from_secs(interval)).await;
     }
 
-    Ok(())
+    Ok(final_status)
 }
 
 /// Find the latest pipeline for a given branch
@@ -1654,5 +1718,22 @@ mod tests {
         }"#;
         let target: Target = serde_json::from_str(json).unwrap();
         assert!(target.commit.is_none());
+    }
+
+    #[test]
+    fn test_status_to_exit_code() {
+        assert_eq!(status_to_exit_code("SUCCESSFUL"), 0);
+        assert_eq!(status_to_exit_code("COMPLETED"), 0);
+        assert_eq!(status_to_exit_code("FAILED"), 1);
+        assert_eq!(status_to_exit_code("ERROR"), 1);
+        assert_eq!(status_to_exit_code("STOPPED"), 1);
+        assert_eq!(status_to_exit_code("EXPIRED"), 1);
+        assert_eq!(status_to_exit_code("PENDING"), 2);
+        assert_eq!(status_to_exit_code("IN_PROGRESS"), 2);
+        // Case insensitive
+        assert_eq!(status_to_exit_code("successful"), 0);
+        assert_eq!(status_to_exit_code("failed"), 1);
+        // Unknown defaults to 0
+        assert_eq!(status_to_exit_code("UNKNOWN_STATUS"), 0);
     }
 }

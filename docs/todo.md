@@ -1,5 +1,14 @@
 # atlassian-cli TODO
 
+## Pipeline UX Fixes (2026-03-11)
+- [x] Issue 6: Better error messages when --repo is missing (show remotes, suggest fix)
+- [x] Issue 7: Make --step pattern respect --ignore-case flag in pipeline logs
+- [x] Issue 1: Git remote auto-detection iterates all remotes, not just origin
+- [x] Issue 5: Add pipeline status --wait and watch exit codes
+- [x] Issue 2: Accept --pipeline flag alongside positional pipeline ID
+- [x] Issue 4: Add --on-complete hook to pipeline watch
+- [x] Issue 3: Add --envelope flag for JSON list output wrapping
+
 ## Recent Changes (2025-11-25)
 - [x] Fix `--workspace` flag to work at any position (`global = true`)
 - [x] Replace all `atlcli` references with `atlassian-cli`

@@ -9,6 +9,12 @@ pub struct GitContext {
     pub repo_slug: Option<String>,
 }
 
+/// Redact credentials from URLs for safe display.
+/// Public alias for use in error messages.
+pub fn redact_url(url_str: &str) -> String {
+    redact_url_credentials(url_str)
+}
+
 /// Redact credentials from URLs for safe logging
 /// Replaces userinfo (username/password/token) with [REDACTED]
 fn redact_url_credentials(url_str: &str) -> String {
@@ -27,52 +33,88 @@ fn redact_url_credentials(url_str: &str) -> String {
     url_str.to_string()
 }
 
-/// Detect workspace and repo from git remote URL
-pub fn detect_git_context() -> GitContext {
-    // Try to get origin remote URL
-    let output = match Command::new("git")
-        .args(["remote", "get-url", "origin"])
+/// Try to get fetch URL for a specific remote name
+fn try_remote(name: &str) -> Option<GitContext> {
+    let output = Command::new("git")
+        .args(["remote", "get-url", name])
         .output()
-    {
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let url = String::from_utf8(output.stdout).ok()?.trim().to_string();
+    if url.is_empty() {
+        return None;
+    }
+    let (workspace, repo_slug) = parse_git_remote(&url)?;
+    tracing::debug!(
+        workspace = %workspace,
+        repo_slug = %repo_slug,
+        remote = name,
+        "Detected git context from remote"
+    );
+    Some(GitContext {
+        workspace: Some(workspace),
+        repo_slug: Some(repo_slug),
+    })
+}
+
+/// Get all git remote names (deduplicated)
+fn get_remote_names() -> Vec<String> {
+    let output = match Command::new("git").arg("remote").output() {
         Ok(output) if output.status.success() => output,
-        _ => {
-            tracing::debug!("Failed to get git remote URL");
-            return GitContext::default();
-        }
+        _ => return vec![],
     };
+    String::from_utf8(output.stdout)
+        .unwrap_or_default()
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
 
-    let remote_url = match String::from_utf8(output.stdout) {
-        Ok(url) => url.trim().to_string(),
-        Err(_) => {
-            tracing::debug!("Invalid UTF-8 in git remote URL");
-            return GitContext::default();
+/// Detect workspace and repo from git remote URL.
+/// Priority: preferred_remote > origin (if Bitbucket) > first Bitbucket remote.
+pub fn detect_git_context(preferred_remote: Option<&str>) -> GitContext {
+    // 1. If user configured a preferred remote, try that first
+    if let Some(remote_name) = preferred_remote {
+        if let Some(ctx) = try_remote(remote_name) {
+            return ctx;
         }
-    };
+        tracing::debug!(
+            remote = remote_name,
+            "Configured remote not found or not Bitbucket, trying all remotes"
+        );
+    }
 
-    if remote_url.is_empty() {
-        tracing::debug!("Empty git remote URL");
+    let remote_names = get_remote_names();
+    if remote_names.is_empty() {
+        tracing::debug!("No git remotes found");
         return GitContext::default();
     }
 
-    // Parse the remote URL
-    match parse_git_remote(&remote_url) {
-        Some((workspace, repo_slug)) => {
-            tracing::debug!(
-                workspace = %workspace,
-                repo_slug = %repo_slug,
-                "Detected git context from remote"
-            );
-            GitContext {
-                workspace: Some(workspace),
-                repo_slug: Some(repo_slug),
-            }
-        }
-        None => {
-            let redacted_url = redact_url_credentials(&remote_url);
-            tracing::debug!(remote_url = %redacted_url, "Not a Bitbucket remote");
-            GitContext::default()
+    // 2. Try "origin" first if it exists
+    if remote_names.iter().any(|n| n == "origin") {
+        if let Some(ctx) = try_remote("origin") {
+            return ctx;
         }
     }
+
+    // 3. Fall back to first Bitbucket remote
+    for name in &remote_names {
+        if name == "origin" {
+            continue; // already tried
+        }
+        if let Some(ctx) = try_remote(name) {
+            return ctx;
+        }
+    }
+
+    tracing::debug!(
+        count = remote_names.len(),
+        "No Bitbucket remote found among remotes"
+    );
+    GitContext::default()
 }
 
 /// Parse git remote URL to extract workspace and repo slug
