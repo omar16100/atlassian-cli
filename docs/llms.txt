@@ -1,0 +1,58 @@
+# atlassian-cli
+
+> One CLI for Jira, Confluence, Bitbucket & JSM. Automate your entire Atlassian Cloud stack from the command line.
+
+## What is atlassian-cli?
+
+atlassian-cli is an open-source, unified command-line interface built in Rust that provides first-class support for Atlassian Cloud products: Jira, Confluence, Bitbucket, and Jira Service Management (JSM).
+
+## Installation
+
+- Homebrew (macOS/Linux): brew install omar16100/atlassian-cli/atlassian-cli
+- Cargo (Rust): cargo install atlassian-cli
+- Binary: Download from https://github.com/omar16100/atlassian-cli/releases
+
+## Key Features
+
+- Supports 4 Atlassian products: Jira, Confluence, Bitbucket, JSM
+- Bulk operations with concurrency control and dry-run mode
+- Multi-format output: table, JSON, CSV, YAML, quiet
+- AES-256-GCM encrypted credential storage
+- Profile-based multi-instance support
+- CI/CD ready with exit codes and machine-readable output
+- Native Rust binary — fast, single executable, no runtime dependencies
+
+## Products Covered
+
+### Jira
+- Issue CRUD, search with JQL, bulk transitions
+- Automation rules, webhooks, audit logs
+- Project and role management
+
+### Confluence
+- Space and page management
+- CQL-based search, bulk export and backup
+- Attachment handling, analytics
+
+### Bitbucket
+- Repository lifecycle management
+- Pull request workflows
+- Branch protection, pipeline operations
+- Bearer and Basic authentication
+
+### JSM (Jira Service Management)
+- Service desk operations
+- Request management
+- Customer portal, SLA tracking
+
+## Links
+
+- Website: https://atlassiancli.com
+- GitHub: https://github.com/omar16100/atlassian-cli
+- Crates.io: https://crates.io/crates/atlassian-cli
+
+## Version
+
+Current version: 0.3.0
+License: MIT
+Author: Omar Shabab (https://omarshabab.com)

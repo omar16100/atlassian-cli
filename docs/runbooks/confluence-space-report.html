@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Confluence Space Analytics Reports | atlassian-cli</title>
+    <meta name="description" content="Generate detailed analytics reports for Confluence spaces including page views, contributors, and activity metrics via the command line.">
+    <meta name="keywords" content="confluence analytics, confluence space report, confluence page views, confluence csv export, atlassian cli, confluence metrics">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Generate Confluence Space Analytics Reports | atlassian-cli">
+    <meta property="og:description" content="Generate detailed analytics reports for Confluence spaces including page views, contributors, and activity metrics via the command line.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/runbooks/confluence-space-report.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Generate Confluence Space Analytics Reports">
+    <meta name="twitter:description" content="Generate detailed analytics reports for Confluence spaces including page views and activity metrics.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/runbooks/confluence-space-report.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- JSON-LD HowTo Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "Generate Confluence Space Analytics Reports",
+      "description": "Generate detailed CSV analytics reports for Confluence spaces including page views, contributors, and activity metrics using atlassian-cli.",
+      "url": "https://atlassiancli.com/runbooks/confluence-space-report.html",
+      "tool": {
+        "@type": "HowToTool",
+        "name": "atlassian-cli"
+      },
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Fetch space statistics",
+          "text": "Query the Confluence analytics API for high-level space statistics including total pages and blog post counts."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "List all pages",
+          "text": "Retrieve all pages in the space using the page list command with JSON output."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Collect page-level metrics",
+          "text": "For each page, fetch view counts, creation date, last modified date, and labels from the Confluence API."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Generate CSV report",
+          "text": "Write all collected data to a CSV file with columns for space, page ID, title, status, views, created, modified, and labels."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Display summary",
+          "text": "Calculate and display aggregate statistics including total pages, total views, average views, and the top 5 most viewed pages."
+        }
+      ],
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      }
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        .runbook-hero {
+            padding: 8rem 0 3rem;
+            text-align: center;
+        }
+        .breadcrumb {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            margin-bottom: 1.5rem;
+        }
+        .breadcrumb a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .breadcrumb a:hover {
+            color: var(--accent-cyan);
+        }
+        .breadcrumb span {
+            margin: 0 0.5rem;
+        }
+        .runbook-badge {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--accent-cyan);
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: var(--font-mono);
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(0, 212, 170, 0.2);
+        }
+        .runbook-title {
+            font-size: clamp(1.75rem, 5vw, 2.5rem);
+            font-weight: 600;
+            line-height: 1.15;
+            margin-bottom: 1rem;
+            letter-spacing: -0.03em;
+        }
+        .runbook-meta {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+        .runbook-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 1.5rem 4rem;
+        }
+        .runbook-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+        }
+        .runbook-content p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+        .runbook-content ul, .runbook-content ol {
+            color: var(--text-secondary);
+            padding-left: 1.5rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.8;
+        }
+        .runbook-content li {
+            margin-bottom: 0.5rem;
+        }
+        .runbook-content li code, .runbook-content p code {
+            background: var(--bg-tertiary);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            color: var(--accent-cyan);
+        }
+        .script-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .script-header h4 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .related-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .related-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+        .related-card h4 {
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-bottom: 0.4rem;
+        }
+        .related-card p {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-bottom: 0;
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 1.25rem;
+        }
+        .step-item p {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="/#install" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="runbook-hero">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/">Home</a><span>&gt;</span><a href="/">Confluence</a><span>&gt;</span>Space Report
+            </div>
+            <div class="runbook-badge">Runbook</div>
+            <h1 class="runbook-title">Generate Confluence Space Analytics Reports</h1>
+            <p class="runbook-meta">Build CSV reports with per-page view counts, creation dates, modification times, and summary statistics for any Confluence space.</p>
+        </div>
+    </section>
+
+    <!-- Content -->
+    <div class="runbook-content">
+
+        <h2>What This Does</h2>
+        <p>This runbook generates a detailed analytics CSV report for a Confluence space. It fetches every page in the space, collects view counts and metadata for each, and outputs a spreadsheet-ready CSV. It also prints a summary with total pages, total views, average views per page, and the top 5 most viewed pages.</p>
+
+        <h2>Prerequisites</h2>
+        <ul>
+            <li><code>atlassian-cli</code> installed (<a href="/#install" style="color: var(--accent-cyan);">install guide</a>)</li>
+            <li>Confluence authentication configured via <code>atlassian-cli auth login</code></li>
+            <li><code>jq</code> installed for JSON processing</li>
+            <li>Confluence analytics permissions for page view data</li>
+        </ul>
+
+        <h2>Quick Start</h2>
+        <pre class="code-block"><code><span class="comment"># Generate report for DOCS space</span>
+./space-report.sh DOCS
+
+<span class="comment"># Use a named profile and custom output file</span>
+./space-report.sh DOCS prod quarterly-report.csv
+
+<span class="comment"># Sort output by views descending</span>
+sort -t<span class="string">','</span> -k5 -nr space_report_*.csv | head -20</code></pre>
+
+        <h2>Full Runbook Script</h2>
+        <div class="script-header">
+            <h4>space-report.sh</h4>
+            <button class="copy-btn" id="copy-script-btn" aria-label="Copy script">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
+        </div>
+        <pre class="code-block" id="full-script"><code><span class="comment">#!/bin/bash</span>
+<span class="comment"># Confluence Space Analytics Report</span>
+<span class="comment">#</span>
+<span class="comment"># Generates a CSV report with space statistics and page view data.</span>
+<span class="comment"># Useful for understanding content usage and identifying popular/stale pages.</span>
+<span class="comment">#</span>
+<span class="comment"># Usage:</span>
+<span class="comment">#   ./space-report.sh SPACE_KEY [PROFILE] [OUTPUT_FILE]</span>
+<span class="comment">#   ./space-report.sh DOCS prod report.csv</span>
+<span class="comment">#</span>
+<span class="comment"># Output CSV columns:</span>
+<span class="comment">#   - Space Key, Page ID, Title, Views, Last Modified, Labels</span>
+<span class="comment">#</span>
+<span class="comment"># Requirements:</span>
+<span class="comment">#   - atlassian-cli installed and configured</span>
+<span class="comment">#   - jq for JSON processing</span>
+
+set -euo pipefail
+
+<span class="comment"># Configuration</span>
+SPACE_KEY=<span class="string">"${1:?Space key required}"</span>
+PROFILE=<span class="string">"${2:-default}"</span>
+OUTPUT_FILE=<span class="string">"${3:-space_report_$(date +%Y%m%d).csv}"</span>
+
+<span class="comment"># Colors</span>
+GREEN=<span class="string">'\033[0;32m'</span>
+YELLOW=<span class="string">'\033[1;33m'</span>
+NC=<span class="string">'\033[0m'</span>
+
+log() {
+    echo -e <span class="string">"${GREEN}[$(date +'%H:%M:%S')]${NC} $*"</span>
+}
+
+warn() {
+    echo -e <span class="string">"${YELLOW}[WARN]${NC} $*"</span>
+}
+
+<span class="comment"># Get space statistics</span>
+get_space_stats() {
+    log <span class="string">"Fetching space statistics for $SPACE_KEY"</span>
+
+    local stats
+    stats=$(atlassian-cli confluence analytics space-stats \
+        --profile <span class="string">"$PROFILE"</span> \
+        <span class="string">"$SPACE_KEY"</span> \
+        --output json)
+
+    echo <span class="string">"$stats"</span> | jq -r <span class="string">'
+        "Space: \(.space_key)",
+        "Total Pages: \(.total_pages)",
+        "Total Blogs: \(.total_blogs)",
+        ""
+    '</span>
+}
+
+<span class="comment"># Get all pages in space</span>
+get_all_pages() {
+    log <span class="string">"Fetching all pages from $SPACE_KEY"</span>
+
+    local pages
+    pages=$(atlassian-cli confluence page list \
+        --profile <span class="string">"$PROFILE"</span> \
+        --space <span class="string">"$SPACE_KEY"</span> \
+        --limit 1000 \
+        --output json)
+
+    echo <span class="string">"$pages"</span>
+}
+
+<span class="comment"># Get page views for a specific page</span>
+get_page_views() {
+    local page_id=<span class="string">"$1"</span>
+
+    <span class="comment"># Try to get page views, return 0 if not available</span>
+    atlassian-cli confluence analytics page-views \
+        --profile <span class="string">"$PROFILE"</span> \
+        <span class="string">"$page_id"</span> \
+        --output json 2&gt;/dev/null | \
+        jq -r <span class="string">'.view_count // 0'</span> || echo <span class="string">"0"</span>
+}
+
+<span class="comment"># Get page details including labels</span>
+get_page_details() {
+    local page_id=<span class="string">"$1"</span>
+
+    atlassian-cli confluence page get \
+        --profile <span class="string">"$PROFILE"</span> \
+        <span class="string">"$page_id"</span> \
+        --output json
+}
+
+<span class="comment"># Generate CSV report</span>
+generate_report() {
+    local pages=<span class="string">"$1"</span>
+
+    log <span class="string">"Generating report: $OUTPUT_FILE"</span>
+
+    <span class="comment"># Write CSV header</span>
+    echo <span class="string">"Space,Page ID,Title,Status,Views,Created,Last Modified,Labels"</span> &gt; <span class="string">"$OUTPUT_FILE"</span>
+
+    local total
+    total=$(echo <span class="string">"$pages"</span> | jq <span class="string">'. | length'</span>)
+    local processed=0
+
+    <span class="comment"># Process each page</span>
+    echo <span class="string">"$pages"</span> | jq -r <span class="string">'.[] | @json'</span> | while IFS= read -r page_json; do
+        local page_id
+        page_id=$(echo <span class="string">"$page_json"</span> | jq -r <span class="string">'.id'</span>)
+        local title
+        title=$(echo <span class="string">"$page_json"</span> | jq -r <span class="string">'.title'</span>)
+        local status
+        status=$(echo <span class="string">"$page_json"</span> | jq -r <span class="string">'.status // "unknown"'</span>)
+
+        processed=$((processed + 1))
+        log <span class="string">"Processing [$processed/$total]: $title"</span>
+
+        <span class="comment"># Get page views</span>
+        local views
+        views=$(get_page_views <span class="string">"$page_id"</span>)
+
+        <span class="comment"># Get detailed page info</span>
+        local details
+        details=$(get_page_details <span class="string">"$page_id"</span>)
+
+        <span class="comment"># Extract metadata</span>
+        local created
+        created=$(echo <span class="string">"$details"</span> | jq -r <span class="string">'.createdAt // "N/A"'</span>)
+        local modified
+        modified=$(echo <span class="string">"$details"</span> | jq -r <span class="string">'.version.createdAt // "N/A"'</span>)
+
+        <span class="comment"># Extract labels</span>
+        local labels=<span class="string">"N/A"</span>
+
+        <span class="comment"># Escape title for CSV</span>
+        local csv_title
+        csv_title=$(echo <span class="string">"$title"</span> | sed <span class="string">'s/"/""/g'</span>)
+
+        <span class="comment"># Write CSV row</span>
+        echo <span class="string">"$SPACE_KEY,\"$page_id\",\"$csv_title\",$status,$views,$created,$modified,\"$labels\""</span> &gt;&gt; <span class="string">"$OUTPUT_FILE"</span>
+
+    done
+}
+
+<span class="comment"># Generate summary statistics</span>
+generate_summary() {
+    log <span class="string">"Generating summary statistics"</span>
+
+    local total_pages
+    total_pages=$(tail -n +2 <span class="string">"$OUTPUT_FILE"</span> | wc -l | tr -d <span class="string">' '</span>)
+
+    local total_views
+    total_views=$(tail -n +2 <span class="string">"$OUTPUT_FILE"</span> | cut -d<span class="string">','</span> -f5 | \
+        awk <span class="string">'{sum+=$1} END {print sum}'</span>)
+
+    local avg_views
+    if [ <span class="string">"$total_pages"</span> -gt 0 ]; then
+        avg_views=$((total_views / total_pages))
+    else
+        avg_views=0
+    fi
+
+    echo <span class="string">""</span>
+    log <span class="string">"Report Summary:"</span>
+    echo <span class="string">"  Total Pages: $total_pages"</span>
+    echo <span class="string">"  Total Views: $total_views"</span>
+    echo <span class="string">"  Average Views: $avg_views"</span>
+    echo <span class="string">""</span>
+
+    <span class="comment"># Top 5 most viewed pages</span>
+    log <span class="string">"Top 5 Most Viewed Pages:"</span>
+    tail -n +2 <span class="string">"$OUTPUT_FILE"</span> | \
+        sort -t<span class="string">','</span> -k5 -nr | \
+        head -5 | \
+        awk -F<span class="string">','</span> <span class="string">'{printf "  %5d views - %s\n", $5, $3}'</span> | \
+        sed <span class="string">'s/"//g'</span>
+
+    echo <span class="string">""</span>
+}
+
+<span class="comment"># Main execution</span>
+main() {
+    log <span class="string">"Starting space analytics report"</span>
+    log <span class="string">"Space: $SPACE_KEY | Profile: $PROFILE"</span>
+
+    <span class="comment"># Get space overview</span>
+    get_space_stats
+
+    <span class="comment"># Get all pages</span>
+    local pages
+    pages=$(get_all_pages)
+
+    if [ <span class="string">"$(echo "$pages" | jq '. | length')"</span> -eq 0 ]; then
+        warn <span class="string">"No pages found in space $SPACE_KEY"</span>
+        exit 0
+    fi
+
+    <span class="comment"># Generate CSV report</span>
+    generate_report <span class="string">"$pages"</span>
+
+    <span class="comment"># Show summary</span>
+    generate_summary
+
+    log <span class="string">"Report saved to: $OUTPUT_FILE"</span>
+}
+
+main</code></pre>
+
+        <h2>How It Works</h2>
+
+        <div class="step-item">
+            <span class="step-number">1</span>
+            <p><strong>Fetch space statistics.</strong> Calls <code>confluence analytics space-stats</code> to get high-level metrics like total pages and blog posts, printed to the console as an overview.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">2</span>
+            <p><strong>List all pages.</strong> Uses <code>confluence page list</code> with a limit of 1000 to retrieve every page in the space as JSON. Exits early if the space is empty.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">3</span>
+            <p><strong>Collect per-page metrics.</strong> Iterates through each page, calling <code>analytics page-views</code> for view counts and <code>page get</code> for creation date, modification date, and status. Gracefully falls back to zero views if analytics data is unavailable.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">4</span>
+            <p><strong>Write CSV report.</strong> Outputs a row per page with columns: Space, Page ID, Title, Status, Views, Created, Last Modified, and Labels. Titles are properly CSV-escaped with double-quote handling.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">5</span>
+            <p><strong>Print summary.</strong> Calculates aggregate statistics from the CSV (total pages, total views, average views) and displays the top 5 most viewed pages sorted by view count.</p>
+        </div>
+
+        <h2>Related Runbooks</h2>
+        <div class="related-links">
+            <a href="/runbooks/confluence-backup.html" class="related-card">
+                <h4>Backup Confluence Spaces</h4>
+                <p>Export pages, blog posts, and attachments to local timestamped backups.</p>
+            </a>
+            <a href="/runbooks/confluence-bulk-cleanup.html" class="related-card">
+                <h4>Bulk Clean Up Old Pages</h4>
+                <p>Find and archive or delete outdated Confluence pages using CQL queries.</p>
+            </a>
+            <a href="/runbooks/confluence-markdown-sync.html" class="related-card">
+                <h4>Sync Markdown to Confluence</h4>
+                <p>Automatically push markdown docs to Confluence pages with pandoc conversion.</p>
+            </a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.0</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">Copied!</div>
+
+    <script>
+    document.getElementById('copy-script-btn').addEventListener('click', function() {
+        const code = document.getElementById('full-script').textContent;
+        navigator.clipboard.writeText(code).then(function() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(function() { toast.classList.remove('show'); }, 2000);
+        });
+    });
+    </script>
+</body>
+</html>

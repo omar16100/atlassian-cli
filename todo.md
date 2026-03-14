@@ -1,5 +1,56 @@
 # Changes Made
 
+## 2026-03-14 - SEO & Traffic Growth Implementation
+
+### Context
+Site was ranking for only 5 keywords (all positions 41-90+) despite target keywords exploding in volume (jira cli: +303% YoY, atlassian cli: +6400% YoY). Root causes: single-page site, zero backlinks, no GSC, no structured data. ChatGPT already drives 8% of traffic without optimization.
+
+### Phase 1: Technical SEO Foundation
+- `docs/index.html` — Added JSON-LD SoftwareApplication schema, canonical URL, Twitter card meta tags, blog nav links, version bump to v0.3.0
+- `docs/sitemap.xml` — Expanded with lastmod dates, blog index URL, llms.txt URL
+- `docs/robots.txt` — Added AI bot directives (GPTBot, ChatGPT-User, Claude-Web, PerplexityBot)
+- `docs/llms.txt` — Created AI assistant context file with product info, features, install commands
+- `docs/blog/index.html` — Created blog listing page with planned article cards matching site design
+- `docs/seo_traffic_growth_plan.md` — Full SEO analysis with DataForSEO data, keyword research, Codex review
+
+### Phase 2: Product Landing Pages — DONE
+- [DONE] `docs/jira/index.html` — Jira CLI product page (target: jira cli 2,900/mo)
+- [DONE] `docs/confluence/index.html` — Confluence CLI product page (target: confluence cli 480/mo)
+- [DONE] `docs/bitbucket/index.html` — Bitbucket CLI product page (target: bitbucket cli 320/mo)
+- [DONE] `docs/jsm/index.html` — JSM CLI product page (target: jira service management cli)
+- [DONE] `docs/product.css` — shared product page styles
+
+### Phase 3: Runbook Pages — DONE (10 pages from existing scripts)
+- [DONE] `docs/runbooks/jira-bulk-transition.html` — from jira/bulk-transition.sh
+- [DONE] `docs/runbooks/jira-project-cleanup.html` — from jira/project-cleanup.sh
+- [DONE] `docs/runbooks/jira-sprint-report.html` — from jira/sprint-report.sh
+- [DONE] `docs/runbooks/confluence-backup.html` — from confluence/backup-space.sh
+- [DONE] `docs/runbooks/confluence-bulk-cleanup.html` — from confluence/bulk-cleanup.sh
+- [DONE] `docs/runbooks/confluence-markdown-sync.html` — from confluence/doc-pipeline.sh
+- [DONE] `docs/runbooks/confluence-space-report.html` — from confluence/space-report.sh
+- [DONE] `docs/runbooks/bitbucket-branch-cleanup.html` — from bitbucket/branch-cleanup.sh
+- [DONE] `docs/runbooks/bitbucket-pr-automation.html` — from bitbucket/pr-automation.sh
+- [DONE] `docs/runbooks/bitbucket-repo-audit.html` — from bitbucket/repo-audit.sh
+
+### Phase 4 (Blog Articles)
+- [DONE] Article 2: `docs/blog/atlassian-cli-guide.html` — atlassian-cli deep-dive (target: atlassian cli, 1300/mo, KD: 5). ~1,500 words, covers install, config, product walkthroughs (Jira/Confluence/Bitbucket/JSM), real-world workflows, internal links to product pages and runbooks.
+- [DONE] Article 7: `docs/blog/jira-cli-tools-compared.html` — Jira CLI tools comparison (target: jira cli tool, 170/mo, KD: 7). ~1,500 words, comparison table (atlassian-cli vs jira-cli vs go-jira vs ACLI), decision matrix, FAQ with JSON-LD FAQPage schema.
+- [DONE] Updated `docs/blog/index.html` — Linked Card 2 and Card 7 to published articles, removed "Coming Soon" hero badge.
+- [DONE] Article 1: `docs/blog/jira-cli-complete-guide.html` — Jira CLI Complete Guide (target: jira cli, 2900/mo, KD: 11). ~2,000 words, comparison table, FAQ with JSON-LD FAQPage schema, CI/CD integration section.
+- Article 3: Confluence CLI guide (target: confluence cli, 480/mo)
+- Article 4: Jira CLI commands cheat sheet (target: jira cli commands, 90/mo, KD: 5)
+- [DONE] Article 5: `docs/blog/jira-bulk-operations.html` — Bulk Jira Operations (target: jira bulk operations, KD: 1). ~1,200 words, dry-run pattern, bulk transition/assign/export, concurrency control, sprint cleanup workflow, FAQ with JSON-LD FAQPage schema.
+- [DONE] Article 6: `docs/blog/bitbucket-cli-guide.html` — Bitbucket CLI Guide (target: bitbucket cli, 320/mo). ~1,500 words, Basic vs Bearer auth, repo/PR/pipeline/branch operations, real-world CI/CD and audit scripts, FAQ with JSON-LD FAQPage schema.
+- [DONE] Updated `docs/blog/index.html` — Linked Card 5 and Card 6 to published articles, changed badges from "Coming Soon" to "Published".
+- Article 8: JSM CLI guide (target: jira service management cli)
+
+### Pending: Infrastructure
+- Set up Google Search Console for atlassiancli.com
+- Set up Bing Webmaster Tools (Bing is #1 search source at 24%)
+- Update Cargo.toml homepage to atlassiancli.com (stop authority leakage to GitHub)
+
+---
+
 ## 2026-02-20 - Bitbucket Bearer Auth Support & App Password Deprecation
 
 ### Context

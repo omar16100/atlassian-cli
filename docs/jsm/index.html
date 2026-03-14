@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSM CLI — Automate Jira Service Management from the Command Line | atlassian-cli</title>
+    <meta name="description" content="Automate Jira Service Management from the command line. Manage requests, customers, SLAs, queues, and knowledge base articles via CLI.">
+    <meta name="keywords" content="jira service management cli, jsm cli tool, service desk automation cli, itsm cli, jsm command line">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="JSM CLI — Automate Jira Service Management from the Command Line">
+    <meta property="og:description" content="Automate Jira Service Management from the command line. Manage requests, customers, SLAs, queues, and knowledge base articles via CLI.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://atlassiancli.com/jsm/">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="JSM CLI — atlassian-cli">
+    <meta name="twitter:description" content="Automate Jira Service Management from the command line. Manage requests, customers, SLAs, queues, and knowledge base.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "atlassian-cli JSM CLI",
+      "description": "Command-line tool for automating Jira Service Management. Manage service desks, requests, customers, SLAs, and queues from your terminal.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux, Windows",
+      "url": "https://atlassiancli.com/jsm/",
+      "downloadUrl": "https://github.com/omar16100/atlassian-cli/releases",
+      "softwareVersion": "0.3.0",
+      "license": "https://opensource.org/licenses/MIT",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      }
+    }
+    </script>
+
+    <link rel="canonical" href="https://atlassiancli.com/jsm/" />
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        .product-hero { padding: 10rem 0 4rem; text-align: center; }
+        .product-hero-badge {
+            display: inline-block;
+            background: rgba(101, 84, 192, 0.15);
+            color: #8777d9;
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: var(--font-mono);
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(101, 84, 192, 0.25);
+        }
+        .product-hero h1 {
+            font-size: clamp(2.5rem, 8vw, 4rem);
+            font-weight: 600;
+            line-height: 1.1;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+        }
+        .product-hero h1 span {
+            background: linear-gradient(135deg, #8777d9, var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .product-hero p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 560px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+        .features-section { padding: var(--section-padding); }
+        .features-section .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.25rem;
+        }
+        .examples-section { padding: var(--section-padding); background: var(--bg-secondary); }
+        .quickstart-section { padding: var(--section-padding); }
+        .quickstart-code {
+            max-width: 680px;
+            margin: 0 auto 2rem;
+        }
+        .resources-section { padding: var(--section-padding); background: var(--bg-secondary); }
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.25rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .resource-card {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+        .resource-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+        .resource-card h4 { font-size: 0.95rem; margin-bottom: 0.5rem; }
+        .resource-card p { font-size: 0.8rem; color: var(--text-secondary); }
+        .product-nav {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .product-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-family: var(--font-mono);
+            padding: 0.4rem 0.8rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .product-nav a:hover, .product-nav a.current {
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+        }
+        .product-nav a.current { color: #8777d9; border-color: rgba(101, 84, 192, 0.4); }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="#quickstart" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="product-hero">
+        <div class="container">
+            <div class="product-hero-badge">Part of atlassian-cli</div>
+            <h1>JSM <span>CLI</span></h1>
+            <p>Automate Jira Service Management from your terminal. Service desks, requests, customers, and queues — scriptable ITSM operations.</p>
+            <div class="product-nav">
+                <a href="/jira/">Jira</a>
+                <a href="/confluence/">Confluence</a>
+                <a href="/bitbucket/">Bitbucket</a>
+                <a href="/jsm/" class="current">JSM</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Grid -->
+    <section class="features-section">
+        <div class="container">
+            <h2 class="section-title">JSM Features</h2>
+            <p class="section-subtitle">Service management automation from the command line</p>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Service Desk Operations</h3>
+                    <p class="feature-desc">List and inspect service desks. Get desk details including request types, portal settings, and queue configuration.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Request Management</h3>
+                    <p class="feature-desc">List, get, and filter service requests. View request details, status, and resolution. Scriptable ticket triage workflows.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Customer Portal</h3>
+                    <p class="feature-desc">Manage customers and organizations. List portal users, add customers to service desks, and audit access.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">SLA Tracking</h3>
+                    <p class="feature-desc">Monitor SLA compliance across service desks. Track time-to-first-response and time-to-resolution metrics via CLI.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Knowledge Base</h3>
+                    <p class="feature-desc">Access knowledge base articles linked to service desks. Integrate KB content into automated workflows and runbooks.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 17 10 11 4 5"></polyline>
+                            <line x1="12" y1="19" x2="20" y2="19"></line>
+                        </svg>
+                    </div>
+                    <h3 class="feature-title">Queue Automation</h3>
+                    <p class="feature-desc">Query and manage service desk queues. Filter requests by status, priority, and assignee. Pipe output to scripts.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Examples -->
+    <section class="examples-section" id="examples">
+        <div class="container">
+            <h2 class="section-title">Code Examples</h2>
+            <p class="section-subtitle">Automate service management tasks</p>
+
+            <div class="examples-tabs">
+                <button class="tab-btn active" data-tab="requests">List Requests</button>
+                <button class="tab-btn" data-tab="customers">Manage Customers</button>
+                <button class="tab-btn" data-tab="servicedesk">Service Desk Info</button>
+            </div>
+
+            <div class="examples-content">
+                <!-- List Requests -->
+                <div class="example-panel active" id="tab-requests">
+                    <div class="example-header">
+                        <h4>Query Service Requests</h4>
+                        <button class="copy-btn" data-copy-target="code-requests" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-requests"><code><span class="comment"># List recent service requests</span>
+atlassian-cli jsm request list --limit 10
+
+<span class="comment"># Get details of a specific request</span>
+atlassian-cli jsm request get SD-123
+
+<span class="comment"># Output as JSON for scripting</span>
+atlassian-cli jsm request list \
+  --limit 50 --output json
+
+<span class="comment"># Export requests to CSV</span>
+atlassian-cli jsm request list \
+  --output csv > requests.csv</code></pre>
+                </div>
+
+                <!-- Manage Customers -->
+                <div class="example-panel" id="tab-customers">
+                    <div class="example-header">
+                        <h4>Customer Management</h4>
+                        <button class="copy-btn" data-copy-target="code-customers" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-customers"><code><span class="comment"># List service desks to find the desk ID</span>
+atlassian-cli jsm servicedesk list
+
+<span class="comment"># List requests filtered by service desk</span>
+atlassian-cli jsm request list \
+  --limit 20 --output json
+
+<span class="comment"># Get request details with full metadata</span>
+atlassian-cli jsm request get SD-456 \
+  --output json
+
+<span class="comment"># Combine with Jira for cross-product views</span>
+atlassian-cli jira search \
+  --jql <span class="string">"project = SD ORDER BY created DESC"</span> \
+  --limit 10</code></pre>
+                </div>
+
+                <!-- Service Desk Info -->
+                <div class="example-panel" id="tab-servicedesk">
+                    <div class="example-header">
+                        <h4>Service Desk Operations</h4>
+                        <button class="copy-btn" data-copy-target="code-servicedesk" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-servicedesk"><code><span class="comment"># List all service desks</span>
+atlassian-cli jsm servicedesk list --limit 10
+
+<span class="comment"># Get service desk details as JSON</span>
+atlassian-cli jsm servicedesk list \
+  --output json
+
+<span class="comment"># Use profiles for different instances</span>
+atlassian-cli jsm servicedesk list \
+  --profile <span class="string">production</span>
+
+<span class="comment"># Combine with table output for quick overview</span>
+atlassian-cli jsm request list \
+  --limit 25 --output table</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section class="quickstart-section" id="quickstart">
+        <div class="container">
+            <h2 class="section-title">Quick Start</h2>
+            <p class="section-subtitle">Set up JSM CLI access in seconds</p>
+            <div class="quickstart-code">
+                <pre class="code-block"><code><span class="comment"># Install via Homebrew</span>
+brew install omar16100/atlassian-cli/atlassian-cli
+
+<span class="comment"># Configure authentication</span>
+atlassian-cli auth login \
+  --profile <span class="string">work</span> \
+  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --email <span class="string">you@company.com</span>
+
+<span class="comment"># Verify connection</span>
+atlassian-cli auth test --profile <span class="string">work</span>
+
+<span class="comment"># List your service desks</span>
+atlassian-cli jsm servicedesk list
+
+<span class="comment"># View recent requests</span>
+atlassian-cli jsm request list --limit 5</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Related Resources -->
+    <section class="resources-section">
+        <div class="container">
+            <h2 class="section-title">Related Resources</h2>
+            <p class="section-subtitle">Learn more about atlassian-cli</p>
+            <div class="resources-grid">
+                <a href="/blog/" class="resource-card">
+                    <h4>Blog</h4>
+                    <p>Tutorials, release notes, and automation guides for JSM and the full Atlassian stack.</p>
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="resource-card">
+                    <h4>Full Documentation</h4>
+                    <p>Complete command reference for JSM service desk, request, and customer operations.</p>
+                </a>
+                <a href="/jira/" class="resource-card">
+                    <h4>Jira CLI</h4>
+                    <p>Combine JSM with Jira CLI for cross-product automation — issues, projects, and bulk operations.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.0</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">Copied!</div>
+
+    <script src="../script.js"></script>
+</body>
+</html>

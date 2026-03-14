@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automate Bitbucket Pull Request Approvals & Merges | atlassian-cli</title>
+    <meta name="description" content="Automate your Bitbucket PR workflow from the command line. Auto-approve trusted authors, auto-merge when approval thresholds are met.">
+    <meta name="keywords" content="bitbucket pr automation, auto approve pull request, auto merge bitbucket, bitbucket cli, pr workflow automation, atlassian cli">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Automate Bitbucket Pull Request Approvals & Merges | atlassian-cli">
+    <meta property="og:description" content="Automate your Bitbucket PR workflow from the command line. Auto-approve trusted authors, auto-merge when approval thresholds are met.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/runbooks/bitbucket-pr-automation.html">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Automate Bitbucket Pull Request Approvals & Merges">
+    <meta name="twitter:description" content="Automate your Bitbucket PR workflow from the command line. Auto-approve and auto-merge PRs.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/runbooks/bitbucket-pr-automation.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- JSON-LD HowTo Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "Automate Bitbucket Pull Request Approvals & Merges",
+      "description": "Automate your Bitbucket PR workflow using the atlassian-cli command line tool. Auto-approve PRs from trusted authors and auto-merge when approval thresholds are met.",
+      "url": "https://atlassiancli.com/runbooks/bitbucket-pr-automation.html",
+      "tool": {
+        "@type": "HowToTool",
+        "name": "atlassian-cli"
+      },
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Configure workspace and repository",
+          "text": "Set the target workspace, repository, profile, trusted author list, and minimum approval threshold via command-line flags."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Fetch open pull requests",
+          "text": "The script lists all open PRs in the target repository using the Bitbucket API."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Auto-approve trusted authors",
+          "text": "PRs authored by users in the trusted-authors list are automatically approved if the --auto-approve flag is set."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Check approval thresholds",
+          "text": "For each open PR, the script checks whether the current approval count meets the configured minimum (default 2)."
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Auto-merge qualifying PRs",
+          "text": "PRs that meet the minimum approval threshold are automatically merged using the configured merge strategy."
+        }
+      ],
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      }
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        .runbook-hero {
+            padding: 8rem 0 3rem;
+            text-align: center;
+        }
+        .breadcrumb {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            margin-bottom: 1.5rem;
+        }
+        .breadcrumb a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .breadcrumb a:hover {
+            color: var(--accent-cyan);
+        }
+        .breadcrumb span {
+            margin: 0 0.5rem;
+        }
+        .runbook-badge {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--accent-cyan);
+            padding: 0.375rem 0.875rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            font-family: var(--font-mono);
+            margin-bottom: 1.5rem;
+            border: 1px solid rgba(0, 212, 170, 0.2);
+        }
+        .runbook-title {
+            font-size: clamp(1.75rem, 5vw, 2.5rem);
+            font-weight: 600;
+            line-height: 1.15;
+            margin-bottom: 1rem;
+            letter-spacing: -0.03em;
+        }
+        .runbook-meta {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+        .runbook-content {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 1.5rem 4rem;
+        }
+        .runbook-content h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+        }
+        .runbook-content p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+        .runbook-content ul, .runbook-content ol {
+            color: var(--text-secondary);
+            padding-left: 1.5rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.8;
+        }
+        .runbook-content li {
+            margin-bottom: 0.5rem;
+        }
+        .runbook-content li code, .runbook-content p code {
+            background: var(--bg-tertiary);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            color: var(--accent-cyan);
+        }
+        .script-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .script-header h4 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .related-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .related-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+        .related-card h4 {
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-bottom: 0.4rem;
+        }
+        .related-card p {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-bottom: 0;
+        }
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(0, 212, 170, 0.1);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 1.25rem;
+        }
+        .step-item p {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="/#install" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="runbook-hero">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/">Home</a><span>&gt;</span><a href="/bitbucket/">Bitbucket</a><span>&gt;</span>PR Automation
+            </div>
+            <div class="runbook-badge">Runbook</div>
+            <h1 class="runbook-title">Automate Bitbucket Pull Request Approvals & Merges</h1>
+            <p class="runbook-meta">Streamline your PR workflow by auto-approving PRs from trusted authors and auto-merging when approval thresholds are met. Full dry-run support for safe testing.</p>
+        </div>
+    </section>
+
+    <!-- Content -->
+    <div class="runbook-content">
+
+        <h2>What This Does</h2>
+        <p>This runbook automates two key PR operations: approving pull requests from a configurable list of trusted authors, and merging PRs that have reached a minimum approval threshold. It processes all open PRs in a given repository and generates a summary report. Dry-run mode is the default so you can preview all actions before they execute.</p>
+
+        <h2>Prerequisites</h2>
+        <ul>
+            <li><code>atlassian-cli</code> installed (<a href="/#install" style="color: var(--accent-cyan);">install guide</a>)</li>
+            <li>Bitbucket authentication configured via <code>atlassian-cli auth login --bitbucket</code></li>
+            <li><code>jq</code> installed for JSON processing</li>
+            <li>PR approval and merge permissions on the target repository</li>
+        </ul>
+
+        <h2>Quick Start</h2>
+        <pre class="code-block"><code><span class="comment"># Preview what would be approved and merged</span>
+./pr-automation.sh --workspace myteam --repo api-service --dry-run
+
+<span class="comment"># Auto-approve PRs from trusted authors</span>
+./pr-automation.sh --workspace myteam --repo api-service \
+  --auto-approve --trusted-authors <span class="string">"ci-bot,release-bot"</span>
+
+<span class="comment"># Auto-merge PRs with enough approvals</span>
+./pr-automation.sh --workspace myteam --repo api-service \
+  --auto-merge --min-approvals 2</code></pre>
+
+        <h2>Full Runbook Script</h2>
+        <div class="script-header">
+            <h4>pr-automation.sh</h4>
+            <button class="copy-btn" id="copy-script-btn" aria-label="Copy script">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
+        </div>
+        <pre class="code-block" id="full-script"><code><span class="comment">#!/bin/bash</span>
+<span class="comment"># Bitbucket Pull Request Automation Script</span>
+<span class="comment">#</span>
+<span class="comment"># Automates PR workflows:</span>
+<span class="comment">#   - Auto-approve PRs matching criteria (author, reviewers, checks passed)</span>
+<span class="comment">#   - Auto-merge approved PRs</span>
+<span class="comment">#   - Add reviewers to PRs missing review</span>
+<span class="comment">#</span>
+<span class="comment"># Usage:</span>
+<span class="comment">#   # Dry run to preview actions</span>
+<span class="comment">#   ./pr-automation.sh --workspace myworkspace --repo myrepo --dry-run</span>
+<span class="comment">#</span>
+<span class="comment">#   # Auto-approve PRs from specific authors</span>
+<span class="comment">#   ./pr-automation.sh --workspace myworkspace --repo myrepo \</span>
+<span class="comment">#                      --auto-approve --trusted-authors "user1,user2"</span>
+<span class="comment">#</span>
+<span class="comment">#   # Auto-merge approved PRs</span>
+<span class="comment">#   ./pr-automation.sh --workspace myworkspace --repo myrepo --auto-merge</span>
+<span class="comment">#</span>
+<span class="comment"># Requirements:</span>
+<span class="comment">#   - atlassian-cli installed and configured</span>
+
+set -euo pipefail
+
+<span class="comment"># Configuration</span>
+WORKSPACE=<span class="string">""</span>
+REPO=<span class="string">""</span>
+PROFILE=<span class="string">"default"</span>
+DRY_RUN=true
+AUTO_APPROVE=false
+AUTO_MERGE=false
+TRUSTED_AUTHORS=<span class="string">""</span>
+MIN_APPROVALS=2
+
+<span class="comment"># Colors</span>
+GREEN=<span class="string">'\033[0;32m'</span>
+YELLOW=<span class="string">'\033[1;33m'</span>
+RED=<span class="string">'\033[0;31m'</span>
+NC=<span class="string">'\033[0m'</span>
+
+log() {
+    echo -e <span class="string">"${GREEN}[INFO]${NC} $*"</span>
+}
+
+warn() {
+    echo -e <span class="string">"${YELLOW}[WARN]${NC} $*"</span>
+}
+
+error() {
+    echo -e <span class="string">"${RED}[ERROR]${NC} $*"</span> &gt;&amp;2
+}
+
+<span class="comment"># Parse arguments</span>
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --workspace)
+                WORKSPACE=<span class="string">"$2"</span>
+                shift 2
+                ;;
+            --repo)
+                REPO=<span class="string">"$2"</span>
+                shift 2
+                ;;
+            --profile)
+                PROFILE=<span class="string">"$2"</span>
+                shift 2
+                ;;
+            --auto-approve)
+                AUTO_APPROVE=true
+                DRY_RUN=false
+                shift
+                ;;
+            --auto-merge)
+                AUTO_MERGE=true
+                DRY_RUN=false
+                shift
+                ;;
+            --trusted-authors)
+                TRUSTED_AUTHORS=<span class="string">"$2"</span>
+                shift 2
+                ;;
+            --min-approvals)
+                MIN_APPROVALS=<span class="string">"$2"</span>
+                shift 2
+                ;;
+            --dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            *)
+                error <span class="string">"Unknown option: $1"</span>
+                exit 1
+                ;;
+        esac
+    done
+
+    if [ -z <span class="string">"$WORKSPACE"</span> ] || [ -z <span class="string">"$REPO"</span> ]; then
+        error <span class="string">"Both --workspace and --repo are required"</span>
+        exit 1
+    fi
+}
+
+<span class="comment"># Get open pull requests</span>
+get_open_prs() {
+    log <span class="string">"Fetching open pull requests..."</span>
+
+    atlassian-cli bitbucket pullrequest list \
+        --profile <span class="string">"$PROFILE"</span> \
+        <span class="string">"$WORKSPACE"</span> \
+        <span class="string">"$REPO"</span> \
+        --state OPEN \
+        --output json
+}
+
+<span class="comment"># Check if author is trusted</span>
+is_trusted_author() {
+    local author=<span class="string">"$1"</span>
+
+    if [ -z <span class="string">"$TRUSTED_AUTHORS"</span> ]; then
+        return 1
+    fi
+
+    echo <span class="string">"$TRUSTED_AUTHORS"</span> | grep -q <span class="string">"$author"</span>
+}
+
+<span class="comment"># Get PR approval count</span>
+get_approval_count() {
+    local pr_id=<span class="string">"$1"</span>
+
+    atlassian-cli bitbucket pullrequest get \
+        --profile <span class="string">"$PROFILE"</span> \
+        <span class="string">"$WORKSPACE"</span> \
+        <span class="string">"$REPO"</span> \
+        <span class="string">"$pr_id"</span> \
+        --output json | \
+        jq <span class="string">'[.participants[] | select(.approved == true)] | length'</span>
+}
+
+<span class="comment"># Auto-approve PR</span>
+approve_pr() {
+    local pr_id=<span class="string">"$1"</span>
+    local title=<span class="string">"$2"</span>
+
+    if [ <span class="string">"$DRY_RUN"</span> = <span class="string">"true"</span> ]; then
+        warn <span class="string">"[DRY-RUN] Would approve PR #$pr_id: $title"</span>
+        return
+    fi
+
+    log <span class="string">"Approving PR #$pr_id: $title"</span>
+
+    atlassian-cli bitbucket pullrequest approve \
+        --profile <span class="string">"$PROFILE"</span> \
+        <span class="string">"$WORKSPACE"</span> \
+        <span class="string">"$REPO"</span> \
+        <span class="string">"$pr_id"</span>
+}
+
+<span class="comment"># Auto-merge PR</span>
+merge_pr() {
+    local pr_id=<span class="string">"$1"</span>
+    local title=<span class="string">"$2"</span>
+
+    if [ <span class="string">"$DRY_RUN"</span> = <span class="string">"true"</span> ]; then
+        warn <span class="string">"[DRY-RUN] Would merge PR #$pr_id: $title"</span>
+        return
+    fi
+
+    log <span class="string">"Merging PR #$pr_id: $title"</span>
+
+    atlassian-cli bitbucket pullrequest merge \
+        --profile <span class="string">"$PROFILE"</span> \
+        <span class="string">"$WORKSPACE"</span> \
+        <span class="string">"$REPO"</span> \
+        <span class="string">"$pr_id"</span> \
+        --strategy merge
+}
+
+<span class="comment"># Process PRs for auto-approval</span>
+process_auto_approve() {
+    local prs=<span class="string">"$1"</span>
+
+    if [ <span class="string">"$AUTO_APPROVE"</span> = <span class="string">"false"</span> ]; then
+        return
+    fi
+
+    log <span class="string">"Processing PRs for auto-approval..."</span>
+
+    local approved=0
+
+    echo <span class="string">"$prs"</span> | jq -r <span class="string">'.[] | @json'</span> | while IFS= read -r pr_json; do
+        local pr_id
+        pr_id=$(echo <span class="string">"$pr_json"</span> | jq -r <span class="string">'.id'</span>)
+        local title
+        title=$(echo <span class="string">"$pr_json"</span> | jq -r <span class="string">'.title'</span>)
+        local author
+        author=$(echo <span class="string">"$pr_json"</span> | jq -r <span class="string">'.author.display_name'</span>)
+
+        <span class="comment"># Check if author is trusted</span>
+        if is_trusted_author <span class="string">"$author"</span>; then
+            log <span class="string">"PR #$pr_id by trusted author: $author"</span>
+            approve_pr <span class="string">"$pr_id"</span> <span class="string">"$title"</span>
+            approved=$((approved + 1))
+        fi
+    done
+
+    log <span class="string">"Auto-approved $approved PRs"</span>
+}
+
+<span class="comment"># Process PRs for auto-merge</span>
+process_auto_merge() {
+    local prs=<span class="string">"$1"</span>
+
+    if [ <span class="string">"$AUTO_MERGE"</span> = <span class="string">"false"</span> ]; then
+        return
+    fi
+
+    log <span class="string">"Processing PRs for auto-merge..."</span>
+
+    local merged=0
+
+    echo <span class="string">"$prs"</span> | jq -r <span class="string">'.[] | @json'</span> | while IFS= read -r pr_json; do
+        local pr_id
+        pr_id=$(echo <span class="string">"$pr_json"</span> | jq -r <span class="string">'.id'</span>)
+        local title
+        title=$(echo <span class="string">"$pr_json"</span> | jq -r <span class="string">'.title'</span>)
+
+        <span class="comment"># Check approval count</span>
+        local approvals
+        approvals=$(get_approval_count <span class="string">"$pr_id"</span>)
+
+        if [ <span class="string">"$approvals"</span> -ge <span class="string">"$MIN_APPROVALS"</span> ]; then
+            log <span class="string">"PR #$pr_id has $approvals approvals (min: $MIN_APPROVALS)"</span>
+            merge_pr <span class="string">"$pr_id"</span> <span class="string">"$title"</span>
+            merged=$((merged + 1))
+        else
+            log <span class="string">"PR #$pr_id has only $approvals approvals (need $MIN_APPROVALS)"</span>
+        fi
+    done
+
+    log <span class="string">"Auto-merged $merged PRs"</span>
+}
+
+<span class="comment"># Generate PR summary</span>
+generate_summary() {
+    local prs=<span class="string">"$1"</span>
+
+    echo <span class="string">""</span>
+    log <span class="string">"Pull Request Summary:"</span>
+
+    local total
+    total=$(echo <span class="string">"$prs"</span> | jq <span class="string">'. | length'</span>)
+    echo <span class="string">"  Total Open PRs: $total"</span>
+
+    local approved
+    approved=$(echo <span class="string">"$prs"</span> | jq <span class="string">'[.[] | select(.state == "OPEN")] | length'</span>)
+    echo <span class="string">"  Approved: $approved"</span>
+
+    echo <span class="string">""</span>
+}
+
+<span class="comment"># Main execution</span>
+main() {
+    parse_args <span class="string">"$@"</span>
+
+    log <span class="string">"Bitbucket PR Automation"</span>
+    log <span class="string">"Workspace: $WORKSPACE | Repo: $REPO | Profile: $PROFILE"</span>
+
+    if [ <span class="string">"$DRY_RUN"</span> = <span class="string">"true"</span> ]; then
+        warn <span class="string">"DRY-RUN MODE: No changes will be made"</span>
+    fi
+
+    local prs
+    prs=$(get_open_prs)
+
+    if [ <span class="string">"$(echo "$prs" | jq '. | length')"</span> -eq 0 ]; then
+        log <span class="string">"No open pull requests found"</span>
+        exit 0
+    fi
+
+    generate_summary <span class="string">"$prs"</span>
+
+    process_auto_approve <span class="string">"$prs"</span>
+    process_auto_merge <span class="string">"$prs"</span>
+
+    log <span class="string">"PR automation complete"</span>
+}
+
+main <span class="string">"$@"</span></code></pre>
+
+        <h2>How It Works</h2>
+
+        <div class="step-item">
+            <span class="step-number">1</span>
+            <p><strong>Parse configuration.</strong> The script reads <code>--workspace</code> and <code>--repo</code> (both required), plus optional flags for <code>--auto-approve</code>, <code>--auto-merge</code>, <code>--trusted-authors</code>, and <code>--min-approvals</code> (default 2). Dry-run mode is enabled by default.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">2</span>
+            <p><strong>Fetch open PRs.</strong> The script calls <code>bitbucket pullrequest list --state OPEN</code> to retrieve all open pull requests for the target repository as JSON, then generates a summary with total and approval counts.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">3</span>
+            <p><strong>Auto-approve trusted authors.</strong> When <code>--auto-approve</code> is set, the script checks each PR author against the <code>--trusted-authors</code> comma-separated list. Matching PRs are approved via the Bitbucket API.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">4</span>
+            <p><strong>Auto-merge on threshold.</strong> When <code>--auto-merge</code> is set, the script fetches the approval count for each PR. PRs meeting the <code>--min-approvals</code> threshold are merged automatically using the default merge strategy.</p>
+        </div>
+        <div class="step-item">
+            <span class="step-number">5</span>
+            <p><strong>Report results.</strong> A summary is printed showing how many PRs were approved and merged. In dry-run mode, all actions are logged as previews without making any actual changes to your repository.</p>
+        </div>
+
+        <h2>Related Runbooks</h2>
+        <div class="related-links">
+            <a href="/runbooks/bitbucket-branch-cleanup.html" class="related-card">
+                <h4>Branch Cleanup</h4>
+                <p>Automatically delete merged branches across all repos in a workspace.</p>
+            </a>
+            <a href="/runbooks/bitbucket-repo-audit.html" class="related-card">
+                <h4>Repository Audit</h4>
+                <p>Generate a CSV audit of all repos with size, language, permissions, and activity.</p>
+            </a>
+            <a href="/bitbucket/" class="related-card">
+                <h4>Bitbucket CLI Guide</h4>
+                <p>Full reference for all Bitbucket commands available in atlassian-cli.</p>
+            </a>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.0</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">Copied!</div>
+
+    <script>
+    document.getElementById('copy-script-btn').addEventListener('click', function() {
+        const code = document.getElementById('full-script').textContent;
+        navigator.clipboard.writeText(code).then(function() {
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(function() { toast.classList.remove('show'); }, 2000);
+        });
+    });
+    </script>
+</body>
+</html>

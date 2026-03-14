@@ -12,6 +12,11 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://atlassiancli.com">
 
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="atlassian-cli | Atlassian Cloud as Code">
+    <meta name="twitter:description" content="One CLI for Jira, Confluence, Bitbucket & JSM. Automate your entire Atlassian stack from the command line.">
+
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,6 +30,34 @@
       gtag('js', new Date());
       gtag('config', 'G-SHR43YZK8C');
     </script>
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "atlassian-cli",
+      "description": "One CLI for Jira, Confluence, Bitbucket & JSM. Automate your entire Atlassian Cloud stack from the command line.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux, Windows",
+      "url": "https://atlassiancli.com",
+      "downloadUrl": "https://github.com/omar16100/atlassian-cli/releases",
+      "softwareVersion": "0.3.0",
+      "license": "https://opensource.org/licenses/MIT",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      }
+    }
+    </script>
+
+    <link rel="canonical" href="https://atlassiancli.com/" />
 
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -43,6 +76,7 @@
                     GitHub
                 </a>
                 <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="#install" class="nav-btn">Install</a>
             </div>
         </div>
@@ -415,12 +449,13 @@ atlassian-cli auth test --bitbucket --profile <span class="string">bb-ci</span><
             <div class="footer-content">
                 <div class="footer-left">
                     <span class="footer-logo">atlassian-cli</span>
-                    <span class="footer-version">v0.2.9</span>
+                    <span class="footer-version">v0.3.0</span>
                 </div>
                 <div class="footer-links">
                     <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
                     <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
                     <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
                 </div>
                 <div class="footer-right">
                     <span class="footer-license">MIT License</span>

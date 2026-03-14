@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira CLI Commands Cheat Sheet | atlassian-cli Blog</title>
+    <meta name="description" content="Quick-reference cheat sheet for Jira CLI commands. Search, create, update, transition, bulk operations, and admin commands -- all copy-paste ready.">
+    <meta name="keywords" content="jira cli commands, jira-cli commands, jira command line, jira cli cheat sheet, jira cli reference, jql cli, jira bulk commands">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Jira CLI Commands Cheat Sheet">
+    <meta property="og:description" content="Quick-reference cheat sheet for Jira CLI commands. Search, create, update, transition, bulk operations, and admin commands -- all copy-paste ready.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/jira-cli-commands-cheat-sheet.html">
+    <meta property="article:published_time" content="2026-03-14T00:00:00Z">
+    <meta property="article:author" content="atlassian-cli team">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Jira CLI Commands Cheat Sheet">
+    <meta name="twitter:description" content="Quick-reference cheat sheet for Jira CLI commands. Search, create, update, transition, bulk operations, and admin commands -- all copy-paste ready.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/jira-cli-commands-cheat-sheet.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Article -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Jira CLI Commands Cheat Sheet",
+      "description": "Quick-reference cheat sheet for Jira CLI commands. Search, create, update, transition, bulk operations, and admin commands -- all copy-paste ready.",
+      "datePublished": "2026-03-14T00:00:00Z",
+      "dateModified": "2026-03-14T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/jira-cli-commands-cheat-sheet.html"
+      },
+      "url": "https://atlassiancli.com/blog/jira-cli-commands-cheat-sheet.html",
+      "inLanguage": "en-US",
+      "keywords": "jira cli commands, jira-cli commands, jira command line cheat sheet, jira cli reference"
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment {
+            color: var(--text-muted);
+        }
+
+        .article-body pre .string {
+            color: var(--accent-cyan);
+        }
+
+        /* Cheat sheet tables */
+        .cheat-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .cheat-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.825rem;
+            min-width: 640px;
+        }
+
+        .cheat-table th {
+            background: var(--bg-tertiary);
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .cheat-table td {
+            padding: 0.625rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: top;
+            line-height: 1.6;
+        }
+
+        .cheat-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .cheat-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .cheat-table td:first-child {
+            white-space: nowrap;
+        }
+
+        .cheat-table td code {
+            font-family: var(--font-mono);
+            font-size: 0.8em;
+            background: var(--bg-terminal);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        .cheat-table td:last-child code {
+            font-size: 0.75em;
+            color: var(--text-primary);
+            background: var(--bg-terminal);
+            display: inline-block;
+            max-width: 100%;
+            word-break: break-all;
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1rem 4rem;
+            }
+
+            .article-body h2 {
+                font-size: 1.25rem;
+            }
+
+            .toc {
+                padding: 1.25rem;
+            }
+
+            .related-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="/#install" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="article-meta">
+                <span class="article-meta-item">March 14, 2026</span>
+                <span class="article-meta-item">~5 min read</span>
+                <span class="article-meta-item">atlassian-cli team</span>
+                <span class="article-keyword">jira cli commands</span>
+            </div>
+            <h1 class="article-title">Jira CLI Commands Cheat Sheet</h1>
+            <p class="article-subtitle">Quick-reference for every Jira CLI command. Copy-paste ready examples for search, create, transition, bulk operations, and admin.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        <!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#authentication">Authentication</a></li>
+                <li><a href="#issue-search">Issue Search</a></li>
+                <li><a href="#issue-crud">Issue CRUD</a></li>
+                <li><a href="#transitions-assignments">Transitions &amp; Assignments</a></li>
+                <li><a href="#comments-watchers">Comments &amp; Watchers</a></li>
+                <li><a href="#bulk-operations">Bulk Operations</a></li>
+                <li><a href="#projects-admin">Projects &amp; Admin</a></li>
+                <li><a href="#output-formats">Output Formats</a></li>
+            </ol>
+        </nav>
+
+        <p>This cheat sheet covers every <strong>Jira CLI command</strong> available in <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a>. All commands are copy-paste ready -- replace placeholder values (<code>DEV-123</code>, <code>user@example.com</code>) with your own. For a full walkthrough with context, see the <a href="/blog/jira-cli-complete-guide.html">Complete Guide to Jira CLI Tools</a>.</p>
+
+        <!-- Section 1: Authentication -->
+        <h2 id="authentication">Authentication</h2>
+
+        <p>Set up profiles and manage credentials. Create an API token at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="nofollow">id.atlassian.com</a> first.</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>auth login</code></td>
+                        <td>Add a new profile with credentials</td>
+                        <td><code>atlassian-cli auth login --profile work --base-url your-domain.atlassian.net --email you@company.com --token $TOKEN --default</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>auth list</code></td>
+                        <td>List all configured profiles</td>
+                        <td><code>atlassian-cli auth list</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>auth test</code></td>
+                        <td>Test authentication works</td>
+                        <td><code>atlassian-cli auth test --profile work</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Credentials are stored with AES-256-GCM encryption in <code>~/.atlassian-cli/config.yaml</code>. Use the <code>--profile</code> flag on any command to target a specific instance.</p>
+
+        <!-- Section 2: Issue Search -->
+        <h2 id="issue-search">Issue Search</h2>
+
+        <p>Search issues using JQL (Jira Query Language). Add <code>--format json</code> to any search for machine-readable output.</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>jira search</code></td>
+                        <td>Search with any JQL query</td>
+                        <td><code>atlassian-cli jira search --jql "project = DEV order by created desc" --limit 5</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira search</code></td>
+                        <td>Open bugs assigned to you</td>
+                        <td><code>atlassian-cli jira search --jql "assignee = currentUser() AND type = Bug AND status != Done"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira search</code></td>
+                        <td>Unassigned issues in sprint</td>
+                        <td><code>atlassian-cli jira search --jql "sprint in openSprints() AND assignee is EMPTY"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira search</code></td>
+                        <td>Recently updated issues</td>
+                        <td><code>atlassian-cli jira search --jql "project = DEV AND updated >= -1d" --format json</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira search</code></td>
+                        <td>Issues by label</td>
+                        <td><code>atlassian-cli jira search --jql "project = DEV AND labels = 'urgent'"</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 3: Issue CRUD -->
+        <h2 id="issue-crud">Issue CRUD</h2>
+
+        <p>Create, read, update, and delete individual issues.</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>jira get</code></td>
+                        <td>Get issue details</td>
+                        <td><code>atlassian-cli jira get DEV-123</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira get</code></td>
+                        <td>Get issue as JSON</td>
+                        <td><code>atlassian-cli jira get DEV-123 --format json</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira create</code></td>
+                        <td>Create a bug</td>
+                        <td><code>atlassian-cli jira create --project DEV --issue-type Bug --summary "Login page returns 500"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira create</code></td>
+                        <td>Create a task</td>
+                        <td><code>atlassian-cli jira create --project DEV --issue-type Task --summary "Update API docs"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira update</code></td>
+                        <td>Update issue summary</td>
+                        <td><code>atlassian-cli jira update DEV-123 --summary "Updated summary"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira delete</code></td>
+                        <td>Delete an issue</td>
+                        <td><code>atlassian-cli jira delete DEV-123</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 4: Transitions & Assignments -->
+        <h2 id="transitions-assignments">Transitions &amp; Assignments</h2>
+
+        <p>Move issues through workflow states and manage assignments.</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>jira transition</code></td>
+                        <td>Move to "In Progress"</td>
+                        <td><code>atlassian-cli jira transition DEV-123 --transition "In Progress"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira transition</code></td>
+                        <td>Move to "Done"</td>
+                        <td><code>atlassian-cli jira transition DEV-123 --transition "Done"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira assign</code></td>
+                        <td>Assign to a user</td>
+                        <td><code>atlassian-cli jira assign DEV-123 --assignee user@example.com</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 5: Comments & Watchers -->
+        <h2 id="comments-watchers">Comments &amp; Watchers</h2>
+
+        <p>Add comments and manage issue watchers.</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>jira automation list</code></td>
+                        <td>List automation rules</td>
+                        <td><code>atlassian-cli jira automation list</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira webhooks list</code></td>
+                        <td>List webhooks</td>
+                        <td><code>atlassian-cli jira webhooks list</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira audit list</code></td>
+                        <td>View audit logs</td>
+                        <td><code>atlassian-cli jira audit list --from 2025-01-01 --limit 100</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 6: Bulk Operations -->
+        <h2 id="bulk-operations">Bulk Operations</h2>
+
+        <p>Process hundreds or thousands of issues with a single command. All bulk commands support <code>--dry-run</code> to preview changes before executing.</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>jira bulk transition</code></td>
+                        <td>Transition matching issues (dry-run)</td>
+                        <td><code>atlassian-cli jira bulk transition --jql "project = DEV AND status = Open" --transition "In Progress" --dry-run</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira bulk transition</code></td>
+                        <td>Transition matching issues (execute)</td>
+                        <td><code>atlassian-cli jira bulk transition --jql "project = DEV AND status = Open" --transition "In Progress"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira bulk assign</code></td>
+                        <td>Assign unassigned issues</td>
+                        <td><code>atlassian-cli jira bulk assign --jql "project = DEV AND assignee is EMPTY" --assignee admin@example.com</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira bulk export</code></td>
+                        <td>Export issues to JSON</td>
+                        <td><code>atlassian-cli jira bulk export --jql "project = DEV" --output issues.json --format json</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira bulk export</code></td>
+                        <td>Export issues to CSV</td>
+                        <td><code>atlassian-cli jira bulk export --jql "project = DEV" --output issues.csv --format csv</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Bulk operations run with concurrent execution and built-in rate-limit handling. The <code>--dry-run</code> flag is essential -- always preview destructive changes before committing.</p>
+
+        <!-- Section 7: Projects & Admin -->
+        <h2 id="projects-admin">Projects &amp; Admin</h2>
+
+        <p>Inspect your Jira configuration: projects, fields, workflows, components, versions, and roles.</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Description</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>jira project list</code></td>
+                        <td>List all projects</td>
+                        <td><code>atlassian-cli jira project list</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira project get</code></td>
+                        <td>Get project details</td>
+                        <td><code>atlassian-cli jira project get DEV</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira fields list</code></td>
+                        <td>List custom fields</td>
+                        <td><code>atlassian-cli jira fields list</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira workflows list</code></td>
+                        <td>List workflows</td>
+                        <td><code>atlassian-cli jira workflows list</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira workflows export</code></td>
+                        <td>Export a workflow definition</td>
+                        <td><code>atlassian-cli jira workflows export --name "Software Simplified Workflow"</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira components list</code></td>
+                        <td>List project components</td>
+                        <td><code>atlassian-cli jira components list --project DEV</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira versions list</code></td>
+                        <td>List project versions</td>
+                        <td><code>atlassian-cli jira versions list --project DEV</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira roles list</code></td>
+                        <td>List project roles</td>
+                        <td><code>atlassian-cli jira roles list --project DEV</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira roles get</code></td>
+                        <td>Get role details</td>
+                        <td><code>atlassian-cli jira roles get --project DEV --role-id 10002</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira roles actors</code></td>
+                        <td>List role actors (members)</td>
+                        <td><code>atlassian-cli jira roles actors --project DEV --role-id 10002</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira roles add-actor</code></td>
+                        <td>Add a user to a role</td>
+                        <td><code>atlassian-cli jira roles add-actor --project DEV --role-id 10002 --user user@example.com</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>jira roles remove-actor</code></td>
+                        <td>Remove a user from a role</td>
+                        <td><code>atlassian-cli jira roles remove-actor --project DEV --role-id 10002 --user user@example.com</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 8: Output Formats -->
+        <h2 id="output-formats">Output Formats</h2>
+
+        <p>Every command supports multiple output formats via the <code>--format</code> flag. Choose the right format for your use case:</p>
+
+        <div class="cheat-table-wrapper">
+            <table class="cheat-table">
+                <thead>
+                    <tr>
+                        <th>Format</th>
+                        <th>Flag</th>
+                        <th>Use Case</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Table</strong></td>
+                        <td><code>--format table</code></td>
+                        <td>Default. Human-readable terminal output with aligned columns.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>JSON</strong></td>
+                        <td><code>--format json</code></td>
+                        <td>Machine-readable. Pipe to <code>jq</code> for filtering. Best for CI/CD pipelines.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CSV</strong></td>
+                        <td><code>--format csv</code></td>
+                        <td>Spreadsheet-ready. Import into Excel, Google Sheets, or any data tool.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>YAML</strong></td>
+                        <td><code>--format yaml</code></td>
+                        <td>Config-file friendly. Good for documentation and version-controlled outputs.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Quiet</strong></td>
+                        <td><code>--format quiet</code></td>
+                        <td>Minimal output. Returns only IDs or keys -- useful for scripting chains.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Examples of piping output for scripting:</p>
+
+        <pre><code><span class="comment"># Get issue keys and pipe to another command</span>
+atlassian-cli jira search \
+  --jql <span class="string">"project = DEV AND status = Open"</span> \
+  --format quiet
+
+<span class="comment"># Export to JSON and filter with jq</span>
+atlassian-cli jira search \
+  --jql <span class="string">"project = DEV"</span> \
+  --format json | jq <span class="string">'.[].key'</span>
+
+<span class="comment"># Export issues to CSV for a spreadsheet</span>
+atlassian-cli jira bulk export \
+  --jql <span class="string">"project = DEV"</span> \
+  --output <span class="string">issues.csv</span> \
+  --format csv</code></pre>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/jira/" class="related-link">
+                <div class="related-link-title">Jira CLI Reference</div>
+                <div class="related-link-desc">Full command reference for Jira issue search, create, transition, and automation.</div>
+            </a>
+            <a href="/blog/jira-cli-complete-guide.html" class="related-link">
+                <div class="related-link-title">Complete Guide to Jira CLI</div>
+                <div class="related-link-desc">In-depth walkthrough of Jira CLI setup, JQL, bulk operations, and CI/CD integration.</div>
+            </a>
+            <a href="/blog/confluence-cli-guide.html" class="related-link">
+                <div class="related-link-title">Confluence CLI Guide</div>
+                <div class="related-link-desc">Manage Confluence spaces, pages, and bulk exports from the command line.</div>
+            </a>
+            <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="related-link">
+                <div class="related-link-title">GitHub Repository</div>
+                <div class="related-link-desc">Source code, documentation, and issue tracker for atlassian-cli.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.0</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
