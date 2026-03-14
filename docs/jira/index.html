@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira CLI — Search, Create & Automate Jira Issues from the Terminal | atlassian-cli</title>
+    <meta name="description" content="Manage Jira from the command line with atlassian-cli. Search issues with JQL, bulk transitions, automation rules, webhooks — all from your terminal.">
+    <meta name="keywords" content="jira cli, jira command line, jira cli tool, jira terminal, jira automation, jql search cli, jira bulk operations">
+    <meta property="og:title" content="Jira CLI — Search, Create & Automate Jira Issues from the Terminal">
+    <meta property="og:description" content="Manage Jira from the command line with atlassian-cli. Search issues with JQL, bulk transitions, automation rules, webhooks — all from your terminal.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://atlassiancli.com/jira/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Jira CLI — Search, Create & Automate Jira Issues from the Terminal">
+    <meta name="twitter:description" content="Manage Jira from the command line with atlassian-cli. Search issues with JQL, bulk transitions, automation rules, webhooks — all from your terminal.">
+    <link rel="canonical" href="https://atlassiancli.com/jira/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "atlassian-cli — Jira CLI",
+      "description": "Manage Jira from the command line. Search issues with JQL, bulk transitions, automation rules, webhooks — all from your terminal.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux, Windows",
+      "url": "https://atlassiancli.com/jira/",
+      "downloadUrl": "https://github.com/omar16100/atlassian-cli/releases",
+      "softwareVersion": "0.3.0",
+      "license": "https://opensource.org/licenses/MIT",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@type": "Person", "name": "Omar Shabab", "url": "https://omarshabab.com" }
+    }
+    </script>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../product.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="/#install" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="product-hero">
+        <div class="container">
+            <a href="/" class="product-hero-badge jira">Part of atlassian-cli</a>
+            <h1 class="product-hero-title">Jira <span class="highlight">CLI</span></h1>
+            <p class="product-hero-subtitle">Search, create, and automate Jira issues from the terminal. JQL queries, bulk transitions, sprint management, and CI/CD integration.</p>
+            <div class="product-hero-links">
+                <a href="/#install">Install</a>
+                <a href="/confluence/">Confluence CLI</a>
+                <a href="/blog/">Blog</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="product-features-section">
+        <div class="container">
+            <h2 class="section-title">Jira Features</h2>
+            <p class="section-subtitle">Everything you need to manage Jira from the command line</p>
+            <div class="product-features-grid">
+                <div class="pf-card">
+                    <div class="pf-card-icon jira">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </div>
+                    <h3 class="pf-card-title">Issue CRUD & JQL Search</h3>
+                    <p class="pf-card-desc">Create, read, update, and delete issues. Search with full JQL support. Filter by project, status, assignee, labels, and custom fields.</p>
+                </div>
+                <div class="pf-card">
+                    <div class="pf-card-icon jira">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                    </div>
+                    <h3 class="pf-card-title">Bulk Transitions</h3>
+                    <p class="pf-card-desc">Transition hundreds of issues at once with dry-run previews. Concurrent execution with configurable concurrency and progress tracking.</p>
+                </div>
+                <div class="pf-card">
+                    <div class="pf-card-icon jira">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    </div>
+                    <h3 class="pf-card-title">Sprint Management</h3>
+                    <p class="pf-card-desc">List sprints, generate velocity reports, and export sprint data as CSV. Track story points, cycle times, and issue breakdowns.</p>
+                </div>
+                <div class="pf-card">
+                    <div class="pf-card-icon jira">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    </div>
+                    <h3 class="pf-card-title">Automation Rules</h3>
+                    <p class="pf-card-desc">List, enable, disable, and export Jira automation rules. Manage your automation configuration as code alongside your project.</p>
+                </div>
+                <div class="pf-card">
+                    <div class="pf-card-icon jira">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    </div>
+                    <h3 class="pf-card-title">Webhooks & Audit Logs</h3>
+                    <p class="pf-card-desc">Register, list, and delete webhooks. Query audit logs with date ranges and event filters for compliance and debugging.</p>
+                </div>
+                <div class="pf-card">
+                    <div class="pf-card-icon jira">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <h3 class="pf-card-title">Role & Permission Management</h3>
+                    <p class="pf-card-desc">Manage project roles, permission schemes, and user assignments. Audit who has access to what across your Jira projects.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Examples -->
+    <section class="code-examples-section">
+        <div class="container">
+            <h2 class="section-title">Real Commands</h2>
+            <p class="section-subtitle">Actual CLI commands from production runbooks</p>
+            <div class="examples-tabs">
+                <button class="tab-btn active" data-tab="search">Search Issues</button>
+                <button class="tab-btn" data-tab="bulk">Bulk Transition</button>
+                <button class="tab-btn" data-tab="sprint">Sprint Report</button>
+            </div>
+            <div class="code-examples-content">
+                <div class="example-panel active" id="tab-search">
+                    <div class="example-header">
+                        <h4>Search Issues with JQL</h4>
+                        <button class="copy-btn" data-copy-target="code-search" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-search"><code><span class="comment"># Search issues by project and status</span>
+atlassian-cli jira search \
+  --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
+  --output json
+
+<span class="comment"># Search with assignee filter, table output</span>
+atlassian-cli jira search \
+  --jql <span class="string">"assignee = currentUser() AND sprint in openSprints()"</span> \
+  --output table
+
+<span class="comment"># Export results as CSV</span>
+atlassian-cli jira search \
+  --jql <span class="string">"project = DEV AND created >= -7d"</span> \
+  --output csv > new_issues.csv</code></pre>
+                </div>
+                <div class="example-panel" id="tab-bulk">
+                    <div class="example-header">
+                        <h4>Bulk Transition Issues</h4>
+                        <button class="copy-btn" data-copy-target="code-bulk" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-bulk"><code><span class="comment"># Preview issues to transition (dry-run)</span>
+atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = PROJ AND status = 'In Progress'"</span> \
+  --transition <span class="string">"Done"</span> \
+  --dry-run
+
+<span class="comment"># Execute the transition with concurrency</span>
+atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = PROJ AND status = 'In Progress'"</span> \
+  --transition <span class="string">"Done"</span> \
+  --concurrency 4 \
+  --comment <span class="string">"Closed via bulk transition"</span> \
+  --profile prod</code></pre>
+                </div>
+                <div class="example-panel" id="tab-sprint">
+                    <div class="example-header">
+                        <h4>Generate Sprint Report</h4>
+                        <button class="copy-btn" data-copy-target="code-sprint" aria-label="Copy code">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </div>
+                    <pre class="code-block" id="code-sprint"><code><span class="comment"># Fetch active sprint issues as JSON</span>
+atlassian-cli jira search \
+  --profile prod \
+  --jql <span class="string">"project = PROJ AND Sprint in openSprints()"</span> \
+  --output json
+
+<span class="comment"># Export sprint data to CSV for reporting</span>
+atlassian-cli jira search \
+  --profile prod \
+  --jql <span class="string">"project = PROJ AND Sprint = 42"</span> \
+  --output csv > sprint-42.csv
+
+<span class="comment"># Pipe to jq for cycle time analysis</span>
+atlassian-cli jira search \
+  --jql <span class="string">"project = PROJ AND Sprint = 42"</span> \
+  --output json | \
+  jq <span class="string">'[.[] | {key, status: .fields.status.name, points: .fields.customfield_10016}]'</span></code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section class="quickstart-section" id="quickstart">
+        <div class="container">
+            <h2 class="section-title">Quick Start</h2>
+            <p class="section-subtitle">Install and start managing Jira in under a minute</p>
+            <div class="quickstart-content">
+                <h4>1. Install</h4>
+                <pre class="code-block"><code><span class="comment"># Homebrew (macOS & Linux)</span>
+brew install omar16100/atlassian-cli/atlassian-cli
+
+<span class="comment"># Or via Cargo</span>
+cargo install atlassian-cli</code></pre>
+                <h4>2. Authenticate</h4>
+                <pre class="code-block"><code><span class="comment"># Add your Jira instance</span>
+atlassian-cli auth login \
+  --profile <span class="string">work</span> \
+  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --email <span class="string">you@company.com</span>
+
+<span class="comment"># Verify connection</span>
+atlassian-cli auth test --profile <span class="string">work</span></code></pre>
+                <h4>3. Start using</h4>
+                <pre class="code-block"><code><span class="comment"># Search your issues</span>
+atlassian-cli jira search \
+  --profile <span class="string">work</span> \
+  --jql <span class="string">"assignee = currentUser()"</span></code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Related Resources -->
+    <section class="related-section">
+        <div class="container">
+            <h2 class="section-title">Related Resources</h2>
+            <p class="section-subtitle">Runbooks, guides, and tutorials for Jira CLI workflows</p>
+            <div class="related-grid">
+                <a href="/runbooks/jira-bulk-transition.html" class="related-card">
+                    <div class="related-card-type">Runbook</div>
+                    <h3 class="related-card-title">Jira Bulk Transition</h3>
+                    <p class="related-card-desc">Production-ready script for bulk transitioning Jira issues with dry-run safety and progress tracking.</p>
+                </a>
+                <a href="/runbooks/jira-project-cleanup.html" class="related-card">
+                    <div class="related-card-type">Runbook</div>
+                    <h3 class="related-card-title">Jira Project Cleanup</h3>
+                    <p class="related-card-desc">Automate stale issue cleanup, archive old projects, and manage issue hygiene from the terminal.</p>
+                </a>
+                <a href="/runbooks/jira-sprint-report.html" class="related-card">
+                    <div class="related-card-type">Runbook</div>
+                    <h3 class="related-card-title">Jira Sprint Report</h3>
+                    <p class="related-card-desc">Generate sprint CSV reports with story points, cycle time metrics, and velocity tracking.</p>
+                </a>
+                <a href="/blog/jira-cli-complete-guide.html" class="related-card">
+                    <div class="related-card-type">Blog</div>
+                    <h3 class="related-card-title">Complete Guide to Jira CLI in 2026</h3>
+                    <p class="related-card-desc">Everything you need to know about managing Jira from the terminal. Setup, JQL, bulk operations, and CI/CD.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Cross-links -->
+    <section class="cross-link">
+        <div class="container">
+            <p>atlassian-cli also supports Confluence, Bitbucket, and JSM.</p>
+            <div class="cross-link-items">
+                <a href="/confluence/">Confluence CLI</a>
+                <a href="/bitbucket/">Bitbucket CLI</a>
+                <a href="/jsm/">JSM CLI</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.0</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+        </div>
+    </footer>
+
+    <div class="toast" id="toast">Copied!</div>
+    <script src="../script.js"></script>
+</body>
+</html>

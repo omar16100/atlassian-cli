@@ -1,3 +1,17 @@
 User-agent: *
 Allow: /
+
 Sitemap: https://atlassiancli.com/sitemap.xml
+
+# AI/LLM context
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /

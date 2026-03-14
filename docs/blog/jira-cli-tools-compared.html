@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Jira CLI Tools Compared (2026) | atlassian-cli Blog</title>
+    <meta name="description" content="An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.">
+    <meta name="keywords" content="jira cli tool, tools like jira, tools similar to jira, jira cli, jira command line, best jira cli, jira cli comparison">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Best Jira CLI Tools Compared (2026)">
+    <meta property="og:description" content="An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/jira-cli-tools-compared.html">
+    <meta property="article:published_time" content="2026-03-14T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Best Jira CLI Tools Compared (2026)">
+    <meta name="twitter:description" content="An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/jira-cli-tools-compared.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Article -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Best Jira CLI Tools Compared (2026)",
+      "description": "An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.",
+      "datePublished": "2026-03-14T00:00:00Z",
+      "dateModified": "2026-03-14T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/jira-cli-tools-compared.html"
+      },
+      "keywords": ["jira cli tool", "tools like jira", "tools similar to jira", "jira cli", "jira command line"]
+    }
+    </script>
+
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the best free Jira CLI?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "For Jira-only workflows, jira-cli by ankitpokhrel offers excellent TUI support and mature Go codebase. For multi-product Atlassian workflows covering Jira, Confluence, Bitbucket, and JSM, atlassian-cli provides the broadest coverage in a single binary. Both are free and open source under MIT license."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which Jira CLI supports Confluence too?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "atlassian-cli is the only open-source CLI that supports both Jira and Confluence (plus Bitbucket and JSM) in a single binary. Other tools like jira-cli and go-jira are Jira-only. ACLI (Appfire) supports multiple products but is a paid commercial tool."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use Jira CLI in GitHub Actions?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. atlassian-cli, jira-cli, and go-jira all work in GitHub Actions and other CI/CD environments. Install via Homebrew, Cargo, or direct binary download in your workflow, set API tokens as secrets, and use --format json for machine-readable output."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-meta-tag {
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            padding: 0.25rem 0.625rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .article-meta-sep {
+            color: var(--border);
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        .article-body {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-top: 3rem;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .article-body h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .article-body h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .article-body p {
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+            font-size: 0.95rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-color: var(--accent-cyan);
+        }
+
+        .article-body ul, .article-body ol {
+            color: var(--text-secondary);
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+            font-size: 0.95rem;
+            line-height: 1.8;
+        }
+
+        .article-body li {
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code:not(pre code) {
+            background: var(--bg-tertiary);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.825rem;
+            color: var(--accent-cyan);
+            border: 1px solid var(--border);
+        }
+
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            color: var(--text-primary);
+        }
+
+        .article-body .comment { color: var(--text-muted); }
+        .article-body .string { color: var(--accent-cyan); }
+
+        /* Comparison table */
+        .comparison-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.825rem;
+            min-width: 680px;
+        }
+
+        .comparison-table thead {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table th {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.775rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .comparison-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+
+        .comparison-table tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table .tool-name {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .comparison-table .check {
+            color: var(--accent-cyan);
+        }
+
+        .comparison-table .cross {
+            color: var(--text-muted);
+        }
+
+        /* Decision matrix */
+        .decision-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .decision-card h4 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .decision-card p {
+            margin-bottom: 0;
+        }
+
+        /* FAQ */
+        .faq-item {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .faq-item:last-child {
+            border-bottom: none;
+        }
+
+        .faq-question {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .article-cta {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .article-cta h3 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+        }
+
+        .article-cta p {
+            margin-bottom: 1.25rem;
+        }
+
+        .article-cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--accent-cyan);
+            color: #000;
+            padding: 0.625rem 1.25rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            border-bottom: none;
+        }
+
+        .article-cta-btn:hover {
+            background: #00e6b8;
+            transform: translateY(-1px);
+            border-bottom: none;
+        }
+
+        .breadcrumb {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            font-family: var(--font-mono);
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1.5rem 4rem;
+            }
+
+            .article-meta {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/#install" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/">Home</a> / <a href="/blog/">Blog</a> / Jira CLI Tools Compared
+            </div>
+            <div class="article-meta">
+                <span>March 14, 2026</span>
+                <span class="article-meta-sep">|</span>
+                <span>~6 min read</span>
+                <span class="article-meta-sep">|</span>
+                <span class="article-meta-tag">jira cli tool</span>
+            </div>
+            <h1 class="article-title">Best Jira CLI Tools Compared (2026)</h1>
+            <p class="article-subtitle">An honest comparison of the Jira CLI tools available today. Features, auth, output formats, and which one fits your workflow.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        <h2>Why the CLI Space for Jira Is Booming</h2>
+
+        <p>Search interest in "jira cli" has grown over 300% since 2023. The reason is straightforward: teams are automating more, CI/CD pipelines need to interact with Jira, and developers want to stay in their terminal instead of context-switching to a browser. Whether it is creating issues from a commit hook, transitioning tickets during a deploy, or exporting sprint data for a retro, a Jira CLI tool saves time.</p>
+
+        <p>But which one should you pick? There are four serious contenders in 2026, each with different strengths. This guide compares them honestly&mdash;including the trade-offs of our own tool, <a href="/blog/atlassian-cli-guide.html">atlassian-cli</a>.</p>
+
+        <h2>The Contenders</h2>
+
+        <ul>
+            <li><strong>atlassian-cli</strong> &mdash; Multi-product CLI for Jira, Confluence, Bitbucket, and JSM. Written in Rust.</li>
+            <li><strong>jira-cli</strong> (ankitpokhrel) &mdash; Feature-rich Jira CLI with a built-in TUI. Written in Go.</li>
+            <li><strong>go-jira</strong> &mdash; Lightweight Jira CLI focused on simplicity. Written in Go.</li>
+            <li><strong>ACLI</strong> (Appfire) &mdash; Enterprise-grade CLI from the Atlassian Marketplace. Written in Java.</li>
+        </ul>
+
+        <h2>Feature Comparison</h2>
+
+        <div class="comparison-table-wrapper">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>atlassian-cli</th>
+                        <th>jira-cli</th>
+                        <th>go-jira</th>
+                        <th>ACLI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Language</td>
+                        <td class="tool-name">Rust</td>
+                        <td>Go</td>
+                        <td>Go</td>
+                        <td>Java</td>
+                    </tr>
+                    <tr>
+                        <td>Products Supported</td>
+                        <td>Jira, Confluence, Bitbucket, JSM</td>
+                        <td>Jira</td>
+                        <td>Jira</td>
+                        <td>Jira, Confluence, Bitbucket, JSM, Bamboo</td>
+                    </tr>
+                    <tr>
+                        <td>Install Methods</td>
+                        <td>Homebrew, Cargo, Binary</td>
+                        <td>Homebrew, Go, Binary</td>
+                        <td>Homebrew, Go, Binary</td>
+                        <td>JAR download</td>
+                    </tr>
+                    <tr>
+                        <td>Auth Methods</td>
+                        <td>API token, Bearer token, env vars</td>
+                        <td>API token, PAT</td>
+                        <td>API token, session cookie</td>
+                        <td>API token, OAuth, PAT</td>
+                    </tr>
+                    <tr>
+                        <td>Output Formats</td>
+                        <td>Table, JSON, CSV, YAML, Quiet</td>
+                        <td>Table, JSON, YAML</td>
+                        <td>JSON, template</td>
+                        <td>Table, JSON, CSV</td>
+                    </tr>
+                    <tr>
+                        <td>Bulk Operations</td>
+                        <td class="check">Yes (transition, assign, label, export, import)</td>
+                        <td class="cross">Limited</td>
+                        <td class="cross">No</td>
+                        <td class="check">Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Dry-Run Mode</td>
+                        <td class="check">Yes</td>
+                        <td class="cross">No</td>
+                        <td class="cross">No</td>
+                        <td class="check">Yes</td>
+                    </tr>
+                    <tr>
+                        <td>TUI / Interactive</td>
+                        <td class="cross">No</td>
+                        <td class="check">Yes (excellent)</td>
+                        <td class="cross">No</td>
+                        <td class="cross">No</td>
+                    </tr>
+                    <tr>
+                        <td>Multi-Instance Profiles</td>
+                        <td class="check">Yes (encrypted)</td>
+                        <td class="check">Yes</td>
+                        <td class="check">Yes</td>
+                        <td class="check">Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Active Development</td>
+                        <td class="check">Yes (2026)</td>
+                        <td class="check">Yes (2026)</td>
+                        <td class="cross">Minimal</td>
+                        <td class="check">Yes (commercial)</td>
+                    </tr>
+                    <tr>
+                        <td>License</td>
+                        <td>MIT (free)</td>
+                        <td>MIT (free)</td>
+                        <td>Apache 2.0 (free)</td>
+                        <td>Commercial (paid)</td>
+                    </tr>
+                    <tr>
+                        <td>Runtime Dependencies</td>
+                        <td>None (native binary)</td>
+                        <td>None (native binary)</td>
+                        <td>None (native binary)</td>
+                        <td>JVM required</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Detailed Reviews</h2>
+
+        <h3>atlassian-cli</h3>
+
+        <p><a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> is the only open-source CLI that covers Jira, Confluence, Bitbucket, and JSM in a single binary. Written in Rust with a modular crate architecture, it ships as a zero-dependency native executable.</p>
+
+        <p><strong>Jira strengths:</strong> Full issue CRUD, JQL search, bulk operations (transition, assign, label, export, import) with concurrent execution and dry-run mode, automation rules management, webhook CRUD, audit log access, project role management, custom fields, and workflow export.</p>
+
+        <pre><code><span class="comment"># Search with JQL, output as JSON</span>
+atlassian-cli jira search \
+  --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
+  --format json
+
+<span class="comment"># Bulk transition with dry-run</span>
+atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = DEV AND status = Open"</span> \
+  --transition <span class="string">"In Progress"</span> \
+  --dry-run
+
+<span class="comment"># Export issues to CSV</span>
+atlassian-cli jira bulk export \
+  --jql <span class="string">"project = DEV"</span> \
+  --output <span class="string">issues.csv</span> \
+  --format csv</code></pre>
+
+        <p><strong>Honest take:</strong> atlassian-cli is newer than jira-cli and go-jira. It does not yet have a TUI or interactive mode. If you only use Jira and want a polished terminal UI, jira-cli is the more mature choice for that specific workflow. Where atlassian-cli excels is when you work across multiple Atlassian products and want one tool, one config, and one credential store for everything. The bulk operations with dry-run are also a standout feature that other free tools lack.</p>
+
+        <h3>jira-cli (ankitpokhrel)</h3>
+
+        <p><a href="https://github.com/ankitpokhrel/jira-cli" target="_blank" rel="noopener">jira-cli</a> is a mature Go-based CLI with one of the best terminal UIs in the space. The <code>jira issue list</code> command renders a beautifully formatted board view directly in the terminal, and the interactive issue creation flow is smooth.</p>
+
+        <pre><code><span class="comment"># List issues from a board</span>
+jira issue list
+
+<span class="comment"># Create issue interactively</span>
+jira issue create
+
+<span class="comment"># View an issue</span>
+jira issue view PROJ-123</code></pre>
+
+        <p><strong>Strengths:</strong> Excellent TUI with board view, interactive workflows, good JQL support, active community, well-documented. Supports Jira Server and Cloud.</p>
+
+        <p><strong>Honest take:</strong> This is the best Jira-only CLI for developers who want a rich interactive experience. The TUI is genuinely useful for daily ticket management. The trade-off is it covers Jira exclusively&mdash;no Confluence, no Bitbucket, no JSM. Bulk operations are limited compared to atlassian-cli. If your workflow is "check board, create ticket, update status," jira-cli is hard to beat.</p>
+
+        <h3>go-jira</h3>
+
+        <p><a href="https://github.com/go-jira/jira" target="_blank" rel="noopener">go-jira</a> is a lightweight, template-driven Jira CLI. It uses Go templates for custom output formatting, which gives you flexibility at the cost of a steeper learning curve for non-trivial output.</p>
+
+        <pre><code><span class="comment"># List issues</span>
+jira list --query <span class="string">"project = DEV"</span>
+
+<span class="comment"># View an issue</span>
+jira view DEV-123
+
+<span class="comment"># Create an issue</span>
+jira create --project DEV --issuetype Task -s <span class="string">"Summary"</span></code></pre>
+
+        <p><strong>Strengths:</strong> Lightweight, simple, template-based output customization, works with Jira Server.</p>
+
+        <p><strong>Honest take:</strong> go-jira was popular in the Jira Server era but has seen minimal maintenance in recent years. If you are on Jira Cloud and want active development, jira-cli or atlassian-cli are better choices. go-jira remains a solid option for Jira Server environments or simple automation scripts where you do not need bulk operations or rich output formats.</p>
+
+        <h3>ACLI (Appfire)</h3>
+
+        <p><a href="https://marketplace.atlassian.com/apps/9/acli-command-line-interface-for-jira-confluence-bitbucket-trello-and-more" target="_blank" rel="noopener">ACLI</a> is the enterprise option. Built by Appfire, available through the Atlassian Marketplace, it supports Jira, Confluence, Bitbucket, Bamboo, and more. It is a Java application distributed as a JAR file.</p>
+
+        <p><strong>Strengths:</strong> Broadest product coverage, enterprise support and SLAs, extensive scripting capabilities, available on the Atlassian Marketplace.</p>
+
+        <p><strong>Honest take:</strong> ACLI is powerful and battle-tested in enterprise environments. The downsides are cost (commercial license), JVM requirement (slower startup, larger footprint), and the learning curve of a massive command surface. If your organization has budget and needs vendor support, ACLI is the safe enterprise pick. For individual developers and small teams, the free open-source tools are typically more practical.</p>
+
+        <h2>Which Tool Should You Choose?</h2>
+
+        <div class="decision-card">
+            <h4>"I only use Jira and want the best terminal experience"</h4>
+            <p>Go with <strong>jira-cli</strong> (ankitpokhrel). The TUI board view and interactive workflows are unmatched.</p>
+        </div>
+
+        <div class="decision-card">
+            <h4>"I use Jira + Confluence + Bitbucket and want one tool"</h4>
+            <p>Go with <strong>atlassian-cli</strong>. Single binary, one config, consistent output across all products. See the <a href="/blog/atlassian-cli-guide.html">full guide</a>.</p>
+        </div>
+
+        <div class="decision-card">
+            <h4>"I need bulk Jira operations with safety guards"</h4>
+            <p>Go with <strong>atlassian-cli</strong>. Bulk transition, assign, label, export, and import with <code>--dry-run</code> and concurrent execution. See the <a href="/runbooks/jira-bulk-transition.html">bulk transition runbook</a>.</p>
+        </div>
+
+        <div class="decision-card">
+            <h4>"I need enterprise support and vendor SLAs"</h4>
+            <p>Go with <strong>ACLI</strong> (Appfire). Commercial license with support, broadest product coverage, Marketplace-certified.</p>
+        </div>
+
+        <div class="decision-card">
+            <h4>"I have simple Jira Server automation scripts"</h4>
+            <p>Go with <strong>go-jira</strong>. Lightweight, template-based, works well for straightforward Jira Server workflows.</p>
+        </div>
+
+        <div class="decision-card">
+            <h4>"I want to automate Jira in GitHub Actions or CI/CD"</h4>
+            <p>Both <strong>atlassian-cli</strong> and <strong>jira-cli</strong> work well. atlassian-cli has the edge if your pipeline also touches Confluence or Bitbucket. Use <code>--format json</code> for machine-readable output.</p>
+        </div>
+
+        <h2>FAQ</h2>
+
+        <div class="faq-item">
+            <h3 class="faq-question">What is the best free Jira CLI?</h3>
+            <p>For Jira-only workflows, <strong>jira-cli</strong> by ankitpokhrel offers the best TUI and interactive experience. For multi-product workflows covering Jira, Confluence, Bitbucket, and JSM, <strong>atlassian-cli</strong> provides the broadest coverage in a single binary. Both are free and open source under the MIT license.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3 class="faq-question">Which Jira CLI supports Confluence too?</h3>
+            <p><strong>atlassian-cli</strong> is the only open-source CLI that supports both Jira and Confluence (plus Bitbucket and JSM) in a single binary. Other tools like jira-cli and go-jira are Jira-only. ACLI supports multiple products but requires a commercial license. With atlassian-cli, you can chain <a href="/jira/">Jira commands</a> and <a href="/confluence/">Confluence commands</a> in the same script using shared profiles.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3 class="faq-question">Can I use Jira CLI in GitHub Actions?</h3>
+            <p>Yes. All four tools work in CI/CD environments. The setup is the same: install the binary (via Homebrew, Cargo, or direct download), set API tokens as GitHub secrets, and run commands with <code>--format json</code> for machine-readable output. atlassian-cli is particularly well-suited for pipelines because it supports exit codes, quiet mode, and environment variable-based auth without config files.</p>
+        </div>
+
+        <h2>Verdict</h2>
+
+        <p>There is no single "best" Jira CLI tool&mdash;it depends on your workflow. If you live in Jira all day and want a beautiful terminal board, use jira-cli. If you work across the Atlassian stack and want unified automation, use atlassian-cli. If you need enterprise support, ACLI is the established choice.</p>
+
+        <p>Our recommendation for most developer teams in 2026: start with <strong>atlassian-cli</strong> if you use more than one Atlassian product, or <strong>jira-cli</strong> if Jira is your only Atlassian tool. Both are free, both are actively maintained, and both install in under a minute.</p>
+
+        <div class="article-cta">
+            <h3>Try atlassian-cli</h3>
+            <p>One CLI for Jira, Confluence, Bitbucket, and JSM. Free and open source.</p>
+            <a href="/#install" class="article-cta-btn">Install Now</a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.0</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,5 +1,23 @@
 # atlassian-cli TODO
 
+## Product Landing Pages — Jira & Confluence (2026-03-14)
+- [x] Create /docs/jira/index.html — Jira CLI product page (315 lines)
+- [x] Create /docs/confluence/index.html — Confluence CLI product page (326 lines)
+- [x] Create /docs/product.css — shared product page styles (259 lines)
+- [x] Hero with badge, features grid (6 cards), tabbed code examples, quick start, related resources
+- [x] Real CLI commands from bulk-transition.sh, sprint-report.sh, backup-space.sh, doc-pipeline.sh
+- [x] JSON-LD SoftwareApplication schema, canonical URLs, OG/Twitter meta, GA tag
+- [x] Cross-product links, copy-to-clipboard buttons, dark theme throughout
+
+## Product Landing Pages — Bitbucket & JSM (2026-03-14)
+- [x] Create /docs/bitbucket/index.html — Bitbucket CLI product page (454 lines)
+- [x] Create /docs/jsm/index.html — JSM CLI product page (442 lines)
+- [x] Match existing site design: nav, footer, styles.css, GA tag, dark theme
+- [x] Add JSON-LD SoftwareApplication schema, canonical URLs, OG/Twitter meta
+- [x] Include tabbed code examples with copy-to-clipboard buttons
+- [x] Add cross-product nav links (/jira/, /confluence/, /bitbucket/, /jsm/)
+- [x] Use real CLI commands from README (not made up)
+
 ## Pipeline UX Fixes Round 2 (2026-03-14)
 - [x] Issue 1: watch --timeout with structured output on timeout
 - [x] Issue 2: steps trigger/manual column from API
