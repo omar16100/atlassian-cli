@@ -546,6 +546,12 @@ enum PipelineCommands {
         /// Shell command to run on pipeline completion. Receives env vars: PIPELINE_STATUS, PIPELINE_BUILD_NUMBER, PIPELINE_UUID, PIPELINE_REF_NAME.
         #[arg(long)]
         on_complete: Option<String>,
+        /// Timeout in seconds. Exit with code 2 if pipeline does not finish in time.
+        #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
+        timeout: Option<u64>,
+        /// Log mode: one line per poll, no ANSI escape codes. Auto-enabled when stdout is not a TTY.
+        #[arg(long)]
+        log: bool,
     },
     /// List steps for a pipeline.
     Steps {
@@ -1338,6 +1344,8 @@ pub async fn execute(
                 interval,
                 steps,
                 on_complete,
+                timeout,
+                log,
             } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline watch")?;
                 let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
@@ -1349,6 +1357,8 @@ pub async fn execute(
                     interval,
                     steps,
                     on_complete.as_deref(),
+                    timeout,
+                    log,
                 )
                 .await?;
                 let exit_code = pipelines::status_to_exit_code(&final_status);

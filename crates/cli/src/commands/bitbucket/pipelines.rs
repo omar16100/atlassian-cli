@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use atlassian_cli_output::OutputFormat;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use url::{self, form_urlencoded};
 
@@ -86,6 +87,14 @@ struct PipelineStep {
     completed_on: Option<String>,
     #[serde(default)]
     duration_in_seconds: Option<u64>,
+    #[serde(default)]
+    trigger: Option<StepTrigger>,
+}
+
+#[derive(Deserialize, Clone)]
+struct StepTrigger {
+    #[serde(rename = "type")]
+    trigger_type: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -144,6 +153,8 @@ struct StepInfo {
     duration: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     logs_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trigger: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -232,7 +243,7 @@ pub fn status_to_exit_code(status: &str) -> i32 {
     match status.to_uppercase().as_str() {
         "SUCCESSFUL" | "COMPLETED" => 0,
         "FAILED" | "ERROR" | "STOPPED" | "EXPIRED" => 1,
-        "PENDING" | "IN_PROGRESS" => 2,
+        "PENDING" | "IN_PROGRESS" | "TIMEOUT" => 2,
         _ => 0,
     }
 }
@@ -517,7 +528,23 @@ async fn fetch_steps(
                     None
                 },
                 duration: if include_details {
-                    step.duration_in_seconds.map(format_duration_secs)
+                    if let Some(secs) = step.duration_in_seconds {
+                        Some(format_duration_secs(secs))
+                    } else if step.started_on.is_some() && step.completed_on.is_none() {
+                        // In-progress step: compute client-side elapsed time
+                        step.started_on.as_ref().and_then(|started_str| {
+                            DateTime::parse_from_rfc3339(started_str).ok().map(
+                                |started| {
+                                    let elapsed =
+                                        Utc::now() - started.with_timezone(&Utc);
+                                    let secs = elapsed.num_seconds().max(0) as u64;
+                                    format!("~{}", format_duration_secs(secs))
+                                },
+                            )
+                        })
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 },
@@ -528,6 +555,10 @@ async fn fetch_steps(
                 } else {
                     None
                 },
+                trigger: step
+                    .trigger
+                    .as_ref()
+                    .and_then(|t| t.trigger_type.clone()),
             }
         })
         .collect())
@@ -1229,6 +1260,7 @@ pub async fn rerun_pipeline(
 
 /// Watch a pipeline until completion.
 /// Returns the final status string for exit code handling.
+#[allow(clippy::too_many_arguments)]
 pub async fn watch_pipeline(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -1237,7 +1269,11 @@ pub async fn watch_pipeline(
     interval: u64,
     show_steps: bool,
     on_complete: Option<&str>,
+    timeout: Option<u64>,
+    log_mode: bool,
 ) -> Result<String> {
+    use std::io::IsTerminal;
+
     // Resolve build number to UUID if needed (only once at start)
     let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
 
@@ -1247,8 +1283,13 @@ pub async fn watch_pipeline(
         OutputFormat::Table | OutputFormat::Markdown
     );
 
-    if is_table {
+    // Log mode: explicit --log flag OR table format piped to non-TTY
+    let use_log_mode = log_mode || (is_table && !std::io::stdout().is_terminal());
+
+    if is_table && !use_log_mode {
         eprintln!("Watching pipeline... (Ctrl-C to stop)");
+    } else if use_log_mode {
+        eprintln!("Watching pipeline in log mode... (Ctrl-C to stop)");
     }
 
     let final_status;
@@ -1263,9 +1304,10 @@ pub async fn watch_pipeline(
             None
         };
 
-        if is_table {
-            // Clear line and print status
-            print!("\x1B[2K\r"); // Clear current line
+        // Render based on mode
+        if is_table && !use_log_mode {
+            // ANSI overwrite mode (interactive TTY)
+            print!("\x1B[2K\r");
 
             let build_num = pipeline
                 .build_number
@@ -1280,7 +1322,7 @@ pub async fn watch_pipeline(
             let icon = get_status_icon(&status);
 
             if let Some(ref step_list) = steps {
-                let summary = format_steps_summary(step_list, is_table);
+                let summary = format_steps_summary(step_list, true);
                 print!(
                     "{} {} {} ({}) [{}] {}",
                     build_num, status, icon, ref_name, elapsed, summary
@@ -1294,16 +1336,44 @@ pub async fn watch_pipeline(
 
             use std::io::Write;
             std::io::stdout().flush().ok();
+        } else if use_log_mode {
+            // Log mode: one timestamped line per poll, no ANSI
+            let now = chrono::Local::now().format("%H:%M:%S");
+            let build_num = pipeline
+                .build_number
+                .map(|n| format!("#{}", n))
+                .unwrap_or_default();
+            let ref_name = pipeline
+                .target
+                .as_ref()
+                .and_then(|t| t.ref_name.clone())
+                .unwrap_or_else(|| "unknown".to_string());
+            let elapsed = format_elapsed(start);
+            let icon = get_status_icon(&status);
+
+            if let Some(ref step_list) = steps {
+                let summary = format_steps_summary(step_list, false);
+                println!(
+                    "[{now}] {build_num} {status} {icon} ({ref_name}) [{elapsed}] [{summary}]"
+                );
+            } else {
+                println!("[{now}] {build_num} {status} {icon} ({ref_name}) [{elapsed}]");
+            }
         }
+        // else: structured format (JSON/YAML/CSV) — no per-poll output
 
         // Check if pipeline reached terminal state
         if is_terminal_state(&status) {
-            if is_table {
-                println!(); // New line after final status
+            if is_table && !use_log_mode {
+                println!();
                 let icon = get_status_icon(&status);
                 println!("\n{icon} Pipeline completed with status: {status}");
+            } else if use_log_mode {
+                let now = chrono::Local::now().format("%H:%M:%S");
+                let icon = get_status_icon(&status);
+                println!("[{now}] {icon} Pipeline completed: {status}");
             } else {
-                // For JSON/YAML/CSV: render final state once (no colors)
+                // Structured output: render final state
                 let steps_summary = steps
                     .as_ref()
                     .filter(|s| !s.is_empty())
@@ -1364,6 +1434,48 @@ pub async fn watch_pipeline(
 
             final_status = status;
             break;
+        }
+
+        // Check timeout before sleeping
+        if let Some(timeout_secs) = timeout {
+            if start.elapsed() > Duration::from_secs(timeout_secs) {
+                tracing::warn!(timeout_secs, elapsed = ?start.elapsed(), "Watch timed out");
+
+                if is_table || use_log_mode {
+                    if is_table && !use_log_mode {
+                        println!();
+                    }
+                    eprintln!("\nTimeout: pipeline did not complete within {timeout_secs}s");
+                } else {
+                    // Structured output on timeout: render current state
+                    let steps_summary = steps
+                        .as_ref()
+                        .filter(|s| !s.is_empty())
+                        .map(|s| format_steps_summary(s, false));
+                    let view = PipelineView {
+                        uuid: pipeline.uuid.clone(),
+                        build_number: pipeline
+                            .build_number
+                            .map(|n| n.to_string())
+                            .unwrap_or_default(),
+                        state: status.clone(),
+                        ref_name: pipeline
+                            .target
+                            .as_ref()
+                            .and_then(|t| t.ref_name.clone())
+                            .unwrap_or_default(),
+                        commit: get_commit_hash(&pipeline),
+                        created: pipeline.created_on.unwrap_or_default(),
+                        completed: pipeline.completed_on.unwrap_or_default(),
+                        steps,
+                        steps_summary,
+                    };
+                    ctx.renderer.render(&view)?;
+                }
+
+                final_status = "TIMEOUT".to_string();
+                break;
+            }
         }
 
         tokio::time::sleep(Duration::from_secs(interval)).await;
@@ -1470,6 +1582,7 @@ mod tests {
                 completed: None,
                 duration: None,
                 logs_url: None,
+                trigger: None,
             },
             StepInfo {
                 uuid: "{uuid2}".to_string(),
@@ -1479,6 +1592,7 @@ mod tests {
                 completed: None,
                 duration: None,
                 logs_url: None,
+                trigger: None,
             },
             StepInfo {
                 uuid: "{uuid3}".to_string(),
@@ -1488,6 +1602,7 @@ mod tests {
                 completed: None,
                 duration: None,
                 logs_url: None,
+                trigger: None,
             },
         ];
         let summary = format_steps_summary(&steps, false);
@@ -1735,5 +1850,28 @@ mod tests {
         assert_eq!(status_to_exit_code("failed"), 1);
         // Unknown defaults to 0
         assert_eq!(status_to_exit_code("UNKNOWN_STATUS"), 0);
+        // Timeout maps to 2
+        assert_eq!(status_to_exit_code("TIMEOUT"), 2);
+    }
+
+    #[test]
+    fn test_step_trigger_deserialization() {
+        let json = r#"{
+            "uuid": "{step-uuid}",
+            "name": "Deploy",
+            "trigger": {"type": "manual"}
+        }"#;
+        let step: PipelineStep = serde_json::from_str(json).unwrap();
+        assert_eq!(step.trigger.unwrap().trigger_type.unwrap(), "manual");
+    }
+
+    #[test]
+    fn test_step_without_trigger_deserialization() {
+        let json = r#"{
+            "uuid": "{step-uuid}",
+            "name": "Build"
+        }"#;
+        let step: PipelineStep = serde_json::from_str(json).unwrap();
+        assert!(step.trigger.is_none());
     }
 }
