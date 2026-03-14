@@ -1,5 +1,12 @@
 # atlassian-cli TODO
 
+## Pipeline UX Fixes Round 2 (2026-03-14)
+- [x] Issue 1: watch --timeout with structured output on timeout
+- [x] Issue 2: steps trigger/manual column from API
+- [x] Issue 3: Better Forbidden error with scope-specific hint
+- [x] Issue 4: steps elapsed time for in-progress steps
+- [x] Issue 6: watch --log mode and non-TTY auto-detect
+
 ## Pipeline UX Fixes (2026-03-11)
 - [x] Issue 6: Better error messages when --repo is missing (show remotes, suggest fix)
 - [x] Issue 7: Make --step pattern respect --ignore-case flag in pipeline logs
