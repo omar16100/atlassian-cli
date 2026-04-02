@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "atlassian-cli-api",
@@ -212,7 +212,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-api"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-auth"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-bulk"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "criterion",
@@ -269,7 +269,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-config"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "dirs",
@@ -283,7 +283,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-output"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -2427,9 +2427,9 @@ checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.8"
+version = "0.103.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ffdfa2f5286e2247234e03f680868ac2815974dc39e00ea15adc445d0aafe52"
+checksum = "df33b2b81ac578cabaf06b89b0631153a3f416b0a886e8a7a1707fb51abbd1ef"
 dependencies = [
  "aws-lc-rs",
  "ring",
