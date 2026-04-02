@@ -13,10 +13,11 @@ pub struct JsmContext<'a> {
 
 impl JsmContext<'_> {
     pub async fn verify_auth(&self) -> anyhow::Result<()> {
-        let _: serde_json::Value =
-            self.client.get("/rest/api/3/myself").await.context(
-                "Authentication may be expired or invalid. Run: atlassian-cli auth test",
-            )?;
+        let _: serde_json::Value = self
+            .client
+            .get("/rest/api/3/myself")
+            .await
+            .context("Failed to verify Jira access. Run: atlassian-cli auth test")?;
         Ok(())
     }
 }

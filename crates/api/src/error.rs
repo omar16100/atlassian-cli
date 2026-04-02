@@ -32,6 +32,9 @@ pub enum ApiError {
     #[error("Request timeout after {attempts} attempts")]
     Timeout { attempts: usize },
 
+    #[error("API endpoint removed: {message}")]
+    EndpointGone { message: String },
+
     #[error("Invalid response format: {0}")]
     InvalidResponse(String),
 }
@@ -42,6 +45,7 @@ impl ApiError {
             ApiError::RateLimitExceeded { .. } => true,
             ApiError::ServerError { status, .. } if *status >= 500 => true,
             ApiError::Timeout { .. } => true,
+            ApiError::EndpointGone { .. } => false,
             _ => false,
         }
     }
@@ -74,6 +78,9 @@ impl ApiError {
                 }
             }
             ApiError::Timeout { .. } => Some("Check your network connection or try again later".to_string()),
+            ApiError::EndpointGone { .. } => {
+                Some("This API endpoint has been removed by Atlassian. Update atlassian-cli to the latest version.".to_string())
+            }
             _ => None,
         }
     }
@@ -138,5 +145,22 @@ mod tests {
         };
         let hint = err.suggestion().unwrap();
         assert!(hint.contains("app-passwords"));
+    }
+
+    #[test]
+    fn endpoint_gone_has_suggestion() {
+        let err = ApiError::EndpointGone {
+            message: "The requested API has been removed".to_string(),
+        };
+        assert!(err.suggestion().is_some());
+        assert!(err.suggestion().unwrap().contains("Update atlassian-cli"));
+    }
+
+    #[test]
+    fn endpoint_gone_is_not_retryable() {
+        let err = ApiError::EndpointGone {
+            message: "removed".to_string(),
+        };
+        assert!(!err.is_retryable());
     }
 }

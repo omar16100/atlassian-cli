@@ -13,10 +13,11 @@ pub struct BambooContext<'a> {
 
 impl BambooContext<'_> {
     pub async fn verify_auth(&self) -> anyhow::Result<()> {
-        let _: serde_json::Value =
-            self.client.get("/rest/api/latest/info").await.context(
-                "Authentication may be expired or invalid. Run: atlassian-cli auth test",
-            )?;
+        let _: serde_json::Value = self
+            .client
+            .get("/rest/api/latest/info")
+            .await
+            .context("Failed to verify Bamboo access. Run: atlassian-cli auth test")?;
         Ok(())
     }
 }

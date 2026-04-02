@@ -13,7 +13,7 @@ impl ConfluenceContext<'_> {
             .client
             .get("/wiki/rest/api/user/current")
             .await
-            .context("Authentication may be expired or invalid. Run: atlassian-cli auth test")?;
+            .context("Failed to verify Confluence access. Run: atlassian-cli auth test")?;
         Ok(())
     }
 }

@@ -7,7 +7,7 @@ async fn test_jira_search_issues() {
     let mock_server = MockServer::start().await;
 
     Mock::given(method("GET"))
-        .and(path("/rest/api/3/search"))
+        .and(path("/rest/api/3/search/jql"))
         .and(query_param("jql", "project = TEST"))
         .and(query_param("maxResults", "50"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -43,10 +43,38 @@ async fn test_jira_search_issues() {
         .with_basic_auth("test@example.com", "fake-token");
 
     let response: Result<serde_json::Value, _> = client
-        .get("/rest/api/3/search?jql=project%20%3D%20TEST&maxResults=50")
+        .get("/rest/api/3/search/jql?jql=project%20%3D%20TEST&maxResults=50")
         .await;
 
     assert!(response.is_ok());
+}
+
+#[tokio::test]
+async fn test_jira_search_410_returns_endpoint_gone() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/rest/api/3/search"))
+        .respond_with(ResponseTemplate::new(410).set_body_json(serde_json::json!({
+            "errorMessages": ["The requested API has been removed. Please migrate to the /rest/api/3/search/jql API."]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: Result<serde_json::Value, _> = client
+        .get("/rest/api/3/search?jql=project%20%3D%20TEST")
+        .await;
+
+    assert!(response.is_err());
+    let err = response.unwrap_err();
+    assert!(
+        matches!(err, atlassian_cli_api::error::ApiError::EndpointGone { .. }),
+        "Expected EndpointGone, got: {err:?}"
+    );
 }
 
 #[tokio::test]

@@ -1,5 +1,21 @@
 # Changes Made
 
+## 2026-04-02 - Jira Search API Migration & 410 Error Handling
+
+### Context
+Atlassian removed `/rest/api/3/search` (returns 410 Gone per CHANGE-2046). Bulk operations still used old endpoint. API client had no 410 handling — errors fell to generic ServerError with misleading "auth expired" context messages.
+
+### Changes
+- [DONE] `crates/cli/src/commands/jira/bulk.rs` — migrated `bulk_export` (line 225) and `search_issue_keys` (line 402) from `POST /rest/api/3/search` to `POST /rest/api/3/search/jql`; converted `fields` from comma-string to array
+- [DONE] `crates/api/src/error.rs` — added `EndpointGone` variant with suggestion text, `is_retryable() → false`, unit tests
+- [DONE] `crates/api/src/lib.rs` — added `StatusCode::GONE` arm in all 4 HTTP method match blocks
+- [DONE] `crates/cli/tests/jira_integration.rs` — updated search mock to new endpoint, added `test_jira_search_410_returns_endpoint_gone` test
+- [DONE] `docs/02042026_jira_search_migration.md` — migration documentation
+
+### Notes
+- Bug 1 (`auth test` false failure) and Bug 2 (`jira issue search`) were already fixed in v0.3.1 — `auth test` uses `/rest/api/3/myself`, `issue search` uses `/rest/api/3/search/jql`
+- Only bulk operations and error handling remained broken
+
 ## 2026-03-14 - SEO & Traffic Growth Implementation
 
 ### Context

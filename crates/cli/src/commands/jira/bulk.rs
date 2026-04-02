@@ -203,10 +203,10 @@ pub async fn bulk_export(
     fields: Vec<String>,
 ) -> Result<()> {
     // Search for issues with specified fields
-    let field_list = if fields.is_empty() {
-        "*all".to_string()
+    let field_list: Vec<String> = if fields.is_empty() {
+        vec!["*all".to_string()]
     } else {
-        fields.join(",")
+        fields
     };
 
     #[derive(Deserialize)]
@@ -222,7 +222,7 @@ pub async fn bulk_export(
 
     let response: SearchResponse = ctx
         .client
-        .post("/rest/api/3/search", &payload)
+        .post("/rest/api/3/search/jql", &payload)
         .await
         .context("Failed to search issues")?;
 
@@ -399,7 +399,7 @@ async fn search_issue_keys(ctx: &JiraContext<'_>, jql: &str) -> Result<Vec<Strin
 
     let response: SearchResponse = ctx
         .client
-        .post("/rest/api/3/search", &payload)
+        .post("/rest/api/3/search/jql", &payload)
         .await
         .context("Failed to search issues")?;
 
