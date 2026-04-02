@@ -125,7 +125,7 @@ enum IssueCommands {
 
     /// Create a new issue
     #[command(
-        long_about = "Create a new issue.\n\nExamples:\n  jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High"
+        long_about = "Create a new issue.\n\nExamples:\n  jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High\n  jira issue create --project PROJ --issue-type Task --summary \"Test\" --field 'customfield_10001={\"value\":\"Alpha\"}' --field 'customfield_10002=[{\"value\":\"Beta\"}]'"
     )]
     Create {
         /// Project key (e.g., PROJ)
@@ -146,6 +146,9 @@ enum IssueCommands {
         /// Priority name (e.g., High, Medium, Low)
         #[arg(long)]
         priority: Option<String>,
+        /// Custom field as key=value where value is JSON (repeatable)
+        #[arg(long = "field")]
+        fields: Vec<String>,
     },
 
     /// Update an existing issue
@@ -161,6 +164,9 @@ enum IssueCommands {
         /// New priority
         #[arg(long)]
         priority: Option<String>,
+        /// Custom field as key=value where value is JSON (repeatable)
+        #[arg(long = "field")]
+        fields: Vec<String>,
     },
 
     /// Delete an issue
@@ -815,7 +821,9 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 description,
                 assignee,
                 priority,
+                fields,
             } => {
+                let custom_fields = issues::parse_custom_fields(&fields)?;
                 issues::create_issue(
                     &ctx,
                     &project,
@@ -824,6 +832,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                     description.as_deref(),
                     assignee.as_deref(),
                     priority.as_deref(),
+                    &custom_fields,
                 )
                 .await
             }
@@ -832,13 +841,16 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 summary,
                 description,
                 priority,
+                fields,
             } => {
+                let custom_fields = issues::parse_custom_fields(&fields)?;
                 issues::update_issue(
                     &ctx,
                     &key,
                     summary.as_deref(),
                     description.as_deref(),
                     priority.as_deref(),
+                    &custom_fields,
                 )
                 .await
             }

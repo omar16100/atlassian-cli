@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, Context, Result};
 use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
@@ -6,6 +8,23 @@ use serde_json::Value;
 use super::utils::JiraContext;
 use crate::commands::common::{render_success, MutationResult};
 use crate::query::JqlBuilder;
+
+/// Parse `--field key=json_value` pairs into a HashMap.
+pub fn parse_custom_fields(raw: &[String]) -> Result<HashMap<String, Value>> {
+    let mut map = HashMap::new();
+    for entry in raw {
+        let (key, val) = entry.split_once('=').ok_or_else(|| {
+            anyhow!(
+                "Invalid --field format '{}': expected key=JSON_VALUE",
+                entry
+            )
+        })?;
+        let parsed: Value = serde_json::from_str(val)
+            .with_context(|| format!("Invalid JSON in --field '{}': {}", key, val))?;
+        map.insert(key.to_string(), parsed);
+    }
+    Ok(map)
+}
 
 // Issue CRUD Operations
 
@@ -242,6 +261,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
     ctx.renderer.render(&view)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_issue(
     ctx: &JiraContext<'_>,
     project: &str,
@@ -250,6 +270,7 @@ pub async fn create_issue(
     description: Option<&str>,
     assignee: Option<&str>,
     priority: Option<&str>,
+    custom_fields: &HashMap<String, Value>,
 ) -> Result<()> {
     use serde_json::json;
 
@@ -276,6 +297,10 @@ pub async fn create_issue(
 
     if let Some(pri) = priority {
         fields["priority"] = json!({ "name": pri });
+    }
+
+    for (key, value) in custom_fields {
+        fields[key] = value.clone();
     }
 
     let payload = json!({ "fields": fields });
@@ -306,6 +331,7 @@ pub async fn update_issue(
     summary: Option<&str>,
     description: Option<&str>,
     priority: Option<&str>,
+    custom_fields: &HashMap<String, Value>,
 ) -> Result<()> {
     use serde_json::json;
 
@@ -328,6 +354,10 @@ pub async fn update_issue(
 
     if let Some(pri) = priority {
         fields["priority"] = json!({ "name": pri });
+    }
+
+    for (key, value) in custom_fields {
+        fields[key] = value.clone();
     }
 
     let payload = json!({ "fields": fields });
@@ -1567,5 +1597,73 @@ mod tests {
             }]
         });
         assert_eq!(extract_adf_markdown(&adf), "status: `IN PROGRESS`");
+    }
+
+    // -- Custom field parsing tests --
+
+    #[test]
+    fn test_parse_custom_fields_single() {
+        let input = vec![r#"customfield_10001={"value":"Alpha"}"#.to_string()];
+        let result = parse_custom_fields(&input).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result["customfield_10001"], json!({"value": "Alpha"}));
+    }
+
+    #[test]
+    fn test_parse_custom_fields_multiple() {
+        let input = vec![
+            r#"customfield_10001={"value":"Alpha"}"#.to_string(),
+            r#"customfield_10002=[{"value":"Beta"}]"#.to_string(),
+        ];
+        let result = parse_custom_fields(&input).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result["customfield_10001"], json!({"value": "Alpha"}));
+        assert_eq!(result["customfield_10002"], json!([{"value": "Beta"}]));
+    }
+
+    #[test]
+    fn test_parse_custom_fields_empty() {
+        let result = parse_custom_fields(&[]).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_custom_fields_string_value() {
+        let input = vec![r#"customfield_10001="just a string""#.to_string()];
+        let result = parse_custom_fields(&input).unwrap();
+        assert_eq!(result["customfield_10001"], json!("just a string"));
+    }
+
+    #[test]
+    fn test_parse_custom_fields_numeric_value() {
+        let input = vec!["customfield_10001=42".to_string()];
+        let result = parse_custom_fields(&input).unwrap();
+        assert_eq!(result["customfield_10001"], json!(42));
+    }
+
+    #[test]
+    fn test_parse_custom_fields_missing_equals() {
+        let input = vec!["customfield_10001_no_value".to_string()];
+        let result = parse_custom_fields(&input);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("expected key=JSON_VALUE"));
+    }
+
+    #[test]
+    fn test_parse_custom_fields_invalid_json() {
+        let input = vec!["customfield_10001={not valid json}".to_string()];
+        let result = parse_custom_fields(&input);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Invalid JSON"));
+    }
+
+    #[test]
+    fn test_parse_custom_fields_equals_in_json_value() {
+        let input = vec![r#"customfield_10001={"formula":"a=b"}"#.to_string()];
+        let result = parse_custom_fields(&input).unwrap();
+        assert_eq!(result["customfield_10001"], json!({"formula": "a=b"}));
     }
 }

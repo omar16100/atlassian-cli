@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use atlassian_cli_bulk::BulkExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs;
-use std::path::PathBuf;
 
 use super::utils::JiraContext;
 use crate::commands::common::{render_success, MutationResult};
@@ -358,6 +360,12 @@ pub async fn bulk_import(
                     fields["labels"] = json!(issue.labels);
                 }
 
+                if let Some(custom) = issue.custom_fields {
+                    for (key, value) in custom {
+                        fields[key] = value;
+                    }
+                }
+
                 let payload = json!({ "fields": fields });
 
                 let response: CreateResponse = client
@@ -470,9 +478,81 @@ pub struct ImportIssue {
     pub priority: Option<String>,
     #[serde(default)]
     pub labels: Vec<String>,
+    #[serde(default)]
+    pub custom_fields: Option<HashMap<String, Value>>,
 }
 
 #[derive(Deserialize)]
 struct CreateResponse {
     key: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_import_issue_deserialize_with_custom_fields() {
+        let json_str = r#"{
+            "summary": "Test ticket",
+            "issue_type": "Task",
+            "custom_fields": {
+                "customfield_10001": {"value": "Alpha"},
+                "customfield_10002": [{"value": "Beta"}]
+            }
+        }"#;
+        let issue: ImportIssue = serde_json::from_str(json_str).unwrap();
+        assert_eq!(issue.summary, "Test ticket");
+        let cf = issue.custom_fields.unwrap();
+        assert_eq!(cf["customfield_10001"], json!({"value": "Alpha"}));
+        assert_eq!(cf["customfield_10002"], json!([{"value": "Beta"}]));
+    }
+
+    #[test]
+    fn test_import_issue_deserialize_without_custom_fields() {
+        let json_str = r#"{
+            "summary": "Basic ticket",
+            "issue_type": "Bug"
+        }"#;
+        let issue: ImportIssue = serde_json::from_str(json_str).unwrap();
+        assert_eq!(issue.summary, "Basic ticket");
+        assert!(issue.custom_fields.is_none());
+    }
+
+    #[test]
+    fn test_import_issue_deserialize_empty_custom_fields() {
+        let json_str = r#"{
+            "summary": "Empty customs",
+            "issue_type": "Story",
+            "custom_fields": {}
+        }"#;
+        let issue: ImportIssue = serde_json::from_str(json_str).unwrap();
+        assert!(issue.custom_fields.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_import_issue_full_roundtrip() {
+        let json_str = r#"{
+            "summary": "Full ticket",
+            "issue_type": "Task",
+            "description": "Some description",
+            "assignee": "user123",
+            "priority": "High",
+            "labels": ["backend", "urgent"],
+            "custom_fields": {
+                "customfield_10001": "plain string",
+                "customfield_10002": 42
+            }
+        }"#;
+        let issue: ImportIssue = serde_json::from_str(json_str).unwrap();
+        assert_eq!(issue.summary, "Full ticket");
+        assert_eq!(issue.description.as_deref(), Some("Some description"));
+        assert_eq!(issue.assignee.as_deref(), Some("user123"));
+        assert_eq!(issue.priority.as_deref(), Some("High"));
+        assert_eq!(issue.labels, vec!["backend", "urgent"]);
+        let cf = issue.custom_fields.unwrap();
+        assert_eq!(cf["customfield_10001"], json!("plain string"));
+        assert_eq!(cf["customfield_10002"], json!(42));
+    }
 }
