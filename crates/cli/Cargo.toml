@@ -39,7 +39,7 @@ htmd.workspace = true
 
 [dev-dependencies]
 wiremock.workspace = true
-tempfile = "3.24"
+tempfile = "3.27"
 cargo-husky.workspace = true
 proptest.workspace = true
 

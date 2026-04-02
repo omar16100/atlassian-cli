@@ -22,7 +22,7 @@ secrecy = "0.10"
 zeroize = "1.7"
 aes-gcm = "0.10"
 argon2 = "0.5"
-rand = "0.9"
+rand = "0.10"
 machine-uid = "0.5"
 whoami = "2.1"
 
