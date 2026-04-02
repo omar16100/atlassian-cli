@@ -53,6 +53,6 @@ atlassian-cli is an open-source, unified command-line interface built in Rust th
 
 ## Version
 
-Current version: 0.3.0
+Current version: 0.3.2
 License: MIT
 Author: Omar Shabab (https://omarshabab.com)
