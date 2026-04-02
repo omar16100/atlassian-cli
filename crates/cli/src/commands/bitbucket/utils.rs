@@ -19,7 +19,7 @@ impl BitbucketContext<'_> {
             "/2.0/user"
         };
         let _: serde_json::Value = self.client.get(endpoint).await.context(
-            "Authentication may be expired or invalid. Run: atlassian-cli auth test --bitbucket",
+            "Failed to verify Bitbucket access. Run: atlassian-cli auth test --bitbucket",
         )?;
         Ok(())
     }

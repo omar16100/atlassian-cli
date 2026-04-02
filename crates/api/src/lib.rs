@@ -226,6 +226,13 @@ impl ApiClient {
                         .unwrap_or_else(|_| "Bad request".to_string());
                     Err(ApiError::BadRequest { message })
                 }
+                StatusCode::GONE => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
+                    Err(ApiError::EndpointGone { message })
+                }
                 StatusCode::TOO_MANY_REQUESTS => {
                     let retry_after = response
                         .headers()
@@ -317,6 +324,13 @@ impl ApiClient {
                         message,
                     })
                 }
+                StatusCode::GONE => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
+                    Err(ApiError::EndpointGone { message })
+                }
                 StatusCode::TOO_MANY_REQUESTS => {
                     let retry_after = response
                         .headers()
@@ -393,6 +407,13 @@ impl ApiClient {
                 StatusCode::NOT_FOUND => {
                     let resource = joined.path().to_string();
                     Err(ApiError::NotFound { resource })
+                }
+                StatusCode::GONE => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
+                    Err(ApiError::EndpointGone { message })
                 }
                 StatusCode::TOO_MANY_REQUESTS => {
                     let retry_after = response
@@ -476,6 +497,13 @@ impl ApiClient {
                         .await
                         .unwrap_or_else(|_| "Bad request".to_string());
                     Err(ApiError::BadRequest { message })
+                }
+                StatusCode::GONE => {
+                    let message = response
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
+                    Err(ApiError::EndpointGone { message })
                 }
                 StatusCode::TOO_MANY_REQUESTS => {
                     let retry_after = response
