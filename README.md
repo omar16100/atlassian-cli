@@ -92,6 +92,10 @@ crates/
    atlassian-cli jira search --jql "project = DEV order by created desc" --limit 5
    atlassian-cli jira get DEV-123
    atlassian-cli jira create --project DEV --issue-type Task --summary "Test task"
+   # Custom fields — discover IDs via `jira fields list`:
+   atlassian-cli jira create --project DEV --issue-type Task --summary "cf test" \
+     --field 'customfield_10010={"value":"Internal"}' \
+     --field 'customfield_10020={"formula":"a=b"}'
    atlassian-cli jira update DEV-123 --summary "Updated summary"
    atlassian-cli jira transition DEV-123 --transition "In Progress"
    atlassian-cli jira assign DEV-123 --assignee user@example.com

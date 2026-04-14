@@ -124,9 +124,14 @@ enum IssueCommands {
     },
 
     /// Create a new issue
-    #[command(
-        long_about = "Create a new issue.\n\nExamples:\n  jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High\n  jira issue create --project PROJ --issue-type Task --summary \"Test\" --field 'customfield_10001={\"value\":\"Alpha\"}' --field 'customfield_10002=[{\"value\":\"Beta\"}]'"
-    )]
+    #[command(long_about = "Create a new issue.\n\nExamples:\n  \
+        jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  \
+        jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High\n  \
+        jira issue create --project PROJ --issue-type Task --summary \"Test\" --field 'customfield_10001={\"value\":\"Alpha\"}' --field 'customfield_10002=[{\"value\":\"Beta\"}]'\n  \
+        jira issue create --project PROJ --issue-type Task --summary \"=in value\" --field 'customfield_10020={\"formula\":\"a=b\"}'\n\n\
+        Discover custom field IDs with: `jira fields list` or `jira fields get <id>`.\n\
+        --field cannot overwrite reserved keys (project, issuetype, summary) or \
+        fields already set via a typed flag (--description, --assignee, --priority).")]
     Create {
         /// Project key (e.g., PROJ)
         #[arg(long)]
@@ -137,7 +142,7 @@ enum IssueCommands {
         /// Issue summary
         #[arg(long)]
         summary: String,
-        /// Issue description (Atlassian Document Format or plain text)
+        /// Issue description (plain text; wrapped as a single-paragraph ADF doc)
         #[arg(long)]
         description: Option<String>,
         /// Assignee account ID or email
@@ -146,26 +151,30 @@ enum IssueCommands {
         /// Priority name (e.g., High, Medium, Low)
         #[arg(long)]
         priority: Option<String>,
-        /// Custom field as key=value where value is JSON (repeatable)
-        #[arg(long = "field")]
+        /// Jira custom field (repeatable). Discover IDs via `jira fields list`.
+        #[arg(long = "field", value_name = "KEY=JSON_VALUE")]
         fields: Vec<String>,
     },
 
     /// Update an existing issue
+    #[command(long_about = "Update an existing issue.\n\n\
+        --field (repeatable) lets you set arbitrary fields (including customfield_*); \
+        discover IDs with `jira fields list`. --field cannot collide with \
+        --summary, --description, or --priority when those are also set.")]
     Update {
         /// Issue key
         key: String,
         /// New summary
         #[arg(long)]
         summary: Option<String>,
-        /// New description
+        /// New description (plain text; wrapped as a single-paragraph ADF doc)
         #[arg(long)]
         description: Option<String>,
         /// New priority
         #[arg(long)]
         priority: Option<String>,
-        /// Custom field as key=value where value is JSON (repeatable)
-        #[arg(long = "field")]
+        /// Jira custom field (repeatable). Discover IDs via `jira fields list`.
+        #[arg(long = "field", value_name = "KEY=JSON_VALUE")]
         fields: Vec<String>,
     },
 

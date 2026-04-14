@@ -856,3 +856,12 @@ current → draft: error (cannot unpublish)
   - Tokens stored only in `~/.atlassian-cli/credentials` with 600 permissions
   - Token lookup: env var → credentials file
   - Removed `CredentialStore` struct, simplified auth code
+
+## 2026-04-14 — Jira custom field support (`--field`) landed (PR #40)
+
+- Added `--field key=JSON_VALUE` to `jira issue create`/`update` and `custom_fields` map to `bulk import` rows.
+- Duplicate `--field` keys hard-error.
+- Collision check rejects raw keys colliding with reserved (`project`, `issuetype`, `summary`) or already-set typed flags (`--description`, `--assignee`, `--priority`, `--labels` in bulk).
+- Payload assembly extracted to `build_create_payload` / `build_update_payload` / `build_bulk_payload` for unit-testability.
+- New doc: `docs/14042026_jira_custom_fields.md`. README example updated. CLI help integration test added.
+- Co-authored with @thereisnotime (original PR).
