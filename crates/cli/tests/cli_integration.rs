@@ -315,3 +315,22 @@ profiles:
         "Jira commands should require base_url. Got: {stderr}"
     );
 }
+
+#[test]
+fn test_jira_issue_create_help_mentions_custom_fields() {
+    let output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "jira", "issue", "create", "--help"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("KEY=JSON_VALUE"),
+        "expected --field value_name in help, got: {stdout}"
+    );
+    assert!(
+        stdout.contains("jira fields list"),
+        "expected fields-discovery hint in help, got: {stdout}"
+    );
+}
