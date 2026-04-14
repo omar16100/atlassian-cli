@@ -17,4 +17,4 @@ deny.toml @omar16100
 
 # Release configuration
 Cargo.toml @omar16100
-.release-please-manifest.json @omar16100
+dist-workspace.toml @omar16100
