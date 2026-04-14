@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -9,7 +9,7 @@ use super::utils::JiraContext;
 use crate::commands::common::{render_success, MutationResult};
 use crate::query::JqlBuilder;
 
-/// Parse `--field key=json_value` pairs into a HashMap.
+/// Parse `--field key=json_value` pairs into a HashMap. Rejects duplicate keys.
 pub fn parse_custom_fields(raw: &[String]) -> Result<HashMap<String, Value>> {
     let mut map = HashMap::new();
     for entry in raw {
@@ -21,9 +21,35 @@ pub fn parse_custom_fields(raw: &[String]) -> Result<HashMap<String, Value>> {
         })?;
         let parsed: Value = serde_json::from_str(val)
             .with_context(|| format!("Invalid JSON in --field '{}': {}", key, val))?;
-        map.insert(key.to_string(), parsed);
+        if map.insert(key.to_string(), parsed).is_some() {
+            bail!("--field '{key}' specified more than once");
+        }
     }
     Ok(map)
+}
+
+/// Hard-error if `custom` tries to set reserved or already-set typed fields.
+///
+/// `mandatory`: (jira_payload_key, cli_flag_hint) — always rejected.
+/// `optional_set`: (jira_payload_key, cli_flag_hint, typed_is_set) — rejected
+/// only when both the typed flag and the raw field target the same key.
+pub(crate) fn check_field_collisions(
+    custom: &HashMap<String, Value>,
+    mandatory: &[(&str, &str)],
+    optional_set: &[(&str, &str, bool)],
+) -> Result<()> {
+    for key in custom.keys() {
+        if let Some((_, hint)) = mandatory.iter().find(|(k, _)| *k == key.as_str()) {
+            bail!("--field cannot set reserved key '{key}'; use {hint} instead");
+        }
+        if let Some((_, hint, _)) = optional_set
+            .iter()
+            .find(|(k, _, set)| *k == key.as_str() && *set)
+        {
+            bail!("--field '{key}' collides with {hint} already set; pick one source");
+        }
+    }
+    Ok(())
 }
 
 // Issue CRUD Operations
@@ -261,6 +287,67 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
     ctx.renderer.render(&view)
 }
 
+/// Wrap a plain string as a minimal single-paragraph ADF doc.
+pub(crate) fn plain_text_adf(text: &str) -> Value {
+    serde_json::json!({
+        "type": "doc",
+        "version": 1,
+        "content": [{
+            "type": "paragraph",
+            "content": [{ "type": "text", "text": text }]
+        }]
+    })
+}
+
+/// Build the POST body for `POST /rest/api/3/issue`. Pure, testable.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn build_create_payload(
+    project: &str,
+    issue_type: &str,
+    summary: &str,
+    description: Option<&str>,
+    assignee: Option<&str>,
+    priority: Option<&str>,
+    custom: &HashMap<String, Value>,
+) -> Result<Value> {
+    use serde_json::json;
+
+    check_field_collisions(
+        custom,
+        &[
+            ("project", "--project"),
+            ("issuetype", "--issue-type"),
+            ("summary", "--summary"),
+        ],
+        &[
+            ("description", "--description", description.is_some()),
+            ("assignee", "--assignee", assignee.is_some()),
+            ("priority", "--priority", priority.is_some()),
+        ],
+    )?;
+
+    let mut fields = json!({
+        "project": { "key": project },
+        "issuetype": { "name": issue_type },
+        "summary": summary,
+    });
+
+    if let Some(desc) = description {
+        fields["description"] = plain_text_adf(desc);
+    }
+    if let Some(user) = assignee {
+        fields["assignee"] = json!({ "id": user });
+    }
+    if let Some(pri) = priority {
+        fields["priority"] = json!({ "name": pri });
+    }
+    for (key, value) in custom {
+        fields[key] = value.clone();
+    }
+
+    Ok(json!({ "fields": fields }))
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn create_issue(
     ctx: &JiraContext<'_>,
@@ -272,38 +359,15 @@ pub async fn create_issue(
     priority: Option<&str>,
     custom_fields: &HashMap<String, Value>,
 ) -> Result<()> {
-    use serde_json::json;
-
-    let mut fields = json!({
-        "project": { "key": project },
-        "issuetype": { "name": issue_type },
-        "summary": summary,
-    });
-
-    if let Some(desc) = description {
-        fields["description"] = json!({
-            "type": "doc",
-            "version": 1,
-            "content": [{
-                "type": "paragraph",
-                "content": [{ "type": "text", "text": desc }]
-            }]
-        });
-    }
-
-    if let Some(user) = assignee {
-        fields["assignee"] = json!({ "id": user });
-    }
-
-    if let Some(pri) = priority {
-        fields["priority"] = json!({ "name": pri });
-    }
-
-    for (key, value) in custom_fields {
-        fields[key] = value.clone();
-    }
-
-    let payload = json!({ "fields": fields });
+    let payload = build_create_payload(
+        project,
+        issue_type,
+        summary,
+        description,
+        assignee,
+        priority,
+        custom_fields,
+    )?;
 
     #[derive(Deserialize)]
     struct CreateResponse {
@@ -325,6 +389,42 @@ pub async fn create_issue(
     )
 }
 
+/// Build the PUT body for `PUT /rest/api/3/issue/{key}`. Pure, testable.
+pub(crate) fn build_update_payload(
+    summary: Option<&str>,
+    description: Option<&str>,
+    priority: Option<&str>,
+    custom: &HashMap<String, Value>,
+) -> Result<Value> {
+    use serde_json::json;
+
+    check_field_collisions(
+        custom,
+        &[],
+        &[
+            ("summary", "--summary", summary.is_some()),
+            ("description", "--description", description.is_some()),
+            ("priority", "--priority", priority.is_some()),
+        ],
+    )?;
+
+    let mut fields = json!({});
+    if let Some(s) = summary {
+        fields["summary"] = json!(s);
+    }
+    if let Some(desc) = description {
+        fields["description"] = plain_text_adf(desc);
+    }
+    if let Some(pri) = priority {
+        fields["priority"] = json!({ "name": pri });
+    }
+    for (key, value) in custom {
+        fields[key] = value.clone();
+    }
+
+    Ok(json!({ "fields": fields }))
+}
+
 pub async fn update_issue(
     ctx: &JiraContext<'_>,
     key: &str,
@@ -333,34 +433,7 @@ pub async fn update_issue(
     priority: Option<&str>,
     custom_fields: &HashMap<String, Value>,
 ) -> Result<()> {
-    use serde_json::json;
-
-    let mut fields = json!({});
-
-    if let Some(s) = summary {
-        fields["summary"] = json!(s);
-    }
-
-    if let Some(desc) = description {
-        fields["description"] = json!({
-            "type": "doc",
-            "version": 1,
-            "content": [{
-                "type": "paragraph",
-                "content": [{ "type": "text", "text": desc }]
-            }]
-        });
-    }
-
-    if let Some(pri) = priority {
-        fields["priority"] = json!({ "name": pri });
-    }
-
-    for (key, value) in custom_fields {
-        fields[key] = value.clone();
-    }
-
-    let payload = json!({ "fields": fields });
+    let payload = build_update_payload(summary, description, priority, custom_fields)?;
 
     let _: Value = ctx
         .client
@@ -1665,5 +1738,95 @@ mod tests {
         let input = vec![r#"customfield_10001={"formula":"a=b"}"#.to_string()];
         let result = parse_custom_fields(&input).unwrap();
         assert_eq!(result["customfield_10001"], json!({"formula": "a=b"}));
+    }
+
+    #[test]
+    fn test_parse_custom_fields_duplicate_key_rejected() {
+        let input = vec![
+            r#"customfield_10001={"value":"first"}"#.to_string(),
+            r#"customfield_10001={"value":"second"}"#.to_string(),
+        ];
+        let err = parse_custom_fields(&input).unwrap_err().to_string();
+        assert!(err.contains("more than once"), "got: {err}");
+        assert!(err.contains("customfield_10001"), "got: {err}");
+    }
+
+    // -- Payload assembly + collision tests --
+
+    fn cf(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn build_create_payload_merges_typed_and_custom() {
+        let custom = cf(&[("customfield_10010", json!({"value": "x"}))]);
+        let payload = build_create_payload(
+            "PROJ",
+            "Task",
+            "hello",
+            Some("desc"),
+            Some("u1"),
+            Some("High"),
+            &custom,
+        )
+        .unwrap();
+        let fields = &payload["fields"];
+        assert_eq!(fields["project"]["key"], "PROJ");
+        assert_eq!(fields["issuetype"]["name"], "Task");
+        assert_eq!(fields["summary"], "hello");
+        assert_eq!(fields["assignee"]["id"], "u1");
+        assert_eq!(fields["priority"]["name"], "High");
+        assert_eq!(fields["customfield_10010"], json!({"value": "x"}));
+        // description wrapped as ADF
+        assert_eq!(fields["description"]["type"], "doc");
+    }
+
+    #[test]
+    fn build_create_payload_rejects_mandatory_collision() {
+        let custom = cf(&[("summary", json!("x"))]);
+        let err = build_create_payload("PROJ", "Task", "s", None, None, None, &custom)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("reserved"), "got: {err}");
+        assert!(err.contains("--summary"), "got: {err}");
+    }
+
+    #[test]
+    fn build_create_payload_rejects_optional_when_both_set() {
+        let custom = cf(&[("description", json!({"type": "doc"}))]);
+        let err =
+            build_create_payload("PROJ", "Task", "s", Some("typed desc"), None, None, &custom)
+                .unwrap_err()
+                .to_string();
+        assert!(err.contains("collides"), "got: {err}");
+        assert!(err.contains("--description"), "got: {err}");
+    }
+
+    #[test]
+    fn build_create_payload_allows_raw_only_optional() {
+        let raw_desc = json!({"type": "doc", "version": 1, "content": []});
+        let custom = cf(&[("description", raw_desc.clone())]);
+        let payload = build_create_payload("PROJ", "Task", "s", None, None, None, &custom).unwrap();
+        assert_eq!(payload["fields"]["description"], raw_desc);
+    }
+
+    #[test]
+    fn build_update_payload_rejects_summary_collision() {
+        let custom = cf(&[("summary", json!("raw"))]);
+        let err = build_update_payload(Some("typed"), None, None, &custom)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("collides"), "got: {err}");
+        assert!(err.contains("--summary"), "got: {err}");
+    }
+
+    #[test]
+    fn build_update_payload_raw_only_priority_ok() {
+        let custom = cf(&[("priority", json!({"name": "Low"}))]);
+        let payload = build_update_payload(None, None, None, &custom).unwrap();
+        assert_eq!(payload["fields"]["priority"], json!({"name": "Low"}));
     }
 }
