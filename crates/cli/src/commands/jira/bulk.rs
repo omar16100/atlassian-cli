@@ -7,8 +7,58 @@ use atlassian_cli_bulk::BulkExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use super::issues::{check_field_collisions, plain_text_adf};
 use super::utils::JiraContext;
 use crate::commands::common::{render_success, MutationResult};
+
+/// Build the POST body for a single bulk-import row. Pure, testable.
+pub(crate) fn build_bulk_payload(project: &str, issue: &ImportIssue) -> Result<Value> {
+    let empty = HashMap::new();
+    let custom = issue.custom_fields.as_ref().unwrap_or(&empty);
+
+    check_field_collisions(
+        custom,
+        &[
+            ("project", "file project"),
+            ("issuetype", "row.issue_type"),
+            ("summary", "row.summary"),
+        ],
+        &[
+            (
+                "description",
+                "row.description",
+                issue.description.is_some(),
+            ),
+            ("assignee", "row.assignee", issue.assignee.is_some()),
+            ("priority", "row.priority", issue.priority.is_some()),
+            ("labels", "row.labels", !issue.labels.is_empty()),
+        ],
+    )?;
+
+    let mut fields = json!({
+        "project": { "key": project },
+        "issuetype": { "name": issue.issue_type },
+        "summary": issue.summary,
+    });
+
+    if let Some(desc) = &issue.description {
+        fields["description"] = plain_text_adf(desc);
+    }
+    if let Some(assignee) = &issue.assignee {
+        fields["assignee"] = json!({ "id": assignee });
+    }
+    if let Some(priority) = &issue.priority {
+        fields["priority"] = json!({ "name": priority });
+    }
+    if !issue.labels.is_empty() {
+        fields["labels"] = json!(issue.labels);
+    }
+    for (key, value) in custom {
+        fields[key] = value.clone();
+    }
+
+    Ok(json!({ "fields": fields }))
+}
 
 // Bulk transition issues
 pub async fn bulk_transition(
@@ -331,42 +381,7 @@ pub async fn bulk_import(
             let client = client.clone();
             let project = project.clone();
             async move {
-                let mut fields = json!({
-                    "project": { "key": project },
-                    "issuetype": { "name": issue.issue_type },
-                    "summary": issue.summary,
-                });
-
-                if let Some(desc) = issue.description {
-                    fields["description"] = json!({
-                        "type": "doc",
-                        "version": 1,
-                        "content": [{
-                            "type": "paragraph",
-                            "content": [{ "type": "text", "text": desc }]
-                        }]
-                    });
-                }
-
-                if let Some(assignee) = issue.assignee {
-                    fields["assignee"] = json!({ "id": assignee });
-                }
-
-                if let Some(priority) = issue.priority {
-                    fields["priority"] = json!({ "name": priority });
-                }
-
-                if !issue.labels.is_empty() {
-                    fields["labels"] = json!(issue.labels);
-                }
-
-                if let Some(custom) = issue.custom_fields {
-                    for (key, value) in custom {
-                        fields[key] = value;
-                    }
-                }
-
-                let payload = json!({ "fields": fields });
+                let payload = build_bulk_payload(&project, &issue)?;
 
                 let response: CreateResponse = client
                     .post("/rest/api/3/issue", &payload)
@@ -554,5 +569,72 @@ mod tests {
         let cf = issue.custom_fields.unwrap();
         assert_eq!(cf["customfield_10001"], json!("plain string"));
         assert_eq!(cf["customfield_10002"], json!(42));
+    }
+
+    fn minimal_issue() -> ImportIssue {
+        ImportIssue {
+            summary: "s".to_string(),
+            issue_type: "Task".to_string(),
+            description: None,
+            assignee: None,
+            priority: None,
+            labels: vec![],
+            custom_fields: None,
+        }
+    }
+
+    #[test]
+    fn build_bulk_payload_merges_typed_and_custom() {
+        let mut issue = minimal_issue();
+        issue.description = Some("d".into());
+        issue.labels = vec!["backend".into()];
+        issue.custom_fields = Some(
+            [("customfield_10010".to_string(), json!({"value": "x"}))]
+                .into_iter()
+                .collect(),
+        );
+        let payload = build_bulk_payload("PROJ", &issue).unwrap();
+        let fields = &payload["fields"];
+        assert_eq!(fields["project"]["key"], "PROJ");
+        assert_eq!(fields["issuetype"]["name"], "Task");
+        assert_eq!(fields["summary"], "s");
+        assert_eq!(fields["labels"], json!(["backend"]));
+        assert_eq!(fields["customfield_10010"], json!({"value": "x"}));
+        assert_eq!(fields["description"]["type"], "doc");
+    }
+
+    #[test]
+    fn build_bulk_payload_rejects_mandatory_collision() {
+        let mut issue = minimal_issue();
+        issue.custom_fields = Some(
+            [("summary".to_string(), json!("raw"))]
+                .into_iter()
+                .collect(),
+        );
+        let err = build_bulk_payload("PROJ", &issue).unwrap_err().to_string();
+        assert!(err.contains("reserved"), "got: {err}");
+        assert!(err.contains("row.summary"), "got: {err}");
+    }
+
+    #[test]
+    fn build_bulk_payload_rejects_labels_collision_when_both_set() {
+        let mut issue = minimal_issue();
+        issue.labels = vec!["a".into()];
+        issue.custom_fields = Some([("labels".to_string(), json!(["b"]))].into_iter().collect());
+        let err = build_bulk_payload("PROJ", &issue).unwrap_err().to_string();
+        assert!(err.contains("collides"), "got: {err}");
+        assert!(err.contains("row.labels"), "got: {err}");
+    }
+
+    #[test]
+    fn build_bulk_payload_allows_raw_only_labels() {
+        let mut issue = minimal_issue();
+        issue.custom_fields = Some(
+            [("labels".to_string(), json!(["b", "c"]))]
+                .into_iter()
+                .collect(),
+        );
+        let payload = build_bulk_payload("PROJ", &issue).unwrap();
+        assert_eq!(payload["fields"]["labels"], json!(["b", "c"]));
     }
 }
