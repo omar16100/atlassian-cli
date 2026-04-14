@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.7](https://github.com/omar16100/atlassian-cli/compare/v0.2.6...v0.2.7) (2026-04-14)
+
+
+### Features
+
+* add automated crates.io publishing on release ([5a7de92](https://github.com/omar16100/atlassian-cli/commit/5a7de92bd7cb237c543e77be11423c0f4441f4a6))
+* add Bitbucket Bearer auth support and deprecation notices ([f7aecc0](https://github.com/omar16100/atlassian-cli/commit/f7aecc01927e0ed9fa4cb908e354dea89767e393))
+* add pipeline variable/secret management commands ([6556d0e](https://github.com/omar16100/atlassian-cli/commit/6556d0e6b1d5fe128ed8fdb9c9749ff2287f4bce))
+* pipeline UX fixes — multi-remote detection, --pipeline flag, --wait, --on-complete, --envelope ([f9758fe](https://github.com/omar16100/atlassian-cli/commit/f9758fe2cd3ec2323c6e8bc2b5304522864c45d7))
+* SEO overhaul — 24 pages, blog, product pages, runbooks, structured data ([a09217b](https://github.com/omar16100/atlassian-cli/commit/a09217b77b24716b478d4611fc58e33cb7a58ecc))
+* watch --timeout, --log mode, steps trigger column, elapsed time, scope-aware 403 hints ([1c9aeba](https://github.com/omar16100/atlassian-cli/commit/1c9aeba9d4e112231a8a2d3f845f86b2b0cb971d))
+
+
+### Bug Fixes
+
+* add workflow_dispatch trigger to publish-crates workflow ([503ca8d](https://github.com/omar16100/atlassian-cli/commit/503ca8d813e56a21230ab6efc3fb129448b945ab))
+* handle Jira ADF description format in issue get/update ([725983e](https://github.com/omar16100/atlassian-cli/commit/725983e63a23dd9773eec0e3f87f57e65c3f84ed))
+* migrate Jira bulk search to /search/jql, add HTTP 410 handling ([c699737](https://github.com/omar16100/atlassian-cli/commit/c6997379eba85750537a2764a81e821d09c376ec))
+* resolve security audit failures ([c100c58](https://github.com/omar16100/atlassian-cli/commit/c100c58f6da263ba558aaa368e0a26b61dc99afc))
+* trigger crates.io publish on tag push instead of release event ([f532400](https://github.com/omar16100/atlassian-cli/commit/f5324004fdd24625201d6028669d06b68353fc4c))
+* update aws-lc-rs 1.15.4 → 1.16.2, aws-lc-sys 0.37.0 → 0.39.1 (security advisory) ([a7dd7c5](https://github.com/omar16100/atlassian-cli/commit/a7dd7c5930395978ff47c91dafdbe578ad8ce5d0))
+* update landing page to v0.2.9 and add Bearer auth examples ([dede06e](https://github.com/omar16100/atlassian-cli/commit/dede06e971aeba817b89b01773dee086c8ed0864))
+* update rustls-webpki 0.103.8 → 0.103.10 (RUSTSEC-2026-0049) ([07a729d](https://github.com/omar16100/atlassian-cli/commit/07a729d6c1f395c4f27b85f61336841eec85fdbe))
+
 ## [0.2.6](https://github.com/omar16100/atlassian-cli/compare/v0.2.5...v0.2.6) (2026-01-31)
 
 
