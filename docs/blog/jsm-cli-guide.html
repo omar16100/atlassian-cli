@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSM from the Terminal: Service Desk Automation | atlassian-cli Blog</title>
     <meta name="description" content="Automate Jira Service Management from the command line. Manage service desks, requests, customers, SLAs, queues, and knowledge base articles via CLI.">
-    <meta name="keywords" content="jira service management cli, jsm cli, service desk automation cli, itsm cli, jsm command line, jira service desk cli">
 
     <!-- Open Graph -->
     <meta property="og:title" content="JSM from the Terminal: Service Desk Automation">
@@ -38,6 +37,17 @@
     </script>
 
     <!-- Structured Data: Article -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "JSM from the Terminal: Service Desk Automation", "item": "https://atlassiancli.com/blog/jsm-cli-guide.html"}
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -402,7 +412,7 @@
                 </a>
                 <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
                 <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/#install" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -479,7 +489,7 @@ atlassian-cli --version</code></pre>
         <pre><code><span class="comment"># Add a profile with your Atlassian credentials</span>
 atlassian-cli auth login \
   --profile <span class="string">work</span> \
-  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --base-url <span class="string">https://your-domain.atlassian.net</span> \
   --email <span class="string">you@company.com</span> \
   --token <span class="string">$ATLASSIAN_API_TOKEN</span> \
   --default
@@ -758,6 +768,10 @@ echo <span class="string">"Onboarded: $CUSTOMER_NAME ($CUSTOMER_EMAIL)"</span></
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>

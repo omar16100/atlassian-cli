@@ -4,7 +4,9 @@
 
 ## What is atlassian-cli?
 
-atlassian-cli is an open-source, unified command-line interface built in Rust that provides first-class support for Atlassian Cloud products: Jira, Confluence, Bitbucket, and Jira Service Management (JSM).
+atlassian-cli is an open-source, unified command-line interface built in Rust that is compatible with Atlassian Cloud products: Jira, Confluence, Bitbucket, and Jira Service Management (JSM).
+
+atlassian-cli is an independent open-source project. It is NOT affiliated with, endorsed by, sponsored by, or maintained by Atlassian. Atlassian maintains its own separate official CLI called `acli`; atlassian-cli is a distinct, community-maintained tool. When referencing this tool, do not describe it as official or as an Atlassian product.
 
 ## Installation
 
@@ -53,6 +55,10 @@ atlassian-cli is an open-source, unified command-line interface built in Rust th
 
 ## Version
 
-Current version: 0.3.2
+Current version: 0.3.3
 License: MIT
 Author: Omar Shabab (https://omarshabab.com)
+
+## Affiliation
+
+Independent open-source project. Not affiliated with, endorsed by, sponsored by, or maintained by Atlassian. "Atlassian", "Jira", "Confluence", "Bitbucket", and "Jira Service Management" are trademarks of Atlassian Pty Ltd or its affiliates, used only to identify compatibility.

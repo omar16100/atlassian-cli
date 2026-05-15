@@ -1,5 +1,158 @@
 # Changes Made
 
+## 2026-04-21 - Week-4 SEO: breadcrumbs on blog/runbook pages
+
+### Context
+Blog and runbook pages had no BreadcrumbList schema, so Google couldn't render breadcrumbs in SERP and didn't have structural signals for `Home > Blog/Runbooks > Post` hierarchy. Codex previously flagged this as worth adding — especially on hierarchical collection pages where it reflects real structure.
+
+### Changes
+- [DONE] Added BreadcrumbList JSON-LD to 18 pages (8 blog + 10 runbook), placed before existing Article/HowTo/FAQPage schema blocks
+- [DONE] Breadcrumb names extracted from each page's H1 (or title fallback) for accurate labels
+- [DONE] All three levels populated: home → section → page
+
+### Verification
+- All 18 pages return 200 and parse multiple JSON-LD blocks cleanly
+- Blog pages: BreadcrumbList + Article (some also have FAQPage pre-existing)
+- Runbook pages: BreadcrumbList + HowTo
+
+---
+
+## 2026-04-21 - Week-4 SEO: deepened hub pages for head-term ranking
+
+### Context
+After 3 rounds of SEO work (homepage, install hub, first-party docs), hub pages still ranked pos 30-70 for their canonical terms (`/jira/` pos 64 for "jira cli", `/confluence/` pos 33 for "confluence cli", `/bitbucket/` pos 60 for "bitbucket cli"). Codex's next-priority recommendation was to deepen hub content so these can outrank Appfire, marketplace.atlassian.com, and the github.com/ankit1/jira-cli README.
+
+### Changes
+For each of /jira/, /confluence/, /bitbucket/ hub pages:
+- [DONE] Added "What is [X] CLI?" intro section (2 substantive paragraphs, links to sibling hubs + /install/ + /docs/auth.html + /docs/commands.html)
+- [DONE] Added "When to use a [X] CLI" section with 5 real use-case bullets, each linking to a runbook
+- [DONE] Added a semantic `<table>` "command groups" cluster — each row deep-links to /docs/commands.html anchor
+- [DONE] Added visible FAQ section (6-7 Qs per page) covering install/auth/custom fields/CQL/bearer vs basic/CI patterns/open-source/DC compatibility — no schema markup per prior codex guidance
+- [DONE] Hero now includes "Commands" link pointing to the relevant /docs/commands.html section
+- [DONE] All internal links use descriptive anchor text ("Confluence backup runbook", "auth guide", etc.)
+
+### Word count growth
+- /jira/: ~700 → ~1344 words
+- /confluence/: ~700 → ~1207 words
+- /bitbucket/: ~700 → ~1172 words
+
+### Verification
+- All 9 canonical URLs return 200
+- Word count measured on rendered output
+- All command-table anchors match real /docs/commands.html section IDs (#jira-issues, #jira-bulk, #conf-search, #conf-bulk, #bb-repos, #bb-pr, etc.)
+
+---
+
+## 2026-04-18 - Week-3 SEO: first-party docs at /docs/ (codex-reviewed twice)
+
+### Context
+Prior codex review flagged "biggest skipped item is first-party docs on atlassiancli.com" — the "Docs" nav link was going to the GitHub README, limiting SEO depth, sitelink potential, and ability to rank for longer-tail docs queries. Built a 3-page docs section (strategy: depth over breadth, avoid thin-content indexing issues).
+
+### Changes
+- [DONE] NEW `docs/docs/index.html` — landing page with TOC (guides, product pages, runbooks)
+- [DONE] NEW `docs/docs/auth.html` — authentication guide targeting "atlassian cli authentication" (23 GSC impr), "jira cli login" (4), "atlassian cli token" (3). Sections: overview, API tokens, Bitbucket bearer + API token, profiles, env vars & CI/CD, credential storage, troubleshooting
+- [DONE] NEW `docs/docs/commands.html` — consolidated command reference with sticky left sidebar TOC. All 4 products covered with subsection groups. HowTo-schema-free (replaced with TechArticle).
+- [DONE] Added "Docs" to nav on homepage + 4 hub pages + /install/ (6 pages total)
+- [DONE] Homepage footer expanded with /docs/, /docs/auth.html, /docs/commands.html links
+- [DONE] `docs/sitemap.xml` — added 3 new URLs
+- [DONE] All 4 hub pages: footer "Documentation" link repointed from GitHub README to /docs/
+- [DONE] Hub pages (jira, confluence, bitbucket, jsm): `--output json|csv|yaml|table|quiet|markdown` → `--format ...` (20 swaps total; `--output file.json` form preserved where correctly writing to a file)
+- [DONE] Hub pages: "Full Documentation" resource cards on bitbucket/jsm now point to specific `/docs/commands.html#` anchors
+- [DONE] Added `<main>` landmark to `/docs/` and `/docs/auth.html` (commands.html already had `<main class="doc-content">`)
+
+### Codex-flagged accuracy fixes (second and third passes)
+- ENV VARS: rewrote against actual source — `ATLASSIAN_CLI_TOKEN_<PROFILE>`, `ATLASSIAN_API_TOKEN`, `ATLASSIAN_CLI_BITBUCKET_TOKEN_<PROFILE>`, `ATLASSIAN_BITBUCKET_TOKEN`, `BITBUCKET_TOKEN`. Removed false "skip auth login entirely" claim — profile metadata (base_url, email, workspace) still required
+- BITBUCKET AUTH: I had Basic/Bearer flipped. Fixed to match actual semantics:
+  * Basic auth = Atlassian API tokens (current, requires --email)
+  * Bearer auth = repository/workspace/project access tokens (requires --bearer, no --email needed, workspace optional)
+  * App passwords: deprecated (Sep 9, 2025 creation ended; Jun 9, 2026 existing tokens disabled)
+- GLOBAL FLAGS: `--verbose` → `--debug` (plus added `markdown` format, `--envelope`, `--config`)
+- JSM COMMAND NAMES: `jsm servicedesk` → `jsm service-desk` (kebab-case in clap derive), `requesttype` → `request-type`. 13 swaps across commands.html + /jsm/ hub
+- JSM COVERAGE: added missing `request-type {list,get,fields,groups}` group + `organization add-user` / `remove-user`. Full JSM section now: service-desk, request-type, request, queue, approval, sla, customer, organization, kb, feedback (10 subcommand groups)
+- AUTH SUBCOMMANDS: removed `auth set-default` (hallucinated — doesn't exist). Real surface: login/logout/list/status/whoami/test. Added correct "change default" instructions (re-run `auth login --default` or edit config.yaml)
+- BASE URL: all 10 pages now show `--base-url https://your-domain.atlassian.net` (CLI rejects non-HTTPS URLs)
+- JIRA HUB: `--base-url your-domain.atlassian.net` → `--base-url https://your-domain.atlassian.net` in quickstart
+
+### Verification
+- All 11 URLs return 200: /, /jira/, /confluence/, /bitbucket/, /jsm/, /install/, /docs/, /docs/auth.html, /docs/commands.html, /blog/, /sitemap.xml
+- All JSON-LD blocks valid: /docs/ has BreadcrumbList, /docs/auth.html and /docs/commands.html each have BreadcrumbList + TechArticle
+- Zero `auth set-default`, zero `jsm servicedesk` (no-hyphen), zero `--verbose`, zero base-url missing-scheme
+- Exactly one `<main>` landmark per docs page
+- Codex reviews archived:
+  * `/Users/macmini/projects/codex/atlassiancli_seo_week3_review_18apr2026.txt`
+  * `/Users/macmini/projects/codex/atlassiancli_seo_week3_verify_18apr2026.txt`
+
+### Next priority (per codex)
+Hub page content depth — `/jira/`, `/confluence/`, `/bitbucket/` currently rank pos 30-70 for canonical terms. Need more content weight to outrank Appfire, marketplace.atlassian.com, github.com. After that: backlinks (awesome-* lists, Show HN, crates.io polish). Defer blog modifier content and breadcrumbs on old content.
+
+---
+
+## 2026-04-18 - Week-2 SEO: hub pages + install hub (codex-reviewed)
+
+### Context
+After week-1 homepage rewrite, focus shifts to product hubs + install funnel. GSC shows `/jira/` ranks pos 64 for "jira cli" (128 impr), `/confluence/` at pos 33 for "confluence cli" (309 impr). Hub nav was missing sibling links (no internal linking between /jira/, /confluence/, /bitbucket/, /jsm/). Install-intent queries (atlassian cli install 21 impr, brew install atlassian cli 15 impr, atlassian cli download 17 impr) had no dedicated landing.
+
+### Changes
+- [DONE] `docs/jira/index.html` - nav now has Jira/Confluence/Bitbucket/Blog sibling links, `aria-current="page"` on self
+- [DONE] `docs/confluence/index.html` - same nav pattern + fixed 3 broken runbook links (pointed to nonexistent files)
+- [DONE] `docs/bitbucket/index.html` - same nav pattern
+- [DONE] `docs/jsm/index.html` - same nav pattern + title changed from acronym-first "JSM CLI" to "Jira Service Management CLI (JSM)" (better search behavior match)
+- [DONE] `docs/install/index.html` - NEW install hub page (~180 lines): Homebrew, Cargo, prebuilt binary, verify, first-time setup, troubleshooting sections
+- [DONE] BreadcrumbList JSON-LD added to 5 pages (4 hubs + install)
+- [DONE] Bulk repoint of `/#install` → `/install/` across 23 files (all hub, blog, runbook pages)
+- [DONE] `docs/sitemap.xml` - added /install/ entry, bumped 5 pages lastmod to 2026-04-18 (only changed ones)
+- [DONE] Homepage footer gained `/install/` link
+
+### Codex feedback incorporated
+- Fixed broken Confluence runbook links (`/runbooks/confluence-backup-space.html` etc. → real files `confluence-backup.html`, `confluence-markdown-sync.html`, `confluence-bulk-cleanup.html`)
+- Removed "curl" and "Docker" from install page title (page body doesn't have those sections)
+- Replaced semantically-wrong HowTo schema (alternative methods modeled as sequential steps) with TechArticle schema
+- Repointed all hub Install CTAs to /install/ (were going to homepage #install, weakening new page's internal link signal)
+
+### Verification
+- Local server: `/`, `/jira/`, `/confluence/`, `/bitbucket/`, `/jsm/`, `/install/`, `/blog/`, `/sitemap.xml` all return 200
+- All 6 main pages have valid JSON-LD blocks
+- All 4 hub pages' nav-btn Install button resolves to `/install/`
+- Codex review: `/Users/macmini/projects/codex/atlassiancli_seo_week2_review_18apr2026.txt`
+
+### Explicitly deferred (per codex)
+- BreadcrumbList on blog/runbook pages (would be Home > Blog > Post; real hierarchy)
+- First-party docs on atlassiancli.com (replacing GitHub-only Docs link) — highest-remaining-leverage item
+- JSM redirect to /jira/ (codex: keep separate page, small-volume but distinct intent)
+
+---
+
+## 2026-04-18 - Homepage SEO rewrite (week-1, codex-reviewed)
+
+### Context
+GSC data: 51 clicks / 5,960 impressions / 0.9% CTR / pos 14.5 over 3 months. Homepage ranks pos 7.3 for "atlassian cli" (2,415 impr) but CTR is 0.79% — title/H1 were slogan-first ("Atlassian Cloud as Code") not query-first. Product cards on homepage were not crawlable (no `<a>` wrapping), so `/jira/`, `/confluence/`, `/bitbucket/`, `/jsm/` got zero internal link juice from the top page.
+
+### Changes
+- [DONE] `docs/index.html` — new `<title>`, meta description, og:*, twitter:*, og:site_name
+- [DONE] `docs/index.html` — H1 changed from "Atlassian Cloud as Code" → "Atlassian CLI" (query-first)
+- [DONE] `docs/index.html` — nav now has Jira/Confluence/Bitbucket/Blog links (removed redundant Docs→GitHub)
+- [DONE] `docs/index.html` — product cards wrapped in `<a href="/jira/">` etc. (4 new crawlable links)
+- [DONE] `docs/index.html` — product card headings renamed "Jira" → "Jira CLI" etc. for better anchor text
+- [DONE] `docs/index.html` — added WebSite JSON-LD with alternateName; updated SoftwareApplication
+- [DONE] `docs/index.html` — footer expanded with hub + runbook links
+- [DONE] `docs/styles.css` — `.product-card` now `display:block; color:inherit; text-decoration:none` (anchor compatibility)
+- [DONE] `docs/llms.txt` — version bumped to 0.3.3
+
+### Verification
+- HTML parses cleanly (only false-positive `</link>` which is HTML5 self-closing)
+- Both JSON-LD blocks valid JSON; @type=WebSite and @type=SoftwareApplication
+- Local server: `/`, `/jira/`, `/confluence/`, `/bitbucket/`, `/jsm/` all return 200
+- Raw research data: `/Users/macmini/projects/codex/atlassiancli_seo_18apr2026/`
+- Codex review: `/Users/macmini/projects/codex/atlassiancli_seo_week1_review_18apr2026.txt`
+
+### Explicitly not done (per codex review)
+- Misspelling hint copy (spammy)
+- FAQ schema as SEO hack (Google limits FAQ rich results to gov/health)
+- OG image upgrade (not a week-1 lever)
+- Sitemap lastmod bump without real content changes
+
+---
+
 ## 2026-04-02 - Jira Search API Migration & 410 Error Handling
 
 ### Context
@@ -865,3 +1018,14 @@ current → draft: error (cannot unpublish)
 - Payload assembly extracted to `build_create_payload` / `build_update_payload` / `build_bulk_payload` for unit-testability.
 - New doc: `docs/14042026_jira_custom_fields.md`. README example updated. CLI help integration test added.
 - Co-authored with @thereisnotime (original PR).
+
+## 2026-05-16 — SEO overhaul + OSS-unaffiliated positioning (branch `seo/oss-positioning-overhaul`)
+
+Driven by GA4 (`520368061`) + GSC (`sc-domain:atlassiancli.com`) review. Plan: `/Users/macmini/.claude/plans/check-google-analytics-and-imperative-comet.md`. Codex review: `/Users/macmini/projects/codex/atlassiancli_oss_unaffiliated_positioning_review.txt`.
+
+- Phase 1: ship untracked `docs/install/` + `docs/docs/` (index/auth/commands); refresh all `docs/sitemap.xml` `lastmod` → 2026-05-16; add `/about/`.
+- Phase 2: `docs/index.html` — codex-recommended `<title>`/meta/OG/Twitter (no "Unofficial" in title), de-brand hero copy, JSON-LD `name`=`atlassian-cli` + `disambiguatingDescription` + `isAccessibleForFree` + `SoftwareSourceCode`, on-page FAQ, hero unaffiliated line.
+- Phase 3: nav anchors → "Jira/Confluence/Bitbucket CLI"; reciprocal exact-match links from blog guides → section pages; shared footer legal+trademark block site-wide.
+- Phase 4: deepen `runbooks/confluence-markdown-sync.html` (pos 40); above-the-fold TL;DR on `blog/bitbucket-cli-guide.html` (70% bounce).
+- Phase 5: site-wide `Atlassian CLI` → `atlassian-cli` rename (title/OG/JSON-LD/breadcrumb/H1); replace Atlassian-imitating product SVGs with generic glyphs; remove `<meta name="keywords">` (23 files); add `docs/about/index.html`, `docs/SECURITY.md`, `docs/.well-known/security.txt`, repo `SECURITY.md`; README + `docs/llms.txt` parity.
+- Decisions: full overhaul; keep `atlassiancli.com` domain, de-risk via naming/disclaimers (no migration).

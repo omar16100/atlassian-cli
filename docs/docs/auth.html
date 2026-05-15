@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>atlassian-cli Authentication — API Tokens, Profiles, Bitbucket Bearer | atlassian-cli</title>
+    <meta name="description" content="Authenticate atlassian-cli with Atlassian Cloud API tokens, Bitbucket bearer tokens, and multiple profiles. AES-256-GCM encrypted credentials, environment variables, CI/CD patterns.">
+    <meta property="og:site_name" content="atlassian-cli">
+    <meta property="og:title" content="atlassian-cli Authentication — API Tokens, Profiles, Bitbucket Bearer">
+    <meta property="og:description" content="Authenticate atlassian-cli with API tokens and bearer tokens. Profile-based multi-instance support with AES-256-GCM encrypted storage.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/docs/auth.html">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="atlassian-cli Authentication — API Tokens, Profiles">
+    <meta name="twitter:description" content="Authenticate atlassian-cli with API tokens and bearer tokens. AES-256-GCM encrypted credentials.">
+    <link rel="canonical" href="https://atlassiancli.com/docs/auth.html" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://atlassiancli.com/docs/"},
+        {"@type": "ListItem", "position": 3, "name": "Authentication", "item": "https://atlassiancli.com/docs/auth.html"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "atlassian-cli Authentication",
+      "description": "Authenticate atlassian-cli with Atlassian Cloud API tokens, Bitbucket bearer tokens, profile management, and environment variables.",
+      "url": "https://atlassiancli.com/docs/auth.html",
+      "author": {"@type": "Person", "name": "Omar Shabab", "url": "https://omarshabab.com"},
+      "about": {"@type": "SoftwareApplication", "name": "atlassian-cli"}
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+      .doc-body { max-width: 760px; margin: 0 auto; padding: 0 1.5rem; }
+      .doc-body h2 { font-size: 1.6rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+      .doc-body h3 { font-size: 1.15rem; margin-top: 1.8rem; margin-bottom: 0.6rem; }
+      .doc-body p, .doc-body li { color: var(--text-secondary); line-height: 1.7; }
+      .doc-body ul, .doc-body ol { margin: 0.8rem 0 1rem 1.2rem; }
+      .doc-body pre.code-block { margin: 1rem 0 1.5rem; }
+      .doc-body code:not(pre code) { background: var(--bg-secondary); padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+      .doc-body .toc { background: var(--bg-secondary); border-radius: 10px; padding: 1rem 1.2rem; border: 1px solid var(--border); margin: 1.5rem 0 2.5rem; }
+      .doc-body .toc ol { margin: 0; padding-left: 1.2rem; }
+      .doc-body .note { background: var(--bg-secondary); border-left: 3px solid var(--accent-cyan); padding: 0.8rem 1rem; border-radius: 0 8px 8px 0; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo"><img src="../assets/logo.svg" alt="atlassian-cli" height="24"></a>
+            <div class="nav-links">
+                <a href="/jira/" class="nav-link">Jira CLI</a>
+                <a href="/confluence/" class="nav-link">Confluence CLI</a>
+                <a href="/bitbucket/" class="nav-link">Bitbucket CLI</a>
+                <a href="/docs/" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">GitHub</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+    <section class="hero" style="padding: 8rem 0 2rem;">
+        <div class="hero-container">
+            <div class="hero-badge">Documentation</div>
+            <h1 class="hero-title">Authentication &amp; Profiles</h1>
+            <p class="hero-subtitle">How to authenticate atlassian-cli with API tokens, bearer tokens, and multiple profiles for Jira, Confluence, Bitbucket, and JSM.</p>
+            <p class="hero-disclaimer">atlassian-cli is an independent open-source tool. Tokens you create are stored locally on your machine; this project and website never receive your Atlassian credentials.</p>
+        </div>
+    </section>
+
+    <section style="padding: 1rem 0 5rem;">
+        <div class="doc-body">
+            <nav class="toc" aria-label="Table of contents">
+                <strong>On this page</strong>
+                <ol>
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#api-token">Atlassian Cloud API token (Jira, Confluence, JSM)</a></li>
+                    <li><a href="#bitbucket">Bitbucket bearer token</a></li>
+                    <li><a href="#profiles">Profiles</a></li>
+                    <li><a href="#env">Environment variables &amp; CI/CD</a></li>
+                    <li><a href="#storage">Where credentials are stored</a></li>
+                    <li><a href="#troubleshooting">Troubleshooting</a></li>
+                </ol>
+            </nav>
+
+            <h2 id="overview">Overview</h2>
+            <p>atlassian-cli supports three authentication paths, all managed by a single <code>auth</code> command group:</p>
+            <ul>
+                <li><strong>Atlassian Cloud API tokens</strong> — for Jira, Confluence, and Jira Service Management. Tokens are scoped per user and created at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">id.atlassian.com/manage-profile/security/api-tokens</a>.</li>
+                <li><strong>Bitbucket bearer tokens</strong> (OAuth app passwords, access tokens, or workspace access tokens). Basic-auth is also supported for legacy accounts.</li>
+                <li><strong>Environment variables</strong> — when a profile isn't configured or you're running in CI.</li>
+            </ul>
+            <p>Each configured account lives in a named <em>profile</em>. You can have any number of profiles (e.g. <code>personal</code>, <code>work</code>, <code>bb-ci</code>) and switch between them with a single flag.</p>
+
+            <h2 id="api-token">Atlassian Cloud API token</h2>
+            <p>This is the most common setup for Jira, Confluence, and JSM.</p>
+            <h3>1. Create an API token</h3>
+            <p>Go to <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">id.atlassian.com/manage-profile/security/api-tokens</a>, click <strong>Create API token</strong>, give it a label, and copy the value (you can only view it once).</p>
+            <div class="note">The token authenticates as <em>you</em>. Anything you can do in Jira/Confluence/JSM via the UI, the CLI can do with that token.</div>
+
+            <h3>2. Log in</h3>
+            <pre class="code-block"><code>atlassian-cli auth login \
+  --profile <span class="string">work</span> \
+  --base-url <span class="string">https://your-domain.atlassian.net</span> \
+  --email <span class="string">you@company.com</span> \
+  --token <span class="string">$ATLASSIAN_API_TOKEN</span> \
+  --default</code></pre>
+            <p>Flags:</p>
+            <ul>
+                <li><code>--profile</code> — a local name. Use anything you like.</li>
+                <li><code>--base-url</code> — your Atlassian Cloud URL, including <code>https://</code>.</li>
+                <li><code>--email</code> — the email of the account that owns the token.</li>
+                <li><code>--token</code> — the API token. Use a shell variable so it doesn't land in your history.</li>
+                <li><code>--default</code> — make this the profile used when <code>--profile</code> is omitted.</li>
+            </ul>
+
+            <h3>3. Verify</h3>
+            <pre class="code-block"><code>atlassian-cli auth test --profile work
+atlassian-cli jira search --jql <span class="string">"project = DEV"</span> --limit 1</code></pre>
+
+            <h2 id="bitbucket">Bitbucket authentication</h2>
+            <p>Bitbucket Cloud supports two token flows. Both are current — pick the one that matches your account model.</p>
+            <div class="note">App passwords are deprecated by Atlassian: new creation was disabled on <strong>September 9, 2025</strong> and existing app passwords stop working on <strong>June 9, 2026</strong>. Use an API token (Basic auth) or access token (Bearer auth) instead.</div>
+
+            <h3>API token (Basic auth) — for your personal account</h3>
+            <p>Create an Atlassian API token scoped to Bitbucket at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">id.atlassian.com/manage-profile/security/api-tokens</a> (select <strong>Bitbucket</strong>). Use it with your account email:</p>
+            <pre class="code-block"><code>atlassian-cli auth login \
+  --profile <span class="string">work</span> \
+  --bitbucket \
+  --email <span class="string">you@company.com</span> \
+  --token <span class="string">$BITBUCKET_TOKEN</span></code></pre>
+
+            <h3>Access token (Bearer auth) — for CI or tight scoping</h3>
+            <p>Access tokens are scoped to a repository, project, or workspace — great for CI pipelines where you want the minimum permissions:</p>
+            <ol>
+                <li>Bitbucket &rarr; your workspace / repository / project &rarr; <strong>Settings</strong> &rarr; <strong>Access tokens</strong></li>
+                <li>Click <strong>Create</strong> and grant only the scopes you need (e.g. <code>repository:read</code>, <code>pullrequest:write</code>)</li>
+            </ol>
+            <pre class="code-block"><code>atlassian-cli auth login \
+  --profile <span class="string">bb-ci</span> \
+  --bitbucket --bearer \
+  --token <span class="string">$BITBUCKET_TOKEN</span></code></pre>
+            <p>Bearer auth does not require <code>--email</code>. The workspace is optional at login — supply <code>--workspace</code> when you want it saved in the profile, or pass <code>--workspace &lt;slug&gt;</code> per-command.</p>
+
+            <h3>Verify</h3>
+            <pre class="code-block"><code>atlassian-cli auth test --bitbucket --profile bb-ci
+atlassian-cli bitbucket whoami --profile bb-ci</code></pre>
+
+            <h2 id="profiles">Profiles</h2>
+            <p>Profiles isolate credentials per account or environment. Common patterns:</p>
+            <ul>
+                <li><code>personal</code> — your own sandbox instance</li>
+                <li><code>work</code> — your company's production instance</li>
+                <li><code>bb-ci</code> — a scoped Bitbucket token for CI pipelines</li>
+                <li><code>staging</code> / <code>prod</code> — separate profiles per environment</li>
+            </ul>
+
+            <h3>List profiles</h3>
+            <pre class="code-block"><code>atlassian-cli auth list</code></pre>
+
+            <h3>Switch profile per command</h3>
+            <pre class="code-block"><code>atlassian-cli jira search --profile personal --jql <span class="string">"project = PERS"</span>
+atlassian-cli jira search --profile work --jql <span class="string">"project = DEV"</span></code></pre>
+
+            <h3>Change the default</h3>
+            <p>Re-run <code>auth login</code> with <code>--default</code> for the profile you want to promote:</p>
+            <pre class="code-block"><code>atlassian-cli auth login --profile work --base-url https://x.atlassian.net --email you@x.com --default</code></pre>
+            <p>Or edit <code>default_profile:</code> directly in <code>~/.atlassian-cli/config.yaml</code>.</p>
+
+            <h3>Remove a profile</h3>
+            <pre class="code-block"><code>atlassian-cli auth logout --profile bb-legacy                    <span class="comment"># remove credentials, keep profile entry</span>
+atlassian-cli auth logout --profile bb-legacy --remove-profile   <span class="comment"># remove profile entirely</span>
+atlassian-cli auth logout --profile work --bitbucket             <span class="comment"># only remove the Bitbucket token</span></code></pre>
+
+            <h2 id="env">Environment variables &amp; CI/CD</h2>
+            <p>In CI you usually don't want persisted secrets. atlassian-cli overrides the stored token with these environment variables, checked in this order:</p>
+            <h3>Jira / Confluence / JSM</h3>
+            <ul>
+                <li><code>ATLASSIAN_CLI_TOKEN_&lt;PROFILE&gt;</code> — per-profile override (profile name uppercased). Example: <code>ATLASSIAN_CLI_TOKEN_WORK</code>.</li>
+                <li><code>ATLASSIAN_API_TOKEN</code> — fallback token used by whichever profile is active.</li>
+            </ul>
+            <h3>Bitbucket</h3>
+            <ul>
+                <li><code>ATLASSIAN_CLI_BITBUCKET_TOKEN_&lt;PROFILE&gt;</code> — per-profile Bitbucket token.</li>
+                <li><code>ATLASSIAN_BITBUCKET_TOKEN</code> — generic Bitbucket fallback.</li>
+                <li><code>BITBUCKET_TOKEN</code> — also recognised (shorter, common in GitHub Actions / Jenkins).</li>
+            </ul>
+            <div class="note">You still need a profile configured with <code>--base-url</code>, <code>--email</code>, and workspace (for Bitbucket). The env vars only override the token. In CI, commit a minimal <code>~/.atlassian-cli/config.yaml</code> (or run <code>auth login</code> in a setup step with a dummy token) so the profile exists; then supply the real token via env var at run time.</div>
+            <pre class="code-block"><code><span class="comment"># GitHub Actions example — token via env, profile metadata from config.yaml</span>
+- name: Sync Jira
+  env:
+    ATLASSIAN_API_TOKEN: ${{ secrets.ATLASSIAN_API_TOKEN }}
+  run: |
+    atlassian-cli auth login \
+      --profile ci --base-url https://mycompany.atlassian.net \
+      --email bot@mycompany.com --default
+    atlassian-cli jira search --jql <span class="string">"project = REL"</span> --format json</code></pre>
+            <p>See the <a href="/runbooks/jira-bulk-transition.html">Jira bulk transition runbook</a> for a full CI example.</p>
+
+            <h2 id="storage">Where credentials are stored</h2>
+            <p>On login, atlassian-cli writes credentials to <code>~/.config/atlassian-cli/credentials</code> (Linux/macOS) or <code>%APPDATA%\atlassian-cli\credentials</code> (Windows). Values are encrypted with <strong>AES-256-GCM</strong>; the per-machine key lives in <code>~/.config/atlassian-cli/key</code>.</p>
+            <p>Profile metadata (names, base URLs, default profile) lives in <code>~/.atlassian-cli/config.yaml</code>. You can edit it by hand if you prefer — see <code>configs/config.example.yaml</code> in the repo.</p>
+            <div class="note">Credentials never touch plaintext disk. On Linux and macOS the config directory is chmod 700 by default.</div>
+
+            <h2 id="troubleshooting">Troubleshooting</h2>
+            <h3>401 Unauthorized</h3>
+            <p>Most likely the token is wrong, expired, or the email doesn't match the token owner. Regenerate at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">id.atlassian.com/manage-profile/security/api-tokens</a>.</p>
+
+            <h3>403 Forbidden</h3>
+            <p>The account is authenticated but lacks permission. For Jira/Confluence, check project/space role. For Bitbucket bearer tokens, verify the scopes on the access token.</p>
+
+            <h3>"No default profile configured"</h3>
+            <p>Run <code>atlassian-cli auth list</code>. If empty, run <code>auth login</code>. If you have profiles but none is default, re-run <code>auth login --default</code> for the profile you want, or edit <code>default_profile:</code> in <code>~/.atlassian-cli/config.yaml</code>.</p>
+
+            <h3>CI can't find the credentials file</h3>
+            <p>In CI you usually want environment variables, not a credentials file. See <a href="#env">Environment variables &amp; CI/CD</a> above.</p>
+
+            <h3>Token works in curl but not atlassian-cli</h3>
+            <p>Check that <code>--base-url</code> includes the scheme (<code>https://</code>) and has no trailing slash. Run with <code>--debug</code> to see the full request.</p>
+
+            <p style="margin-top: 3rem;"><strong>Next:</strong> <a href="/docs/commands.html">Command reference &rarr;</a></p>
+        </div>
+    </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.3</span>
+                </div>
+                <div class="footer-links">
+                    <a href="/install/">Install</a>
+                    <a href="/docs/">Docs</a>
+                    <a href="/jira/">Jira CLI</a>
+                    <a href="/confluence/">Confluence CLI</a>
+                    <a href="/bitbucket/">Bitbucket CLI</a>
+                    <a href="/blog/">Blog</a>
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                </div>
+                <div class="footer-right"><span class="footer-license">MIT License</span></div>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generate Confluence Space Analytics Reports | atlassian-cli</title>
     <meta name="description" content="Generate detailed analytics reports for Confluence spaces including page views, contributors, and activity metrics via the command line.">
-    <meta name="keywords" content="confluence analytics, confluence space report, confluence page views, confluence csv export, atlassian cli, confluence metrics">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Generate Confluence Space Analytics Reports | atlassian-cli">
@@ -36,6 +35,17 @@
     </script>
 
     <!-- JSON-LD HowTo Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Runbooks", "item": "https://atlassiancli.com/runbooks/"},
+        {"@type": "ListItem", "position": 3, "name": "Generate Confluence Space Analytics Reports", "item": "https://atlassiancli.com/runbooks/confluence-space-report.html"}
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -245,7 +255,7 @@
                 </a>
                 <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
                 <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/#install" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -270,7 +280,7 @@
 
         <h2>Prerequisites</h2>
         <ul>
-            <li><code>atlassian-cli</code> installed (<a href="/#install" style="color: var(--accent-cyan);">install guide</a>)</li>
+            <li><code>atlassian-cli</code> installed (<a href="/install/" style="color: var(--accent-cyan);">install guide</a>)</li>
             <li>Confluence authentication configured via <code>atlassian-cli auth login</code></li>
             <li><code>jq</code> installed for JSON processing</li>
             <li>Confluence analytics permissions for page view data</li>
@@ -563,6 +573,10 @@ main</code></pre>
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>

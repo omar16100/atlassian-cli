@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jira CLI — Search, Create & Automate Jira Issues from the Terminal | atlassian-cli</title>
     <meta name="description" content="Manage Jira from the command line with atlassian-cli. Search issues with JQL, bulk transitions, automation rules, webhooks — all from your terminal.">
-    <meta name="keywords" content="jira cli, jira command line, jira cli tool, jira terminal, jira automation, jql search cli, jira bulk operations">
     <meta property="og:title" content="Jira CLI — Search, Create & Automate Jira Issues from the Terminal">
     <meta property="og:description" content="Manage Jira from the command line with atlassian-cli. Search issues with JQL, bulk transitions, automation rules, webhooks — all from your terminal.">
     <meta property="og:type" content="website">
@@ -23,6 +22,16 @@
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-SHR43YZK8C');
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Jira CLI", "item": "https://atlassiancli.com/jira/"}
+      ]
+    }
     </script>
     <script type="application/ld+json">
     {
@@ -51,15 +60,18 @@
                 <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
             </a>
             <div class="nav-links">
+                <a href="/jira/" class="nav-link" aria-current="page">Jira CLI</a>
+                <a href="/confluence/" class="nav-link">Confluence CLI</a>
+                <a href="/bitbucket/" class="nav-link">Bitbucket CLI</a>
+                <a href="/docs/" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                     </svg>
                     GitHub
                 </a>
-                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
-                <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/#install" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -71,10 +83,29 @@
             <h1 class="product-hero-title">Jira <span class="highlight">CLI</span></h1>
             <p class="product-hero-subtitle">Search, create, and automate Jira issues from the terminal. JQL queries, bulk transitions, sprint management, and CI/CD integration.</p>
             <div class="product-hero-links">
-                <a href="/#install">Install</a>
+                <a href="/install/">Install</a>
+                <a href="/docs/commands.html#jira-issues">Commands</a>
                 <a href="/confluence/">Confluence CLI</a>
                 <a href="/blog/">Blog</a>
             </div>
+        </div>
+    </section>
+
+    <!-- What is Jira CLI? -->
+    <section class="product-features-section" style="padding-top: 2rem;">
+        <div class="container" style="max-width: 820px;">
+            <h2 class="section-title">What is the Jira CLI?</h2>
+            <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">The Jira CLI (<code>atlassian-cli jira</code>) is a command-line tool that lets you drive Jira Cloud from a terminal or script instead of the web UI. Issues, projects, sprints, automation rules, webhooks, audit logs, and custom fields are all addressable with one binary. Because the output is structured (JSON / CSV / YAML / table), it composes cleanly with <code>jq</code>, spreadsheets, and CI pipelines — making it a natural fit for bulk changes, reporting, and "Jira as code" workflows.</p>
+            <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">It's part of <a href="/">atlassian-cli</a>, a single open-source Rust binary that also covers <a href="/confluence/">Confluence</a>, <a href="/bitbucket/">Bitbucket</a>, and <a href="/jsm/">Jira Service Management</a>. Installation is a one-liner via <a href="/install/">Homebrew or Cargo</a>; authentication uses a standard <a href="/docs/auth.html">Atlassian Cloud API token</a>.</p>
+
+            <h2 class="section-title" style="margin-top: 3rem;">When to use a Jira CLI</h2>
+            <ul style="color: var(--text-secondary); line-height: 1.8; max-width: 720px; margin: 0 auto;">
+                <li><strong>Bulk edits</strong> — transition, assign, label, or relabel hundreds of issues that match a JQL query, with dry-run previews so you can see the blast radius first.</li>
+                <li><strong>Reporting &amp; exports</strong> — pull a sprint, a backlog, or a cross-project JQL result into JSON or CSV for dashboards, spreadsheets, and audits.</li>
+                <li><strong>CI/CD automation</strong> — open release tickets from a pipeline, comment on issues with build results, or gate a deploy on ticket status.</li>
+                <li><strong>Onboarding &amp; audits</strong> — list project roles, webhook registrations, automation rules, and permission schemes across projects in one pass.</li>
+                <li><strong>Migrations</strong> — export from one instance, transform, and re-create in another. Profiles let you point at staging and production from the same shell.</li>
+            </ul>
         </div>
     </section>
 
@@ -151,17 +182,17 @@
                     <pre class="code-block" id="code-search"><code><span class="comment"># Search issues by project and status</span>
 atlassian-cli jira search \
   --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
-  --output json
+  --format json
 
 <span class="comment"># Search with assignee filter, table output</span>
 atlassian-cli jira search \
   --jql <span class="string">"assignee = currentUser() AND sprint in openSprints()"</span> \
-  --output table
+  --format table
 
 <span class="comment"># Export results as CSV</span>
 atlassian-cli jira search \
   --jql <span class="string">"project = DEV AND created >= -7d"</span> \
-  --output csv > new_issues.csv</code></pre>
+  --format csv > new_issues.csv</code></pre>
                 </div>
                 <div class="example-panel" id="tab-bulk">
                     <div class="example-header">
@@ -195,18 +226,18 @@ atlassian-cli jira bulk transition \
 atlassian-cli jira search \
   --profile prod \
   --jql <span class="string">"project = PROJ AND Sprint in openSprints()"</span> \
-  --output json
+  --format json
 
 <span class="comment"># Export sprint data to CSV for reporting</span>
 atlassian-cli jira search \
   --profile prod \
   --jql <span class="string">"project = PROJ AND Sprint = 42"</span> \
-  --output csv > sprint-42.csv
+  --format csv > sprint-42.csv
 
 <span class="comment"># Pipe to jq for cycle time analysis</span>
 atlassian-cli jira search \
   --jql <span class="string">"project = PROJ AND Sprint = 42"</span> \
-  --output json | \
+  --format json | \
   jq <span class="string">'[.[] | {key, status: .fields.status.name, points: .fields.customfield_10016}]'</span></code></pre>
                 </div>
             </div>
@@ -226,10 +257,10 @@ brew install omar16100/atlassian-cli/atlassian-cli
 <span class="comment"># Or via Cargo</span>
 cargo install atlassian-cli</code></pre>
                 <h4>2. Authenticate</h4>
-                <pre class="code-block"><code><span class="comment"># Add your Jira instance</span>
+                <pre class="code-block"><code><span class="comment"># Add your Jira instance (HTTPS required)</span>
 atlassian-cli auth login \
   --profile <span class="string">work</span> \
-  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --base-url <span class="string">https://your-domain.atlassian.net</span> \
   --email <span class="string">you@company.com</span>
 
 <span class="comment"># Verify connection</span>
@@ -239,6 +270,78 @@ atlassian-cli auth test --profile <span class="string">work</span></code></pre>
 atlassian-cli jira search \
   --profile <span class="string">work</span> \
   --jql <span class="string">"assignee = currentUser()"</span></code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Command cluster -->
+    <section class="product-features-section">
+        <div class="container" style="max-width: 880px;">
+            <h2 class="section-title">Jira command groups</h2>
+            <p class="section-subtitle">Every group links to its section of the full <a href="/docs/commands.html">command reference</a>.</p>
+            <table style="width: 100%; margin: 2rem 0; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <th style="text-align: left; padding: 0.75rem 0.5rem; color: var(--text-primary); font-weight: 600;">Group</th>
+                        <th style="text-align: left; padding: 0.75rem 0.5rem; color: var(--text-primary); font-weight: 600;">Covers</th>
+                    </tr>
+                </thead>
+                <tbody style="color: var(--text-secondary);">
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-issues"><code>jira search / get / create / update / transition / assign / delete</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Issue CRUD. JQL search with any field, assignee/status filters, custom field payloads via <code>--field 'customfield_XXXXX=...'</code>.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-projects"><code>jira project / components / versions</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Project inventory, component and version management.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-roles"><code>jira roles</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">List roles, add/remove actors, audit who has which role on which project.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-fields"><code>jira fields / workflows</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Discover custom field IDs, list and export workflows for version-controlled config.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-bulk"><code>jira bulk transition / assign / export</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Run operations across every issue matching a JQL query. Dry-run, concurrency, progress tracking.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-automation"><code>jira automation / webhooks / audit</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Inspect automation rules, manage webhooks, query the audit log with date/event filters.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="color: var(--text-secondary);">Full flags, output schemas, and CI patterns are documented in the <a href="/docs/commands.html">atlassian-cli command reference</a>. For authentication setup see <a href="/docs/auth.html">Authentication &amp; Profiles</a>.</p>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="product-features-section" style="background: var(--bg-secondary);">
+        <div class="container" style="max-width: 760px;">
+            <h2 class="section-title">Frequently asked questions</h2>
+            <div style="margin-top: 2rem; color: var(--text-secondary); line-height: 1.7;">
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Is there an official Jira CLI?</h3>
+                <p>Atlassian ships <code>acli</code> for some administrative scenarios, but it focuses on Atlassian's own SDK/plugin workflows rather than day-to-day issue management. <code>atlassian-cli</code> is an independent open-source Rust CLI focused on Jira Cloud automation — issue CRUD, JQL search, bulk operations, and CI-friendly output. See <a href="/blog/jira-cli-tools-compared.html">Jira CLI tools compared</a> for a detailed comparison.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">How do I log in?</h3>
+                <p>Generate an Atlassian API token at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">id.atlassian.com/manage-profile/security/api-tokens</a>, then run <code>atlassian-cli auth login --profile work --base-url https://your-domain.atlassian.net --email you@company.com --token $TOKEN --default</code>. The full flow — including multiple profiles and Bitbucket bearer tokens — is in <a href="/docs/auth.html">the auth guide</a>.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Can I run it in GitHub Actions / GitLab CI / Jenkins?</h3>
+                <p>Yes. Install via Cargo or a prebuilt binary (see <a href="/install/">install guide</a>), then set <code>ATLASSIAN_API_TOKEN</code> as a secret. With a minimal profile committed, the CLI reads the token from the environment. Machine-readable output (<code>--format json</code>, <code>--format quiet</code>) and sane exit codes make it easy to gate pipelines on results.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Does it support custom fields?</h3>
+                <p>Yes. Discover IDs with <code>atlassian-cli jira fields list</code>, then pass values via repeatable <code>--field 'customfield_10010={"value":"Internal"}'</code> flags on <code>create</code> and <code>update</code>. Each <code>--field</code> takes the raw JSON Jira expects, so every field type (select, cascade, formula, sprint, epic link) is supported.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">How do I bulk-transition issues safely?</h3>
+                <p>Always run with <code>--dry-run</code> first: <code>atlassian-cli jira bulk transition --jql "project = DEV AND status = 'In Progress'" --transition "Done" --dry-run</code>. That prints the full list of keys that would change, without calling the mutation API. Remove <code>--dry-run</code> once it looks right. The <a href="/runbooks/jira-bulk-transition.html">bulk transition runbook</a> walks through a production example end-to-end.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Does it work with Jira Data Center / Server?</h3>
+                <p>atlassian-cli targets Jira Cloud's REST API. Some Data Center instances expose compatible endpoints, but it isn't the primary focus; check the <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub repo</a> for current DC coverage.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Is it free?</h3>
+                <p>Yes — MIT-licensed, no subscription, no telemetry tied to accounts. You'll need an Atlassian Cloud license for the Jira instance itself, but the CLI is free to use in personal and commercial projects.</p>
             </div>
         </div>
     </section>
@@ -295,7 +398,7 @@ atlassian-cli jira search \
                 </div>
                 <div class="footer-links">
                     <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
-                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="/docs/">Documentation</a>
                     <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
                     <a href="/blog/">Blog</a>
                 </div>
@@ -305,6 +408,10 @@ atlassian-cli jira search \
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>

@@ -673,7 +673,7 @@ pub async fn list_pipelines(
     };
     let rows: Vec<PipelineRow> = all_pipelines
         .iter()
-        .zip(step_summaries.into_iter())
+        .zip(step_summaries)
         .map(|(pipeline, steps_summary)| {
             let status = get_pipeline_status(pipeline);
             PipelineRow {
