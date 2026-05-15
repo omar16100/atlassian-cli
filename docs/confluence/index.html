@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Confluence CLI — Manage Pages, Spaces & Exports from the Terminal | atlassian-cli</title>
     <meta name="description" content="Manage Confluence from the command line with atlassian-cli. CQL search, bulk export, space backups, page management — all from your terminal.">
-    <meta name="keywords" content="confluence cli, confluence command line, confluence cli tool, confluence terminal, confluence backup, cql search cli, confluence export">
     <meta property="og:title" content="Confluence CLI — Manage Pages, Spaces & Exports from the Terminal">
     <meta property="og:description" content="Manage Confluence from the command line with atlassian-cli. CQL search, bulk export, space backups, page management — all from your terminal.">
     <meta property="og:type" content="website">
@@ -23,6 +22,16 @@
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-SHR43YZK8C');
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Confluence CLI", "item": "https://atlassiancli.com/confluence/"}
+      ]
+    }
     </script>
     <script type="application/ld+json">
     {
@@ -51,15 +60,18 @@
                 <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
             </a>
             <div class="nav-links">
+                <a href="/jira/" class="nav-link">Jira CLI</a>
+                <a href="/confluence/" class="nav-link" aria-current="page">Confluence CLI</a>
+                <a href="/bitbucket/" class="nav-link">Bitbucket CLI</a>
+                <a href="/docs/" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                     </svg>
                     GitHub
                 </a>
-                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
-                <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/#install" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -71,10 +83,29 @@
             <h1 class="product-hero-title">Confluence <span class="highlight">CLI</span></h1>
             <p class="product-hero-subtitle">Manage pages, spaces, and exports from the terminal. CQL search, bulk backup, markdown sync, and attachment handling.</p>
             <div class="product-hero-links">
-                <a href="/#install">Install</a>
+                <a href="/install/">Install</a>
+                <a href="/docs/commands.html#conf-pages">Commands</a>
                 <a href="/jira/">Jira CLI</a>
                 <a href="/blog/">Blog</a>
             </div>
+        </div>
+    </section>
+
+    <!-- What is Confluence CLI? -->
+    <section class="product-features-section" style="padding-top: 2rem;">
+        <div class="container" style="max-width: 820px;">
+            <h2 class="section-title">What is the Confluence CLI?</h2>
+            <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">The Confluence CLI (<code>atlassian-cli confluence</code>) is a command-line tool for Atlassian Confluence Cloud. It covers the full page and space lifecycle — search with CQL, create/update/delete pages, manage attachments, export spaces for backup, bulk-label or bulk-delete pages, and synchronize Markdown repositories into Confluence. Output formats (JSON, CSV, YAML, table) make it easy to feed results into audits, dashboards, or other automation.</p>
+            <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">It ships as part of <a href="/">atlassian-cli</a>, one open-source Rust binary that also handles <a href="/jira/">Jira</a>, <a href="/bitbucket/">Bitbucket</a>, and <a href="/jsm/">Jira Service Management</a>. Install via <a href="/install/">Homebrew or Cargo</a> and authenticate with an <a href="/docs/auth.html">Atlassian Cloud API token</a>.</p>
+
+            <h2 class="section-title" style="margin-top: 3rem;">When to use a Confluence CLI</h2>
+            <ul style="color: var(--text-secondary); line-height: 1.8; max-width: 720px; margin: 0 auto;">
+                <li><strong>Space backups</strong> — export every page in a space to JSON with attachments, on a schedule, straight into object storage. See the <a href="/runbooks/confluence-backup.html">Confluence backup runbook</a>.</li>
+                <li><strong>Markdown → Confluence pipelines</strong> — maintain docs in Git, render with pandoc, and sync to Confluence. The <a href="/runbooks/confluence-markdown-sync.html">markdown sync runbook</a> shows an idempotent pipeline.</li>
+                <li><strong>Bulk cleanup</strong> — archive, delete, or relabel every page matching a CQL query. Dry-run previews protect shared spaces.</li>
+                <li><strong>Content audits</strong> — list pages modified in the last N days, find orphaned pages, or identify attachments over a size threshold.</li>
+                <li><strong>Onboarding &amp; access reviews</strong> — list space permissions and page restrictions to confirm who can see what.</li>
+            </ul>
         </div>
     </section>
 
@@ -150,17 +181,17 @@
                     </div>
                     <pre class="code-block" id="code-search"><code><span class="comment"># Search pages in a space</span>
 atlassian-cli confluence search cql \
-  --output json \
+  --format json \
   <span class="string">"space = DOCS AND type = page"</span>
 
 <span class="comment"># Search by label</span>
 atlassian-cli confluence search cql \
-  --output table \
+  --format table \
   <span class="string">"space = DOCS AND label = 'architecture'"</span>
 
 <span class="comment"># Find recently modified pages</span>
 atlassian-cli confluence search cql \
-  --output json \
+  --format json \
   <span class="string">"space = DOCS AND lastModified >= now('-7d')"</span></code></pre>
                 </div>
                 <div class="example-panel" id="tab-backup">
@@ -181,13 +212,13 @@ atlassian-cli confluence bulk export \
 atlassian-cli confluence space get \
   --profile prod \
   DOCS \
-  --output json
+  --format json
 
 <span class="comment"># List and download attachments</span>
 atlassian-cli confluence attachment list \
   --profile prod \
   123456 \
-  --output json</code></pre>
+  --format json</code></pre>
                 </div>
                 <div class="example-panel" id="tab-sync">
                     <div class="example-header">
@@ -198,7 +229,7 @@ atlassian-cli confluence attachment list \
                     </div>
                     <pre class="code-block" id="code-sync"><code><span class="comment"># Search for existing page by title</span>
 atlassian-cli confluence search cql \
-  --output json \
+  --format json \
   <span class="string">"space = DOCS AND title = \"API Reference\""</span>
 
 <span class="comment"># Create a new page in a space</span>
@@ -240,7 +271,7 @@ cargo install atlassian-cli</code></pre>
                 <pre class="code-block"><code><span class="comment"># Add your Confluence instance</span>
 atlassian-cli auth login \
   --profile <span class="string">work</span> \
-  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --base-url <span class="string">https://your-domain.atlassian.net</span> \
   --email <span class="string">you@company.com</span>
 
 <span class="comment"># Verify connection</span>
@@ -254,26 +285,99 @@ atlassian-cli confluence search cql \
         </div>
     </section>
 
+    <!-- Command cluster -->
+    <section class="product-features-section">
+        <div class="container" style="max-width: 880px;">
+            <h2 class="section-title">Confluence command groups</h2>
+            <p class="section-subtitle">Each group links into the full <a href="/docs/commands.html">command reference</a>.</p>
+            <table style="width: 100%; margin: 2rem 0; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <th style="text-align: left; padding: 0.75rem 0.5rem; color: var(--text-primary); font-weight: 600;">Group</th>
+                        <th style="text-align: left; padding: 0.75rem 0.5rem; color: var(--text-primary); font-weight: 600;">Covers</th>
+                    </tr>
+                </thead>
+                <tbody style="color: var(--text-secondary);">
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#conf-search"><code>confluence search cql / text / in-space</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">CQL queries, full-text search, per-space search. Filter by type, label, contributor, or modified date.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#conf-spaces"><code>confluence space</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Create, update, delete, list spaces. Manage space permissions and default settings.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#conf-pages"><code>confluence page</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Page CRUD, version history, labels, comments, restrictions. Works on any page you have access to.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#conf-blog"><code>confluence blog</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Blog post CRUD in any space.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#conf-attach"><code>confluence attachment</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Upload, download, list, and delete page attachments.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#conf-bulk"><code>confluence bulk export / delete / add-labels</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Bulk operations with CQL filter + dry-run. Export a whole space to JSON, clean up stale content, retag at scale.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#conf-analytics"><code>confluence analytics</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem;">Page-view and space-stats analytics for reporting.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="color: var(--text-secondary);">See the <a href="/docs/commands.html">complete command reference</a> for flags and output schemas. Auth setup is in the <a href="/docs/auth.html">Authentication guide</a>.</p>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="product-features-section" style="background: var(--bg-secondary);">
+        <div class="container" style="max-width: 760px;">
+            <h2 class="section-title">Frequently asked questions</h2>
+            <div style="margin-top: 2rem; color: var(--text-secondary); line-height: 1.7;">
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">How do I back up a Confluence space?</h3>
+                <p>Run <code>atlassian-cli confluence bulk export --space DEV --format json --output backup.json</code>. That pulls every page in the space into one JSON file you can store in S3 / Git / anywhere. Attach the matching attachments via the <code>attachment</code> group. End-to-end script in the <a href="/runbooks/confluence-backup.html">Confluence backup runbook</a>.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Can I sync Markdown files into Confluence?</h3>
+                <p>Yes. The usual pattern is: render Markdown to Confluence storage format with pandoc, then pass the HTML to <code>confluence page create</code> or <code>confluence page update</code>. The <a href="/runbooks/confluence-markdown-sync.html">markdown → Confluence runbook</a> contains a production-ready script with idempotent upserts keyed by page title.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">What is CQL and how do I use it?</h3>
+                <p>Confluence Query Language. Same shape as Jira's JQL but with Confluence-specific fields: <code>space = DEV</code>, <code>type = page</code>, <code>label = onboarding</code>, <code>lastmodified &gt;= "2026-01-01"</code>. Combine clauses with <code>AND</code> / <code>OR</code>. The CLI accepts CQL directly: <code>atlassian-cli confluence search cql --cql "space = DEV AND type = page AND label = onboarding"</code>.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Is there dry-run mode for bulk operations?</h3>
+                <p>Yes. Every <code>confluence bulk</code> subcommand accepts <code>--dry-run</code>, which prints the exact list of pages that <em>would</em> be affected without calling the mutating API. Run it first, sanity-check the list, then re-run without the flag.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Does it work with Confluence Data Center?</h3>
+                <p>Primary target is Confluence Cloud. Some Data Center instances expose compatible v2 REST APIs, but support varies — check the <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub repo</a> for the current DC status.</p>
+
+                <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Is it free?</h3>
+                <p>Yes — MIT-licensed, open source. You need an Atlassian Cloud subscription for the Confluence instance itself, but the CLI is free for any use.</p>
+            </div>
+        </div>
+    </section>
+
     <!-- Related Resources -->
     <section class="related-section">
         <div class="container">
             <h2 class="section-title">Related Resources</h2>
             <p class="section-subtitle">Runbooks, guides, and tutorials for Confluence CLI workflows</p>
             <div class="related-grid">
-                <a href="/runbooks/confluence-backup-space.html" class="related-card">
+                <a href="/runbooks/confluence-backup.html" class="related-card">
                     <div class="related-card-type">Runbook</div>
-                    <h3 class="related-card-title">Confluence Space Backup</h3>
+                    <h3 class="related-card-title">Confluence Backup</h3>
                     <p class="related-card-desc">Production-ready script for backing up entire Confluence spaces with pages, blog posts, and attachments.</p>
                 </a>
-                <a href="/runbooks/confluence-doc-pipeline.html" class="related-card">
+                <a href="/runbooks/confluence-markdown-sync.html" class="related-card">
                     <div class="related-card-type">Runbook</div>
-                    <h3 class="related-card-title">Documentation Pipeline</h3>
+                    <h3 class="related-card-title">Markdown &rarr; Confluence Sync</h3>
                     <p class="related-card-desc">Automate markdown-to-Confluence sync. Convert docs from Git repos into Confluence pages with labels.</p>
                 </a>
-                <a href="/runbooks/confluence-bulk-export.html" class="related-card">
+                <a href="/runbooks/confluence-bulk-cleanup.html" class="related-card">
                     <div class="related-card-type">Runbook</div>
-                    <h3 class="related-card-title">Confluence Bulk Export</h3>
-                    <p class="related-card-desc">Export pages in bulk as JSON or CSV. Filter by CQL, include attachments, and create backup manifests.</p>
+                    <h3 class="related-card-title">Confluence Bulk Cleanup</h3>
+                    <p class="related-card-desc">Bulk archive, delete, or relabel pages with CQL filters, dry-run previews, and safety limits.</p>
                 </a>
                 <a href="/blog/confluence-cli-guide.html" class="related-card">
                     <div class="related-card-type">Blog</div>
@@ -306,7 +410,7 @@ atlassian-cli confluence search cql \
                 </div>
                 <div class="footer-links">
                     <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
-                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="/docs/">Documentation</a>
                     <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
                     <a href="/blog/">Blog</a>
                 </div>
@@ -316,6 +420,10 @@ atlassian-cli confluence search cql \
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>

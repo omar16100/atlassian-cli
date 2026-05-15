@@ -6,6 +6,12 @@ Automate your entire Atlassian Cloud stack from the terminal. Bulk operations,
 dry-run mode, multiple output formats (JSON/CSV/YAML/table), and profile-based
 multi-instance support.
 
+> **Independent open-source project.** `atlassian-cli` is not affiliated with,
+> endorsed by, sponsored by, or maintained by Atlassian. Atlassian maintains its
+> own separate official CLI (`acli`). Atlassian, Jira, Confluence, Bitbucket, and
+> Jira Service Management are trademarks of Atlassian Pty Ltd; product names are
+> used here only to identify compatibility.
+
 [![CI](https://github.com/omar16100/atlassian-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/omar16100/atlassian-cli/actions)
 [![crates.io](https://img.shields.io/crates/v/atlassian-cli.svg)](https://crates.io/crates/atlassian-cli)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

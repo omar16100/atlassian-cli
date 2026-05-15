@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Install atlassian-cli — Homebrew, Cargo, prebuilt binaries | atlassian-cli</title>
+    <meta name="description" content="Install atlassian-cli in under a minute. Homebrew (brew install), Cargo, or a prebuilt binary for macOS, Linux, and Windows. Free, open source, MIT licensed.">
+    <meta property="og:site_name" content="atlassian-cli">
+    <meta property="og:title" content="Install atlassian-cli — Homebrew, Cargo, prebuilt binaries">
+    <meta property="og:description" content="Install atlassian-cli in under a minute. Homebrew, Cargo, or a prebuilt binary for macOS, Linux, and Windows.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/install/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Install atlassian-cli — Homebrew, Cargo, prebuilt binaries">
+    <meta name="twitter:description" content="Install atlassian-cli in under a minute. Homebrew, Cargo, or a prebuilt binary for macOS, Linux, and Windows.">
+    <link rel="canonical" href="https://atlassiancli.com/install/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Install", "item": "https://atlassiancli.com/install/"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "Install atlassian-cli",
+      "description": "How to install atlassian-cli on macOS, Linux, or Windows via Homebrew, Cargo, or a prebuilt binary release.",
+      "url": "https://atlassiancli.com/install/",
+      "author": {"@type": "Person", "name": "Omar Shabab", "url": "https://omarshabab.com"},
+      "about": {
+        "@type": "SoftwareApplication",
+        "name": "atlassian-cli",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "macOS, Linux, Windows"
+      }
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="/jira/" class="nav-link">Jira CLI</a>
+                <a href="/confluence/" class="nav-link">Confluence CLI</a>
+                <a href="/bitbucket/" class="nav-link">Bitbucket CLI</a>
+                <a href="/docs/" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="#homebrew" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero" style="padding-top: 6rem;">
+        <div class="hero-container">
+            <div class="hero-badge">Install Guide</div>
+            <h1 class="hero-title">Install <span class="hero-highlight">atlassian-cli</span></h1>
+            <p class="hero-subtitle">Install atlassian-cli in under a minute. Homebrew, Cargo, or a prebuilt binary — macOS, Linux, Windows. Free and open source (MIT).</p>
+            <p class="hero-disclaimer">Independent open-source project — not affiliated with, endorsed by, or maintained by Atlassian.</p>
+        </div>
+    </section>
+
+    <!-- Install methods -->
+    <section class="install" style="padding-top: 2rem;">
+        <div class="container">
+            <h2 class="section-title" id="homebrew">Install with Homebrew</h2>
+            <p class="section-subtitle">Recommended for macOS and Linux. Updates automatically via <code>brew upgrade</code>.</p>
+            <pre class="code-block"><code>brew install omar16100/atlassian-cli/atlassian-cli</code></pre>
+            <p>The formula lives in the <a href="https://github.com/omar16100/homebrew-atlassian-cli" target="_blank" rel="noopener">omar16100/atlassian-cli tap</a>. After install, run <code>atlassian-cli --version</code> to verify.</p>
+
+            <h2 class="section-title" id="cargo" style="margin-top: 3rem;">Install with Cargo</h2>
+            <p class="section-subtitle">Works anywhere the Rust toolchain runs. Compiles from source.</p>
+            <pre class="code-block"><code>cargo install atlassian-cli</code></pre>
+            <p>The crate is published at <a href="https://crates.io/crates/atlassian-cli" target="_blank" rel="noopener">crates.io/crates/atlassian-cli</a>. Requires Rust 1.75+.</p>
+
+            <h2 class="section-title" id="binary" style="margin-top: 3rem;">Prebuilt binary download</h2>
+            <p class="section-subtitle">No build toolchain required. Signed releases for macOS (Intel + Apple Silicon), Linux (x86_64 + aarch64), and Windows.</p>
+            <p><a href="https://github.com/omar16100/atlassian-cli/releases" target="_blank" rel="noopener" class="install-link">Download the latest release from GitHub &rarr;</a></p>
+            <p>Extract the archive and place the binary anywhere on your <code>$PATH</code>, e.g. <code>/usr/local/bin</code> or <code>~/.local/bin</code>.</p>
+
+            <h2 class="section-title" id="verify" style="margin-top: 3rem;">Verify the install</h2>
+            <pre class="code-block"><code>atlassian-cli --version
+atlassian-cli --help</code></pre>
+            <p>You should see the version number (currently <strong>0.3.3</strong>) and the top-level help text.</p>
+
+            <h2 class="section-title" id="first-run" style="margin-top: 3rem;">First-time setup</h2>
+            <p class="section-subtitle">Configure a profile once, reuse it everywhere.</p>
+            <pre class="code-block"><code><span class="comment"># Jira / Confluence / JSM (API token)</span>
+atlassian-cli auth login \
+  --profile <span class="string">work</span> \
+  --base-url <span class="string">https://your-domain.atlassian.net</span> \
+  --email <span class="string">you@company.com</span>
+
+<span class="comment"># Bitbucket Cloud (bearer token)</span>
+atlassian-cli auth login \
+  --profile <span class="string">bb-ci</span> \
+  --bitbucket --bearer \
+  --workspace <span class="string">myteam</span>
+
+<span class="comment"># Test it</span>
+atlassian-cli auth test --profile <span class="string">work</span></code></pre>
+            <p>Credentials are stored with AES-256-GCM encryption at <code>~/.config/atlassian-cli/credentials</code>. See <a href="/jira/">Jira CLI</a>, <a href="/confluence/">Confluence CLI</a>, or <a href="/bitbucket/">Bitbucket CLI</a> for product-specific commands.</p>
+
+            <h2 class="section-title" id="troubleshooting" style="margin-top: 3rem;">Troubleshooting</h2>
+            <ul class="product-features" style="max-width: 640px; margin: 0 auto;">
+                <li><strong>command not found</strong> — ensure the install directory is on your <code>$PATH</code>. For Homebrew on Apple Silicon, that's <code>/opt/homebrew/bin</code>.</li>
+                <li><strong>brew install fails with "no such tap"</strong> — run <code>brew tap omar16100/atlassian-cli</code> first, then <code>brew install atlassian-cli</code>.</li>
+                <li><strong>cargo install is slow</strong> — use prebuilt binaries or Homebrew; Cargo compiles from source.</li>
+                <li><strong>authentication fails</strong> — Atlassian Cloud requires an <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">API token</a>, not your account password.</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.3</span>
+                </div>
+                <div class="footer-links">
+                    <a href="/jira/">Jira CLI</a>
+                    <a href="/confluence/">Confluence CLI</a>
+                    <a href="/bitbucket/">Bitbucket CLI</a>
+                    <a href="/jsm/">JSM CLI</a>
+                    <a href="/blog/">Blog</a>
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

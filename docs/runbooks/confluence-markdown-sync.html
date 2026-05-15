@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sync Markdown Files to Confluence Pages | atlassian-cli</title>
     <meta name="description" content="Automatically sync markdown documentation to Confluence pages using the CLI. Build a docs pipeline with pandoc and atlassian-cli.">
-    <meta name="keywords" content="confluence markdown sync, markdown to confluence, confluence docs pipeline, pandoc confluence, atlassian cli, confluence automation">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Sync Markdown Files to Confluence Pages | atlassian-cli">
@@ -36,6 +35,17 @@
     </script>
 
     <!-- JSON-LD HowTo Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Runbooks", "item": "https://atlassiancli.com/runbooks/"},
+        {"@type": "ListItem", "position": 3, "name": "Sync Markdown Files to Confluence Pages", "item": "https://atlassiancli.com/runbooks/confluence-markdown-sync.html"}
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -85,6 +95,38 @@
         "name": "Omar Shabab",
         "url": "https://omarshabab.com"
       }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Can this runbook delete Confluence pages?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. The script only creates new pages or updates the content of existing ones. It never calls a delete endpoint, so syncing cannot remove a Confluence page even if the source markdown file is deleted."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it support nested pages or multiple spaces?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "It syncs every markdown file found under the docs directory into a single target space as a flat set of pages. Nesting is supported only when a parent page ID is supplied; multi-space sync requires running the script once per space key."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the pipeline detect what changed?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Each run looks up the page by title with a CQL search. If the page exists its body is overwritten with the freshly converted HTML; if it does not exist the page is created. Re-running with identical markdown produces the same storage-format output, so the operation is effectively idempotent."
+          }
+        }
+      ]
     }
     </script>
 
@@ -251,7 +293,7 @@
                 </a>
                 <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
                 <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/#install" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -272,11 +314,12 @@
     <div class="runbook-content">
 
         <h2>What This Does</h2>
-        <p>This runbook scans a local directory for markdown files, converts each one to Confluence-compatible HTML using pandoc, and creates or updates the corresponding Confluence page. It extracts page titles from the first heading in each file and applies tracking labels automatically. Ideal for keeping Git-based docs in sync with Confluence.</p>
+        <p>This runbook scans a local directory for markdown files, converts each one to Confluence-compatible HTML using pandoc, and creates or updates the corresponding Confluence page. It extracts page titles from the first <code># heading</code> in each file and applies tracking labels automatically. Ideal for keeping Git-based docs in sync with Confluence.</p>
+        <p>It solves the recurring problem of documentation drift: when engineering teams write docs in markdown next to their code but stakeholders read those docs in Confluence, the two copies fall out of step. Run this script as the last step of a docs change &mdash; locally before a release, or automatically in CI on every merge to a docs branch &mdash; and Confluence always reflects what is in version control. Because it searches by page title and overwrites the body in place rather than creating duplicates, repeated runs are idempotent: a file whose content has not changed produces byte-identical storage-format HTML, so re-publishing is a safe no-op. For the full command set used here, see the <a href="/docs/commands.html" style="color: var(--accent-cyan);">command reference</a> and the broader <a href="/confluence/" style="color: var(--accent-cyan);">Confluence CLI</a> guide.</p>
 
         <h2>Prerequisites</h2>
         <ul>
-            <li><code>atlassian-cli</code> installed (<a href="/#install" style="color: var(--accent-cyan);">install guide</a>)</li>
+            <li><code>atlassian-cli</code> installed (<a href="/install/" style="color: var(--accent-cyan);">install guide</a>)</li>
             <li>Confluence authentication configured via <code>atlassian-cli auth login</code></li>
             <li><code>pandoc</code> installed for markdown-to-HTML conversion</li>
             <li><code>jq</code> installed for JSON processing</li>
@@ -516,6 +559,7 @@ main() {
 main <span class="string">"$@"</span></code></pre>
 
         <h2>How It Works</h2>
+        <p>The pipeline is deliberately stateless &mdash; there is no local database tracking which page maps to which file. Instead, the markdown file's first H1 becomes the canonical page title, and a Confluence CQL query (<code>space = KEY AND title = "..."</code>) is the lookup key. This means the "diff" the script performs is not a line-level comparison; it is an upsert. If a matching title is found, the converted body replaces the existing page content via <code>confluence page update</code>; if not, <code>confluence page create</code> makes a new page. The conversion itself is done by <code>pandoc -f markdown -t html</code>, after which two lightweight <code>sed</code> passes adjust the output for Confluence's storage format (adding top margin to <code>h1</code> elements and a class to inline <code>code</code>). Pandoc handles fenced code blocks, links, and most tables cleanly, though complex GitHub-flavored markdown tables and raw HTML can need manual review. Setting <code>DRY_RUN=true</code> makes every create, update, and label step print what it would do without calling the API, which is the safe way to validate a new docs directory. The numbered steps below trace one full pass over the docs tree.</p>
 
         <div class="step-item">
             <span class="step-number">1</span>
@@ -537,6 +581,45 @@ main <span class="string">"$@"</span></code></pre>
             <span class="step-number">5</span>
             <p><strong>Apply tracking labels.</strong> Tags each synced page with <code>auto-generated</code> and <code>documentation</code> labels so you can easily identify and filter machine-synced content in Confluence.</p>
         </div>
+
+        <h2>Common Errors &amp; Fixes</h2>
+        <ul>
+            <li><strong>401 / 403 from the API.</strong> The auth profile is missing or its API token expired &mdash; re-run <code>atlassian-cli auth login</code> (or pass the correct <code>--profile</code>) and confirm the token has space write access.</li>
+            <li><strong><code>Required command not found: pandoc</code>.</strong> Pandoc is not on the PATH &mdash; install it with <code>brew install pandoc</code> (macOS) or <code>apt-get install pandoc</code> (Debian/Ubuntu).</li>
+            <li><strong>Page created in the wrong place / "parent not found".</strong> The target space key is wrong or the supplied parent ID does not exist in that space &mdash; verify the <code>SPACE_KEY</code> argument and the parent page ID before re-running.</li>
+            <li><strong>HTTP 429 rate limiting.</strong> Too many pages synced too fast &mdash; sync in smaller batches or add a short <code>sleep</code> between files; the CLI also retries transient 429s automatically.</li>
+            <li><strong>Tables render as raw text or break layout.</strong> Pandoc's default GitHub-flavored table conversion can mangle complex tables &mdash; simplify the markdown table or pre-convert with <code>pandoc -f gfm -t html</code>.</li>
+            <li><strong>Duplicate pages appear.</strong> Two markdown files share the same first H1, so both upsert to the same title &mdash; give each file a unique top-level heading.</li>
+        </ul>
+
+        <h2>CI/CD Integration</h2>
+        <p>Because the sync is idempotent and supports a dry-run, it runs cleanly in CI: gate it on changes under your <code>docs/</code> path and publish on every merge so Confluence never lags behind the repository. Store the API token as an encrypted secret and pass it through the auth profile. The GitHub Actions workflow below runs the runbook whenever files under <code>docs/</code> change on the main branch:</p>
+        <pre class="code-block"><code><span class="comment"># .github/workflows/confluence-sync.yml</span>
+name: Sync docs to Confluence
+on:
+  push:
+    branches: [main]
+    paths:
+      - <span class="string">'docs/**'</span>
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update &amp;&amp; sudo apt-get install -y pandoc jq
+      - name: Install atlassian-cli
+        run: pipx install atlassian-cli
+      - name: Sync markdown to Confluence
+        env:
+          ATLASSIAN_API_TOKEN: <span class="string">${{ secrets.ATLASSIAN_API_TOKEN }}</span>
+        run: ./doc-pipeline.sh DOCS prod</code></pre>
+        <p>GitLab CI achieves the same result with a job that uses an <code>only:&nbsp;changes:&nbsp;["docs/**"]</code> rule and a masked CI/CD variable for the token instead of the <code>on.push.paths</code> trigger and Actions secret.</p>
+
+        <h2>FAQ</h2>
+        <p><strong>Can it delete Confluence pages?</strong> No. The script only creates or updates pages &mdash; it never calls a delete endpoint, so removing a markdown file does not remove the corresponding Confluence page. Use the <a href="/runbooks/confluence-bulk-cleanup.html" style="color: var(--accent-cyan);">bulk cleanup runbook</a> for deletions.</p>
+        <p><strong>Does it support nested pages or multiple spaces?</strong> All discovered files sync into one target space as a flat set of pages; nesting works only when a parent page ID is passed, and multi-space sync means running the script once per space key.</p>
+        <p><strong>How does it detect changes?</strong> It does not diff line by line. It looks up each page by its H1 title via CQL and upserts the converted body, so unchanged markdown re-publishes identical HTML and the run is a safe no-op. Keep an offline copy with the <a href="/runbooks/confluence-backup.html" style="color: var(--accent-cyan);">Confluence backup runbook</a> before large syncs.</p>
 
         <h2>Related Runbooks</h2>
         <div class="related-links">
@@ -575,6 +658,10 @@ main <span class="string">"$@"</span></code></pre>
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>
