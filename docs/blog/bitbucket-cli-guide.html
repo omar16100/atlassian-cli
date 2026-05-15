@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitbucket CLI: Automate PRs, Pipelines & Repos | atlassian-cli Blog</title>
     <meta name="description" content="Automate your entire Bitbucket workflow from the terminal. Pull requests, pipelines, branch protection, bearer auth, and repository management.">
-    <meta name="keywords" content="bitbucket cli, bitbucket command line, bitbucket cli tool, bitbucket automation, bitbucket pr cli, bitbucket pipeline cli, bitbucket terminal">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Bitbucket CLI: Automate PRs, Pipelines & Repos">
@@ -38,6 +37,17 @@
     </script>
 
     <!-- Structured Data: Article -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Bitbucket CLI: Automate PRs, Pipelines & Repos", "item": "https://atlassiancli.com/blog/bitbucket-cli-guide.html"}
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -443,7 +453,7 @@
                 </a>
                 <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
                 <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/#install" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -465,6 +475,27 @@
     <!-- Article Body -->
     <article class="article-body">
 
+        <!-- TL;DR -->
+        <div class="toc">
+            <div class="toc-title">TL;DR</div>
+            <p>atlassian-cli gives you a full Bitbucket CLI for pull requests, pipelines, repos, and branch protection in one Rust binary. Install it, then jump to the section you need below.</p>
+            <pre><code><span class="comment"># Install</span>
+brew install omar16100/atlassian-cli/atlassian-cli
+
+<span class="comment"># List open pull requests</span>
+atlassian-cli bitbucket pr list --workspace <span class="string">myteam</span> --repo <span class="string">api-service</span> --state <span class="string">OPEN</span></code></pre>
+            <ul>
+                <li><a href="#why-bitbucket-cli">Why Automate Bitbucket from CLI?</a></li>
+                <li><a href="#authentication">Authentication</a></li>
+                <li><a href="#repository-management">Repository Management</a></li>
+                <li><a href="#pull-requests">Pull Request Workflows</a></li>
+                <li><a href="#pipelines">Pipeline Operations</a></li>
+                <li><a href="#branch-management">Branch Management</a></li>
+                <li><a href="#real-world-workflows">Real-World Workflows</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ul>
+        </div>
+
         <!-- Table of Contents -->
         <nav class="toc">
             <div class="toc-title">Contents</div>
@@ -485,7 +516,7 @@
 
         <p>Bitbucket's web UI works fine for reviewing a single pull request. It doesn't work well when you need to audit permissions across 200 repositories, trigger pipelines from a CI script, or clean up stale branches across your entire workspace.</p>
 
-        <p>A <strong>Bitbucket CLI</strong> turns these multi-click workflows into single commands. With <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a>, you get full Bitbucket coverage in the same binary that handles Jira, Confluence, and JSM. That means one tool, one config, one authentication flow for your entire Atlassian stack.</p>
+        <p>A <strong>Bitbucket CLI</strong> turns these multi-click workflows into single commands. With <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a>, you get full Bitbucket coverage in the same binary that handles Jira, Confluence, and JSM. That means one tool, one config, one authentication flow for your entire Atlassian stack. For the full command reference, see the <a href="/bitbucket/">Bitbucket CLI</a> documentation.</p>
 
         <p>Common use cases for a Bitbucket command line tool:</p>
 
@@ -834,6 +865,10 @@ atlassian-cli bitbucket --workspace myteam commit browse <span class="string">ap
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>

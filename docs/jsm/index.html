@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSM CLI — Automate Jira Service Management from the Command Line | atlassian-cli</title>
-    <meta name="description" content="Automate Jira Service Management from the command line. Manage requests, customers, SLAs, queues, and knowledge base articles via CLI.">
-    <meta name="keywords" content="jira service management cli, jsm cli tool, service desk automation cli, itsm cli, jsm command line">
+    <title>Jira Service Management CLI (JSM) — Automate Service Desk, Requests & SLAs | atlassian-cli</title>
+    <meta name="description" content="Automate Jira Service Management (JSM) from the command line. Manage requests, customers, SLAs, queues, and knowledge base articles via CLI.">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="JSM CLI — Automate Jira Service Management from the Command Line">
+    <meta property="og:title" content="Jira Service Management CLI (JSM) — atlassian-cli">
     <meta property="og:description" content="Automate Jira Service Management from the command line. Manage requests, customers, SLAs, queues, and knowledge base articles via CLI.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://atlassiancli.com/jsm/">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="JSM CLI — atlassian-cli">
+    <meta name="twitter:title" content="Jira Service Management CLI (JSM) — atlassian-cli">
     <meta name="twitter:description" content="Automate Jira Service Management from the command line. Manage requests, customers, SLAs, queues, and knowledge base.">
 
     <!-- Fonts -->
@@ -33,6 +32,16 @@
     </script>
 
     <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "JSM CLI", "item": "https://atlassiancli.com/jsm/"}
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -161,15 +170,18 @@
                 <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
             </a>
             <div class="nav-links">
+                <a href="/jira/" class="nav-link">Jira CLI</a>
+                <a href="/confluence/" class="nav-link">Confluence CLI</a>
+                <a href="/bitbucket/" class="nav-link">Bitbucket CLI</a>
+                <a href="/docs/" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                     </svg>
                     GitHub
                 </a>
-                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
-                <a href="/blog/" class="nav-link">Blog</a>
-                <a href="#quickstart" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -178,8 +190,8 @@
     <section class="product-hero">
         <div class="container">
             <div class="product-hero-badge">Part of atlassian-cli</div>
-            <h1>JSM <span>CLI</span></h1>
-            <p>Automate Jira Service Management from your terminal. Service desks, requests, customers, and queues — scriptable ITSM operations.</p>
+            <h1>Jira Service Management <span>CLI (JSM)</span></h1>
+            <p>Automate Jira Service Management from your terminal. Service desks, requests, customers, SLAs, and queues — scriptable ITSM operations.</p>
             <div class="product-nav">
                 <a href="/jira/">Jira</a>
                 <a href="/confluence/">Confluence</a>
@@ -296,11 +308,11 @@ atlassian-cli jsm request get SD-123
 
 <span class="comment"># Output as JSON for scripting</span>
 atlassian-cli jsm request list \
-  --limit 50 --output json
+  --limit 50 --format json
 
 <span class="comment"># Export requests to CSV</span>
 atlassian-cli jsm request list \
-  --output csv > requests.csv</code></pre>
+  --format csv > requests.csv</code></pre>
                 </div>
 
                 <!-- Manage Customers -->
@@ -315,15 +327,15 @@ atlassian-cli jsm request list \
                         </button>
                     </div>
                     <pre class="code-block" id="code-customers"><code><span class="comment"># List service desks to find the desk ID</span>
-atlassian-cli jsm servicedesk list
+atlassian-cli jsm service-desk list
 
 <span class="comment"># List requests filtered by service desk</span>
 atlassian-cli jsm request list \
-  --limit 20 --output json
+  --limit 20 --format json
 
 <span class="comment"># Get request details with full metadata</span>
 atlassian-cli jsm request get SD-456 \
-  --output json
+  --format json
 
 <span class="comment"># Combine with Jira for cross-product views</span>
 atlassian-cli jira search \
@@ -343,19 +355,19 @@ atlassian-cli jira search \
                         </button>
                     </div>
                     <pre class="code-block" id="code-servicedesk"><code><span class="comment"># List all service desks</span>
-atlassian-cli jsm servicedesk list --limit 10
+atlassian-cli jsm service-desk list --limit 10
 
 <span class="comment"># Get service desk details as JSON</span>
-atlassian-cli jsm servicedesk list \
-  --output json
+atlassian-cli jsm service-desk list \
+  --format json
 
 <span class="comment"># Use profiles for different instances</span>
-atlassian-cli jsm servicedesk list \
+atlassian-cli jsm service-desk list \
   --profile <span class="string">production</span>
 
 <span class="comment"># Combine with table output for quick overview</span>
 atlassian-cli jsm request list \
-  --limit 25 --output table</code></pre>
+  --limit 25 --format table</code></pre>
                 </div>
             </div>
         </div>
@@ -373,14 +385,14 @@ brew install omar16100/atlassian-cli/atlassian-cli
 <span class="comment"># Configure authentication</span>
 atlassian-cli auth login \
   --profile <span class="string">work</span> \
-  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --base-url <span class="string">https://your-domain.atlassian.net</span> \
   --email <span class="string">you@company.com</span>
 
 <span class="comment"># Verify connection</span>
 atlassian-cli auth test --profile <span class="string">work</span>
 
 <span class="comment"># List your service desks</span>
-atlassian-cli jsm servicedesk list
+atlassian-cli jsm service-desk list
 
 <span class="comment"># View recent requests</span>
 atlassian-cli jsm request list --limit 5</code></pre>
@@ -398,9 +410,9 @@ atlassian-cli jsm request list --limit 5</code></pre>
                     <h4>Blog</h4>
                     <p>Tutorials, release notes, and automation guides for JSM and the full Atlassian stack.</p>
                 </a>
-                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="resource-card">
-                    <h4>Full Documentation</h4>
-                    <p>Complete command reference for JSM service desk, request, and customer operations.</p>
+                <a href="/docs/commands.html#jsm-servicedesk" class="resource-card">
+                    <h4>JSM Command Reference</h4>
+                    <p>Complete command reference for JSM service desk, request, customer, approvals, and SLA operations.</p>
                 </a>
                 <a href="/jira/" class="resource-card">
                     <h4>Jira CLI</h4>
@@ -420,7 +432,7 @@ atlassian-cli jsm request list --limit 5</code></pre>
                 </div>
                 <div class="footer-links">
                     <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
-                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="/docs/">Documentation</a>
                     <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
                     <a href="/blog/">Blog</a>
                 </div>
@@ -430,6 +442,10 @@ atlassian-cli jsm request list --limit 5</code></pre>
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>

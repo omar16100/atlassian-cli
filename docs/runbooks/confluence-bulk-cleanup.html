@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Clean Up Old Confluence Pages | atlassian-cli</title>
     <meta name="description" content="Find and clean up old, outdated Confluence pages using CQL queries and bulk operations from the command line. Includes dry-run mode.">
-    <meta name="keywords" content="confluence cleanup, confluence bulk delete, confluence archive pages, confluence cql, atlassian cli, confluence command line">
 
     <!-- Open Graph -->
     <meta property="og:title" content="Bulk Clean Up Old Confluence Pages | atlassian-cli">
@@ -36,6 +35,17 @@
     </script>
 
     <!-- JSON-LD HowTo Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Runbooks", "item": "https://atlassiancli.com/runbooks/"},
+        {"@type": "ListItem", "position": 3, "name": "Bulk Clean Up Old Confluence Pages", "item": "https://atlassiancli.com/runbooks/confluence-bulk-cleanup.html"}
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -240,7 +250,7 @@
                 </a>
                 <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
                 <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/#install" class="nav-btn">Install</a>
+                <a href="/install/" class="nav-btn">Install</a>
             </div>
         </div>
     </nav>
@@ -265,7 +275,7 @@
 
         <h2>Prerequisites</h2>
         <ul>
-            <li><code>atlassian-cli</code> installed (<a href="/#install" style="color: var(--accent-cyan);">install guide</a>)</li>
+            <li><code>atlassian-cli</code> installed (<a href="/install/" style="color: var(--accent-cyan);">install guide</a>)</li>
             <li>Confluence authentication configured via <code>atlassian-cli auth login</code></li>
             <li>Space admin permissions for delete operations</li>
         </ul>
@@ -573,6 +583,10 @@ main <span class="string">"$@"</span></code></pre>
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>
