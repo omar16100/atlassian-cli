@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>atlassian-cli Documentation — Commands, Authentication, Profiles | atlassian-cli</title>
+    <meta name="description" content="First-party documentation for atlassian-cli: command reference for Jira, Confluence, Bitbucket, and JSM, authentication with API tokens, profile management, and output formats.">
+    <meta property="og:site_name" content="atlassian-cli">
+    <meta property="og:title" content="atlassian-cli Documentation — Commands, Authentication, Profiles">
+    <meta property="og:description" content="First-party documentation for atlassian-cli: command reference, authentication, profiles, output formats.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://atlassiancli.com/docs/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="atlassian-cli Documentation">
+    <meta name="twitter:description" content="Command reference for Jira, Confluence, Bitbucket, JSM. Authentication, profiles, output formats.">
+    <link rel="canonical" href="https://atlassiancli.com/docs/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Documentation", "item": "https://atlassiancli.com/docs/"}
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+      .docs-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; max-width: 960px; margin: 2rem auto 0; }
+      .docs-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; text-decoration: none; color: inherit; transition: all 0.2s; display: block; }
+      .docs-card:hover { border-color: var(--border-hover); transform: translateY(-2px); }
+      .docs-card h3 { font-size: 1.05rem; margin-bottom: 0.4rem; }
+      .docs-card p { font-size: 0.85rem; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo"><img src="../assets/logo.svg" alt="atlassian-cli" height="24"></a>
+            <div class="nav-links">
+                <a href="/jira/" class="nav-link">Jira CLI</a>
+                <a href="/confluence/" class="nav-link">Confluence CLI</a>
+                <a href="/bitbucket/" class="nav-link">Bitbucket CLI</a>
+                <a href="/docs/" class="nav-link" aria-current="page">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">GitHub</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <main>
+    <section class="hero" style="padding: 8rem 0 3rem;">
+        <div class="hero-container">
+            <div class="hero-badge">Documentation</div>
+            <h1 class="hero-title">atlassian-cli <span class="hero-highlight">Documentation</span></h1>
+            <p class="hero-subtitle">Command reference for Jira, Confluence, Bitbucket, and Jira Service Management (JSM). Authentication, profiles, and output formats.</p>
+        </div>
+    </section>
+
+    <section style="padding: 1rem 0 5rem;">
+        <div class="container">
+            <h2 class="section-title">Guides</h2>
+            <div class="docs-grid">
+                <a href="/docs/auth.html" class="docs-card">
+                    <h3>Authentication &amp; Profiles</h3>
+                    <p>Log in with API tokens, set up profiles for multiple instances, use bearer tokens for Bitbucket, and store credentials securely with AES-256-GCM encryption.</p>
+                </a>
+                <a href="/docs/commands.html" class="docs-card">
+                    <h3>Command Reference</h3>
+                    <p>Every Jira, Confluence, Bitbucket, and JSM command with flags, examples, and sample output. Bulk operations, dry-run, and CI/CD patterns.</p>
+                </a>
+                <a href="/install/" class="docs-card">
+                    <h3>Install</h3>
+                    <p>Install via Homebrew, Cargo, or a prebuilt binary. macOS, Linux, and Windows supported. Verify, configure, and run your first command.</p>
+                </a>
+            </div>
+
+            <h2 class="section-title" style="margin-top: 4rem;">Product Pages</h2>
+            <div class="docs-grid">
+                <a href="/jira/" class="docs-card">
+                    <h3>Jira CLI</h3>
+                    <p>Search issues with JQL, bulk transitions, custom fields, automation rules, webhooks, and audit logs.</p>
+                </a>
+                <a href="/confluence/" class="docs-card">
+                    <h3>Confluence CLI</h3>
+                    <p>Space and page management, CQL search, bulk export, backup, markdown sync, and attachment handling.</p>
+                </a>
+                <a href="/bitbucket/" class="docs-card">
+                    <h3>Bitbucket CLI</h3>
+                    <p>Repository and pull request workflows, pipelines, branch protection, bearer &amp; basic auth.</p>
+                </a>
+                <a href="/jsm/" class="docs-card">
+                    <h3>Jira Service Management CLI (JSM)</h3>
+                    <p>Service desk operations, request management, SLA tracking, and queues.</p>
+                </a>
+            </div>
+
+            <h2 class="section-title" style="margin-top: 4rem;">Runbooks</h2>
+            <div class="docs-grid">
+                <a href="/runbooks/confluence-markdown-sync.html" class="docs-card">
+                    <h3>Markdown &rarr; Confluence Sync</h3>
+                    <p>Convert markdown files to Confluence pages with labels. Pandoc pipeline, idempotent uploads.</p>
+                </a>
+                <a href="/runbooks/confluence-backup.html" class="docs-card">
+                    <h3>Confluence Backup</h3>
+                    <p>Back up an entire Confluence space with pages, blog posts, and attachments.</p>
+                </a>
+                <a href="/runbooks/jira-bulk-transition.html" class="docs-card">
+                    <h3>Jira Bulk Transition</h3>
+                    <p>Transition hundreds of Jira issues matching a JQL query with dry-run preview.</p>
+                </a>
+                <a href="/runbooks/bitbucket-pr-automation.html" class="docs-card">
+                    <h3>Bitbucket PR Automation</h3>
+                    <p>List, approve, and merge PRs in bulk. Build approval automation into your CI pipeline.</p>
+                </a>
+            </div>
+        </div>
+    </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.3.3</span>
+                </div>
+                <div class="footer-links">
+                    <a href="/install/">Install</a>
+                    <a href="/docs/">Docs</a>
+                    <a href="/jira/">Jira CLI</a>
+                    <a href="/confluence/">Confluence CLI</a>
+                    <a href="/bitbucket/">Bitbucket CLI</a>
+                    <a href="/blog/">Blog</a>
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                </div>
+                <div class="footer-right"><span class="footer-license">MIT License</span></div>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

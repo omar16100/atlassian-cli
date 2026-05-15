@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>atlassian-cli | Atlassian Cloud as Code</title>
-    <meta name="description" content="One CLI for Jira, Confluence, Bitbucket & JSM. Automate your entire Atlassian stack from the command line.">
+    <title>atlassian-cli: Open-Source CLI for Jira, Confluence & Bitbucket</title>
+    <meta name="description" content="Independent MIT-licensed command-line tool compatible with Jira, Confluence, Bitbucket and JSM Cloud. Install with Homebrew, Cargo, or a binary. Not affiliated with Atlassian.">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="atlassian-cli | Atlassian Cloud as Code">
-    <meta property="og:description" content="One CLI for Jira, Confluence, Bitbucket & JSM">
+    <meta property="og:site_name" content="atlassian-cli">
+    <meta property="og:title" content="atlassian-cli: Open-Source CLI for Jira, Confluence & Bitbucket">
+    <meta property="og:description" content="Independent MIT-licensed command-line tool compatible with Jira, Confluence, Bitbucket and JSM Cloud. Install with Homebrew, Cargo, or a binary. Not affiliated with Atlassian.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://atlassiancli.com">
+    <meta property="og:url" content="https://atlassiancli.com/">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="atlassian-cli | Atlassian Cloud as Code">
-    <meta name="twitter:description" content="One CLI for Jira, Confluence, Bitbucket & JSM. Automate your entire Atlassian stack from the command line.">
+    <meta name="twitter:title" content="atlassian-cli: Open-Source CLI for Jira, Confluence & Bitbucket">
+    <meta name="twitter:description" content="Independent MIT-licensed command-line tool compatible with Jira, Confluence, Bitbucket and JSM Cloud. Install with Homebrew, Cargo, or a binary. Not affiliated with Atlassian.">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,15 +36,27 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "atlassian-cli",
+      "alternateName": ["atlassian-cli", "atlassiancli"],
+      "url": "https://atlassiancli.com/"
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "atlassian-cli",
-      "description": "One CLI for Jira, Confluence, Bitbucket & JSM. Automate your entire Atlassian Cloud stack from the command line.",
+      "alternateName": "atlassian-cli",
+      "description": "Independent open-source command-line tool compatible with Jira, Confluence, Bitbucket and Jira Service Management (JSM) Cloud. Install via Homebrew, Cargo, or prebuilt binary.",
+      "disambiguatingDescription": "Independent open-source project. Not affiliated with, endorsed by, sponsored by, or maintained by Atlassian. Atlassian maintains its own separate official ACLI.",
       "applicationCategory": "DeveloperApplication",
       "operatingSystem": "macOS, Linux, Windows",
-      "url": "https://atlassiancli.com",
+      "url": "https://atlassiancli.com/",
       "downloadUrl": "https://github.com/omar16100/atlassian-cli/releases",
       "softwareVersion": "0.3.3",
       "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -54,6 +67,55 @@
         "name": "Omar Shabab",
         "url": "https://omarshabab.com"
       }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareSourceCode",
+      "name": "atlassian-cli",
+      "description": "Independent open-source CLI for Jira, Confluence, Bitbucket and JSM Cloud, written in Rust.",
+      "codeRepository": "https://github.com/omar16100/atlassian-cli",
+      "programmingLanguage": "Rust",
+      "license": "https://opensource.org/licenses/MIT",
+      "url": "https://atlassiancli.com/",
+      "maintainer": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Who maintains atlassian-cli?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "atlassian-cli is an independent open-source project maintained by Omar Shabab and contributors. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli made by Atlassian?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Atlassian maintains its own separate official ACLI (acli). atlassian-cli is an independent open-source tool focused on Jira, Confluence, Bitbucket, and JSM Cloud automation."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does this site collect Atlassian API tokens?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. The documentation shows how to configure API tokens locally for the CLI on your own machine. This website does not collect, transmit, or process Atlassian credentials."
+          }
+        }
+      ]
     }
     </script>
 
@@ -69,14 +131,17 @@
                 <img src="assets/logo.svg" alt="atlassian-cli" height="24">
             </a>
             <div class="nav-links">
+                <a href="/jira/" class="nav-link">Jira CLI</a>
+                <a href="/confluence/" class="nav-link">Confluence CLI</a>
+                <a href="/bitbucket/" class="nav-link">Bitbucket CLI</a>
+                <a href="/docs/" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                     </svg>
                     GitHub
                 </a>
-                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
-                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="#install" class="nav-btn">Install</a>
             </div>
         </div>
@@ -85,9 +150,10 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="hero-container">
-            <div class="hero-badge">Open Source CLI</div>
-            <h1 class="hero-title">Atlassian Cloud<br><span class="hero-highlight">as Code</span></h1>
-            <p class="hero-subtitle">One CLI for Jira, Confluence, Bitbucket & JSM.<br>Automate your entire stack from the terminal.</p>
+            <div class="hero-badge">Independent Open-Source CLI</div>
+            <h1 class="hero-title"><span class="hero-highlight">atlassian-cli</span><br>open-source CLI for Jira, Confluence &amp; Bitbucket</h1>
+            <p class="hero-subtitle">One command line for Jira, Confluence, Bitbucket &amp; JSM.<br>Automate your Atlassian Cloud stack from the terminal — free, open source, MIT licensed.</p>
+            <p class="hero-disclaimer">Independent project — not affiliated with, endorsed by, or maintained by Atlassian.</p>
 
             <!-- Terminal Demo -->
             <div class="terminal">
@@ -138,70 +204,77 @@
 
             <div class="products-grid">
                 <!-- Jira -->
-                <div class="product-card">
+                <a href="/jira/" class="product-card">
                     <div class="product-icon jira">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
-                            <path d="M27.4 14.6L17.4 4.6c-.8-.8-2-.8-2.8 0L4.6 14.6c-.8.8-.8 2 0 2.8l10 10c.8.8 2 .8 2.8 0l10-10c.8-.8.8-2 0-2.8zM16 20.2L11.8 16 16 11.8 20.2 16 16 20.2z"/>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                            <path d="M9 7v10M15 7v10"/>
                         </svg>
                     </div>
-                    <h3 class="product-name">Jira</h3>
+                    <h3 class="product-name">Jira CLI</h3>
                     <ul class="product-features">
                         <li>Search, create, update issues</li>
                         <li>Bulk transitions with dry-run</li>
                         <li>Automation rules management</li>
-                        <li>Webhooks & audit logs</li>
+                        <li>Webhooks &amp; audit logs</li>
                     </ul>
-                </div>
+                </a>
 
                 <!-- Confluence -->
-                <div class="product-card">
+                <a href="/confluence/" class="product-card">
                     <div class="product-icon confluence">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
-                            <path d="M4 23.2c-.4.6-.3 1.4.3 1.8l6.6 4.8c.6.4 1.4.3 1.8-.3 2.4-3.4 5-5 8.2-5 2.4 0 4.6.8 6.8 2.4.6.4 1.4.3 1.8-.3l4.2-5.8c.4-.6.3-1.4-.3-1.8-4.2-3.2-9-4.8-14.2-4.8-7.4 0-12.6 4.2-15.2 9z"/>
-                            <path d="M28 8.8c.4-.6.3-1.4-.3-1.8l-6.6-4.8c-.6-.4-1.4-.3-1.8.3-2.4 3.4-5 5-8.2 5-2.4 0-4.6-.8-6.8-2.4-.6-.4-1.4-.3-1.8.3L.3 11.2c-.4.6-.3 1.4.3 1.8 4.2 3.2 9 4.8 14.2 4.8 7.4 0 12.6-4.2 15.2-9z"/>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="8" y1="13" x2="16" y2="13"/>
+                            <line x1="8" y1="17" x2="16" y2="17"/>
                         </svg>
                     </div>
-                    <h3 class="product-name">Confluence</h3>
+                    <h3 class="product-name">Confluence CLI</h3>
                     <ul class="product-features">
-                        <li>Space & page management</li>
+                        <li>Space &amp; page management</li>
                         <li>CQL-based search</li>
-                        <li>Bulk export & backup</li>
+                        <li>Bulk export &amp; backup</li>
                         <li>Attachment handling</li>
                     </ul>
-                </div>
+                </a>
 
                 <!-- Bitbucket -->
-                <div class="product-card">
+                <a href="/bitbucket/" class="product-card">
                     <div class="product-icon bitbucket">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
-                            <path d="M2 4a1 1 0 00-1 1.1l3.9 23.8a1.3 1.3 0 001.3 1.1h19.8a1 1 0 001-.8L31 5.1A1 1 0 0030 4H2zm17.3 16.6h-6.6L11.2 13h9.6l-1.5 7.6z"/>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="6" cy="6" r="3"/>
+                            <circle cx="6" cy="18" r="3"/>
+                            <circle cx="18" cy="9" r="3"/>
+                            <path d="M18 12v1a3 3 0 0 1-3 3H9M6 9v6"/>
                         </svg>
                     </div>
-                    <h3 class="product-name">Bitbucket</h3>
+                    <h3 class="product-name">Bitbucket CLI</h3>
                     <ul class="product-features">
                         <li>Repository management</li>
                         <li>Pull request workflows</li>
-                        <li>Bearer & Basic auth</li>
+                        <li>Bearer &amp; Basic auth</li>
                         <li>Pipeline operations</li>
                     </ul>
-                </div>
+                </a>
 
                 <!-- JSM -->
-                <div class="product-card">
+                <a href="/jsm/" class="product-card">
                     <div class="product-icon jsm">
-                        <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor">
-                            <path d="M16 2C8.3 2 2 8.3 2 16s6.3 14 14 14 14-6.3 14-14S23.7 2 16 2zm0 25c-6.1 0-11-4.9-11-11S9.9 5 16 5s11 4.9 11 11-4.9 11-11 11z"/>
-                            <path d="M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 13c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5z"/>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 14v-2a8 8 0 0 1 16 0v2"/>
+                            <path d="M4 14a2 2 0 0 1 2-2h1v6H6a2 2 0 0 1-2-2zM20 14a2 2 0 0 0-2-2h-1v6h1a2 2 0 0 0 2-2z"/>
+                            <path d="M18 18v1a3 3 0 0 1-3 3h-3"/>
                         </svg>
                     </div>
-                    <h3 class="product-name">JSM</h3>
+                    <h3 class="product-name">JSM CLI</h3>
                     <ul class="product-features">
                         <li>Service desk operations</li>
                         <li>Request management</li>
                         <li>Customer portal access</li>
                         <li>SLA tracking</li>
                     </ul>
-                </div>
+                </a>
             </div>
         </div>
     </section>
@@ -428,7 +501,7 @@ atlassian-cli bitbucket branch protect main --approvals 2</code></pre>
                 <pre class="code-block"><code><span class="comment"># Add a Jira/Confluence profile</span>
 atlassian-cli auth login \
   --profile <span class="string">work</span> \
-  --base-url <span class="string">your-domain.atlassian.net</span> \
+  --base-url <span class="string">https://your-domain.atlassian.net</span> \
   --email <span class="string">you@company.com</span>
 
 <span class="comment"># Add a Bitbucket Bearer token profile</span>
@@ -443,6 +516,32 @@ atlassian-cli auth test --bitbucket --profile <span class="string">bb-ci</span><
         </div>
     </section>
 
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <h2 class="section-title">Frequently Asked Questions</h2>
+            <p class="section-subtitle">What atlassian-cli is — and what it isn't</p>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>Who maintains atlassian-cli?</h3>
+                    <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a> and contributors. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is atlassian-cli made by Atlassian?</h3>
+                    <p>No. Atlassian maintains its own separate official ACLI (<code>acli</code>). atlassian-cli is an independent open-source tool focused on Jira, Confluence, Bitbucket, and JSM Cloud automation.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Does this site collect Atlassian API tokens?</h3>
+                    <p>No. The <a href="/docs/auth.html">documentation</a> shows how to configure API tokens locally for the CLI on your own machine. This website does not collect, transmit, or process Atlassian credentials.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is it free?</h3>
+                    <p>Yes. atlassian-cli is free and open source under the MIT License. Get it on <a href="/install/">the install page</a> or <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
@@ -452,10 +551,19 @@ atlassian-cli auth test --bitbucket --profile <span class="string">bb-ci</span><
                     <span class="footer-version">v0.3.3</span>
                 </div>
                 <div class="footer-links">
-                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
-                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
-                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/install/">Install</a>
+                    <a href="/docs/">Docs</a>
+                    <a href="/docs/auth.html">Authentication</a>
+                    <a href="/docs/commands.html">Command reference</a>
+                    <a href="/jira/">Jira CLI</a>
+                    <a href="/confluence/">Confluence CLI</a>
+                    <a href="/bitbucket/">Bitbucket CLI</a>
+                    <a href="/jsm/">JSM CLI</a>
                     <a href="/blog/">Blog</a>
+                    <a href="/runbooks/confluence-markdown-sync.html">Markdown &rarr; Confluence runbook</a>
+                    <a href="/runbooks/jira-bulk-transition.html">Jira bulk transition runbook</a>
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
                 </div>
                 <div class="footer-right">
                     <span class="footer-license">MIT License</span>
@@ -463,6 +571,10 @@ atlassian-cli auth test --bitbucket --profile <span class="string">bb-ci</span><
             </div>
             <div class="footer-credit">
                 Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
             </div>
         </div>
     </footer>

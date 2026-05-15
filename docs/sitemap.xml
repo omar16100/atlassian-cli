@@ -3,7 +3,7 @@
   <!-- Homepage -->
   <url>
     <loc>https://atlassiancli.com/</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -11,81 +11,117 @@
   <!-- Product Pages -->
   <url>
     <loc>https://atlassiancli.com/jira/</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/confluence/</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/bitbucket/</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/jsm/</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
+  </url>
+
+  <!-- Install hub -->
+  <url>
+    <loc>https://atlassiancli.com/install/</loc>
+    <lastmod>2026-05-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- First-party docs -->
+  <url>
+    <loc>https://atlassiancli.com/docs/</loc>
+    <lastmod>2026-05-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://atlassiancli.com/docs/auth.html</loc>
+    <lastmod>2026-05-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://atlassiancli.com/docs/commands.html</loc>
+    <lastmod>2026-05-16</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- About / independence -->
+  <url>
+    <loc>https://atlassiancli.com/about/</loc>
+    <lastmod>2026-05-16</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
   </url>
 
   <!-- Blog -->
   <url>
     <loc>https://atlassiancli.com/blog/</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/jira-cli-complete-guide.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/atlassian-cli-guide.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/jira-cli-tools-compared.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/confluence-cli-guide.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/jira-cli-commands-cheat-sheet.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/jira-bulk-operations.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/bitbucket-cli-guide.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/blog/jsm-cli-guide.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -93,19 +129,19 @@
   <!-- Runbooks: Jira -->
   <url>
     <loc>https://atlassiancli.com/runbooks/jira-bulk-transition.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/runbooks/jira-project-cleanup.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/runbooks/jira-sprint-report.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -113,25 +149,25 @@
   <!-- Runbooks: Confluence -->
   <url>
     <loc>https://atlassiancli.com/runbooks/confluence-backup.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/runbooks/confluence-bulk-cleanup.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/runbooks/confluence-markdown-sync.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/runbooks/confluence-space-report.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -139,19 +175,19 @@
   <!-- Runbooks: Bitbucket -->
   <url>
     <loc>https://atlassiancli.com/runbooks/bitbucket-branch-cleanup.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/runbooks/bitbucket-pr-automation.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://atlassiancli.com/runbooks/bitbucket-repo-audit.html</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -159,7 +195,7 @@
   <!-- AI Context -->
   <url>
     <loc>https://atlassiancli.com/llms.txt</loc>
-    <lastmod>2026-03-14</lastmod>
+    <lastmod>2026-05-16</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
