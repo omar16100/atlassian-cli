@@ -769,6 +769,7 @@ pub async fn trigger_pipeline(
     ref_type: &str,
     variable_strings: Vec<String>,
     secured: bool,
+    custom_pipeline: Option<String>,
 ) -> Result<()> {
     let mut payload = serde_json::json!({
         "target": {
@@ -777,6 +778,13 @@ pub async fn trigger_pipeline(
             "type": "pipeline_ref_target"
         }
     });
+
+    if let Some(name) = custom_pipeline {
+        payload["target"]["selector"] = serde_json::json!({
+            "type": "custom",
+            "pattern": name
+        });
+    }
 
     // Add variables if provided
     if !variable_strings.is_empty() {
