@@ -761,15 +761,17 @@ pub async fn get_pipeline(
     ctx.renderer.render(&view)
 }
 
-pub async fn trigger_pipeline(
-    ctx: &BitbucketContext<'_>,
-    workspace: &str,
-    repo_slug: &str,
+/// Build the POST body for triggering a pipeline. Pure and testable.
+///
+/// `custom_pipeline` injects a `target.selector` so a named custom pipeline from
+/// `bitbucket-pipelines.yml` is run instead of the branch default. `variables`,
+/// when non-empty, is serialized as the top-level `variables` array.
+fn build_trigger_payload(
     ref_name: &str,
     ref_type: &str,
-    variable_strings: Vec<String>,
-    secured: bool,
-) -> Result<()> {
+    custom_pipeline: Option<&str>,
+    variables: &[PipelineVariable],
+) -> serde_json::Value {
     let mut payload = serde_json::json!({
         "target": {
             "ref_name": ref_name,
@@ -778,11 +780,38 @@ pub async fn trigger_pipeline(
         }
     });
 
-    // Add variables if provided
-    if !variable_strings.is_empty() {
-        let variables = parse_variables(variable_strings.clone(), secured)?;
-        payload["variables"] = serde_json::to_value(variables)?;
+    if let Some(name) = custom_pipeline {
+        payload["target"]["selector"] = serde_json::json!({
+            "type": "custom",
+            "pattern": name
+        });
     }
+
+    if !variables.is_empty() {
+        payload["variables"] = serde_json::json!(variables);
+    }
+
+    payload
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn trigger_pipeline(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    ref_name: &str,
+    ref_type: &str,
+    variable_strings: Vec<String>,
+    secured: bool,
+    custom_pipeline: Option<String>,
+) -> Result<()> {
+    let variables = if variable_strings.is_empty() {
+        Vec::new()
+    } else {
+        parse_variables(variable_strings.clone(), secured)?
+    };
+
+    let payload = build_trigger_payload(ref_name, ref_type, custom_pipeline.as_deref(), &variables);
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/");
     let pipeline: Pipeline = ctx.client.post(&path, &payload).await.with_context(|| {
@@ -1833,6 +1862,48 @@ mod tests {
         }"#;
         let target: Target = serde_json::from_str(json).unwrap();
         assert!(target.commit.is_none());
+    }
+
+    #[test]
+    fn test_build_trigger_payload_default_has_no_selector() {
+        let payload = build_trigger_payload("main", "branch", None, &[]);
+        assert_eq!(payload["target"]["ref_name"], "main");
+        assert_eq!(payload["target"]["ref_type"], "branch");
+        assert_eq!(payload["target"]["type"], "pipeline_ref_target");
+        assert!(payload["target"].get("selector").is_none());
+        assert!(payload.get("variables").is_none());
+    }
+
+    #[test]
+    fn test_build_trigger_payload_injects_custom_selector() {
+        let payload = build_trigger_payload("dev", "branch", Some("s3-access-test"), &[]);
+        assert_eq!(payload["target"]["selector"]["type"], "custom");
+        assert_eq!(payload["target"]["selector"]["pattern"], "s3-access-test");
+    }
+
+    #[test]
+    fn test_build_trigger_payload_includes_variables() {
+        let vars = vec![PipelineVariable {
+            key: "ENV".to_string(),
+            value: "prod".to_string(),
+            secured: false,
+        }];
+        let payload = build_trigger_payload("main", "branch", None, &vars);
+        assert_eq!(payload["variables"][0]["key"], "ENV");
+        assert_eq!(payload["variables"][0]["value"], "prod");
+        assert_eq!(payload["variables"][0]["secured"], false);
+    }
+
+    #[test]
+    fn test_build_trigger_payload_selector_and_variables_together() {
+        let vars = vec![PipelineVariable {
+            key: "REGION".to_string(),
+            value: "eu".to_string(),
+            secured: true,
+        }];
+        let payload = build_trigger_payload("main", "branch", Some("deploy"), &vars);
+        assert_eq!(payload["target"]["selector"]["pattern"], "deploy");
+        assert_eq!(payload["variables"][0]["secured"], true);
     }
 
     #[test]

@@ -496,6 +496,9 @@ enum PipelineCommands {
         /// Mark all variables as secured.
         #[arg(long, default_value_t = false)]
         secured: bool,
+        /// Custom pipeline name to trigger (selector pattern from bitbucket-pipelines.yml).
+        #[arg(long)]
+        custom_pipeline: Option<String>,
     },
     /// Stop a running pipeline.
     Stop {
@@ -1293,10 +1296,18 @@ pub async fn execute(
                 ref_type,
                 variables,
                 secured,
+                custom_pipeline,
             } => {
                 let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline trigger")?;
                 pipelines::trigger_pipeline(
-                    &ctx, &workspace, &repo_slug, &ref_name, &ref_type, variables, secured,
+                    &ctx,
+                    &workspace,
+                    &repo_slug,
+                    &ref_name,
+                    &ref_type,
+                    variables,
+                    secured,
+                    custom_pipeline,
                 )
                 .await
             }
