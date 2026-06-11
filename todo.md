@@ -1,5 +1,32 @@
 # Changes Made
 
+## 2026-06-12 — Markdown to ADF for Jira descriptions/comments (#39)
+
+### Context
+`--description` (and comment bodies) wrapped the whole string in a single ADF
+paragraph, flattening headings/lists/bold. Issue #39 asked the CLI to parse
+structure into multi-node ADF.
+
+### Change
+- New `crates/cli/src/commands/jira/adf.rs`: `markdown_to_adf(text) -> Value` parses
+  CommonMark via `pulldown-cmark` (added, default-features off) into ADF: paragraph,
+  heading (attrs.level), bulletList/orderedList (attrs.order) + listItem, codeBlock
+  (attrs.language), blockquote, rule, marks strong/em/strike/code/link, hardBreak.
+- Removed `plain_text_adf`; repointed description (`build_create_payload`,
+  `build_update_payload`, `build_bulk_payload`) and comments (`add_comment`,
+  `update_comment`) to `markdown_to_adf`. Plain text still yields a single paragraph.
+- Updated `--description` help text (create + update).
+- Codex-reviewed; fixed 4 ADF-schema findings: `code` mark only combines with `link`;
+  heading downgraded to paragraph inside listItem/blockquote; blockquote flattened
+  inside listItem (and nested blockquote); empty listItem/blockquote get an empty
+  paragraph; empty-href links stay plain text.
+- 16 adf unit tests; full `cargo test` + `cargo clippy` clean.
+
+### Behavior change
+`--description` now interprets markdown. Plain text is unaffected (single paragraph),
+but text containing markdown syntax (`#`, `-`, `**`, backticks, links) now renders
+structured. `--field description=<json>` remains the raw-ADF escape hatch.
+
 ## 2026-06-12 — Drop unmaintained proc-macro-error2; fixes Security Audit (#53)
 
 ### Context

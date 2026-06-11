@@ -5,6 +5,7 @@ use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::adf::markdown_to_adf;
 use super::utils::JiraContext;
 use crate::commands::common::{render_success, MutationResult};
 use crate::query::JqlBuilder;
@@ -287,18 +288,6 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
     ctx.renderer.render(&view)
 }
 
-/// Wrap a plain string as a minimal single-paragraph ADF doc.
-pub(crate) fn plain_text_adf(text: &str) -> Value {
-    serde_json::json!({
-        "type": "doc",
-        "version": 1,
-        "content": [{
-            "type": "paragraph",
-            "content": [{ "type": "text", "text": text }]
-        }]
-    })
-}
-
 /// Build the POST body for `POST /rest/api/3/issue`. Pure, testable.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn build_create_payload(
@@ -333,7 +322,7 @@ pub(crate) fn build_create_payload(
     });
 
     if let Some(desc) = description {
-        fields["description"] = plain_text_adf(desc);
+        fields["description"] = markdown_to_adf(desc);
     }
     if let Some(user) = assignee {
         fields["assignee"] = json!({ "id": user });
@@ -413,7 +402,7 @@ pub(crate) fn build_update_payload(
         fields["summary"] = json!(s);
     }
     if let Some(desc) = description {
-        fields["description"] = plain_text_adf(desc);
+        fields["description"] = markdown_to_adf(desc);
     }
     if let Some(pri) = priority {
         fields["priority"] = json!({ "name": pri });
@@ -749,16 +738,7 @@ pub async fn list_comments(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
 pub async fn add_comment(ctx: &JiraContext<'_>, key: &str, body: &str) -> Result<()> {
     use serde_json::json;
 
-    let payload = json!({
-        "body": {
-            "type": "doc",
-            "version": 1,
-            "content": [{
-                "type": "paragraph",
-                "content": [{ "type": "text", "text": body }]
-            }]
-        }
-    });
+    let payload = json!({ "body": markdown_to_adf(body) });
 
     let _: Value = ctx
         .client
@@ -777,16 +757,7 @@ pub async fn add_comment(ctx: &JiraContext<'_>, key: &str, body: &str) -> Result
 pub async fn update_comment(ctx: &JiraContext<'_>, comment_id: &str, body: &str) -> Result<()> {
     use serde_json::json;
 
-    let payload = json!({
-        "body": {
-            "type": "doc",
-            "version": 1,
-            "content": [{
-                "type": "paragraph",
-                "content": [{ "type": "text", "text": body }]
-            }]
-        }
-    });
+    let payload = json!({ "body": markdown_to_adf(body) });
 
     let _: Value = ctx
         .client
