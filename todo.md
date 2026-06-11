@@ -1,5 +1,22 @@
 # Changes Made
 
+## 2026-06-12 — Drop unmaintained proc-macro-error2; fixes Security Audit (#53)
+
+### Context
+CI `cargo deny check advisories` failed repo-wide on RUSTSEC-2026-0173
+(`proc-macro-error2` unmaintained), pulled transitively via `tabled` ->
+`tabled_derive`. This blocked the dependabot dep-bump PR #53 and every other PR.
+
+### Change
+- `Cargo.toml`: `tabled = { version = "0.21", default-features = false, features = ["std"] }`.
+  The repo only uses `tabled::builder::Builder` and `tabled::settings::Style`, never
+  `#[derive(Tabled)]`, so disabling the default `derive` feature drops `tabled_derive`
+  and `proc-macro-error2` entirely. Proper removal, not a deny.toml suppression. Also
+  takes the tabled 0.20 -> 0.21 bump from #53.
+- Verified: `cargo tree -i proc-macro-error2` and `tabled_derive` both empty;
+  `cargo deny check advisories` = ok; full `cargo test` + `cargo clippy` clean;
+  table render output unchanged.
+
 ## 2026-06-11 — Bug fixes: HTTP 204 false errors (#45) + Confluence list parse (#49)
 
 ### Context
