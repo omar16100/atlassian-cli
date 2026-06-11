@@ -20,13 +20,18 @@ pub async fn list_pages(
         results: Vec<Page>,
     }
 
+    // Fields beyond `id` are optional: the Confluence v2 pages list may omit `type`
+    // entirely and can return null/absent `title`/`status` for some content, which
+    // would otherwise abort the whole parse with "error decoding response body".
     #[derive(Deserialize)]
     struct Page {
         id: String,
-        title: String,
-        #[serde(rename = "type")]
-        page_type: String,
-        status: String,
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(rename = "type", default)]
+        page_type: Option<String>,
+        #[serde(default)]
+        status: Option<String>,
     }
 
     let query_string = {
@@ -65,9 +70,9 @@ pub async fn list_pages(
         .iter()
         .map(|p| Row {
             id: p.id.as_str(),
-            title: p.title.as_str(),
-            page_type: p.page_type.as_str(),
-            status: p.status.as_str(),
+            title: p.title.as_deref().unwrap_or(""),
+            page_type: p.page_type.as_deref().unwrap_or(""),
+            status: p.status.as_deref().unwrap_or(""),
         })
         .collect();
 

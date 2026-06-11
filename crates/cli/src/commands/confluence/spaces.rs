@@ -17,14 +17,19 @@ pub async fn list_spaces(
         results: Vec<Space>,
     }
 
+    // Only `id` is guaranteed; the v2 spaces list may omit `type` and can return
+    // null/absent `key`/`name`/`status`, which would otherwise abort the parse.
     #[derive(Deserialize)]
     struct Space {
         id: String,
-        key: String,
-        name: String,
-        #[serde(rename = "type")]
-        space_type: String,
-        status: String,
+        #[serde(default)]
+        key: Option<String>,
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(rename = "type", default)]
+        space_type: Option<String>,
+        #[serde(default)]
+        status: Option<String>,
     }
 
     let query_string = {
@@ -64,10 +69,10 @@ pub async fn list_spaces(
         .iter()
         .map(|s| Row {
             id: s.id.as_str(),
-            key: s.key.as_str(),
-            name: s.name.as_str(),
-            space_type: s.space_type.as_str(),
-            status: s.status.as_str(),
+            key: s.key.as_deref().unwrap_or(""),
+            name: s.name.as_deref().unwrap_or(""),
+            space_type: s.space_type.as_deref().unwrap_or(""),
+            status: s.status.as_deref().unwrap_or(""),
         })
         .collect();
 
