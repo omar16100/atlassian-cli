@@ -23,7 +23,7 @@ zeroize = "1.7"
 aes-gcm = "0.10"
 argon2 = "0.5"
 rand = "0.10"
-machine-uid = "0.5"
+machine-uid = "0.6"
 whoami = "2.1"
 
 [dev-dependencies]
