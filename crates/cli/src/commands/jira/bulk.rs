@@ -7,7 +7,8 @@ use atlassian_cli_bulk::BulkExecutor;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::issues::{check_field_collisions, plain_text_adf};
+use super::adf::markdown_to_adf;
+use super::issues::check_field_collisions;
 use super::utils::JiraContext;
 use crate::commands::common::{render_success, MutationResult};
 
@@ -42,7 +43,7 @@ pub(crate) fn build_bulk_payload(project: &str, issue: &ImportIssue) -> Result<V
     });
 
     if let Some(desc) = &issue.description {
-        fields["description"] = plain_text_adf(desc);
+        fields["description"] = markdown_to_adf(desc);
     }
     if let Some(assignee) = &issue.assignee {
         fields["assignee"] = json!({ "id": assignee });
