@@ -36,6 +36,7 @@ reqwest = { workspace = true, features = ["multipart"] }
 chrono.workspace = true
 rpassword = "7"
 htmd.workspace = true
+pulldown-cmark.workspace = true
 
 [dev-dependencies]
 wiremock.workspace = true

@@ -4,6 +4,7 @@ use atlassian_cli_output::OutputRenderer;
 use clap::{Args, Subcommand};
 
 // Submodules
+mod adf;
 mod audit;
 mod automation;
 mod bulk;
@@ -142,7 +143,8 @@ enum IssueCommands {
         /// Issue summary
         #[arg(long)]
         summary: String,
-        /// Issue description (plain text; wrapped as a single-paragraph ADF doc)
+        /// Issue description. Markdown is converted to ADF (headings, lists, bold,
+        /// italic, inline code, links, code blocks). Plain text stays a paragraph.
         #[arg(long)]
         description: Option<String>,
         /// Assignee account ID or email
@@ -167,7 +169,8 @@ enum IssueCommands {
         /// New summary
         #[arg(long)]
         summary: Option<String>,
-        /// New description (plain text; wrapped as a single-paragraph ADF doc)
+        /// New description. Markdown is converted to ADF (headings, lists, bold,
+        /// italic, inline code, links, code blocks). Plain text stays a paragraph.
         #[arg(long)]
         description: Option<String>,
         /// New priority
