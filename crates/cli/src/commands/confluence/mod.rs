@@ -7,6 +7,7 @@ use clap::{Args, Subcommand};
 mod analytics;
 mod attachments;
 mod bulk;
+mod folders;
 mod pages;
 mod search;
 mod spaces;
@@ -29,6 +30,10 @@ enum ConfluenceCommands {
     /// Page operations
     #[command(subcommand)]
     Page(PageCommands),
+
+    /// Folder operations (v2 Folder API)
+    #[command(subcommand)]
+    Folder(FolderCommands),
 
     /// Blog post operations
     #[command(subcommand)]
@@ -123,6 +128,41 @@ enum SpaceCommands {
         /// Subject identifier (user ID or group name)
         #[arg(long)]
         subject_id: String,
+    },
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum FolderCommands {
+    /// Get folder details by ID
+    #[command(
+        long_about = "Get folder details by ID.\n\nExamples:\n  confluence folder get 3309240341"
+    )]
+    Get {
+        /// Folder ID
+        folder_id: String,
+    },
+    /// Create a new folder
+    #[command(
+        long_about = "Create a folder in a space.\n\nExamples:\n  confluence folder create --space TEAM --title \"Architecture\"\n  confluence folder create --space TEAM --title \"Diagrams\" --parent 3302031761"
+    )]
+    Create {
+        /// Space key (e.g., TEAM)
+        #[arg(long)]
+        space: String,
+        /// Folder title
+        #[arg(long)]
+        title: String,
+        /// Parent folder or page ID
+        #[arg(long)]
+        parent: Option<String>,
+    },
+    /// Delete a folder
+    Delete {
+        /// Folder ID
+        folder_id: String,
+        /// Force deletion without confirmation
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -632,6 +672,17 @@ pub async fn execute(
                     &subject_id,
                 )
                 .await
+            }
+        },
+        ConfluenceCommands::Folder(cmd) => match cmd {
+            FolderCommands::Get { folder_id } => folders::get_folder(&ctx, &folder_id).await,
+            FolderCommands::Create {
+                space,
+                title,
+                parent,
+            } => folders::create_folder(&ctx, &space, &title, parent.as_deref()).await,
+            FolderCommands::Delete { folder_id, force } => {
+                folders::delete_folder(&ctx, &folder_id, force).await
             }
         },
         ConfluenceCommands::Blog(cmd) => match cmd {
