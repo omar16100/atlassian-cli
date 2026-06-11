@@ -15,12 +15,15 @@ pub async fn search_cql(
         results: Vec<SearchResult>,
     }
 
+    // Only `id` is guaranteed; `title`/`type` may be null or absent for some
+    // content types, which would otherwise abort the parse.
     #[derive(Deserialize)]
     struct SearchResult {
         id: String,
-        title: String,
-        #[serde(rename = "type")]
-        content_type: String,
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(rename = "type", default)]
+        content_type: Option<String>,
     }
 
     let mut query_params = vec![format!("cql={}", urlencoding::encode(cql))];
@@ -56,8 +59,8 @@ pub async fn search_cql(
         .iter()
         .map(|r| Row {
             id: r.id.as_str(),
-            title: r.title.as_str(),
-            content_type: r.content_type.as_str(),
+            title: r.title.as_deref().unwrap_or(""),
+            content_type: r.content_type.as_deref().unwrap_or(""),
         })
         .collect();
 
