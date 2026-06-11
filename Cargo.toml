@@ -56,6 +56,8 @@ backoff = { version = "0.4", features = ["tokio"] }
 async-trait = "0.1"
 async-stream = "0.3"
 htmd = "0.5"
+# Markdown -> ADF conversion for Jira descriptions/comments
+pulldown-cmark = { version = "0.12", default-features = false }
 
 # Testing
 wiremock = "0.6"
