@@ -29,7 +29,10 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 
 # Output formatting
-tabled = "0.20"
+# default-features disabled to drop the `derive` feature (tabled_derive ->
+# proc-macro-error2, which is unmaintained per RUSTSEC-2026-0173). We only use
+# tabled's Builder + Style, not #[derive(Tabled)].
+tabled = { version = "0.21", default-features = false, features = ["std"] }
 colored = "3.1"
 indicatif = "0.18"
 
