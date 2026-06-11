@@ -1,5 +1,46 @@
 # Changes Made
 
+## 2026-06-12 — Drop unmaintained proc-macro-error2; fixes Security Audit (#53)
+
+### Context
+CI `cargo deny check advisories` failed repo-wide on RUSTSEC-2026-0173
+(`proc-macro-error2` unmaintained), pulled transitively via `tabled` ->
+`tabled_derive`. This blocked the dependabot dep-bump PR #53 and every other PR.
+
+### Change
+- `Cargo.toml`: `tabled = { version = "0.21", default-features = false, features = ["std"] }`.
+  The repo only uses `tabled::builder::Builder` and `tabled::settings::Style`, never
+  `#[derive(Tabled)]`, so disabling the default `derive` feature drops `tabled_derive`
+  and `proc-macro-error2` entirely. Proper removal, not a deny.toml suppression. Also
+  takes the tabled 0.20 -> 0.21 bump from #53.
+- Verified: `cargo tree -i proc-macro-error2` and `tabled_derive` both empty;
+  `cargo deny check advisories` = ok; full `cargo test` + `cargo clippy` clean;
+  table render output unchanged.
+
+## 2026-06-11 — Bug fixes: HTTP 204 false errors (#45) + Confluence list parse (#49)
+
+### Context
+Issue triage flagged two real defects. #45: mutating Jira/Confluence commands (update,
+transition, assign, deletes) exited non-zero with "error decoding response body" even
+though the write succeeded, because the API returns HTTP 204 No Content and the client
+parsed the empty body as JSON. #49 (trailing note): `confluence page list` failed with
+the same parse error because list structs had required `String` fields the v2 API can
+omit or null. Codex reviewed the fix design (read-only).
+
+### #45 — central fix in `crates/api/src/lib.rs`
+- `request()` success arm now reads body bytes and treats an empty or whitespace-only
+  body as JSON `null` before deserializing (was `response.json::<T>()` unconditionally).
+- Callers discard the body as `let _: Value`, so they receive `Value::Null` and succeed.
+  No call-site changes; fixes all 204-returning endpoints at once.
+- Added 3 wiremock tests: 204 PUT → Ok(Null), empty 200 → Ok(Null), JSON 200 still parses.
+
+### #49 — defensive deserialization on Confluence list structs
+- `Page` (pages.rs), `Space` (spaces.rs), `SearchResult` (search.rs): non-`id` string
+  fields are now `Option<String>` with `#[serde(default)]` (handles both absent AND null;
+  plain serde default does not cover explicit null). Rendered via `.as_deref().unwrap_or("")`.
+
+Verification: `cargo test` (all pass, +3 new), `cargo clippy --all-targets` clean.
+
 ## 2026-04-21 - Week-4 SEO: breadcrumbs on blog/runbook pages
 
 ### Context
