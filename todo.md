@@ -1,5 +1,27 @@
 # Changes Made
 
+## 2026-06-12 — Confluence v2 Folder API command group (#49)
+
+### Context
+Confluence v2 treats folders as a distinct content type with their own endpoints,
+but the CLI had no `confluence folder` command, so folder IDs 404'd against
+`page get`. Issue #49 asked for get/create/delete.
+
+### Change
+- New `crates/cli/src/commands/confluence/folders.rs`:
+  - `folder get <ID>` -> GET /wiki/api/v2/folders/{id} (renders full response Value).
+  - `folder create --space <KEY> --title <T> [--parent <ID>]` -> POST
+    /wiki/api/v2/folders. Resolves the space key to a numeric spaceId first.
+  - `folder delete <ID> [--force]` -> DELETE /wiki/api/v2/folders/{id} via
+    `delete_no_content` (moves to trash; copy reflects that).
+  - Pure `build_folder_payload`; 4 unit tests.
+- New `resolve_space_id(ctx, key)` helper in `confluence/utils.rs`
+  (GET /wiki/api/v2/spaces?keys=<key> -> results[0].id).
+- Wired `Folder(FolderCommands)` group + dispatch in `confluence/mod.rs`.
+- Codex-reviewed (no blockers); applied both should-fixes: `get` preserves the full
+  response, delete copy says "move to trash" not "permanently delete".
+- The `page list` parse bug also referenced in #49 shipped earlier in #56.
+
 ## 2026-06-12 — Markdown to ADF for Jira descriptions/comments (#39)
 
 ### Context
