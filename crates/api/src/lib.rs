@@ -524,10 +524,26 @@ impl ApiClient {
                         message,
                     })
                 }
-                status if status.is_success() => response.json::<T>().await.map_err(|e| {
-                    error!("Failed to parse JSON response: {}", e);
-                    ApiError::InvalidResponse(e.to_string())
-                }),
+                status if status.is_success() => {
+                    let bytes = response
+                        .bytes()
+                        .await
+                        .map_err(|e| ApiError::InvalidResponse(e.to_string()))?;
+                    // Successful responses with an empty (or whitespace-only) body,
+                    // e.g. HTTP 204 No Content from Jira update/transition/assign and
+                    // most DELETEs, are treated as JSON `null`. Callers that discard
+                    // the body (`let _: Value`) then succeed instead of failing to
+                    // parse an empty body as JSON.
+                    let slice: &[u8] = if bytes.iter().all(|b| b.is_ascii_whitespace()) {
+                        b"null"
+                    } else {
+                        &bytes
+                    };
+                    serde_json::from_slice::<T>(slice).map_err(|e| {
+                        error!("Failed to parse JSON response: {}", e);
+                        ApiError::InvalidResponse(e.to_string())
+                    })
+                }
                 _ => {
                     let message = response
                         .text()
@@ -646,5 +662,64 @@ mod tests {
             }
             other => panic!("Expected Forbidden, got: {:?}", other),
         }
+    }
+
+    // Regression for #45: a successful PUT/POST returning HTTP 204 No Content (empty
+    // body) must not fail JSON parsing. Callers discard the body as `Value`.
+    #[tokio::test]
+    async fn test_204_no_content_put_succeeds() {
+        let server = MockServer::start().await;
+        Mock::given(method("PUT"))
+            .and(path("issue/AEA-1"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result: error::Result<serde_json::Value> = client
+            .put("/issue/AEA-1", &serde_json::json!({"fields": {}}))
+            .await;
+
+        match result {
+            Ok(serde_json::Value::Null) => {}
+            other => panic!("Expected Ok(Null) for 204, got: {:?}", other),
+        }
+    }
+
+    // A 200 with an empty/whitespace-only body is also treated as null.
+    #[tokio::test]
+    async fn test_200_empty_body_succeeds() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("transitions"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("  \n"))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result: error::Result<serde_json::Value> =
+            client.post("/transitions", &serde_json::json!({})).await;
+
+        match result {
+            Ok(serde_json::Value::Null) => {}
+            other => panic!("Expected Ok(Null) for empty 200, got: {:?}", other),
+        }
+    }
+
+    // A non-empty JSON body on success still parses normally.
+    #[tokio::test]
+    async fn test_200_json_body_still_parses() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("issue/AEA-1"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({"key": "AEA-1"})),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result: serde_json::Value = client.get("/issue/AEA-1").await.unwrap();
+        assert_eq!(result["key"], "AEA-1");
     }
 }
