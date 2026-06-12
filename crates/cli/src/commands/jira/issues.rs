@@ -248,6 +248,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         assignee: &'a str,
         reporter: &'a str,
         issue_type: &'a str,
+        attachments: &'a Vec<AttachmentField>,
     }
 
     let view = IssueDetails {
@@ -283,6 +284,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             .as_ref()
             .map(|t| t.name.as_str())
             .unwrap_or(""),
+        attachments: &issue.fields.attachment,
     };
 
     ctx.renderer.render(&view)
@@ -681,7 +683,7 @@ pub async fn delete_link(ctx: &JiraContext<'_>, link_id: &str) -> Result<()> {
 
 // Comment operations
 
-pub async fn list_comments(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
+pub async fn list_comments(ctx: &JiraContext<'_>, key: &str, full: bool) -> Result<()> {
     #[derive(Deserialize)]
     struct CommentsResponse {
         comments: Vec<Comment>,
@@ -712,22 +714,28 @@ pub async fn list_comments(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         id: &'a str,
         author: &'a str,
         created: &'a str,
-        body_preview: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body_preview: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body: Option<String>,
     }
 
     let rows: Vec<Row<'_>> = response
         .comments
         .iter()
         .map(|c| {
-            let preview = extract_adf_text(&c.body)
-                .chars()
-                .take(50)
-                .collect::<String>();
+            let text = extract_adf_text(&c.body);
+            let (body_preview, body) = if full {
+                (None, Some(text))
+            } else {
+                (Some(text.chars().take(50).collect::<String>()), None)
+            };
             Row {
                 id: c.id.as_str(),
                 author: c.author.display_name.as_str(),
                 created: c.created.as_str(),
-                body_preview: preview,
+                body_preview,
+                body,
             }
         })
         .collect();
@@ -810,6 +818,18 @@ struct IssueFields {
     description: Option<Value>,
     #[serde(default)]
     issuetype: Option<IssueTypeField>,
+    #[serde(default)]
+    attachment: Vec<AttachmentField>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct AttachmentField {
+    id: String,
+    filename: String,
+    #[serde(rename = "mimeType")]
+    mime_type: String,
+    size: u64,
+    content: String,
 }
 
 #[derive(Deserialize)]
