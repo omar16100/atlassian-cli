@@ -108,6 +108,7 @@
                 <li><a href="#conf-spaces">Spaces</a></li>
                 <li><a href="#conf-pages">Pages</a></li>
                 <li><a href="#conf-blog">Blog posts</a></li>
+                <li><a href="#conf-folders">Folders</a></li>
                 <li><a href="#conf-attach">Attachments</a></li>
                 <li><a href="#conf-bulk">Bulk operations</a></li>
                 <li><a href="#conf-analytics">Analytics</a></li>
@@ -273,6 +274,11 @@ atlassian-cli confluence blog create --space DEV --title <span class="string">"S
 atlassian-cli confluence blog update --id 67890 --title <span class="string">"Updated Recap"</span>
 atlassian-cli confluence blog delete --id 67890</code></pre>
 
+            <h2 id="conf-folders">Confluence — Folders <span style="font-size:0.7rem;color:var(--accent-cyan);">new in 0.4</span></h2>
+            <pre class="code-block"><code>atlassian-cli confluence folder get 3309240341
+atlassian-cli confluence folder create --space DOCS --title <span class="string">"Architecture"</span> --parent 3302031761
+atlassian-cli confluence folder delete 3309240341 --force</code></pre>
+
             <h2 id="conf-attach">Confluence — Attachments</h2>
             <pre class="code-block"><code>atlassian-cli confluence attachment list --page-id 12345
 atlassian-cli confluence attachment get --id 11111
@@ -329,6 +335,10 @@ atlassian-cli bitbucket --workspace myteam project delete PROJ --force</code></p
             <h2 id="bb-pipelines">Bitbucket — Pipelines</h2>
             <pre class="code-block"><code>atlassian-cli bitbucket --workspace myteam pipeline list api-service
 atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main
+
+<span class="comment"># Trigger a named custom pipeline from bitbucket-pipelines.yml (new in 0.4)</span>
+atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main --custom-pipeline s3-access-test
+
 atlassian-cli bitbucket --workspace myteam pipeline stop api-service {uuid}</code></pre>
 
             <h2 id="bb-webhooks">Bitbucket — Webhooks &amp; SSH keys</h2>
@@ -424,7 +434,7 @@ atlassian-cli jsm feedback delete SD-123</code></pre>
             <div class="footer-content">
                 <div class="footer-left">
                     <span class="footer-logo">atlassian-cli</span>
-                    <span class="footer-version">v0.3.3</span>
+                    <span class="footer-version">v0.4.1</span>
                 </div>
                 <div class="footer-links">
                     <a href="/install/">Install</a>
