@@ -66,6 +66,34 @@
       }
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I use Bitbucket from the command line?",
+          "acceptedAnswer": { "@type": "Answer", "text": "atlassian-cli is a Bitbucket CLI for pull requests, pipelines, branches, repositories and permissions. After authenticating, run commands like 'atlassian-cli bitbucket --workspace myteam pr list api-service'. A full list of Bitbucket commands is in the docs." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I trigger Bitbucket Pipelines from the CLI?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes, including named custom pipelines. Run 'atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main --custom-pipeline <name>'. Custom pipeline triggers were added in version 0.4." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli the official Bitbucket CLI?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. atlassian-cli is an independent, open-source tool and is not affiliated with, endorsed by, or maintained by Atlassian. Atlassian ships its own separate official CLI (acli)." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the Bitbucket CLI free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. atlassian-cli is free and open source under the MIT License, installable via Homebrew, Cargo, or a prebuilt binary." }
+        }
+      ]
+    }
+    </script>
 
     <link rel="canonical" href="https://atlassiancli.com/bitbucket/" />
     <link rel="stylesheet" href="../styles.css">
@@ -526,6 +554,32 @@ atlassian-cli bitbucket --workspace myteam \
                     <h4>Example Scripts</h4>
                     <p>Production-ready shell scripts for PR automation, branch cleanup, and repo audits.</p>
                 </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <h2 class="section-title">Bitbucket CLI FAQ</h2>
+            <p class="section-subtitle">Automating Bitbucket from the command line</p>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>How do I use Bitbucket from the command line?</h3>
+                    <p>atlassian-cli is a Bitbucket CLI for pull requests, pipelines, branches, repositories and permissions. After <a href="/docs/auth.html">authenticating</a>, run commands like <code>atlassian-cli bitbucket --workspace myteam pr list api-service</code>. See the full <a href="/docs/commands.html#bb-repos">Bitbucket command reference</a>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I trigger Bitbucket Pipelines from the CLI?</h3>
+                    <p>Yes, including named custom pipelines: <code>atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main --custom-pipeline &lt;name&gt;</code>. Custom pipeline triggers landed in <a href="/blog/atlassian-cli-0-4-release.html">version 0.4</a>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is atlassian-cli the official Bitbucket CLI?</h3>
+                    <p>No. atlassian-cli is an independent, open-source tool and is not affiliated with, endorsed by, or maintained by Atlassian. Atlassian ships its own separate official CLI (<code>acli</code>).</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is the Bitbucket CLI free?</h3>
+                    <p>Yes. atlassian-cli is free and open source under the MIT License. Get it on <a href="/install/">the install page</a> or <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>.</p>
+                </div>
             </div>
         </div>
     </section>
