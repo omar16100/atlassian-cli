@@ -181,17 +181,17 @@
                         </button>
                     </div>
                     <pre class="code-block" id="code-search"><code><span class="comment"># Search issues by project and status</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
   --format json
 
 <span class="comment"># Search with assignee filter, table output</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"assignee = currentUser() AND sprint in openSprints()"</span> \
   --format table
 
 <span class="comment"># Export results as CSV</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV AND created >= -7d"</span> \
   --format csv > new_issues.csv</code></pre>
                 </div>
@@ -224,19 +224,19 @@ atlassian-cli jira bulk transition \
                         </button>
                     </div>
                     <pre class="code-block" id="code-sprint"><code><span class="comment"># Fetch active sprint issues as JSON</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --profile prod \
   --jql <span class="string">"project = PROJ AND Sprint in openSprints()"</span> \
   --format json
 
 <span class="comment"># Export sprint data to CSV for reporting</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --profile prod \
   --jql <span class="string">"project = PROJ AND Sprint = 42"</span> \
   --format csv > sprint-42.csv
 
 <span class="comment"># Pipe to jq for cycle time analysis</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = PROJ AND Sprint = 42"</span> \
   --format json | \
   jq <span class="string">'[.[] | {key, status: .fields.status.name, points: .fields.customfield_10016}]'</span></code></pre>
@@ -268,7 +268,7 @@ atlassian-cli auth login \
 atlassian-cli auth test --profile <span class="string">work</span></code></pre>
                 <h4>3. Start using</h4>
                 <pre class="code-block"><code><span class="comment"># Search your issues</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --profile <span class="string">work</span> \
   --jql <span class="string">"assignee = currentUser()"</span></code></pre>
             </div>
@@ -289,7 +289,7 @@ atlassian-cli jira search \
                 </thead>
                 <tbody style="color: var(--text-secondary);">
                     <tr style="border-bottom: 1px solid var(--border);">
-                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-issues"><code>jira search / get / create / update / transition / assign / delete</code></a></td>
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#jira-issues"><code>jira issue search / get / create / update / transition / assign / delete</code></a></td>
                         <td style="padding: 0.75rem 0.5rem;">Issue CRUD. JQL search with any field, assignee/status filters, custom field payloads via <code>--field 'customfield_XXXXX=...'</code>.</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--border);">

@@ -95,7 +95,7 @@ preview_issues() {
     log "Query: $JQL"
 
     local issues
-    issues=$(atlassian-cli jira search \
+    issues=$(atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$JQL" \
         --output json 2>/dev/null || echo "[]")

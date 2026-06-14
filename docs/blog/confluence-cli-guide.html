@@ -535,7 +535,7 @@ atlassian-cli confluence space add-permission <span class="string">DEV</span> \
 atlassian-cli confluence page list --space <span class="string">DEV</span> --limit <span class="string">25</span>
 
 <span class="comment"># Get a page by ID</span>
-atlassian-cli confluence page get --id <span class="string">12345</span>
+atlassian-cli confluence page get <span class="string">12345</span>
 
 <span class="comment"># Create a new page</span>
 atlassian-cli confluence page create \
@@ -544,53 +544,55 @@ atlassian-cli confluence page create \
   --body <span class="string">"&lt;p&gt;Page content here&lt;/p&gt;"</span>
 
 <span class="comment"># Update a page title</span>
-atlassian-cli confluence page update --id <span class="string">12345</span> \
+atlassian-cli confluence page update <span class="string">12345</span> \
   --title <span class="string">"Updated Title"</span>
 
 <span class="comment"># Delete a page</span>
-atlassian-cli confluence page delete --id <span class="string">12345</span></code></pre>
+atlassian-cli confluence page delete <span class="string">12345</span></code></pre>
 
         <h3>Labels and comments</h3>
 
         <pre><code><span class="comment"># Add a label to a page</span>
-atlassian-cli confluence page add-label --id <span class="string">12345</span> \
-  --label <span class="string">documentation</span>
+atlassian-cli confluence page add-label <span class="string">12345</span> <span class="string">documentation</span>
 
 <span class="comment"># Remove a label</span>
-atlassian-cli confluence page remove-label --id <span class="string">12345</span> \
-  --label <span class="string">outdated</span>
+atlassian-cli confluence page remove-label <span class="string">12345</span> <span class="string">outdated</span>
 
 <span class="comment"># List comments on a page</span>
-atlassian-cli confluence page comments --id <span class="string">12345</span>
+atlassian-cli confluence page comments <span class="string">12345</span>
 
 <span class="comment"># Add a comment</span>
-atlassian-cli confluence page add-comment --id <span class="string">12345</span> \
-  --body <span class="string">"Reviewed and approved."</span></code></pre>
+atlassian-cli confluence page add-comment <span class="string">12345</span> \
+  <span class="string">"Reviewed and approved."</span></code></pre>
 
         <h3>Versions and restrictions</h3>
 
         <pre><code><span class="comment"># View page version history</span>
-atlassian-cli confluence page versions --id <span class="string">12345</span>
+atlassian-cli confluence page versions <span class="string">12345</span>
 
 <span class="comment"># View page restrictions</span>
-atlassian-cli confluence page get-restrictions --id <span class="string">12345</span>
+atlassian-cli confluence page get-restrictions <span class="string">12345</span>
 
 <span class="comment"># Restrict editing to a specific user</span>
-atlassian-cli confluence page add-restriction --id <span class="string">12345</span> \
+atlassian-cli confluence page add-restriction \
   --operation <span class="string">update</span> \
-  --user <span class="string">user@example.com</span>
+  --subject-type <span class="string">user</span> \
+  --subject-id <span class="string">user@example.com</span> \
+  <span class="string">12345</span>
 
 <span class="comment"># Remove a restriction</span>
-atlassian-cli confluence page remove-restriction --id <span class="string">12345</span> \
+atlassian-cli confluence page remove-restriction \
   --operation <span class="string">update</span> \
-  --user <span class="string">user@example.com</span></code></pre>
+  --subject-type <span class="string">user</span> \
+  --subject-id <span class="string">user@example.com</span> \
+  <span class="string">12345</span></code></pre>
 
         <h3>Attachments</h3>
 
         <p>Upload, download, and manage file attachments on any page:</p>
 
         <pre><code><span class="comment"># List attachments on a page</span>
-atlassian-cli confluence attachment list --page-id <span class="string">12345</span>
+atlassian-cli confluence attachment list <span class="string">12345</span>
 
 <span class="comment"># Upload a file</span>
 atlassian-cli confluence attachment upload \
@@ -603,10 +605,10 @@ atlassian-cli confluence attachment download \
   --output <span class="string">./download.png</span>
 
 <span class="comment"># Get attachment metadata</span>
-atlassian-cli confluence attachment get --id <span class="string">11111</span>
+atlassian-cli confluence attachment get <span class="string">11111</span>
 
 <span class="comment"># Delete an attachment</span>
-atlassian-cli confluence attachment delete --id <span class="string">11111</span></code></pre>
+atlassian-cli confluence attachment delete <span class="string">11111</span></code></pre>
 
         <h3>Blog posts</h3>
 
@@ -622,11 +624,11 @@ atlassian-cli confluence blog create \
   --body <span class="string">"&lt;p&gt;Summary of sprint work&lt;/p&gt;"</span>
 
 <span class="comment"># Update a blog post</span>
-atlassian-cli confluence blog update --id <span class="string">67890</span> \
+atlassian-cli confluence blog update <span class="string">67890</span> \
   --title <span class="string">"Updated Recap"</span>
 
 <span class="comment"># Delete a blog post</span>
-atlassian-cli confluence blog delete --id <span class="string">67890</span></code></pre>
+atlassian-cli confluence blog delete <span class="string">67890</span></code></pre>
 
         <!-- Section 6: Bulk Export & Backup -->
         <h2 id="bulk-export-backup">Bulk Export &amp; Backup</h2>
@@ -637,7 +639,7 @@ atlassian-cli confluence blog delete --id <span class="string">67890</span></cod
 
         <pre><code><span class="comment"># Export all pages from a space to JSON</span>
 atlassian-cli confluence bulk export \
-  --space <span class="string">DEV</span> \
+  --cql <span class="string">"space = DEV"</span> \
   --output <span class="string">backup.json</span> \
   --format <span class="string">json</span>
 
@@ -663,10 +665,10 @@ atlassian-cli confluence bulk add-labels \
         <h3>Bulk delete</h3>
 
         <pre><code><span class="comment"># Preview: delete all pages in a space (dry-run first!)</span>
-atlassian-cli confluence bulk delete --space <span class="string">OLD</span> --dry-run
+atlassian-cli confluence bulk delete --cql <span class="string">"space = OLD"</span> --dry-run
 
 <span class="comment"># Execute the deletion</span>
-atlassian-cli confluence bulk delete --space <span class="string">OLD</span></code></pre>
+atlassian-cli confluence bulk delete --cql <span class="string">"space = OLD"</span></code></pre>
 
         <h3>Backup script example</h3>
 
@@ -682,7 +684,7 @@ mkdir -p "$BACKUP_DIR"
 for SPACE in DEV OPS DOCS ENG; do
   echo "Exporting space: $SPACE"
   atlassian-cli confluence bulk export \
-    --space "$SPACE" \
+    --cql "space = $SPACE" \
     --output "$BACKUP_DIR/${SPACE}.json" \
     --format json
 done
@@ -709,7 +711,7 @@ atlassian-cli confluence page create \
   --body <span class="string">"$BODY"</span>
 
 <span class="comment"># Or update an existing page</span>
-atlassian-cli confluence page update --id <span class="string">12345</span> \
+atlassian-cli confluence page update <span class="string">12345</span> \
   --title <span class="string">"Project README"</span></code></pre>
 
         <p>In CI/CD, this pattern runs on every merge to <code>main</code>, keeping your Confluence documentation automatically in sync with the codebase. The same approach works for publishing ADRs (Architecture Decision Records), runbooks, or any documentation that lives in Git.</p>
@@ -731,10 +733,10 @@ atlassian-cli confluence search cql \
   --format json
 
 <span class="comment"># Space-level analytics</span>
-atlassian-cli confluence analytics space-stats --space <span class="string">DEV</span>
+atlassian-cli confluence analytics space-stats <span class="string">DEV</span>
 
 <span class="comment"># Page view stats for a specific page</span>
-atlassian-cli confluence analytics page-views --id <span class="string">12345</span> \
+atlassian-cli confluence analytics page-views <span class="string">12345</span> \
   --from <span class="string">2025-01-01</span></code></pre>
 
         <h3>Migration between spaces</h3>
@@ -743,7 +745,7 @@ atlassian-cli confluence analytics page-views --id <span class="string">12345</s
 
         <pre><code><span class="comment"># Export source space</span>
 atlassian-cli confluence bulk export \
-  --space <span class="string">OLD_DOCS</span> \
+  --cql <span class="string">"space = OLD_DOCS"</span> \
   --output <span class="string">migration.json</span> \
   --format <span class="string">json</span>
 

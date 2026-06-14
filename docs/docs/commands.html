@@ -158,16 +158,16 @@
 
             <h2 id="output-formats">Output formats</h2>
             <pre class="code-block"><code><span class="comment"># Human-readable table (default)</span>
-atlassian-cli jira search --jql <span class="string">"project = DEV"</span>
+atlassian-cli jira issue search --jql <span class="string">"project = DEV"</span>
 
 <span class="comment"># Machine-readable JSON — pipe to jq, feed other tools</span>
-atlassian-cli jira search --jql <span class="string">"project = DEV"</span> --format json | jq <span class="string">'.[].key'</span>
+atlassian-cli jira issue search --jql <span class="string">"project = DEV"</span> --format json | jq <span class="string">'.[].key'</span>
 
 <span class="comment"># CSV — open in a spreadsheet</span>
-atlassian-cli jira search --jql <span class="string">"project = DEV"</span> --format csv --output issues.csv
+atlassian-cli jira issue search --jql <span class="string">"project = DEV"</span> --format csv --output issues.csv
 
 <span class="comment"># YAML — good for configuration diffs</span>
-atlassian-cli jira workflows export --name <span class="string">"Software Simplified Workflow"</span> --format yaml
+atlassian-cli jira workflows export <span class="string">"Software Simplified Workflow"</span> --format yaml
 
 <span class="comment"># Quiet — exit code only; useful in CI gating</span>
 atlassian-cli auth test --profile prod --format quiet &amp;&amp; echo OK</code></pre>
@@ -185,37 +185,37 @@ atlassian-cli auth logout --profile old --bitbucket        <span class="comment"
             <div class="note">To change which profile is default, re-run <code>auth login --default</code> for the profile you want as default, or edit <code>default_profile:</code> in <code>~/.atlassian-cli/config.yaml</code> directly.</div>
 
             <h2 id="jira-issues">Jira — Issues</h2>
-            <pre class="code-block"><code>atlassian-cli jira search --jql <span class="string">"project = DEV order by created desc"</span> --limit 5
-atlassian-cli jira get DEV-123
-atlassian-cli jira create --project DEV --issue-type Task --summary <span class="string">"Test task"</span>
+            <pre class="code-block"><code>atlassian-cli jira issue search --jql <span class="string">"project = DEV order by created desc"</span> --limit 5
+atlassian-cli jira issue get DEV-123
+atlassian-cli jira issue create --project DEV --issue-type Task --summary <span class="string">"Test task"</span>
 
 <span class="comment"># Custom fields — discover IDs via `jira fields list`</span>
-atlassian-cli jira create --project DEV --issue-type Task --summary <span class="string">"cf test"</span> \
+atlassian-cli jira issue create --project DEV --issue-type Task --summary <span class="string">"cf test"</span> \
   --field <span class="string">'customfield_10010={"value":"Internal"}'</span> \
   --field <span class="string">'customfield_10020={"formula":"a=b"}'</span>
 
-atlassian-cli jira update DEV-123 --summary <span class="string">"Updated summary"</span>
-atlassian-cli jira transition DEV-123 --transition <span class="string">"In Progress"</span>
-atlassian-cli jira assign DEV-123 --assignee user@example.com
-atlassian-cli jira delete DEV-123</code></pre>
+atlassian-cli jira issue update DEV-123 --summary <span class="string">"Updated summary"</span>
+atlassian-cli jira issue transition DEV-123 --transition <span class="string">"In Progress"</span>
+atlassian-cli jira issue assign DEV-123 --assignee user@example.com
+atlassian-cli jira issue delete DEV-123</code></pre>
 
             <h2 id="jira-projects">Jira — Projects</h2>
             <pre class="code-block"><code>atlassian-cli jira project list
 atlassian-cli jira project get DEV
-atlassian-cli jira components list --project DEV
-atlassian-cli jira versions list --project DEV</code></pre>
+atlassian-cli jira components list DEV
+atlassian-cli jira versions list DEV</code></pre>
 
             <h2 id="jira-roles">Jira — Roles</h2>
-            <pre class="code-block"><code>atlassian-cli jira roles list --project DEV
-atlassian-cli jira roles get --project DEV --role-id 10002
-atlassian-cli jira roles actors --project DEV --role-id 10002
-atlassian-cli jira roles add-actor --project DEV --role-id 10002 --user user@example.com
-atlassian-cli jira roles remove-actor --project DEV --role-id 10002 --user user@example.com</code></pre>
+            <pre class="code-block"><code>atlassian-cli jira roles list DEV
+atlassian-cli jira roles get DEV 10002
+atlassian-cli jira roles actors DEV 10002
+atlassian-cli jira roles add-actor DEV 10002 --user user@example.com
+atlassian-cli jira roles remove-actor DEV 10002 --user user@example.com</code></pre>
 
             <h2 id="jira-fields">Jira — Fields &amp; workflows</h2>
             <pre class="code-block"><code>atlassian-cli jira fields list
 atlassian-cli jira workflows list
-atlassian-cli jira workflows export --name <span class="string">"Software Simplified Workflow"</span></code></pre>
+atlassian-cli jira workflows export <span class="string">"Software Simplified Workflow"</span></code></pre>
 
             <h2 id="jira-bulk">Jira — Bulk operations</h2>
             <pre class="code-block"><code><span class="comment"># Dry-run first — always</span>
@@ -239,9 +239,9 @@ atlassian-cli jira webhooks list
 atlassian-cli jira audit list --from 2025-01-01 --limit 100</code></pre>
 
             <h2 id="conf-search">Confluence — Search</h2>
-            <pre class="code-block"><code>atlassian-cli confluence search cql --cql <span class="string">"space = DEV and type = page"</span> --limit 5
-atlassian-cli confluence search text --query <span class="string">"meeting notes"</span> --limit 10
-atlassian-cli confluence search in-space --space DEV --query <span class="string">"api docs"</span></code></pre>
+            <pre class="code-block"><code>atlassian-cli confluence search cql <span class="string">"space = DEV and type = page"</span> --limit 5
+atlassian-cli confluence search text <span class="string">"meeting notes"</span> --limit 10
+atlassian-cli confluence search in-space DEV <span class="string">"api docs"</span></code></pre>
 
             <h2 id="conf-spaces">Confluence — Spaces</h2>
             <pre class="code-block"><code>atlassian-cli confluence space list --limit 10
@@ -250,29 +250,29 @@ atlassian-cli confluence space create --key DOCS --name <span class="string">"Do
 atlassian-cli confluence space update DEV --name <span class="string">"Development Space"</span>
 atlassian-cli confluence space delete OLD --force
 atlassian-cli confluence space permissions DEV
-atlassian-cli confluence space add-permission DEV --principal user@example.com --operation read</code></pre>
+atlassian-cli confluence space add-permission --permission read --subject-type user --subject-id user@example.com DEV</code></pre>
 
             <h2 id="conf-pages">Confluence — Pages</h2>
             <pre class="code-block"><code>atlassian-cli confluence page list --space DEV --limit 25
-atlassian-cli confluence page get --id 12345
+atlassian-cli confluence page get 12345
 atlassian-cli confluence page create --space DEV --title <span class="string">"New Page"</span> --body <span class="string">"&lt;p&gt;Content&lt;/p&gt;"</span>
-atlassian-cli confluence page update --id 12345 --title <span class="string">"Updated Title"</span>
-atlassian-cli confluence page delete --id 12345
-atlassian-cli confluence page versions --id 12345
-atlassian-cli confluence page add-label --id 12345 --label documentation
-atlassian-cli confluence page remove-label --id 12345 --label outdated
-atlassian-cli confluence page comments --id 12345
-atlassian-cli confluence page add-comment --id 12345 --body <span class="string">"Great work!"</span>
-atlassian-cli confluence page get-restrictions --id 12345
-atlassian-cli confluence page add-restriction --id 12345 --operation update --user user@example.com
-atlassian-cli confluence page remove-restriction --id 12345 --operation update --user user@example.com</code></pre>
+atlassian-cli confluence page update 12345 --title <span class="string">"Updated Title"</span>
+atlassian-cli confluence page delete 12345
+atlassian-cli confluence page versions 12345
+atlassian-cli confluence page add-label 12345 documentation
+atlassian-cli confluence page remove-label 12345 outdated
+atlassian-cli confluence page comments 12345
+atlassian-cli confluence page add-comment 12345 <span class="string">"Great work!"</span>
+atlassian-cli confluence page get-restrictions 12345
+atlassian-cli confluence page add-restriction --operation update --subject-type user --subject-id user@example.com 12345
+atlassian-cli confluence page remove-restriction --operation update --subject-type user --subject-id user@example.com 12345</code></pre>
 
             <h2 id="conf-blog">Confluence — Blog posts</h2>
             <pre class="code-block"><code>atlassian-cli confluence blog list --space DEV --limit 10
-atlassian-cli confluence blog get --id 67890
+atlassian-cli confluence blog get 67890
 atlassian-cli confluence blog create --space DEV --title <span class="string">"Sprint Recap"</span> --body <span class="string">"&lt;p&gt;Summary&lt;/p&gt;"</span>
-atlassian-cli confluence blog update --id 67890 --title <span class="string">"Updated Recap"</span>
-atlassian-cli confluence blog delete --id 67890</code></pre>
+atlassian-cli confluence blog update 67890 --title <span class="string">"Updated Recap"</span>
+atlassian-cli confluence blog delete 67890</code></pre>
 
             <h2 id="conf-folders">Confluence — Folders <span style="font-size:0.7rem;color:var(--accent-cyan);">new in 0.4</span></h2>
             <pre class="code-block"><code>atlassian-cli confluence folder get 3309240341
@@ -280,21 +280,21 @@ atlassian-cli confluence folder create --space DOCS --title <span class="string"
 atlassian-cli confluence folder delete 3309240341 --force</code></pre>
 
             <h2 id="conf-attach">Confluence — Attachments</h2>
-            <pre class="code-block"><code>atlassian-cli confluence attachment list --page-id 12345
-atlassian-cli confluence attachment get --id 11111
-atlassian-cli confluence attachment upload --page-id 12345 --file ./diagram.png
-atlassian-cli confluence attachment download --id 11111 --output ./download.png
-atlassian-cli confluence attachment delete --id 11111</code></pre>
+            <pre class="code-block"><code>atlassian-cli confluence attachment list 12345
+atlassian-cli confluence attachment get 11111
+atlassian-cli confluence attachment upload --file ./diagram.png 12345
+atlassian-cli confluence attachment download --output ./download.png 11111
+atlassian-cli confluence attachment delete 11111</code></pre>
 
             <h2 id="conf-bulk">Confluence — Bulk operations</h2>
-            <pre class="code-block"><code>atlassian-cli confluence bulk delete --space OLD --dry-run
+            <pre class="code-block"><code>atlassian-cli confluence bulk delete --cql "space = OLD" --dry-run
 atlassian-cli confluence bulk add-labels --cql <span class="string">"space = DEV"</span> --labels docs,reviewed --dry-run
-atlassian-cli confluence bulk export --space DEV --output backup.json --format json</code></pre>
+atlassian-cli confluence bulk export --cql "space = DEV" --output backup.json --format json</code></pre>
             <p>For a full markdown-to-Confluence pipeline see the <a href="/runbooks/confluence-markdown-sync.html">Markdown sync runbook</a>.</p>
 
             <h2 id="conf-analytics">Confluence — Analytics</h2>
-            <pre class="code-block"><code>atlassian-cli confluence analytics page-views --id 12345 --from 2025-01-01
-atlassian-cli confluence analytics space-stats --space DEV</code></pre>
+            <pre class="code-block"><code>atlassian-cli confluence analytics page-views 12345 --from 2025-01-01
+atlassian-cli confluence analytics space-stats DEV</code></pre>
 
             <h2 id="bb-user">Bitbucket — User info</h2>
             <div class="note"><code>bb</code> is an alias for <code>bitbucket</code>. Both work in every command below.</div>

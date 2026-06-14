@@ -502,19 +502,19 @@ atlassian-cli auth test --profile <span class="string">work</span></code></pre>
         <!-- Section 3: Service Desk Operations -->
         <h2 id="service-desk-ops">Service Desk Operations</h2>
 
-        <p>The <code>jsm servicedesk</code> subcommand lets you list and inspect your service desks. This is typically the first thing you run to discover desk IDs, which are required for filtering requests and managing customers.</p>
+        <p>The <code>jsm service-desk</code> subcommand lets you list and inspect your service desks. This is typically the first thing you run to discover desk IDs, which are required for filtering requests and managing customers.</p>
 
         <pre><code><span class="comment"># List all service desks</span>
-atlassian-cli jsm servicedesk list --limit <span class="string">10</span>
+atlassian-cli jsm service-desk list --limit <span class="string">10</span>
 
 <span class="comment"># Get details for a specific service desk (by ID)</span>
-atlassian-cli jsm servicedesk get <span class="string">1</span>
+atlassian-cli jsm service-desk get <span class="string">1</span>
 
 <span class="comment"># List organizations attached to a service desk</span>
-atlassian-cli jsm servicedesk organizations <span class="string">1</span>
+atlassian-cli jsm service-desk organizations <span class="string">1</span>
 
 <span class="comment"># List customers of a service desk</span>
-atlassian-cli jsm servicedesk customers <span class="string">1</span> --limit <span class="string">25</span></code></pre>
+atlassian-cli jsm service-desk customers <span class="string">1</span> --limit <span class="string">25</span></code></pre>
 
         <p>The <code>servicedesk get</code> command returns the desk name, project key, project ID, and portal URL. Use <code>--format json</code> to pipe the output into <code>jq</code> or downstream scripts.</p>
 
@@ -571,7 +571,7 @@ atlassian-cli jsm request comments <span class="string">SD-123</span></code></pr
         <!-- Section 5: Customer Management -->
         <h2 id="customer-management">Customer Management</h2>
 
-        <p>The <code>jsm customer</code> and <code>jsm servicedesk</code> subcommands handle customer lifecycle: creating portal users, adding them to service desks, and managing organizations.</p>
+        <p>The <code>jsm customer</code> and <code>jsm service-desk</code> subcommands handle customer lifecycle: creating portal users, adding them to service desks, and managing organizations.</p>
 
         <pre><code><span class="comment"># Create a new customer</span>
 atlassian-cli jsm customer create \
@@ -579,11 +579,11 @@ atlassian-cli jsm customer create \
   --display-name <span class="string">"Jane Doe"</span>
 
 <span class="comment"># Add customer to a service desk</span>
-atlassian-cli jsm servicedesk add-customer <span class="string">1</span> \
+atlassian-cli jsm service-desk add-customer <span class="string">1</span> \
   --account-id <span class="string">5b10a2844c20165700ede21g</span>
 
 <span class="comment"># Remove customer from a service desk</span>
-atlassian-cli jsm servicedesk remove-customer <span class="string">1</span> \
+atlassian-cli jsm service-desk remove-customer <span class="string">1</span> \
   --account-id <span class="string">5b10a2844c20165700ede21g</span>
 
 <span class="comment"># List organizations</span>
@@ -597,7 +597,7 @@ atlassian-cli jsm organization add-user <span class="string">5</span> \
   --account-id <span class="string">5b10a2844c20165700ede21g</span>
 
 <span class="comment"># Add organization to a service desk</span>
-atlassian-cli jsm servicedesk add-organization <span class="string">1</span> --org-id <span class="string">5</span></code></pre>
+atlassian-cli jsm service-desk add-organization <span class="string">1</span> --org-id <span class="string">5</span></code></pre>
 
         <p>This enables fully scripted customer onboarding: create the customer, assign them to an organization, and grant access to the appropriate service desk -- all in a single shell script.</p>
 
@@ -703,9 +703,9 @@ atlassian-cli jsm organization add-user <span class="string">5</span> \
   --account-id <span class="string">"$ACCOUNT_ID"</span>
 
 <span class="comment"># Grant access to IT Help Desk and HR Service Desk</span>
-atlassian-cli jsm servicedesk add-customer <span class="string">1</span> \
+atlassian-cli jsm service-desk add-customer <span class="string">1</span> \
   --account-id <span class="string">"$ACCOUNT_ID"</span>
-atlassian-cli jsm servicedesk add-customer <span class="string">2</span> \
+atlassian-cli jsm service-desk add-customer <span class="string">2</span> \
   --account-id <span class="string">"$ACCOUNT_ID"</span>
 
 echo <span class="string">"Onboarded: $CUSTOMER_NAME ($CUSTOMER_EMAIL)"</span></code></pre>

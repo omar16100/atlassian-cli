@@ -513,29 +513,29 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><code>jira search</code></td>
+                        <td><code>jira issue search</code></td>
                         <td>Search with any JQL query</td>
-                        <td><code>atlassian-cli jira search --jql "project = DEV order by created desc" --limit 5</code></td>
+                        <td><code>atlassian-cli jira issue search --jql "project = DEV order by created desc" --limit 5</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira search</code></td>
+                        <td><code>jira issue search</code></td>
                         <td>Open bugs assigned to you</td>
-                        <td><code>atlassian-cli jira search --jql "assignee = currentUser() AND type = Bug AND status != Done"</code></td>
+                        <td><code>atlassian-cli jira issue search --jql "assignee = currentUser() AND type = Bug AND status != Done"</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira search</code></td>
+                        <td><code>jira issue search</code></td>
                         <td>Unassigned issues in sprint</td>
-                        <td><code>atlassian-cli jira search --jql "sprint in openSprints() AND assignee is EMPTY"</code></td>
+                        <td><code>atlassian-cli jira issue search --jql "sprint in openSprints() AND assignee is EMPTY"</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira search</code></td>
+                        <td><code>jira issue search</code></td>
                         <td>Recently updated issues</td>
-                        <td><code>atlassian-cli jira search --jql "project = DEV AND updated >= -1d" --format json</code></td>
+                        <td><code>atlassian-cli jira issue search --jql "project = DEV AND updated >= -1d" --format json</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira search</code></td>
+                        <td><code>jira issue search</code></td>
                         <td>Issues by label</td>
-                        <td><code>atlassian-cli jira search --jql "project = DEV AND labels = 'urgent'"</code></td>
+                        <td><code>atlassian-cli jira issue search --jql "project = DEV AND labels = 'urgent'"</code></td>
                     </tr>
                 </tbody>
             </table>
@@ -557,34 +557,34 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><code>jira get</code></td>
+                        <td><code>jira issue get</code></td>
                         <td>Get issue details</td>
-                        <td><code>atlassian-cli jira get DEV-123</code></td>
+                        <td><code>atlassian-cli jira issue get DEV-123</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira get</code></td>
+                        <td><code>jira issue get</code></td>
                         <td>Get issue as JSON</td>
-                        <td><code>atlassian-cli jira get DEV-123 --format json</code></td>
+                        <td><code>atlassian-cli jira issue get DEV-123 --format json</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira create</code></td>
+                        <td><code>jira issue create</code></td>
                         <td>Create a bug</td>
-                        <td><code>atlassian-cli jira create --project DEV --issue-type Bug --summary "Login page returns 500"</code></td>
+                        <td><code>atlassian-cli jira issue create --project DEV --issue-type Bug --summary "Login page returns 500"</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira create</code></td>
+                        <td><code>jira issue create</code></td>
                         <td>Create a task</td>
-                        <td><code>atlassian-cli jira create --project DEV --issue-type Task --summary "Update API docs"</code></td>
+                        <td><code>atlassian-cli jira issue create --project DEV --issue-type Task --summary "Update API docs"</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira update</code></td>
+                        <td><code>jira issue update</code></td>
                         <td>Update issue summary</td>
-                        <td><code>atlassian-cli jira update DEV-123 --summary "Updated summary"</code></td>
+                        <td><code>atlassian-cli jira issue update DEV-123 --summary "Updated summary"</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira delete</code></td>
+                        <td><code>jira issue delete</code></td>
                         <td>Delete an issue</td>
-                        <td><code>atlassian-cli jira delete DEV-123</code></td>
+                        <td><code>atlassian-cli jira issue delete DEV-123</code></td>
                     </tr>
                 </tbody>
             </table>
@@ -606,19 +606,19 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td><code>jira transition</code></td>
+                        <td><code>jira issue transition</code></td>
                         <td>Move to "In Progress"</td>
-                        <td><code>atlassian-cli jira transition DEV-123 --transition "In Progress"</code></td>
+                        <td><code>atlassian-cli jira issue transition DEV-123 --transition "In Progress"</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira transition</code></td>
+                        <td><code>jira issue transition</code></td>
                         <td>Move to "Done"</td>
-                        <td><code>atlassian-cli jira transition DEV-123 --transition "Done"</code></td>
+                        <td><code>atlassian-cli jira issue transition DEV-123 --transition "Done"</code></td>
                     </tr>
                     <tr>
-                        <td><code>jira assign</code></td>
+                        <td><code>jira issue assign</code></td>
                         <td>Assign to a user</td>
-                        <td><code>atlassian-cli jira assign DEV-123 --assignee user@example.com</code></td>
+                        <td><code>atlassian-cli jira issue assign DEV-123 --assignee user@example.com</code></td>
                     </tr>
                 </tbody>
             </table>
@@ -742,42 +742,42 @@
                     <tr>
                         <td><code>jira workflows export</code></td>
                         <td>Export a workflow definition</td>
-                        <td><code>atlassian-cli jira workflows export --name "Software Simplified Workflow"</code></td>
+                        <td><code>atlassian-cli jira workflows export "Software Simplified Workflow"</code></td>
                     </tr>
                     <tr>
                         <td><code>jira components list</code></td>
                         <td>List project components</td>
-                        <td><code>atlassian-cli jira components list --project DEV</code></td>
+                        <td><code>atlassian-cli jira components list DEV</code></td>
                     </tr>
                     <tr>
                         <td><code>jira versions list</code></td>
                         <td>List project versions</td>
-                        <td><code>atlassian-cli jira versions list --project DEV</code></td>
+                        <td><code>atlassian-cli jira versions list DEV</code></td>
                     </tr>
                     <tr>
                         <td><code>jira roles list</code></td>
                         <td>List project roles</td>
-                        <td><code>atlassian-cli jira roles list --project DEV</code></td>
+                        <td><code>atlassian-cli jira roles list DEV</code></td>
                     </tr>
                     <tr>
                         <td><code>jira roles get</code></td>
                         <td>Get role details</td>
-                        <td><code>atlassian-cli jira roles get --project DEV --role-id 10002</code></td>
+                        <td><code>atlassian-cli jira roles get DEV 10002</code></td>
                     </tr>
                     <tr>
                         <td><code>jira roles actors</code></td>
                         <td>List role actors (members)</td>
-                        <td><code>atlassian-cli jira roles actors --project DEV --role-id 10002</code></td>
+                        <td><code>atlassian-cli jira roles actors DEV 10002</code></td>
                     </tr>
                     <tr>
                         <td><code>jira roles add-actor</code></td>
                         <td>Add a user to a role</td>
-                        <td><code>atlassian-cli jira roles add-actor --project DEV --role-id 10002 --user user@example.com</code></td>
+                        <td><code>atlassian-cli jira roles add-actor DEV 10002 --user user@example.com</code></td>
                     </tr>
                     <tr>
                         <td><code>jira roles remove-actor</code></td>
                         <td>Remove a user from a role</td>
-                        <td><code>atlassian-cli jira roles remove-actor --project DEV --role-id 10002 --user user@example.com</code></td>
+                        <td><code>atlassian-cli jira roles remove-actor DEV 10002 --user user@example.com</code></td>
                     </tr>
                 </tbody>
             </table>
@@ -830,12 +830,12 @@
         <p>Examples of piping output for scripting:</p>
 
         <pre><code><span class="comment"># Get issue keys and pipe to another command</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV AND status = Open"</span> \
   --format quiet
 
 <span class="comment"># Export to JSON and filter with jq</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV"</span> \
   --format json | jq <span class="string">'.[].key'</span>
 

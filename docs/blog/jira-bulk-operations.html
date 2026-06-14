@@ -519,7 +519,7 @@ atlassian-cli jira bulk export \
         <p>You can also pipe search results directly into other tools without writing to a file:</p>
 
         <pre><code><span class="comment"># Count bugs by priority using jq</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV AND type = Bug"</span> \
   --format json | jq <span class="string">'group_by(.fields.priority.name) | map({priority: .[0].fields.priority.name, count: length})'</span></code></pre>
 
@@ -608,7 +608,7 @@ atlassian-cli jira bulk export \
   --format <span class="string">json</span>
 
 <span class="comment"># Step 4: Count remaining open issues</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --profile "$PROFILE" \
   --jql <span class="string">"project = $PROJECT AND status != Done AND status != Closed"</span> \
   --format json | jq <span class="string">'. | length'</span>

@@ -50,7 +50,7 @@ get_all_repos() {
 get_repo_permissions() {
     local repo="$1"
 
-    atlassian-cli bitbucket permissions list \
+    atlassian-cli bitbucket permission list \
         --profile "$PROFILE" \
         "$WORKSPACE" \
         "$repo" \
