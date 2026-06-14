@@ -1,5 +1,33 @@
 # Changes Made
 
+## 2026-06-14 — Site: 0.4 release announcement + changelog page
+
+### Context
+v0.4.0 and v0.4.1 shipped but were never announced on atlassiancli.com, the site had
+no changelog page, and every page still showed v0.3.3.
+
+### Change (docs/ only — the published site)
+- New `docs/blog/atlassian-cli-0-4-release.html` — combined "What's New in 0.4" post
+  (markdown->ADF, Confluence folders, custom pipelines, 0.4.1 attachments + comments
+  --full, the HTTP 204 fix). Mirrors the existing blog template; correct `jira issue`
+  command syntax.
+- New `docs/changelog/index.html` (`/changelog/`) — version blocks (0.4.1, 0.4.0, 0.3.3,
+  link-out for older), CollectionPage/ItemList JSON-LD.
+- Wired in: new blog card on `/blog/`, sitemap entries + refreshed lastmods, Changelog
+  link in the nav + footer of all primary pages and a docs landing card, `/changelog/`
+  added to llms.txt.
+- Version sweep 0.3.3 -> 0.4.1 across all 31 footer badges + 5 softwareVersion schemas +
+  llms.txt + install prose (exact strings only; historical versions in the changelog
+  preserved).
+- `docs/docs/commands.html`: added Confluence Folders section + `--custom-pipeline`.
+- Verified: all pages serve 200 locally, sitemap valid (xmllint), all JSON-LD parses,
+  canonical == og:url.
+
+### Known follow-up (not done here)
+`docs/docs/commands.html` and the older `docs/blog/*.html` use a stale `jira <verb>`
+syntax (e.g. `jira create`) that should be `jira issue <verb>`. Out of scope for the
+announcement; worth a separate cleanup pass.
+
 ## 2026-06-12 — Confluence v2 Folder API command group (#49)
 
 ### Context
