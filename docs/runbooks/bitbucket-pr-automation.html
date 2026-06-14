@@ -415,7 +415,7 @@ parse_args() {
 get_open_prs() {
     log <span class="string">"Fetching open pull requests..."</span>
 
-    atlassian-cli bitbucket pullrequest list \
+    atlassian-cli bitbucket pr list \
         --profile <span class="string">"$PROFILE"</span> \
         <span class="string">"$WORKSPACE"</span> \
         <span class="string">"$REPO"</span> \
@@ -438,7 +438,7 @@ is_trusted_author() {
 get_approval_count() {
     local pr_id=<span class="string">"$1"</span>
 
-    atlassian-cli bitbucket pullrequest get \
+    atlassian-cli bitbucket pr get \
         --profile <span class="string">"$PROFILE"</span> \
         <span class="string">"$WORKSPACE"</span> \
         <span class="string">"$REPO"</span> \
@@ -459,7 +459,7 @@ approve_pr() {
 
     log <span class="string">"Approving PR #$pr_id: $title"</span>
 
-    atlassian-cli bitbucket pullrequest approve \
+    atlassian-cli bitbucket pr approve \
         --profile <span class="string">"$PROFILE"</span> \
         <span class="string">"$WORKSPACE"</span> \
         <span class="string">"$REPO"</span> \
@@ -478,7 +478,7 @@ merge_pr() {
 
     log <span class="string">"Merging PR #$pr_id: $title"</span>
 
-    atlassian-cli bitbucket pullrequest merge \
+    atlassian-cli bitbucket pr merge \
         --profile <span class="string">"$PROFILE"</span> \
         <span class="string">"$WORKSPACE"</span> \
         <span class="string">"$REPO"</span> \
@@ -606,7 +606,7 @@ main <span class="string">"$@"</span></code></pre>
         </div>
         <div class="step-item">
             <span class="step-number">2</span>
-            <p><strong>Fetch open PRs.</strong> The script calls <code>bitbucket pullrequest list --state OPEN</code> to retrieve all open pull requests for the target repository as JSON, then generates a summary with total and approval counts.</p>
+            <p><strong>Fetch open PRs.</strong> The script calls <code>bitbucket pr list --state OPEN</code> to retrieve all open pull requests for the target repository as JSON, then generates a summary with total and approval counts.</p>
         </div>
         <div class="step-item">
             <span class="step-number">3</span>

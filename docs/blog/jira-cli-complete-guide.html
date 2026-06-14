@@ -513,7 +513,7 @@
         <!-- Section 1: What is a Jira CLI? -->
         <h2 id="what-is-jira-cli">What is a Jira CLI?</h2>
 
-        <p>A <strong>Jira CLI</strong> (command-line interface) is a tool that lets you interact with Jira directly from your terminal. Instead of clicking through the Jira web UI to search issues, create tickets, or transition workflows, you run commands like <code>atlassian-cli jira search --jql "project = DEV"</code> and get results instantly.</p>
+        <p>A <strong>Jira CLI</strong> (command-line interface) is a tool that lets you interact with Jira directly from your terminal. Instead of clicking through the Jira web UI to search issues, create tickets, or transition workflows, you run commands like <code>atlassian-cli jira issue search --jql "project = DEV"</code> and get results instantly.</p>
 
         <p>Jira CLI tools are used by <strong>DevOps engineers</strong> who need to automate ticket creation in pipelines, <strong>platform engineers</strong> managing thousands of issues across projects, and <strong>Jira admins</strong> performing bulk operations that would take hours in the browser. If your workflow involves Jira and a terminal, a Jira CLI eliminates context-switching and unlocks automation that the web UI simply cannot provide.</p>
 
@@ -637,7 +637,7 @@ atlassian-cli auth list</code></pre>
 
         <p>Search for recent issues in a project:</p>
 
-        <pre><code>atlassian-cli jira search --jql <span class="string">"project = DEV order by created desc"</span> --limit <span class="string">5</span></code></pre>
+        <pre><code>atlassian-cli jira issue search --jql <span class="string">"project = DEV order by created desc"</span> --limit <span class="string">5</span></code></pre>
 
         <p>This returns a formatted table by default. Add <code>--format json</code> for machine-readable output, or <code>--format csv</code> for spreadsheets.</p>
 
@@ -646,19 +646,19 @@ atlassian-cli auth list</code></pre>
 
         <h3>Search issues with JQL</h3>
 
-        <p>JQL (Jira Query Language) is the most powerful way to find issues. The <code>jira search</code> command accepts any valid JQL string:</p>
+        <p>JQL (Jira Query Language) is the most powerful way to find issues. The <code>jira issue search</code> command accepts any valid JQL string:</p>
 
         <pre><code><span class="comment"># Open bugs assigned to you</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"assignee = currentUser() AND type = Bug AND status != Done"</span>
 
 <span class="comment"># Issues updated in the last 24 hours</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV AND updated >= -1d"</span> \
   --format json
 
 <span class="comment"># Unassigned issues in the current sprint</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"sprint in openSprints() AND assignee is EMPTY"</span></code></pre>
 
         <h3>Create an issue</h3>
@@ -666,13 +666,13 @@ atlassian-cli jira search \
         <p>Create issues directly from the terminal. Specify the project, issue type, and summary as flags:</p>
 
         <pre><code><span class="comment"># Create a bug</span>
-atlassian-cli jira create \
+atlassian-cli jira issue create \
   --project <span class="string">DEV</span> \
   --issue-type <span class="string">Bug</span> \
   --summary <span class="string">"Login page returns 500 on invalid email"</span>
 
 <span class="comment"># Create a task</span>
-atlassian-cli jira create \
+atlassian-cli jira issue create \
   --project <span class="string">DEV</span> \
   --issue-type <span class="string">Task</span> \
   --summary <span class="string">"Update API documentation for v2 endpoints"</span></code></pre>
@@ -682,23 +682,23 @@ atlassian-cli jira create \
         <p>Move issues through your workflow and update fields without opening the browser:</p>
 
         <pre><code><span class="comment"># Transition an issue to "In Progress"</span>
-atlassian-cli jira transition <span class="string">DEV-123</span> --transition <span class="string">"In Progress"</span>
+atlassian-cli jira issue transition <span class="string">DEV-123</span> --transition <span class="string">"In Progress"</span>
 
 <span class="comment"># Update the summary</span>
-atlassian-cli jira update <span class="string">DEV-123</span> --summary <span class="string">"Updated: Login page error handling"</span>
+atlassian-cli jira issue update <span class="string">DEV-123</span> --summary <span class="string">"Updated: Login page error handling"</span>
 
 <span class="comment"># Assign to a team member</span>
-atlassian-cli jira assign <span class="string">DEV-123</span> --assignee <span class="string">user@example.com</span></code></pre>
+atlassian-cli jira issue assign <span class="string">DEV-123</span> --assignee <span class="string">user@example.com</span></code></pre>
 
         <h3>View issue details</h3>
 
         <p>Get full details on any issue including status, assignee, and description:</p>
 
         <pre><code><span class="comment"># Get issue details</span>
-atlassian-cli jira get <span class="string">DEV-123</span>
+atlassian-cli jira issue get <span class="string">DEV-123</span>
 
 <span class="comment"># JSON output for scripting</span>
-atlassian-cli jira get <span class="string">DEV-123</span> --format json</code></pre>
+atlassian-cli jira issue get <span class="string">DEV-123</span> --format json</code></pre>
 
         <h3>Projects, fields, and workflows</h3>
 

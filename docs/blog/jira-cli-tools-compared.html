@@ -595,7 +595,7 @@
         <p><strong>Jira strengths:</strong> Full issue CRUD, JQL search, bulk operations (transition, assign, label, export, import) with concurrent execution and dry-run mode, automation rules management, webhook CRUD, audit log access, project role management, custom fields, and workflow export.</p>
 
         <pre><code><span class="comment"># Search with JQL, output as JSON</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
   --format json
 
@@ -641,7 +641,7 @@ jira list --query <span class="string">"project = DEV"</span>
 jira view DEV-123
 
 <span class="comment"># Create an issue</span>
-jira create --project DEV --issuetype Task -s <span class="string">"Summary"</span></code></pre>
+jira issue create --project DEV --issuetype Task -s <span class="string">"Summary"</span></code></pre>
 
         <p><strong>Strengths:</strong> Lightweight, simple, template-based output customization, works with Jira Server.</p>
 

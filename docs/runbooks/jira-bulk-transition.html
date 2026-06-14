@@ -401,7 +401,7 @@ preview_issues() {
     log <span class="string">"Query: $JQL"</span>
 
     local issues
-    issues=$(atlassian-cli jira search \
+    issues=$(atlassian-cli jira issue search \
         --profile <span class="string">"$PROFILE"</span> \
         --jql <span class="string">"$JQL"</span> \
         --output json 2&gt;/dev/null || echo <span class="string">"[]"</span>)
@@ -491,7 +491,7 @@ main <span class="string">"$@"</span></code></pre>
         </div>
         <div class="step-item">
             <span class="step-number">2</span>
-            <p><strong>Preview matching issues.</strong> A <code>jira search</code> call finds all issues matching your JQL. The first 10 results are displayed with their key, summary, and current status so you can verify the query is correct.</p>
+            <p><strong>Preview matching issues.</strong> A <code>jira issue search</code> call finds all issues matching your JQL. The first 10 results are displayed with their key, summary, and current status so you can verify the query is correct.</p>
         </div>
         <div class="step-item">
             <span class="step-number">3</span>

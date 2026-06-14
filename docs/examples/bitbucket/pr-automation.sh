@@ -105,7 +105,7 @@ parse_args() {
 get_open_prs() {
     log "Fetching open pull requests..."
 
-    atlassian-cli bitbucket pullrequest list \
+    atlassian-cli bitbucket pr list \
         --profile "$PROFILE" \
         "$WORKSPACE" \
         "$REPO" \
@@ -128,7 +128,7 @@ is_trusted_author() {
 get_approval_count() {
     local pr_id="$1"
 
-    atlassian-cli bitbucket pullrequest get \
+    atlassian-cli bitbucket pr get \
         --profile "$PROFILE" \
         "$WORKSPACE" \
         "$REPO" \
@@ -149,7 +149,7 @@ approve_pr() {
 
     log "Approving PR #$pr_id: $title"
 
-    atlassian-cli bitbucket pullrequest approve \
+    atlassian-cli bitbucket pr approve \
         --profile "$PROFILE" \
         "$WORKSPACE" \
         "$REPO" \
@@ -168,7 +168,7 @@ merge_pr() {
 
     log "Merging PR #$pr_id: $title"
 
-    atlassian-cli bitbucket pullrequest merge \
+    atlassian-cli bitbucket pr merge \
         --profile "$PROFILE" \
         "$WORKSPACE" \
         "$REPO" \

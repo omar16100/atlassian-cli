@@ -429,7 +429,7 @@ preview_issues() {
     log <span class="string">"JQL: $jql"</span>
 
     local issues
-    issues=$(atlassian-cli jira search \
+    issues=$(atlassian-cli jira issue search \
         --profile <span class="string">"$PROFILE"</span> \
         --jql <span class="string">"$jql"</span> \
         --output json 2&gt;/dev/null || echo <span class="string">"[]"</span>)
@@ -495,7 +495,7 @@ generate_report() {
     log <span class="string">"Generating cleanup report..."</span>
 
     local issues
-    issues=$(atlassian-cli jira search \
+    issues=$(atlassian-cli jira issue search \
         --profile <span class="string">"$PROFILE"</span> \
         --jql <span class="string">"$jql"</span> \
         --output json)
