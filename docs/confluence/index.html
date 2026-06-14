@@ -49,6 +49,34 @@
       "author": { "@type": "Person", "name": "Omar Shabab", "url": "https://omarshabab.com" }
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I manage Confluence from the command line?",
+          "acceptedAnswer": { "@type": "Answer", "text": "atlassian-cli is a Confluence CLI for pages, spaces, folders, blog posts, CQL search, bulk export and attachments. After authenticating, run commands like 'atlassian-cli confluence page list --space DEV' or 'atlassian-cli confluence search cql \"space = DEV\"'. A full command reference is available in the docs." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does the Confluence CLI support the v2 Folder API and Markdown?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Version 0.4 added a 'confluence folder' command group for the Confluence v2 Folder API, plus Markdown-to-ADF conversion for Jira descriptions and comments." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli the official Confluence CLI?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. atlassian-cli is an independent, open-source tool and is not affiliated with, endorsed by, or maintained by Atlassian. Atlassian ships its own separate official CLI (acli)." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the Confluence CLI free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. atlassian-cli is free and open source under the MIT License, installable via Homebrew, Cargo, or a prebuilt binary." }
+        }
+      ]
+    }
+    </script>
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="../product.css">
 </head>
@@ -397,6 +425,32 @@ atlassian-cli confluence search cql \
                 <a href="/jira/">Jira CLI</a>
                 <a href="/bitbucket/">Bitbucket CLI</a>
                 <a href="/jsm/">JSM CLI</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <h2 class="section-title">Confluence CLI FAQ</h2>
+            <p class="section-subtitle">Managing Confluence from the command line</p>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>How do I manage Confluence from the command line?</h3>
+                    <p>atlassian-cli is a Confluence CLI for pages, spaces, folders, blog posts, CQL search, bulk export and attachments. After <a href="/docs/auth.html">authenticating</a>, run commands like <code>atlassian-cli confluence page list --space DEV</code> or <code>atlassian-cli confluence search cql "space = DEV"</code>. See the full <a href="/docs/commands.html#conf-pages">Confluence command reference</a>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Does the Confluence CLI support the v2 Folder API and Markdown?</h3>
+                    <p>Yes. Version 0.4 added a <code>confluence folder</code> command group for the Confluence v2 Folder API, plus Markdown-to-ADF conversion. See <a href="/blog/atlassian-cli-0-4-release.html">what's new in 0.4</a> or the <a href="/changelog/">changelog</a>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is atlassian-cli the official Confluence CLI?</h3>
+                    <p>No. atlassian-cli is an independent, open-source tool and is not affiliated with, endorsed by, or maintained by Atlassian. Atlassian ships its own separate official CLI (<code>acli</code>).</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is the Confluence CLI free?</h3>
+                    <p>Yes. atlassian-cli is free and open source under the MIT License. Get it on <a href="/install/">the install page</a> or <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>.</p>
+                </div>
             </div>
         </div>
     </section>
