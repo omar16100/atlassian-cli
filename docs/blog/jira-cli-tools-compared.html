@@ -55,7 +55,7 @@
       "headline": "Best Jira CLI Tools Compared (2026)",
       "description": "An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.",
       "datePublished": "2026-03-14T00:00:00Z",
-      "dateModified": "2026-03-14T00:00:00Z",
+      "dateModified": "2026-06-14T00:00:00Z",
       "author": {
         "@type": "Person",
         "name": "Omar Shabab",
@@ -654,6 +654,12 @@ jira issue create --project DEV --issuetype Task -s <span class="string">"Summar
         <p><strong>Strengths:</strong> Broadest product coverage, enterprise support and SLAs, extensive scripting capabilities, available on the Atlassian Marketplace.</p>
 
         <p><strong>Honest take:</strong> ACLI is powerful and battle-tested in enterprise environments. The downsides are cost (commercial license), JVM requirement (slower startup, larger footprint), and the learning curve of a massive command surface. If your organization has budget and needs vendor support, ACLI is the safe enterprise pick. For individual developers and small teams, the free open-source tools are typically more practical.</p>
+
+        <h3>Atlassian's official acli</h3>
+
+        <p>Atlassian now ships its own official command-line tool, <a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener"><code>acli</code></a> — a separate, first-party product maintained by Atlassian. If you specifically want the vendor-supported, official CLI, <code>acli</code> is the canonical choice and the right starting point.</p>
+
+        <p><strong>How this project differs:</strong> <strong>atlassian-cli</strong> (this site) is an <em>independent, community open-source</em> project. It is not <code>acli</code>, not affiliated with Atlassian, and not a replacement for the official tool — it is a separate MIT-licensed option for people who want a single Rust binary spanning Jira, Confluence, Bitbucket, and JSM, with consistent <code>--format json/csv/yaml</code> output and no runtime dependencies. Pick the official <code>acli</code> for first-party support; pick atlassian-cli if you want a free, unified, scriptable OSS tool. The two can happily coexist.</p>
 
         <h2>Which Tool Should You Choose?</h2>
 
