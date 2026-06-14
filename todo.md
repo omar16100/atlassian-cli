@@ -1,5 +1,35 @@
 # Changes Made
 
+## 2026-06-14 — Site-wide CLI command-syntax cleanup (docs accuracy)
+
+### Context
+The docs (commands.html, blog posts, runbooks, example .sh) were written against an
+older CLI and used many invalid command forms. Verified every form against the built
+binary's --help and corrected them.
+
+### Fixed (all verified against the binary)
+- `jira <verb>` -> `jira issue <verb>` (search/get/create/update/delete/transition/
+  assign/unassign), including bare `<code>` prose refs.
+- `bitbucket pullrequest` -> `bitbucket pr`; `bitbucket permissions` -> `permission`.
+- `jsm servicedesk` -> `jsm service-desk` (commands + prose; left `--servicedesk-id`).
+- Confluence positional IDs: `page/blog/attachment <verb> --id N` -> positional `N`;
+  `attachment list --page-id N` -> `N`; add-label/remove-label/add-comment now positional;
+  add/remove-restriction -> `--operation --subject-type --subject-id <PAGE_ID>`;
+  space add-permission -> `--permission --subject-type --subject-id <KEY>`.
+- `confluence search cql/text/in-space` use positional QUERY/SPACE, not --cql/--query/--space.
+- `confluence bulk export/delete --space X` -> `--cql "space = X"` (incl. multi-line/span).
+- `confluence analytics page-views/space-stats` use positional ID/KEY.
+- jira roles/components/versions use positional `<PROJECT>`/`<ROLE_ID>` not --project/--role-id;
+  `jira workflows export` uses positional `<NAME>`.
+- `--output json` -> `--format json` on repo list / space get; fixed an invalid
+  `pr merge --auto-complete` hero snippet.
+
+### Verification
+Built a flag-audit script (/tmp/flagcheck.py) that resolves each documented command's
+path against the binary and checks every --flag exists. All 42 command paths valid;
+remaining audit hits are false positives (global --profile, one prose `pr create:` line).
+Structural-pattern greps all return 0.
+
 ## 2026-06-14 — Site: 0.4 release announcement + changelog page
 
 ### Context

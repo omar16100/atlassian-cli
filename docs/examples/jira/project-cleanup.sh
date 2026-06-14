@@ -122,7 +122,7 @@ preview_issues() {
     log "JQL: $jql"
 
     local issues
-    issues=$(atlassian-cli jira search \
+    issues=$(atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$jql" \
         --output json 2>/dev/null || echo "[]")
@@ -188,7 +188,7 @@ generate_report() {
     log "Generating cleanup report..."
 
     local issues
-    issues=$(atlassian-cli jira search \
+    issues=$(atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$jql" \
         --output json)

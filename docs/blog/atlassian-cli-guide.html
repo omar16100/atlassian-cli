@@ -405,12 +405,12 @@ atlassian-cli auth list</code></pre>
         <p>The <a href="/jira/">Jira subcommand</a> covers the full issue lifecycle plus project administration. Here are the commands you will reach for most often.</p>
 
         <pre><code><span class="comment"># Search issues with JQL</span>
-atlassian-cli jira search \
+atlassian-cli jira issue search \
   --jql <span class="string">"project = DEV AND status = 'In Progress'"</span> \
   --limit 20
 
 <span class="comment"># Create an issue</span>
-atlassian-cli jira create \
+atlassian-cli jira issue create \
   --project <span class="string">DEV</span> \
   --issue-type <span class="string">Task</span> \
   --summary <span class="string">"Automate deployment pipeline"</span>
@@ -434,7 +434,7 @@ atlassian-cli confluence search cql \
 
 <span class="comment"># Bulk export an entire space to JSON</span>
 atlassian-cli confluence bulk export \
-  --space <span class="string">DOCS</span> \
+  --cql <span class="string">"space = DOCS"</span> \
   --output <span class="string">backup.json</span> \
   --format json
 
@@ -469,7 +469,7 @@ atlassian-cli bitbucket --workspace <span class="string">myteam</span> bulk dele
         <p>The <a href="/jsm/">JSM subcommand</a> handles service desk listing, request management, and customer operations.</p>
 
         <pre><code><span class="comment"># List service desks</span>
-atlassian-cli jsm servicedesk list --limit 10
+atlassian-cli jsm service-desk list --limit 10
 
 <span class="comment"># Get a specific request</span>
 atlassian-cli jsm request get <span class="string">SD-123</span></code></pre>
@@ -498,12 +498,12 @@ atlassian-cli jira bulk export \
 
         <pre><code><span class="comment"># Export full space to JSON</span>
 atlassian-cli confluence bulk export \
-  --space <span class="string">DOCS</span> \
+  --cql <span class="string">"space = DOCS"</span> \
   --output <span class="string">/backups/confluence-$(date +%Y%m%d).json</span> \
   --format json
 
 <span class="comment"># Check space stats</span>
-atlassian-cli confluence analytics space-stats --space <span class="string">DOCS</span></code></pre>
+atlassian-cli confluence analytics space-stats <span class="string">DOCS</span></code></pre>
 
         <h3>Release Automation</h3>
 

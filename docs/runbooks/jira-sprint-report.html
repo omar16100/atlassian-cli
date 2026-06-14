@@ -419,7 +419,7 @@ fetch_issues() {
     log <span class="string">"Fetching sprint issues..."</span>
     log <span class="string">"JQL: $jql"</span>
 
-    atlassian-cli jira search \
+    atlassian-cli jira issue search \
         --profile <span class="string">"$PROFILE"</span> \
         --jql <span class="string">"$jql"</span> \
         --output json
@@ -537,7 +537,7 @@ main <span class="string">"$@"</span></code></pre>
         </div>
         <div class="step-item">
             <span class="step-number">2</span>
-            <p><strong>Fetch all sprint issues.</strong> The CLI's <code>jira search</code> command retrieves every issue in the sprint as JSON, including fields like story points (<code>customfield_10016</code>), assignee, status, and resolution date.</p>
+            <p><strong>Fetch all sprint issues.</strong> The CLI's <code>jira issue search</code> command retrieves every issue in the sprint as JSON, including fields like story points (<code>customfield_10016</code>), assignee, status, and resolution date.</p>
         </div>
         <div class="step-item">
             <span class="step-number">3</span>

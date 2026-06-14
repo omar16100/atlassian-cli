@@ -117,7 +117,7 @@ fetch_issues() {
     log "Fetching sprint issues..."
     log "JQL: $jql"
 
-    atlassian-cli jira search \
+    atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$jql" \
         --output json

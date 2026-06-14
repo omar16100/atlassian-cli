@@ -294,7 +294,7 @@
 ./repo-audit.sh myworkspace prod repos_audit.csv
 
 <span class="comment"># Quick one-liner with atlassian-cli directly</span>
-atlassian-cli bitbucket repo list myworkspace --output json | \
+atlassian-cli bitbucket --workspace myworkspace repo list --format json | \
   jq -r <span class="string">'.[] | [.slug, .language, .size] | @csv'</span></code></pre>
 
         <h2>Full Runbook Script</h2>
@@ -359,7 +359,7 @@ get_all_repos() {
 get_repo_permissions() {
     local repo=<span class="string">"$1"</span>
 
-    atlassian-cli bitbucket permissions list \
+    atlassian-cli bitbucket permission list \
         --profile <span class="string">"$PROFILE"</span> \
         <span class="string">"$WORKSPACE"</span> \
         <span class="string">"$repo"</span> \
