@@ -66,6 +66,34 @@
       }
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I manage Jira Service Management from the command line?",
+          "acceptedAnswer": { "@type": "Answer", "text": "atlassian-cli is a JSM CLI for service desks, customer requests, queues, SLAs, approvals, organizations and request types. After authenticating, run commands like 'atlassian-cli jsm request list --servicedesk-id 10' or 'atlassian-cli jsm request create --servicedesk-id 10 --request-type-id 7 --summary \"...\"'. A full command reference is available in the docs." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I create and transition JSM requests from the CLI?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Use 'atlassian-cli jsm request create' to raise a request, 'jsm request transition' to move it through its workflow, and 'jsm request add-comment' to reply, all scriptable for automation." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli the official Jira Service Management CLI?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. atlassian-cli is an independent, open-source tool and is not affiliated with, endorsed by, or maintained by Atlassian. Atlassian ships its own separate official CLI (acli)." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the JSM CLI free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. atlassian-cli is free and open source under the MIT License, installable via Homebrew, Cargo, or a prebuilt binary." }
+        }
+      ]
+    }
+    </script>
 
     <link rel="canonical" href="https://atlassiancli.com/jsm/" />
     <link rel="stylesheet" href="../styles.css">
@@ -419,6 +447,32 @@ atlassian-cli jsm request list --limit 5</code></pre>
                     <h4>Jira CLI</h4>
                     <p>Combine JSM with Jira CLI for cross-product automation — issues, projects, and bulk operations.</p>
                 </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <h2 class="section-title">JSM CLI FAQ</h2>
+            <p class="section-subtitle">Jira Service Management from the command line</p>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>How do I manage Jira Service Management from the command line?</h3>
+                    <p>atlassian-cli is a JSM CLI for service desks, customer requests, queues, SLAs, approvals, organizations and request types. After <a href="/docs/auth.html">authenticating</a>, run commands like <code>atlassian-cli jsm request list --servicedesk-id 10</code> or <code>atlassian-cli jsm request create --servicedesk-id 10 --request-type-id 7 --summary "..."</code>. See the full <a href="/docs/commands.html#jsm-requests">JSM command reference</a>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I create and transition JSM requests from the CLI?</h3>
+                    <p>Yes. Use <code>atlassian-cli jsm request create</code> to raise a request, <code>jsm request transition</code> to move it through its workflow, and <code>jsm request add-comment</code> to reply — all scriptable for automation.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is atlassian-cli the official Jira Service Management CLI?</h3>
+                    <p>No. atlassian-cli is an independent, open-source tool and is not affiliated with, endorsed by, or maintained by Atlassian. Atlassian ships its own separate official CLI (<code>acli</code>).</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is the JSM CLI free?</h3>
+                    <p>Yes. atlassian-cli is free and open source under the MIT License. Get it on <a href="/install/">the install page</a> or <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>.</p>
+                </div>
             </div>
         </div>
     </section>
