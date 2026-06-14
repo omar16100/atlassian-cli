@@ -896,7 +896,9 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 LinkCommands::Delete { link_id } => issues::delete_link(&ctx, &link_id).await,
             },
             IssueCommands::Comments(comment_cmd) => match comment_cmd {
-                CommentCommands::List { key, full } => issues::list_comments(&ctx, &key, full).await,
+                CommentCommands::List { key, full } => {
+                    issues::list_comments(&ctx, &key, full).await
+                }
                 CommentCommands::Add { key, body } => issues::add_comment(&ctx, &key, &body).await,
                 CommentCommands::Update { comment_id, body } => {
                     issues::update_comment(&ctx, &comment_id, &body).await
