@@ -339,13 +339,13 @@ atlassian-cli confluence search cql \
             <h2 class="section-title">Frequently asked questions</h2>
             <div style="margin-top: 2rem; color: var(--text-secondary); line-height: 1.7;">
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">How do I back up a Confluence space?</h3>
-                <p>Run <code>atlassian-cli confluence bulk export --space DEV --format json --output backup.json</code>. That pulls every page in the space into one JSON file you can store in S3 / Git / anywhere. Attach the matching attachments via the <code>attachment</code> group. End-to-end script in the <a href="/runbooks/confluence-backup.html">Confluence backup runbook</a>.</p>
+                <p>Run <code>atlassian-cli confluence bulk export --cql "space = DEV" --format json --output backup.json</code>. That pulls every page in the space into one JSON file you can store in S3 / Git / anywhere. Attach the matching attachments via the <code>attachment</code> group. End-to-end script in the <a href="/runbooks/confluence-backup.html">Confluence backup runbook</a>.</p>
 
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Can I sync Markdown files into Confluence?</h3>
                 <p>Yes. The usual pattern is: render Markdown to Confluence storage format with pandoc, then pass the HTML to <code>confluence page create</code> or <code>confluence page update</code>. The <a href="/runbooks/confluence-markdown-sync.html">markdown → Confluence runbook</a> contains a production-ready script with idempotent upserts keyed by page title.</p>
 
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">What is CQL and how do I use it?</h3>
-                <p>Confluence Query Language. Same shape as Jira's JQL but with Confluence-specific fields: <code>space = DEV</code>, <code>type = page</code>, <code>label = onboarding</code>, <code>lastmodified &gt;= "2026-01-01"</code>. Combine clauses with <code>AND</code> / <code>OR</code>. The CLI accepts CQL directly: <code>atlassian-cli confluence search cql --cql "space = DEV AND type = page AND label = onboarding"</code>.</p>
+                <p>Confluence Query Language. Same shape as Jira's JQL but with Confluence-specific fields: <code>space = DEV</code>, <code>type = page</code>, <code>label = onboarding</code>, <code>lastmodified &gt;= "2026-01-01"</code>. Combine clauses with <code>AND</code> / <code>OR</code>. The CLI accepts CQL directly: <code>atlassian-cli confluence search cql "space = DEV AND type = page AND label = onboarding"</code>.</p>
 
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Is there dry-run mode for bulk operations?</h3>
                 <p>Yes. Every <code>confluence bulk</code> subcommand accepts <code>--dry-run</code>, which prints the exact list of pages that <em>would</em> be affected without calling the mutating API. Run it first, sanity-check the list, then re-run without the flag.</p>

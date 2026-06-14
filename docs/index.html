@@ -169,7 +169,7 @@
                 <div class="terminal-body">
                     <div class="terminal-line" data-delay="0">
                         <span class="terminal-prompt">$</span>
-                        <span class="terminal-text" data-text="atlassian-cli jira search --jql &quot;project = DEV&quot;"></span>
+                        <span class="terminal-text" data-text="atlassian-cli jira issue search --jql &quot;project = DEV&quot;"></span>
                     </div>
                     <div class="terminal-line" data-delay="2000">
                         <span class="terminal-prompt">$</span>
@@ -177,7 +177,7 @@
                     </div>
                     <div class="terminal-line" data-delay="4000">
                         <span class="terminal-prompt">$</span>
-                        <span class="terminal-text" data-text="atlassian-cli bitbucket pr merge --auto-complete"></span>
+                        <span class="terminal-text" data-text="atlassian-cli bitbucket --workspace myteam pr merge api-service 42"></span>
                     </div>
                 </div>
             </div>
@@ -409,7 +409,7 @@ atlassian-cli confluence bulk export \
   --format json
 
 <span class="comment"># Get space metadata</span>
-atlassian-cli confluence space get DOCS --output json
+atlassian-cli confluence space get DOCS --format json
 
 <span class="comment"># List attachments for a page</span>
 atlassian-cli confluence attachment list 123456</code></pre>

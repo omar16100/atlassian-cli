@@ -136,7 +136,7 @@
 
             <h3>3. Verify</h3>
             <pre class="code-block"><code>atlassian-cli auth test --profile work
-atlassian-cli jira search --jql <span class="string">"project = DEV"</span> --limit 1</code></pre>
+atlassian-cli jira issue search --jql <span class="string">"project = DEV"</span> --limit 1</code></pre>
 
             <h2 id="bitbucket">Bitbucket authentication</h2>
             <p>Bitbucket Cloud supports two token flows. Both are current — pick the one that matches your account model.</p>
@@ -179,8 +179,8 @@ atlassian-cli bitbucket whoami --profile bb-ci</code></pre>
             <pre class="code-block"><code>atlassian-cli auth list</code></pre>
 
             <h3>Switch profile per command</h3>
-            <pre class="code-block"><code>atlassian-cli jira search --profile personal --jql <span class="string">"project = PERS"</span>
-atlassian-cli jira search --profile work --jql <span class="string">"project = DEV"</span></code></pre>
+            <pre class="code-block"><code>atlassian-cli jira issue search --profile personal --jql <span class="string">"project = PERS"</span>
+atlassian-cli jira issue search --profile work --jql <span class="string">"project = DEV"</span></code></pre>
 
             <h3>Change the default</h3>
             <p>Re-run <code>auth login</code> with <code>--default</code> for the profile you want to promote:</p>
@@ -214,7 +214,7 @@ atlassian-cli auth logout --profile work --bitbucket             <span class="co
     atlassian-cli auth login \
       --profile ci --base-url https://mycompany.atlassian.net \
       --email bot@mycompany.com --default
-    atlassian-cli jira search --jql <span class="string">"project = REL"</span> --format json</code></pre>
+    atlassian-cli jira issue search --jql <span class="string">"project = REL"</span> --format json</code></pre>
             <p>See the <a href="/runbooks/jira-bulk-transition.html">Jira bulk transition runbook</a> for a full CI example.</p>
 
             <h2 id="storage">Where credentials are stored</h2>
