@@ -269,7 +269,12 @@ enum LinkCommands {
 #[derive(Subcommand, Debug, Clone)]
 enum CommentCommands {
     /// List comments on an issue
-    List { key: String },
+    List {
+        key: String,
+        /// Show full comment body instead of truncated preview
+        #[arg(long)]
+        full: bool,
+    },
     /// Add a comment to an issue
     Add {
         key: String,
@@ -891,7 +896,9 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 LinkCommands::Delete { link_id } => issues::delete_link(&ctx, &link_id).await,
             },
             IssueCommands::Comments(comment_cmd) => match comment_cmd {
-                CommentCommands::List { key } => issues::list_comments(&ctx, &key).await,
+                CommentCommands::List { key, full } => {
+                    issues::list_comments(&ctx, &key, full).await
+                }
                 CommentCommands::Add { key, body } => issues::add_comment(&ctx, &key, &body).await,
                 CommentCommands::Update { comment_id, body } => {
                     issues::update_comment(&ctx, &comment_id, &body).await

@@ -225,6 +225,8 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             .map(extract_adf_markdown)
             .unwrap_or_default();
 
+        let attachments_md = attachments_markdown(&issue.fields.attachment);
+
         let md = format!(
             "# {key}: {summary}\n\n\
              | Field | Value |\n\
@@ -234,7 +236,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
              | Assignee | {assignee} |\n\
              | Reporter | {reporter} |\n\n\
              ## Description\n\n\
-             {description}"
+             {description}{attachments_md}"
         );
         return ctx.renderer.render_raw(&md);
     }
@@ -248,6 +250,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         assignee: &'a str,
         reporter: &'a str,
         issue_type: &'a str,
+        attachments: &'a Vec<AttachmentField>,
     }
 
     let view = IssueDetails {
@@ -283,6 +286,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             .as_ref()
             .map(|t| t.name.as_str())
             .unwrap_or(""),
+        attachments: &issue.fields.attachment,
     };
 
     ctx.renderer.render(&view)
@@ -681,7 +685,7 @@ pub async fn delete_link(ctx: &JiraContext<'_>, link_id: &str) -> Result<()> {
 
 // Comment operations
 
-pub async fn list_comments(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
+pub async fn list_comments(ctx: &JiraContext<'_>, key: &str, full: bool) -> Result<()> {
     #[derive(Deserialize)]
     struct CommentsResponse {
         comments: Vec<Comment>,
@@ -712,22 +716,28 @@ pub async fn list_comments(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         id: &'a str,
         author: &'a str,
         created: &'a str,
-        body_preview: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body_preview: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body: Option<String>,
     }
 
     let rows: Vec<Row<'_>> = response
         .comments
         .iter()
         .map(|c| {
-            let preview = extract_adf_text(&c.body)
-                .chars()
-                .take(50)
-                .collect::<String>();
+            let text = extract_adf_text(&c.body);
+            let (body_preview, body) = if full {
+                (None, Some(text))
+            } else {
+                (Some(text.chars().take(50).collect::<String>()), None)
+            };
             Row {
                 id: c.id.as_str(),
                 author: c.author.display_name.as_str(),
                 created: c.created.as_str(),
-                body_preview: preview,
+                body_preview,
+                body,
             }
         })
         .collect();
@@ -810,6 +820,62 @@ struct IssueFields {
     description: Option<Value>,
     #[serde(default)]
     issuetype: Option<IssueTypeField>,
+    #[serde(default)]
+    attachment: Vec<AttachmentField>,
+}
+
+/// Jira returns attachment `id` as a number in some responses and a string in
+/// others; accept either and normalize to a string. All fields are optional so a
+/// single missing/null property never aborts the whole issue parse.
+#[derive(Deserialize, Serialize)]
+struct AttachmentField {
+    #[serde(
+        default,
+        deserialize_with = "de_id_to_string",
+        skip_serializing_if = "Option::is_none"
+    )]
+    id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    filename: Option<String>,
+    #[serde(rename = "mimeType", default, skip_serializing_if = "Option::is_none")]
+    mime_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    size: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+}
+
+/// Deserialize a value that may be a JSON string, number, or null into an
+/// `Option<String>` (used for Jira's number-or-string attachment `id`).
+fn de_id_to_string<'de, D>(deserializer: D) -> std::result::Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<Value>::deserialize(deserializer)?;
+    Ok(value.and_then(|v| match v {
+        Value::String(s) => Some(s),
+        Value::Number(n) => Some(n.to_string()),
+        _ => None,
+    }))
+}
+
+/// Render an attachments section for markdown `issue get`. Empty string when the
+/// issue has no attachments.
+fn attachments_markdown(attachments: &[AttachmentField]) -> String {
+    if attachments.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from(
+        "\n\n## Attachments\n\n| Filename | Size | ID | URL |\n| --- | --- | --- | --- |\n",
+    );
+    for a in attachments {
+        let filename = a.filename.as_deref().unwrap_or("");
+        let size = a.size.map(|s| s.to_string()).unwrap_or_default();
+        let id = a.id.as_deref().unwrap_or("");
+        let url = a.content.as_deref().unwrap_or("");
+        out.push_str(&format!("| {filename} | {size} | {id} | {url} |\n"));
+    }
+    out
 }
 
 #[derive(Deserialize)]
@@ -1312,6 +1378,60 @@ mod tests {
         }"#;
         let fields: IssueFields = serde_json::from_str(json_str).unwrap();
         assert!(fields.description.is_none());
+    }
+
+    #[test]
+    fn test_issue_fields_deserialize_attachments_numeric_id() {
+        // Jira commonly returns attachment `id` as a number; this must not abort
+        // the whole issue parse (regression guard for #63 / PR #64).
+        let json_str = r#"{
+            "summary": "Has attachments",
+            "attachment": [
+                {"id": 10000, "filename": "diagram.png", "mimeType": "image/png", "size": 98150, "content": "https://x/secure/attachment/10000/diagram.png"},
+                {"id": "10001", "filename": "notes.txt", "mimeType": "text/plain", "size": 12, "content": "https://x/2"}
+            ]
+        }"#;
+        let fields: IssueFields = serde_json::from_str(json_str).unwrap();
+        assert_eq!(fields.attachment.len(), 2);
+        assert_eq!(fields.attachment[0].id.as_deref(), Some("10000"));
+        assert_eq!(
+            fields.attachment[0].filename.as_deref(),
+            Some("diagram.png")
+        );
+        assert_eq!(fields.attachment[0].mime_type.as_deref(), Some("image/png"));
+        assert_eq!(fields.attachment[0].size, Some(98150));
+        // string id also accepted
+        assert_eq!(fields.attachment[1].id.as_deref(), Some("10001"));
+    }
+
+    #[test]
+    fn test_issue_fields_deserialize_attachment_partial_fields() {
+        // A missing/null nested property must not fail the whole parse.
+        let json_str = r#"{
+            "attachment": [{"id": 5, "filename": null}]
+        }"#;
+        let fields: IssueFields = serde_json::from_str(json_str).unwrap();
+        assert_eq!(fields.attachment.len(), 1);
+        assert_eq!(fields.attachment[0].id.as_deref(), Some("5"));
+        assert!(fields.attachment[0].filename.is_none());
+        assert!(fields.attachment[0].content.is_none());
+    }
+
+    #[test]
+    fn test_issue_fields_no_attachment_field() {
+        let fields: IssueFields = serde_json::from_str(r#"{"summary": "x"}"#).unwrap();
+        assert!(fields.attachment.is_empty());
+    }
+
+    #[test]
+    fn test_attachments_markdown_empty_and_populated() {
+        assert_eq!(attachments_markdown(&[]), "");
+        let json_str = r#"{"attachment":[{"id":7,"filename":"a.png","mimeType":"image/png","size":10,"content":"https://u"}]}"#;
+        let fields: IssueFields = serde_json::from_str(json_str).unwrap();
+        let md = attachments_markdown(&fields.attachment);
+        assert!(md.contains("## Attachments"));
+        assert!(md.contains("a.png"));
+        assert!(md.contains("https://u"));
     }
 
     #[test]
