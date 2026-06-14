@@ -51,6 +51,34 @@
       }
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I install atlassian-cli with Homebrew?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Run 'brew install omar16100/atlassian-cli/atlassian-cli'. This installs the atlassian-cli binary on macOS or Linux. Verify with 'atlassian-cli --version'." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I install atlassian-cli with Cargo?",
+          "acceptedAnswer": { "@type": "Answer", "text": "If you have the Rust toolchain, run 'cargo install atlassian-cli'. You can also download a prebuilt binary from the GitHub releases page or use the shell installer script." }
+        },
+        {
+          "@type": "Question",
+          "name": "Which platforms does atlassian-cli support?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Prebuilt binaries are available for macOS (Apple Silicon and Intel) and Linux (gnu and musl). It also installs from source via Cargo on any platform with a Rust toolchain." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli the same as Atlassian's official acli?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. atlassian-cli is an independent, open-source project and is not Atlassian's official acli. If you specifically want Atlassian's first-party CLI, install acli from Atlassian. atlassian-cli is a separate, free, MIT-licensed tool for Jira, Confluence, Bitbucket and JSM." }
+        }
+      ]
+    }
+    </script>
 
     <link rel="stylesheet" href="../styles.css">
 </head>
@@ -137,6 +165,32 @@ atlassian-cli auth test --profile <span class="string">work</span></code></pre>
                 <li><strong>cargo install is slow</strong> — use prebuilt binaries or Homebrew; Cargo compiles from source.</li>
                 <li><strong>authentication fails</strong> — Atlassian Cloud requires an <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noopener">API token</a>, not your account password.</li>
             </ul>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <h2 class="section-title">Install FAQ</h2>
+            <p class="section-subtitle">Getting atlassian-cli onto your machine</p>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>How do I install atlassian-cli with Homebrew?</h3>
+                    <p>Run <code>brew install omar16100/atlassian-cli/atlassian-cli</code> on macOS or Linux, then verify with <code>atlassian-cli --version</code>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How do I install atlassian-cli with Cargo?</h3>
+                    <p>With the Rust toolchain installed, run <code>cargo install atlassian-cli</code>. You can also grab a prebuilt binary from <a href="https://github.com/omar16100/atlassian-cli/releases" target="_blank" rel="noopener">GitHub releases</a> or use the shell installer script above.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Which platforms does atlassian-cli support?</h3>
+                    <p>Prebuilt binaries cover macOS (Apple Silicon and Intel) and Linux (gnu and musl). It also builds from source via Cargo on any platform with a Rust toolchain.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is atlassian-cli the same as Atlassian's official acli?</h3>
+                    <p>No. atlassian-cli is an independent, open-source project and is not Atlassian's official <code>acli</code>. If you specifically want Atlassian's first-party CLI, install <code>acli</code> from Atlassian. atlassian-cli is a separate, free, MIT-licensed tool for Jira, Confluence, Bitbucket and JSM.</p>
+                </div>
+            </div>
         </div>
     </section>
 

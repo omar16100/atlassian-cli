@@ -49,6 +49,34 @@
       "author": { "@type": "Person", "name": "Omar Shabab", "url": "https://omarshabab.com" }
     }
     </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I use Jira from the command line?",
+          "acceptedAnswer": { "@type": "Answer", "text": "atlassian-cli is a Jira CLI for issues, projects, bulk operations, workflows and automation. After authenticating, run commands like 'atlassian-cli jira issue search --jql \"project = DEV AND status = Open\"' or 'atlassian-cli jira issue create --project DEV --issue-type Task --summary \"...\"'. A full command reference is available in the docs." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I write Jira descriptions in Markdown from the CLI?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Since version 0.4, the --description flag and comments convert Markdown (headings, lists, bold, code, links) into Atlassian Document Format (ADF), so formatting is preserved in Jira." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli the same as jira-cli or the official Atlassian acli?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. atlassian-cli is an independent, open-source tool that covers Jira, Confluence, Bitbucket and JSM in one binary. It is not affiliated with Atlassian (which ships its own official acli) and is a separate project from jira-cli." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is the Jira CLI free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. atlassian-cli is free and open source under the MIT License, installable via Homebrew, Cargo, or a prebuilt binary." }
+        }
+      ]
+    }
+    </script>
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="../product.css">
 </head>
@@ -385,6 +413,32 @@ atlassian-cli jira issue search \
                 <a href="/confluence/">Confluence CLI</a>
                 <a href="/bitbucket/">Bitbucket CLI</a>
                 <a href="/jsm/">JSM CLI</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq" id="faq">
+        <div class="container">
+            <h2 class="section-title">Jira CLI FAQ</h2>
+            <p class="section-subtitle">Working with Jira from the command line</p>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>How do I use Jira from the command line?</h3>
+                    <p>atlassian-cli is a Jira CLI for issues, projects, bulk operations, workflows and automation. After <a href="/docs/auth.html">authenticating</a>, run commands like <code>atlassian-cli jira issue search --jql "project = DEV AND status = Open"</code> or <code>atlassian-cli jira issue create --project DEV --issue-type Task --summary "..."</code>. See the full <a href="/docs/commands.html#jira-issues">Jira command reference</a>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I write Jira descriptions in Markdown from the CLI?</h3>
+                    <p>Yes. Since <a href="/blog/atlassian-cli-0-4-release.html">version 0.4</a>, <code>--description</code> and comments convert Markdown (headings, lists, bold, code, links) into Atlassian Document Format (ADF), so formatting is preserved in Jira.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is atlassian-cli the same as jira-cli or Atlassian's official acli?</h3>
+                    <p>No. atlassian-cli is an independent, open-source tool that covers Jira, Confluence, Bitbucket and JSM in one binary. It is not affiliated with Atlassian (which ships its own official <code>acli</code>) and is a separate project from <a href="/blog/jira-cli-tools-compared.html">jira-cli</a>.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Is the Jira CLI free?</h3>
+                    <p>Yes. atlassian-cli is free and open source under the MIT License. Get it on <a href="/install/">the install page</a> or <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>.</p>
+                </div>
             </div>
         </div>
     </section>
