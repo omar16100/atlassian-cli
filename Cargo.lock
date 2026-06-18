@@ -183,7 +183,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "atlassian-cli-api",
@@ -213,7 +213,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-api"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-auth"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-bulk"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "criterion",
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-config"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "dirs",
@@ -284,7 +284,7 @@ dependencies = [
 
 [[package]]
 name = "atlassian-cli-output"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "clap",
