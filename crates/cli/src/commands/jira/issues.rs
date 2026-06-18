@@ -226,6 +226,13 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             .unwrap_or_default();
 
         let attachments_md = attachments_markdown(&issue.fields.attachment);
+        let sprint_md = issue
+            .fields
+            .sprint
+            .as_ref()
+            .and_then(extract_active_sprint)
+            .map(|s| format!("| Sprint | {s} |\n"))
+            .unwrap_or_default();
 
         let md = format!(
             "# {key}: {summary}\n\n\
@@ -234,7 +241,8 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
              | Status | {status} |\n\
              | Type | {issue_type} |\n\
              | Assignee | {assignee} |\n\
-             | Reporter | {reporter} |\n\n\
+             | Reporter | {reporter} |\n\
+             {sprint_md}\n\
              ## Description\n\n\
              {description}{attachments_md}"
         );
@@ -250,6 +258,8 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         assignee: &'a str,
         reporter: &'a str,
         issue_type: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        sprint: Option<String>,
         attachments: &'a Vec<AttachmentField>,
     }
 
@@ -262,6 +272,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             .as_ref()
             .map(|s| s.name.as_str())
             .unwrap_or(""),
+        sprint: issue.fields.sprint.as_ref().and_then(extract_active_sprint),
         description: issue
             .fields
             .description
@@ -351,6 +362,7 @@ pub async fn create_issue(
     assignee: Option<&str>,
     priority: Option<&str>,
     custom_fields: &HashMap<String, Value>,
+    sprint: Option<&str>,
 ) -> Result<()> {
     let payload = build_create_payload(
         project,
@@ -373,6 +385,10 @@ pub async fn create_issue(
         .post("/rest/api/3/issue", &payload)
         .await
         .context("Failed to create issue")?;
+
+    if let Some(sprint_id) = sprint {
+        add_to_sprint(ctx, &response.key, sprint_id).await?;
+    }
 
     tracing::info!(key = %response.key, id = %response.id, "Issue created successfully");
     render_success(
@@ -418,6 +434,45 @@ pub(crate) fn build_update_payload(
     Ok(json!({ "fields": fields }))
 }
 
+/// Build the body for `POST /rest/agile/1.0/sprint/{id}/issue`. Pure, testable.
+fn build_sprint_add_payload(key: &str) -> Value {
+    serde_json::json!({ "issues": [key] })
+}
+
+/// Add an issue to a sprint via the Agile API. This is the reliable way to set a
+/// sprint (no per-instance customfield id, and it avoids the "Number value expected"
+/// quirk of writing the sprint field directly).
+async fn add_to_sprint(ctx: &JiraContext<'_>, key: &str, sprint_id: &str) -> Result<()> {
+    let id: u64 = sprint_id.parse().map_err(|_| {
+        anyhow!("Invalid --sprint '{sprint_id}': expected a numeric sprint id (e.g. 25446)")
+    })?;
+    let payload = build_sprint_add_payload(key);
+    let _: Value = ctx
+        .client
+        .post(&format!("/rest/agile/1.0/sprint/{id}/issue"), &payload)
+        .await
+        .with_context(|| format!("Failed to add {key} to sprint {id}"))?;
+    Ok(())
+}
+
+/// Summarize an issue's Jira sprint field (customfield_10020) for display, e.g.
+/// "Sprint 12 (active)". Prefers an active sprint, else the most recent entry.
+fn extract_active_sprint(value: &Value) -> Option<String> {
+    let arr = value.as_array()?;
+    let pick = arr
+        .iter()
+        .find(|s| s.get("state").and_then(Value::as_str) == Some("active"))
+        .or_else(|| arr.last())?;
+    let name = pick.get("name").and_then(Value::as_str).unwrap_or("");
+    if name.is_empty() {
+        return None;
+    }
+    match pick.get("state").and_then(Value::as_str) {
+        Some(state) if !state.is_empty() => Some(format!("{name} ({state})")),
+        _ => Some(name.to_string()),
+    }
+}
+
 pub async fn update_issue(
     ctx: &JiraContext<'_>,
     key: &str,
@@ -425,14 +480,30 @@ pub async fn update_issue(
     description: Option<&str>,
     priority: Option<&str>,
     custom_fields: &HashMap<String, Value>,
+    sprint: Option<&str>,
 ) -> Result<()> {
-    let payload = build_update_payload(summary, description, priority, custom_fields)?;
+    let has_fields = summary.is_some()
+        || description.is_some()
+        || priority.is_some()
+        || !custom_fields.is_empty();
+    if !has_fields && sprint.is_none() {
+        bail!(
+            "Nothing to update for {key}: provide --summary, --description, --priority, --field, or --sprint"
+        );
+    }
 
-    let _: Value = ctx
-        .client
-        .put(&format!("/rest/api/3/issue/{key}"), &payload)
-        .await
-        .with_context(|| format!("Failed to update issue {key}"))?;
+    if has_fields {
+        let payload = build_update_payload(summary, description, priority, custom_fields)?;
+        let _: Value = ctx
+            .client
+            .put(&format!("/rest/api/3/issue/{key}"), &payload)
+            .await
+            .with_context(|| format!("Failed to update issue {key}"))?;
+    }
+
+    if let Some(sprint_id) = sprint {
+        add_to_sprint(ctx, key, sprint_id).await?;
+    }
 
     tracing::info!(%key, "Issue updated successfully");
     render_success(
@@ -822,6 +893,10 @@ struct IssueFields {
     issuetype: Option<IssueTypeField>,
     #[serde(default)]
     attachment: Vec<AttachmentField>,
+    // customfield_10020 is the standard Jira Cloud "Sprint" field (an array of
+    // sprint objects). Optional so instances that omit/remap it never break the parse.
+    #[serde(rename = "customfield_10020", default)]
+    sprint: Option<Value>,
 }
 
 /// Jira returns attachment `id` as a number in some responses and a string in
@@ -1421,6 +1496,54 @@ mod tests {
     fn test_issue_fields_no_attachment_field() {
         let fields: IssueFields = serde_json::from_str(r#"{"summary": "x"}"#).unwrap();
         assert!(fields.attachment.is_empty());
+    }
+
+    #[test]
+    fn test_build_sprint_add_payload() {
+        let p = build_sprint_add_payload("DEV-1");
+        assert_eq!(p, serde_json::json!({ "issues": ["DEV-1"] }));
+    }
+
+    #[test]
+    fn test_extract_active_sprint_prefers_active() {
+        // Issue is in a closed and an active sprint; show the active one.
+        let v = serde_json::json!([
+            {"id": 1, "name": "Sprint 11", "state": "closed"},
+            {"id": 2, "name": "Sprint 12", "state": "active"}
+        ]);
+        assert_eq!(
+            extract_active_sprint(&v).as_deref(),
+            Some("Sprint 12 (active)")
+        );
+    }
+
+    #[test]
+    fn test_extract_active_sprint_falls_back_to_last() {
+        let v = serde_json::json!([{"id": 1, "name": "Sprint 9", "state": "closed"}]);
+        assert_eq!(
+            extract_active_sprint(&v).as_deref(),
+            Some("Sprint 9 (closed)")
+        );
+        // empty / non-array -> None
+        assert_eq!(extract_active_sprint(&serde_json::json!([])), None);
+        assert_eq!(extract_active_sprint(&serde_json::json!("x")), None);
+    }
+
+    #[test]
+    fn test_issue_fields_deserialize_sprint() {
+        let json = r#"{
+            "summary": "S",
+            "customfield_10020": [{"id": 25446, "name": "Sprint 12", "state": "active"}]
+        }"#;
+        let fields: IssueFields = serde_json::from_str(json).unwrap();
+        let sprint = fields.sprint.as_ref().and_then(extract_active_sprint);
+        assert_eq!(sprint.as_deref(), Some("Sprint 12 (active)"));
+    }
+
+    #[test]
+    fn test_issue_fields_sprint_absent_is_none() {
+        let fields: IssueFields = serde_json::from_str(r#"{"summary": "x"}"#).unwrap();
+        assert!(fields.sprint.is_none());
     }
 
     #[test]

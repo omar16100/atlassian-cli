@@ -156,6 +156,9 @@ enum IssueCommands {
         /// Jira custom field (repeatable). Discover IDs via `jira fields list`.
         #[arg(long = "field", value_name = "KEY=JSON_VALUE")]
         fields: Vec<String>,
+        /// Add the new issue to a sprint by numeric sprint id (Agile API).
+        #[arg(long)]
+        sprint: Option<String>,
     },
 
     /// Update an existing issue
@@ -179,6 +182,10 @@ enum IssueCommands {
         /// Jira custom field (repeatable). Discover IDs via `jira fields list`.
         #[arg(long = "field", value_name = "KEY=JSON_VALUE")]
         fields: Vec<String>,
+        /// Assign the issue to a sprint by numeric sprint id (Agile API). Prefer
+        /// this over --field customfield_10020 for sprints.
+        #[arg(long)]
+        sprint: Option<String>,
     },
 
     /// Delete an issue
@@ -839,6 +846,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 assignee,
                 priority,
                 fields,
+                sprint,
             } => {
                 let custom_fields = issues::parse_custom_fields(&fields)?;
                 issues::create_issue(
@@ -850,6 +858,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                     assignee.as_deref(),
                     priority.as_deref(),
                     &custom_fields,
+                    sprint.as_deref(),
                 )
                 .await
             }
@@ -859,6 +868,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 description,
                 priority,
                 fields,
+                sprint,
             } => {
                 let custom_fields = issues::parse_custom_fields(&fields)?;
                 issues::update_issue(
@@ -868,6 +878,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                     description.as_deref(),
                     priority.as_deref(),
                     &custom_fields,
+                    sprint.as_deref(),
                 )
                 .await
             }
