@@ -1,5 +1,25 @@
 # Changes Made
 
+## 2026-06-18 — Jira sprint UX: --sprint flag + sprint in issue get (#72)
+
+### Context
+Issue #72 reported `--field customfield_10020=<id>` failing to set a sprint. Not a
+current bug: on 0.4.1 it already sends the working payload, the "204 error" was the
+pre-0.4.0 false alarm, and `issue get` didn't show the sprint (so "None" was a
+verification artifact). Added ergonomic sprint support.
+
+### Change (crates/cli/src/commands/jira/{issues.rs,mod.rs})
+- `--sprint <id>` flag on `jira issue create` and `update`, implemented via the Agile
+  API `POST /rest/agile/1.0/sprint/{id}/issue` `{"issues":[KEY]}` (no customfield id,
+  avoids the "Number value expected" quirk). New `add_to_sprint` + pure
+  `build_sprint_add_payload`; numeric-id validation.
+- `update` now PUTs only when there are field changes, so a `--sprint`-only update
+  doesn't send an empty `{"fields":{}}`; bails if nothing to update.
+- `issue get` now displays the sprint: `IssueFields` reads `customfield_10020`
+  (optional/default), `extract_active_sprint` summarizes it ("Sprint 12 (active)"),
+  shown in markdown + JSON/table output.
+- 5 unit tests; commands.html updated. Also merged dependabot PR #71 (zeroize 1.9.0).
+
 ## 2026-06-14 — Site-wide CLI command-syntax cleanup (docs accuracy)
 
 ### Context

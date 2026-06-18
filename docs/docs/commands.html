@@ -197,7 +197,11 @@ atlassian-cli jira issue create --project DEV --issue-type Task --summary <span 
 atlassian-cli jira issue update DEV-123 --summary <span class="string">"Updated summary"</span>
 atlassian-cli jira issue transition DEV-123 --transition <span class="string">"In Progress"</span>
 atlassian-cli jira issue assign DEV-123 --assignee user@example.com
-atlassian-cli jira issue delete DEV-123</code></pre>
+atlassian-cli jira issue delete DEV-123
+
+<span class="comment"># Assign to a sprint by numeric sprint id (Agile API; no customfield id needed)</span>
+atlassian-cli jira issue update DEV-123 --sprint 25446
+atlassian-cli jira issue create --project DEV --issue-type Task --summary <span class="string">"In sprint"</span> --sprint 25446</code></pre>
 
             <h2 id="jira-projects">Jira — Projects</h2>
             <pre class="code-block"><code>atlassian-cli jira project list
