@@ -46,9 +46,10 @@
         "@type": "ItemList",
         "itemListOrder": "https://schema.org/ItemListOrderDescending",
         "itemListElement": [
-          {"@type": "ListItem", "position": 1, "name": "v0.4.1", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.1"},
-          {"@type": "ListItem", "position": 2, "name": "v0.4.0", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.0"},
-          {"@type": "ListItem", "position": 3, "name": "v0.3.3", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.3.3"}
+          {"@type": "ListItem", "position": 1, "name": "v0.4.2", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.2"},
+          {"@type": "ListItem", "position": 2, "name": "v0.4.1", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.1"},
+          {"@type": "ListItem", "position": 3, "name": "v0.4.0", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.0"},
+          {"@type": "ListItem", "position": 4, "name": "v0.3.3", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.3.3"}
         ]
       }
     }
@@ -199,6 +200,19 @@
 
                 <div class="release">
                     <div class="release-head">
+                        <span class="release-version">0.4.2</span>
+                        <span class="release-date">June 18, 2026</span>
+                        <a class="release-link" href="https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.2" target="_blank" rel="noopener">GitHub release →</a>
+                    </div>
+                    <ul>
+                        <li><strong>Jira sprints from the CLI</strong> — <code>jira issue create</code> and <code>jira issue update</code> take a <code>--sprint &lt;id&gt;</code> flag that assigns the issue to a sprint via the Agile API, so you no longer need to look up the board's <code>customfield_10020</code> id by hand.</li>
+                        <li><strong>Sprint in <code>issue get</code></strong> — <code>jira issue get</code> now displays the issue's sprint, so you can verify sprint assignment without a raw REST call.</li>
+                        <li><strong>Maintenance:</strong> bumped <code>zeroize</code> to 1.9.0.</li>
+                    </ul>
+                </div>
+
+                <div class="release">
+                    <div class="release-head">
                         <span class="release-version">0.4.1</span>
                         <span class="release-date">June 14, 2026</span>
                         <a class="release-link" href="https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.1" target="_blank" rel="noopener">GitHub release →</a>
@@ -256,7 +270,7 @@
             <div class="footer-content">
                 <div class="footer-left">
                     <span class="footer-logo">atlassian-cli</span>
-                    <span class="footer-version">v0.4.1</span>
+                    <span class="footer-version">v0.4.2</span>
                 </div>
                 <div class="footer-links">
                     <a href="/jira/">Jira CLI</a>
