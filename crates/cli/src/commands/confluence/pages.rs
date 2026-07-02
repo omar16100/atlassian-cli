@@ -472,24 +472,71 @@ pub async fn remove_page_label(
     )
 }
 
+/// A footer comment as returned by `GET /wiki/api/v2/pages/{id}/footer-comments`.
+///
+/// Every field beyond `id` is treated as optional. The Confluence Cloud API
+/// omits `createdAt` for some comments (older/system-generated ones), and only
+/// returns `body` when `body-format` is requested. Deserialising these as
+/// required fields previously caused the whole command to fail with
+/// "missing field `createdAt`" on otherwise healthy pages.
+#[derive(Deserialize)]
+struct Comment {
+    id: String,
+    #[serde(default)]
+    title: String,
+    #[serde(rename = "createdAt", default)]
+    created_at: Option<String>,
+    #[serde(default)]
+    body: Option<CommentBody>,
+}
+
+#[derive(Deserialize)]
+struct CommentBody {
+    #[serde(default)]
+    storage: Option<CommentBodyValue>,
+}
+
+#[derive(Deserialize)]
+struct CommentBodyValue {
+    #[serde(default)]
+    value: String,
+}
+
+#[derive(Deserialize)]
+struct CommentsResponse {
+    #[serde(default)]
+    results: Vec<Comment>,
+}
+
+/// Return the raw storage-format (HTML) body of a comment, if one was returned.
+fn comment_storage_html(comment: &Comment) -> Option<&str> {
+    comment
+        .body
+        .as_ref()
+        .and_then(|b| b.storage.as_ref())
+        .map(|s| s.value.as_str())
+        .filter(|v| !v.is_empty())
+}
+
+/// Convert a comment's storage-format body to markdown for display. Falls back
+/// to an empty string when no body was returned or conversion fails.
+fn comment_body_markdown(comment: &Comment) -> String {
+    match comment_storage_html(comment) {
+        Some(html) => htmd::convert(html).unwrap_or_default().trim().to_string(),
+        None => String::new(),
+    }
+}
+
 // List page comments
 pub async fn list_page_comments(ctx: &ConfluenceContext<'_>, page_id: &str) -> Result<()> {
-    #[derive(Deserialize)]
-    struct CommentsResponse {
-        results: Vec<Comment>,
-    }
-
-    #[derive(Deserialize)]
-    struct Comment {
-        id: String,
-        title: String,
-        #[serde(rename = "createdAt")]
-        created_at: String,
-    }
-
+    // Request the storage-format body so callers actually get the comment text
+    // (the old confluence-cli captured this); previously only metadata was returned.
     let response: CommentsResponse = ctx
         .client
-        .get(&format!("/wiki/api/v2/pages/{}/footer-comments", page_id))
+        .get(&format!(
+            "/wiki/api/v2/pages/{}/footer-comments?body-format=storage",
+            page_id
+        ))
         .await
         .with_context(|| format!("Failed to list comments for page {}", page_id))?;
 
@@ -498,6 +545,7 @@ pub async fn list_page_comments(ctx: &ConfluenceContext<'_>, page_id: &str) -> R
         id: &'a str,
         title: &'a str,
         created_at: &'a str,
+        body: String,
     }
 
     let rows: Vec<Row<'_>> = response
@@ -506,7 +554,8 @@ pub async fn list_page_comments(ctx: &ConfluenceContext<'_>, page_id: &str) -> R
         .map(|c| Row {
             id: c.id.as_str(),
             title: c.title.as_str(),
-            created_at: c.created_at.as_str(),
+            created_at: c.created_at.as_deref().unwrap_or(""),
+            body: comment_body_markdown(c),
         })
         .collect();
 
@@ -996,4 +1045,84 @@ pub async fn delete_blogpost(
         &format!("✅ Deleted blog post: {blogpost_id}"),
         &MutationResult::with_id(format!("Deleted blog post: {blogpost_id}"), blogpost_id),
     )
+}
+
+#[cfg(test)]
+mod comment_tests {
+    use super::*;
+
+    // Regression: the API omits `createdAt` for some footer-comments, which used
+    // to fail deserialisation with "missing field `createdAt`" and abort the
+    // whole `page comments` command. It must now parse into `None`.
+    #[test]
+    fn comment_tolerates_missing_created_at() {
+        let c: Comment = serde_json::from_str(r#"{"id":"42","title":"Re: X"}"#).unwrap();
+        assert_eq!(c.id, "42");
+        assert_eq!(c.title, "Re: X");
+        assert!(c.created_at.is_none());
+    }
+
+    #[test]
+    fn comment_tolerates_missing_title_and_body() {
+        let c: Comment = serde_json::from_str(r#"{"id":"1"}"#).unwrap();
+        assert_eq!(c.id, "1");
+        assert_eq!(c.title, "");
+        assert!(comment_storage_html(&c).is_none());
+        assert_eq!(comment_body_markdown(&c), "");
+    }
+
+    #[test]
+    fn comment_parses_created_at_when_present() {
+        let c: Comment =
+            serde_json::from_str(r#"{"id":"7","createdAt":"2026-01-02T03:04:05Z"}"#).unwrap();
+        assert_eq!(c.created_at.as_deref(), Some("2026-01-02T03:04:05Z"));
+    }
+
+    // The body is only present when `body-format` is requested; when present we
+    // extract the storage HTML and convert it to markdown for display.
+    #[test]
+    fn comment_body_converts_storage_html_to_markdown() {
+        let json = r#"{
+            "id": "9",
+            "createdAt": "2026-01-01T00:00:00Z",
+            "body": { "storage": { "value": "<p>Hello <strong>world</strong></p>", "representation": "storage" } }
+        }"#;
+        let c: Comment = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            comment_storage_html(&c),
+            Some("<p>Hello <strong>world</strong></p>")
+        );
+        let md = comment_body_markdown(&c);
+        assert!(md.contains("Hello"));
+        assert!(md.contains("world"));
+    }
+
+    #[test]
+    fn comment_empty_body_value_is_treated_as_absent() {
+        let json = r#"{"id":"3","body":{"storage":{"value":""}}}"#;
+        let c: Comment = serde_json::from_str(json).unwrap();
+        assert!(comment_storage_html(&c).is_none());
+    }
+
+    // A whole response mixing comments with and without createdAt must fully parse
+    // (previously a single bad comment failed the entire list).
+    #[test]
+    fn comments_response_with_mixed_fields_fully_parses() {
+        let json = r#"{
+            "results": [
+                {"id":"1","title":"a","createdAt":"2026-01-01T00:00:00Z"},
+                {"id":"2","title":"b"},
+                {"id":"3"}
+            ]
+        }"#;
+        let resp: CommentsResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.results.len(), 3);
+        assert!(resp.results[1].created_at.is_none());
+    }
+
+    #[test]
+    fn comments_response_empty_results_parses() {
+        let resp: CommentsResponse = serde_json::from_str(r#"{"results":[]}"#).unwrap();
+        assert!(resp.results.is_empty());
+    }
 }
