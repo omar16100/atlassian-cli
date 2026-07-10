@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitbucket REST API: A Practical Guide | atlassian-cli Blog</title>
+    <meta name="description" content="The Bitbucket REST API 2.0 explained: base URLs, authentication, real endpoint examples with curl, pagination, rate limits, and a CLI wrapper.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Bitbucket REST API: A Practical Guide">
+    <meta property="og:description" content="The Bitbucket REST API 2.0 explained: base URLs, authentication, real endpoint examples with curl, pagination, rate limits, and a CLI wrapper.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/bitbucket-rest-api-guide.html">
+    <meta property="article:published_time" content="2026-07-10T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Bitbucket REST API: A Practical Guide">
+    <meta name="twitter:description" content="The Bitbucket REST API 2.0 explained: base URLs, authentication, real endpoint examples with curl, pagination, rate limits, and a CLI wrapper.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/bitbucket-rest-api-guide.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Breadcrumb -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Bitbucket REST API: A Practical Guide", "item": "https://atlassiancli.com/blog/bitbucket-rest-api-guide.html"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Bitbucket REST API: A Practical Guide",
+      "description": "The Bitbucket REST API 2.0 explained: base URLs, authentication, real endpoint examples with curl, pagination, rate limits, and a CLI wrapper.",
+      "datePublished": "2026-07-10T00:00:00Z",
+      "dateModified": "2026-07-10T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/bitbucket-rest-api-guide.html"
+      },
+      "url": "https://atlassiancli.com/blog/bitbucket-rest-api-guide.html",
+      "inLanguage": "en-US",
+      "keywords": "bitbucket rest api, bitbucket api 2.0, bitbucket api authentication, bitbucket api endpoints, bitbucket api curl"
+    }
+    </script>
+
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the base URL for the Bitbucket REST API?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The current Bitbucket Cloud REST API is version 2.0, and every endpoint lives under https://api.bitbucket.org/2.0/. For example, listing repositories in a workspace is a GET request to https://api.bitbucket.org/2.0/repositories/{workspace}. All responses are JSON, and collection endpoints are paginated."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I authenticate with the Bitbucket API?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Bitbucket Cloud supports OAuth 2.0, app passwords used with HTTP Basic authentication, and access tokens scoped to a repository, project, or workspace. For quick scripts, an app password with Basic auth is the simplest: pass it with curl -u \"username:app_password\". For automation, prefer a scoped access token so you can limit and revoke access without touching your account password."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does the Bitbucket REST API have rate limits?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Bitbucket enforces per-hour rate limits and returns an HTTP 429 status when you exceed them. When you script against the API directly, you need to detect 429 responses and back off before retrying. atlassian-cli handles this for you with automatic backoff, so bulk operations keep running without manual retries."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is the Bitbucket REST API paginated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Collection endpoints return a paginated object with a values array plus page, pagelen, and next fields. To read every result you follow the next URL until it disappears. You can request larger pages with the pagelen query parameter. A CLI wrapper like atlassian-cli walks these pages automatically so you get the full result set from a single command."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I use a CLI instead of calling the Bitbucket REST API directly?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. atlassian-cli is an independent open-source wrapper that maps common REST 2.0 endpoints to short commands for repositories, branches, pull requests, pipelines, and permissions. It handles authentication, pagination, and rate limiting so you do not have to write curl and jq pipelines by hand. It is not Atlassian's official CLI (acli)."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment {
+            color: var(--text-muted);
+        }
+
+        .article-body pre .string {
+            color: var(--accent-cyan);
+        }
+
+        /* Comparison / reference table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid var(--border);
+            padding: 0.65rem 0.85rem;
+            text-align: left;
+            vertical-align: top;
+            line-height: 1.6;
+        }
+
+        .comparison-table th {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+        }
+
+        .comparison-table td {
+            color: var(--text-secondary);
+        }
+
+        .comparison-table code {
+            font-size: 0.8em;
+            white-space: nowrap;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Note / callout */
+        .callout {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent-cyan);
+            border-radius: 8px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .callout p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* FAQ section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .faq-item h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .faq-item p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* Article CTA */
+        .article-cta {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+
+        .article-cta h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-cta p {
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-cta .btn-primary {
+            display: inline-block;
+            background: var(--accent-cyan);
+            color: #04110d;
+            font-weight: 600;
+            padding: 0.75rem 1.75rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.925rem;
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1rem 4rem;
+            }
+
+            .article-body h2 {
+                font-size: 1.25rem;
+            }
+
+            .toc {
+                padding: 1.25rem;
+            }
+
+            .related-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <nav class="breadcrumb" aria-label="Breadcrumb" style="margin-bottom:1.5rem;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);">
+                <a href="/" style="color:var(--text-muted);text-decoration:none;">Home</a>
+                &nbsp;/&nbsp;
+                <a href="/blog/" style="color:var(--text-muted);text-decoration:none;">Blog</a>
+                &nbsp;/&nbsp;
+                <span>Bitbucket REST API</span>
+            </nav>
+            <div class="article-meta">
+                <span class="article-meta-item">July 10, 2026</span>
+                <span class="article-meta-item">~8 min read</span>
+                <span class="article-keyword">bitbucket rest api</span>
+            </div>
+            <h1 class="article-title">Bitbucket REST API: A Practical Guide</h1>
+            <p class="article-subtitle">Base URLs, authentication, real endpoint examples with curl, pagination, and rate limits -- plus how to skip the boilerplate with a CLI wrapper.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#what-is">What Is the Bitbucket REST API?</a></li>
+                <li><a href="#auth">Authentication Options</a></li>
+                <li><a href="#endpoints">Core REST 2.0 Endpoints</a></li>
+                <li><a href="#curl">Making Requests With curl</a></li>
+                <li><a href="#pagination">Pagination and Rate Limits</a></li>
+                <li><a href="#cli-wrapper">Wrapping the API With a CLI</a></li>
+                <li><a href="#mapping">Mapping Endpoints to CLI Commands</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- Section 1 -->
+        <h2 id="what-is">What Is the Bitbucket REST API?</h2>
+
+        <p>The <strong>Bitbucket REST API</strong> is the HTTP interface Atlassian exposes for automating Bitbucket Cloud: creating repositories, opening and merging pull requests, triggering pipelines, managing branch permissions, and reading commits. The current version is <strong>2.0</strong>, and every endpoint lives under a single base URL: <code>https://api.bitbucket.org/2.0/</code>. Requests are ordinary HTTPS calls, and responses come back as JSON, so anything that can send an authenticated GET or POST (curl, a Python script, a CI job) can drive Bitbucket.</p>
+
+        <p>The API is organized around a few nouns. A <strong>workspace</strong> groups your repositories, a <strong>repository</strong> is identified by a slug, and resources like pull requests and pipelines hang off a repository. A typical path reads left to right: <code>/2.0/repositories/{workspace}/{repo_slug}/pullrequests</code>. Once you know that shape, most of the API is discoverable by swapping the last segment.</p>
+
+        <p>This guide walks through authentication, the endpoints you will actually reach for, how pagination and rate limits work, and how to avoid writing the same curl-and-jq plumbing every time by putting a command-line wrapper in front of the API.</p>
+
+        <div class="callout">
+            <p><strong>How this differs from official tooling:</strong> <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> is an independent, community, MIT-licensed open-source project. It is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>) and is not affiliated with, endorsed by, or sponsored by Atlassian. Use the official <code>acli</code> for first-party vendor support. Use atlassian-cli if you want a single free Rust binary that wraps the Bitbucket REST API alongside Jira, Confluence, and JSM.</p>
+        </div>
+
+        <!-- Section 2 -->
+        <h2 id="auth">Authentication Options</h2>
+
+        <p>Every request to the Bitbucket REST API must be authenticated. Bitbucket Cloud supports several methods, and which one you pick depends on whether you are running a quick script or a long-lived automation.</p>
+
+        <ul>
+            <li><strong>App passwords (HTTP Basic auth).</strong> An app password is a scoped credential tied to your account that you pass as the password in Basic auth. It is the simplest option for scripts and works with <code>curl -u "username:app_password"</code>.</li>
+            <li><strong>Access tokens.</strong> Repository, project, and workspace access tokens are scoped to a single resource rather than your whole account. They are the safer default for automation because you can grant narrow permissions and revoke a token without changing your password.</li>
+            <li><strong>OAuth 2.0.</strong> For applications acting on behalf of other users, register an OAuth consumer and exchange it for a bearer token. This is the right path when you are building an integration rather than a personal script.</li>
+        </ul>
+
+        <p>For the examples below, store your credential in an environment variable so it never lands in shell history or a committed file:</p>
+
+        <pre><code><span class="comment"># Export a Basic-auth credential for the current shell session</span>
+export BB_USER=<span class="string">"your-bitbucket-username"</span>
+export BB_APP_PASSWORD=<span class="string">"your-app-password"</span></code></pre>
+
+        <p>With an access token instead, you send it as a bearer token: <code>-H "Authorization: Bearer $BB_TOKEN"</code>. The endpoints are identical; only the auth header changes.</p>
+
+        <!-- Section 3 -->
+        <h2 id="endpoints">Core REST 2.0 Endpoints</h2>
+
+        <p>You do not need to memorize the whole API. In practice, a handful of endpoints cover the vast majority of automation. Here are the ones worth knowing, all relative to <code>https://api.bitbucket.org/2.0/</code>:</p>
+
+        <div class="table-scroll">
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Method &amp; Path</th>
+                    <th>What it does</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>GET /user</code></td>
+                    <td>Returns the authenticated account. A quick way to verify your credential works.</td>
+                </tr>
+                <tr>
+                    <td><code>GET /workspaces/{workspace}</code></td>
+                    <td>Details for a workspace, including its slug and membership settings.</td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{workspace}</code></td>
+                    <td>Lists repositories in a workspace. Paginated.</td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{workspace}/{repo}</code></td>
+                    <td>Details for one repository.</td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{workspace}/{repo}/refs/branches</code></td>
+                    <td>Lists branches for a repository.</td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{workspace}/{repo}/pullrequests</code></td>
+                    <td>Lists pull requests. Filter with the <code>state</code> query parameter.</td>
+                </tr>
+                <tr>
+                    <td><code>POST /repositories/{workspace}/{repo}/pullrequests</code></td>
+                    <td>Creates a pull request from a source branch to a destination.</td>
+                </tr>
+                <tr>
+                    <td><code>POST .../pullrequests/{id}/approve</code></td>
+                    <td>Approves a pull request.</td>
+                </tr>
+                <tr>
+                    <td><code>POST .../pullrequests/{id}/merge</code></td>
+                    <td>Merges a pull request with a chosen strategy.</td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{workspace}/{repo}/pipelines/</code></td>
+                    <td>Lists pipeline runs for a repository.</td>
+                </tr>
+                <tr>
+                    <td><code>POST /repositories/{workspace}/{repo}/pipelines/</code></td>
+                    <td>Triggers a pipeline for a branch or commit.</td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{workspace}/{repo}/commits</code></td>
+                    <td>Lists commits, optionally scoped to a branch.</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <!-- Section 4 -->
+        <h2 id="curl">Making Requests With curl</h2>
+
+        <p>The fastest way to learn the API is to hit it directly. Start with a read that confirms your credential and shows you the JSON shape:</p>
+
+        <pre><code><span class="comment"># List the first 10 repositories in a workspace</span>
+curl -s -u <span class="string">"$BB_USER:$BB_APP_PASSWORD"</span> \
+  <span class="string">"https://api.bitbucket.org/2.0/repositories/myteam?pagelen=10"</span></code></pre>
+
+        <p>Reads are safe to experiment with. Writes are where the API earns its keep. Creating a pull request is a <code>POST</code> with a small JSON body describing the source and destination branches:</p>
+
+        <pre><code><span class="comment"># Open a pull request from feature/new into main</span>
+curl -s -u <span class="string">"$BB_USER:$BB_APP_PASSWORD"</span> \
+  -X POST \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  <span class="string">"https://api.bitbucket.org/2.0/repositories/myteam/api-service/pullrequests"</span> \
+  -d <span class="string">'{
+    "title": "Add feature",
+    "source": { "branch": { "name": "feature/new" } },
+    "destination": { "branch": { "name": "main" } }
+  }'</span></code></pre>
+
+        <p>Triggering a pipeline follows the same pattern. The body tells Bitbucket which ref to build:</p>
+
+        <pre><code><span class="comment"># Trigger the default pipeline on the main branch</span>
+curl -s -u <span class="string">"$BB_USER:$BB_APP_PASSWORD"</span> \
+  -X POST \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  <span class="string">"https://api.bitbucket.org/2.0/repositories/myteam/api-service/pipelines/"</span> \
+  -d <span class="string">'{
+    "target": {
+      "type": "pipeline_ref_target",
+      "ref_type": "branch",
+      "ref_name": "main"
+    }
+  }'</span></code></pre>
+
+        <p>These three requests (list, create PR, trigger pipeline) are representative of the whole API. Most other operations are a variation on the same theme: a path built from workspace and repo, a method, and a JSON body. The friction shows up around the edges: encoding query parameters, following pagination, parsing JSON out of every response, and retrying when you get throttled.</p>
+
+        <!-- Section 5 -->
+        <h2 id="pagination">Pagination and Rate Limits</h2>
+
+        <p>Two behaviors trip people up when they script against the Bitbucket REST API directly.</p>
+
+        <p><strong>Pagination.</strong> Collection endpoints do not return every result at once. They return a page object shaped like this:</p>
+
+        <pre><code>{
+  <span class="string">"pagelen"</span>: 10,
+  <span class="string">"page"</span>: 1,
+  <span class="string">"values"</span>: [ <span class="comment">/* repositories, PRs, commits... */</span> ],
+  <span class="string">"next"</span>: <span class="string">"https://api.bitbucket.org/2.0/repositories/myteam?page=2"</span>
+}</code></pre>
+
+        <p>To read the full result set, you follow the <code>next</code> URL until the field disappears. You can request bigger pages with the <code>pagelen</code> query parameter to cut the number of round trips. Any script that only reads the first page silently misses data, which is a common and hard-to-spot bug.</p>
+
+        <p><strong>Rate limits.</strong> Bitbucket enforces per-hour rate limits and returns an HTTP <code>429</code> when you exceed them. A robust client has to detect that status and back off before retrying, otherwise a large batch will start failing partway through. Getting pagination and backoff right is most of the work in a good Bitbucket client, and it is exactly the boilerplate a wrapper removes.</p>
+
+        <!-- Section 6 -->
+        <h2 id="cli-wrapper">Wrapping the API With a CLI</h2>
+
+        <p>If you are reaching for the Bitbucket REST API repeatedly, a command-line wrapper turns each of those curl blocks into a single line. <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> maps the REST 2.0 endpoints above to short commands, and it handles authentication, pagination, and 429 backoff internally so you get complete results without writing the plumbing.</p>
+
+        <p>Authenticate once, then call the API by intent instead of URL. See the <a href="/docs/auth.html">authentication guide</a> for the full setup:</p>
+
+        <pre><code><span class="comment"># Store credentials in a named profile</span>
+atlassian-cli auth login \
+  --profile work \
+  --base-url https://your-workspace.atlassian.net \
+  --email you@example.com \
+  --token $TOKEN \
+  --default
+
+<span class="comment"># Confirm the Bitbucket credential resolves</span>
+atlassian-cli bitbucket whoami</code></pre>
+
+        <p>From there, the same operations you wrote by hand become one-liners. Listing repositories walks every page for you:</p>
+
+        <pre><code><span class="comment"># List repositories in a workspace (pagination handled automatically)</span>
+atlassian-cli bitbucket --workspace myteam repo list --limit 10
+
+<span class="comment"># Machine-readable output for scripting</span>
+atlassian-cli bitbucket --workspace myteam repo list --format json | jq <span class="string">'.[].slug'</span></code></pre>
+
+        <p>Opening a pull request no longer needs a hand-built JSON body:</p>
+
+        <pre><code><span class="comment"># Create a PR from feature/new into main</span>
+atlassian-cli bitbucket --workspace myteam pr create api-service \
+  --title <span class="string">"Add feature"</span> \
+  --source feature/new \
+  --destination main
+
+<span class="comment"># Approve and merge it</span>
+atlassian-cli bitbucket --workspace myteam pr approve api-service 123
+atlassian-cli bitbucket --workspace myteam pr merge api-service 123 --strategy merge_commit</code></pre>
+
+        <p>Triggering a pipeline collapses the earlier POST into its arguments, including named custom pipelines defined in <code>bitbucket-pipelines.yml</code>:</p>
+
+        <pre><code><span class="comment"># Trigger the pipeline on main</span>
+atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main
+
+<span class="comment"># Trigger a named custom pipeline</span>
+atlassian-cli bitbucket --workspace myteam pipeline trigger api-service \
+  --ref-name main --custom-pipeline s3-access-test</code></pre>
+
+        <p>Every command accepts the global <code>--format json|csv|yaml</code> flag, so you can pipe results into <code>jq</code>, a spreadsheet, or another tool without parsing raw HTTP responses. The <code>bb</code> alias is interchangeable with <code>bitbucket</code> if you want to type less.</p>
+
+        <div class="article-cta">
+            <h3>Try atlassian-cli</h3>
+            <p>A single free binary that wraps the Bitbucket REST API alongside Jira, Confluence, and JSM. Independent and MIT-licensed.</p>
+            <a href="/install/" class="btn-primary">Install atlassian-cli</a>
+        </div>
+
+        <!-- Section 7 -->
+        <h2 id="mapping">Mapping Endpoints to CLI Commands</h2>
+
+        <p>If you already know the REST endpoint you need, this table shows the equivalent atlassian-cli command. It is a useful bridge when you are porting an existing curl script to the CLI. The full list is in the <a href="/docs/commands.html">command reference</a>.</p>
+
+        <div class="table-scroll">
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>REST 2.0 endpoint</th>
+                    <th>atlassian-cli command</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>GET /repositories/{ws}</code></td>
+                    <td><code>bitbucket --workspace ws repo list</code></td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{ws}/{repo}</code></td>
+                    <td><code>bitbucket --workspace ws repo get repo</code></td>
+                </tr>
+                <tr>
+                    <td><code>GET /repositories/{ws}/{repo}/refs/branches</code></td>
+                    <td><code>bitbucket --workspace ws branch list repo</code></td>
+                </tr>
+                <tr>
+                    <td><code>GET .../pullrequests?state=OPEN</code></td>
+                    <td><code>bitbucket --workspace ws pr list repo --state OPEN</code></td>
+                </tr>
+                <tr>
+                    <td><code>POST .../pullrequests</code></td>
+                    <td><code>bitbucket --workspace ws pr create repo --title ... --source ... --destination ...</code></td>
+                </tr>
+                <tr>
+                    <td><code>POST .../pullrequests/{id}/merge</code></td>
+                    <td><code>bitbucket --workspace ws pr merge repo 123 --strategy merge_commit</code></td>
+                </tr>
+                <tr>
+                    <td><code>POST .../pipelines/</code></td>
+                    <td><code>bitbucket --workspace ws pipeline trigger repo --ref-name main</code></td>
+                </tr>
+                <tr>
+                    <td><code>GET .../commits</code></td>
+                    <td><code>bitbucket --workspace ws commit list repo --branch main</code></td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p>For repeatable workflows built on these commands, the <a href="/runbooks/bitbucket-pr-automation.html">Bitbucket PR automation runbook</a> shows a complete review-and-merge script, and the <a href="/blog/bitbucket-cli-guide.html">Bitbucket CLI guide</a> covers day-to-day usage in more depth. Sibling walkthroughs on <a href="/blog/bitbucket-api-from-cli.html">calling the Bitbucket API from the CLI</a> and the full <a href="/blog/bitbucket-cli-commands.html">Bitbucket CLI command list</a> go further on each area.</p>
+
+        <!-- FAQ -->
+        <h2 id="faq">FAQ</h2>
+
+        <div class="faq-item">
+            <h3>What is the base URL for the Bitbucket REST API?</h3>
+            <p>The current Bitbucket Cloud REST API is version 2.0, and every endpoint lives under <code>https://api.bitbucket.org/2.0/</code>. For example, listing repositories in a workspace is a GET request to <code>https://api.bitbucket.org/2.0/repositories/{workspace}</code>. All responses are JSON, and collection endpoints are paginated.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>How do I authenticate with the Bitbucket API?</h3>
+            <p>Bitbucket Cloud supports OAuth 2.0, app passwords used with HTTP Basic authentication, and access tokens scoped to a repository, project, or workspace. For quick scripts, an app password with Basic auth is the simplest: pass it with <code>curl -u "username:app_password"</code>. For automation, prefer a scoped access token so you can limit and revoke access without touching your account password.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Does the Bitbucket REST API have rate limits?</h3>
+            <p>Yes. Bitbucket enforces per-hour rate limits and returns an HTTP 429 status when you exceed them. When you script against the API directly, you need to detect 429 responses and back off before retrying. atlassian-cli handles this for you with automatic backoff, so bulk operations keep running without manual retries.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>How is the Bitbucket REST API paginated?</h3>
+            <p>Collection endpoints return a paginated object with a <code>values</code> array plus <code>page</code>, <code>pagelen</code>, and <code>next</code> fields. To read every result you follow the <code>next</code> URL until it disappears. You can request larger pages with the <code>pagelen</code> query parameter. A CLI wrapper like atlassian-cli walks these pages automatically so you get the full result set from a single command.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Can I use a CLI instead of calling the Bitbucket REST API directly?</h3>
+            <p>Yes. atlassian-cli is an independent open-source wrapper that maps common REST 2.0 endpoints to short commands for repositories, branches, pull requests, pipelines, and permissions. It handles authentication, pagination, and rate limiting so you do not have to write curl and jq pipelines by hand. It is not Atlassian's official CLI (<code>acli</code>).</p>
+        </div>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/bitbucket/" class="related-link">
+                <div class="related-link-title">Bitbucket CLI Hub</div>
+                <div class="related-link-desc">Every Bitbucket command atlassian-cli supports: repos, branches, PRs, pipelines, and permissions.</div>
+            </a>
+            <a href="/docs/commands.html" class="related-link">
+                <div class="related-link-title">Command Reference</div>
+                <div class="related-link-desc">Full flag-by-flag reference for Bitbucket, Jira, Confluence, and JSM commands.</div>
+            </a>
+            <a href="/runbooks/bitbucket-pr-automation.html" class="related-link">
+                <div class="related-link-title">PR Automation Runbook</div>
+                <div class="related-link-desc">A complete script that reviews, approves, and merges pull requests from the terminal.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.4.2</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

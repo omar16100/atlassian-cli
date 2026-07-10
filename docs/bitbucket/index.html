@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitbucket CLI — Automate Pull Requests, Pipelines & Repository Management | atlassian-cli</title>
-    <meta name="description" content="Automate Bitbucket from the command line with atlassian-cli. Pull requests, pipelines, branch protection, repository management — all from your terminal.">
+    <title>Bitbucket CLI, Automate Pull Requests, Pipelines & Repository Management | atlassian-cli</title>
+    <meta name="description" content="Automate Bitbucket from the command line with atlassian-cli. Pull requests, pipelines, branch protection, repository management, all from your terminal.">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Bitbucket CLI — Automate Pull Requests, Pipelines & Repository Management">
-    <meta property="og:description" content="Automate Bitbucket from the command line with atlassian-cli. Pull requests, pipelines, branch protection, repository management — all from your terminal.">
+    <meta property="og:title" content="Bitbucket CLI, Automate Pull Requests, Pipelines & Repository Management">
+    <meta property="og:description" content="Automate Bitbucket from the command line with atlassian-cli. Pull requests, pipelines, branch protection, repository management, all from your terminal.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://atlassiancli.com/bitbucket/">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Bitbucket CLI — atlassian-cli">
+    <meta name="twitter:title" content="Bitbucket CLI, atlassian-cli">
     <meta name="twitter:description" content="Automate Bitbucket from the command line. Pull requests, pipelines, branch protection, repository management.">
 
     <!-- Fonts -->
@@ -221,6 +221,7 @@
             <div class="product-hero-badge">Part of atlassian-cli</div>
             <h1>Bitbucket <span>CLI</span></h1>
             <p>Automate pull requests, pipelines, branches, and repository management from your terminal. Bearer and Basic auth supported.</p>
+            <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin:1.25rem auto 0;max-width:820px;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
             <div class="product-nav">
                 <a href="/jira/">Jira</a>
                 <a href="/confluence/">Confluence</a>
@@ -234,16 +235,17 @@
     <section class="features-section" style="padding-top: 2rem;">
         <div class="container" style="max-width: 820px;">
             <h2 class="section-title">What is the Bitbucket CLI?</h2>
-            <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">The Bitbucket CLI (<code>atlassian-cli bitbucket</code>, aliased as <code>bb</code>) is a command-line tool for Bitbucket Cloud. It covers the full repo + PR workflow — list/create/update repositories, manage branches and branch protection, open/approve/merge pull requests, trigger pipelines, rotate SSH keys, administer webhooks, and browse commits. Output formats (JSON, CSV, YAML, table) make it drop-in for CI pipelines and audits.</p>
+            <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">The Bitbucket CLI (<code>atlassian-cli bitbucket</code>, aliased as <code>bb</code>) is a command-line tool for Bitbucket Cloud. It covers the full repo + PR workflow, list/create/update repositories, manage branches and branch protection, open/approve/merge pull requests, trigger pipelines, rotate SSH keys, administer webhooks, and browse commits. Output formats (JSON, CSV, YAML, table) make it drop-in for CI pipelines and audits.</p>
             <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">It ships as part of <a href="/">atlassian-cli</a>, one open-source Rust binary that also handles <a href="/jira/">Jira</a>, <a href="/confluence/">Confluence</a>, and <a href="/jsm/">Jira Service Management</a>. Install via <a href="/install/">Homebrew or Cargo</a>, then authenticate with either a <strong>Bitbucket API token</strong> (Basic auth, personal account) or a <strong>workspace / repository access token</strong> (Bearer auth, CI-scoped). See the <a href="/docs/auth.html#bitbucket">auth guide</a> for both flows.</p>
+            <p style="color: var(--text-secondary); line-height: 1.75; font-size: 1.05rem;">If you already reach for GitHub's <code>gh</code> CLI, this gives Bitbucket Cloud the same terminal-native flow: open a pull request, approve and merge it, trigger a pipeline, or spin up a repository without leaving your shell or opening a browser tab. The <a href="/blog/bitbucket-cli-guide.html">Bitbucket CLI guide</a> walks through setup and the everyday commands end to end.</p>
 
             <h2 class="section-title" style="margin-top: 3rem;">When to use a Bitbucket CLI</h2>
             <ul style="color: var(--text-secondary); line-height: 1.8; max-width: 720px; margin: 0 auto;">
-                <li><strong>PR automation</strong> — open a PR from a build, approve + merge release branches on a schedule, post comments with test coverage results. See the <a href="/runbooks/bitbucket-pr-automation.html">PR automation runbook</a>.</li>
-                <li><strong>Branch hygiene</strong> — bulk-delete stale feature branches older than N days, protect <code>main</code> across all repos, audit current branch restrictions. See the <a href="/runbooks/bitbucket-branch-cleanup.html">branch cleanup runbook</a>.</li>
-                <li><strong>Repository inventory</strong> — list every repo in a workspace, filter by last update, find orphaned repos. The <a href="/runbooks/bitbucket-repo-audit.html">repo audit runbook</a> has a ready-made script.</li>
-                <li><strong>Pipeline orchestration</strong> — trigger pipelines from other CI systems, poll for completion, collect logs.</li>
-                <li><strong>Access reviews</strong> — list workspace members, repo permissions, and deploy keys for compliance.</li>
+                <li><strong>PR automation</strong>, open a PR from a build, approve + merge release branches on a schedule, post comments with test coverage results. See the <a href="/runbooks/bitbucket-pr-automation.html">PR automation runbook</a>.</li>
+                <li><strong>Branch hygiene</strong>, bulk-delete stale feature branches older than N days, protect <code>main</code> across all repos, audit current branch restrictions. See the <a href="/runbooks/bitbucket-branch-cleanup.html">branch cleanup runbook</a>.</li>
+                <li><strong>Repository inventory</strong>, list every repo in a workspace, filter by last update, find orphaned repos. The <a href="/runbooks/bitbucket-repo-audit.html">repo audit runbook</a> has a ready-made script.</li>
+                <li><strong>Pipeline orchestration</strong>, trigger pipelines from other CI systems, poll for completion, collect logs.</li>
+                <li><strong>Access reviews</strong>, list workspace members, repo permissions, and deploy keys for compliance.</li>
             </ul>
         </div>
     </section>
@@ -262,7 +264,7 @@
                         </svg>
                     </div>
                     <h3 class="feature-title">Repository Management</h3>
-                    <p class="feature-desc">List, create, update, and delete repositories. Bulk archive stale repos with dry-run. Full CRUD for projects and workspaces.</p>
+                    <p class="feature-desc">List, create, update, and delete repositories. Bulk archive stale repos with dry-run. Full CRUD for projects, plus workspace listing.</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -474,7 +476,7 @@ atlassian-cli bitbucket --workspace myteam \
                 <tbody style="color: var(--text-secondary);">
                     <tr style="border-bottom: 1px solid var(--border);">
                         <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#bb-repos"><code>bb repo</code></a></td>
-                        <td style="padding: 0.75rem 0.5rem;">List, get, create, update, delete repositories. Filter by project or last update.</td>
+                        <td style="padding: 0.75rem 0.5rem;">List, get, create, update, delete repositories. List accepts <code>--limit</code>.</td>
                     </tr>
                     <tr style="border-bottom: 1px solid var(--border);">
                         <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><a href="/docs/commands.html#bb-branches"><code>bb branch</code></a></td>
@@ -510,13 +512,84 @@ atlassian-cli bitbucket --workspace myteam \
         </div>
     </section>
 
+    <!-- Common commands -->
+    <section class="features-section" style="background: var(--bg-secondary);">
+        <div class="container" style="max-width: 880px;">
+            <h2 class="section-title">Common Bitbucket commands</h2>
+            <p class="section-subtitle">The handful you reach for daily. Every flag is verified against the <a href="/docs/commands.html">command reference</a>.</p>
+            <p style="color: var(--text-secondary);">Prefix each with <code>atlassian-cli</code> (<code>bb</code> is the built-in alias for <code>bitbucket</code>). Where a repository is involved, add <code>--workspace &lt;name&gt;</code>, for example <code>atlassian-cli bb --workspace myteam pr list api-service</code>.</p>
+            <table style="width: 100%; margin: 2rem 0; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <th style="text-align: left; padding: 0.75rem 0.5rem; color: var(--text-primary); font-weight: 600;">Command</th>
+                        <th style="text-align: left; padding: 0.75rem 0.5rem; color: var(--text-primary); font-weight: 600;">What it does</th>
+                    </tr>
+                </thead>
+                <tbody style="color: var(--text-secondary);">
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb repo list</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">List every repository in the workspace.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb repo get &lt;repo&gt;</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Show a single repository's details.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb pr list &lt;repo&gt; --state OPEN</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">List open pull requests (add <code>--format json</code> for CI).</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb pr create &lt;repo&gt; --title … --source … --destination …</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Open a pull request between two branches.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb pr approve &lt;repo&gt; &lt;id&gt;</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Approve a pull request.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb pr merge &lt;repo&gt; &lt;id&gt; --strategy merge_commit</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Merge a pull request with a chosen strategy.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb branch protect &lt;repo&gt; --pattern "main" --kind restrict_merges --approvals 2</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Require approvals before merging into a branch.</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb pipeline trigger &lt;repo&gt; --ref-name main</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Start a pipeline on a branch (add <code>--custom-pipeline &lt;name&gt;</code> for a named pipeline).</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb bulk delete-branches &lt;repo&gt; --dry-run</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Preview a stale-branch cleanup before deleting.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75rem 0.5rem; vertical-align: top;"><code>bb whoami</code></td>
+                        <td style="padding: 0.75rem 0.5rem;">Show the authenticated Bitbucket account.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h2 class="section-title" style="margin-top: 3rem;">Common tasks</h2>
+            <p class="section-subtitle">Map a job to the exact command.</p>
+            <ul style="color: var(--text-secondary); line-height: 1.9; max-width: 780px; margin: 0 auto;">
+                <li><strong>Open a PR from a build</strong>, <code>bb --workspace myteam pr create api-service --title "Ship it" --source feature/x --destination main</code>. Full example in the <a href="/runbooks/bitbucket-pr-automation.html">PR automation runbook</a>.</li>
+                <li><strong>Approve and merge a release PR</strong>, <code>bb --workspace myteam pr approve api-service 42</code> then <code>bb --workspace myteam pr merge api-service 42 --strategy merge_commit</code>.</li>
+                <li><strong>Trigger a deploy pipeline</strong>, <code>bb --workspace myteam pipeline trigger api-service --ref-name main --custom-pipeline &lt;name&gt;</code>.</li>
+                <li><strong>Lock down <code>main</code></strong>, <code>bb --workspace myteam branch protect api-service --pattern "main" --kind restrict_merges --approvals 2</code>. See the <a href="/runbooks/bitbucket-branch-cleanup.html">branch cleanup runbook</a>.</li>
+                <li><strong>Clean up merged branches</strong>, <code>bb --workspace myteam bulk delete-branches api-service --exclude feature/keep --dry-run</code>.</li>
+                <li><strong>Audit repository access</strong>, <code>bb --workspace myteam permission list api-service</code>. The <a href="/runbooks/bitbucket-repo-audit.html">repo audit runbook</a> scripts a full workspace sweep.</li>
+                <li><strong>Confirm which token is active</strong>, <code>bb whoami --profile bb-ci</code>.</li>
+            </ul>
+        </div>
+    </section>
+
     <!-- FAQ -->
     <section class="features-section" style="background: var(--bg-primary);">
         <div class="container" style="max-width: 760px;">
             <h2 class="section-title">Frequently asked questions</h2>
             <div style="margin-top: 2rem; color: var(--text-secondary); line-height: 1.7;">
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">What's the difference between Basic and Bearer auth for Bitbucket?</h3>
-                <p><strong>Basic auth</strong> uses an Atlassian API token scoped to Bitbucket — it authenticates as <em>your</em> account and needs your email. Good for personal day-to-day work. <strong>Bearer auth</strong> uses a repository/workspace/project <em>access token</em> — it's scoped to a specific resource and doesn't need an email, so it's the right choice for CI. App passwords are deprecated (creation ended Sep 9, 2025; existing app passwords stop working Jun 9, 2026). Full setup in the <a href="/docs/auth.html#bitbucket">auth guide</a>.</p>
+                <p><strong>Basic auth</strong> uses an Atlassian API token scoped to Bitbucket, it authenticates as <em>your</em> account and needs your email. Good for personal day-to-day work. <strong>Bearer auth</strong> uses a repository/workspace/project <em>access token</em>, it's scoped to a specific resource and doesn't need an email, so it's the right choice for CI. App passwords are deprecated (creation ended Sep 9, 2025; existing app passwords stop working Jun 9, 2026). Full setup in the <a href="/docs/auth.html#bitbucket">auth guide</a>.</p>
 
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Can I use <code>bb</code> instead of <code>bitbucket</code>?</h3>
                 <p>Yes. <code>bb</code> is the built-in visible alias. <code>atlassian-cli bb pr list myteam api-service</code> is identical to <code>atlassian-cli bitbucket pr list myteam api-service</code>.</p>
@@ -528,10 +601,10 @@ atlassian-cli bitbucket --workspace myteam \
                 <p>Yes. <code>atlassian-cli bb --workspace myteam bulk delete-branches api-service --exclude feature/keep --dry-run</code> prints the list of branches that would go, filtered by your exclusion patterns. Remove <code>--dry-run</code> once it looks right. The <a href="/runbooks/bitbucket-branch-cleanup.html">branch cleanup runbook</a> walks through a production version.</p>
 
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Does it support self-hosted Bitbucket?</h3>
-                <p>Current focus is Bitbucket Cloud. Bitbucket Data Center has a different REST API surface — check the <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub repo</a> for any DC-specific work.</p>
+                <p>Current focus is Bitbucket Cloud. Bitbucket Data Center has a different REST API surface, check the <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub repo</a> for any DC-specific work.</p>
 
                 <h3 style="color: var(--text-primary); margin-top: 1.5rem;">Is it free?</h3>
-                <p>Yes — MIT licensed. Bitbucket Cloud itself has a free tier for small teams; the CLI works with any plan.</p>
+                <p>Yes, MIT licensed. Bitbucket Cloud itself has a free tier for small teams; the CLI works with any plan.</p>
             </div>
         </div>
     </section>
@@ -542,6 +615,10 @@ atlassian-cli bitbucket --workspace myteam \
             <h2 class="section-title">Related Resources</h2>
             <p class="section-subtitle">Guides, runbooks, and more</p>
             <div class="resources-grid">
+                <a href="/blog/bitbucket-cli-guide.html" class="resource-card">
+                    <h4>Bitbucket CLI Guide</h4>
+                    <p>Step-by-step walkthrough: install, authenticate, and run your first PR, pipeline, and branch commands.</p>
+                </a>
                 <a href="/blog/" class="resource-card">
                     <h4>Blog</h4>
                     <p>Tutorials, release notes, and automation tips for Bitbucket and the full Atlassian stack.</p>

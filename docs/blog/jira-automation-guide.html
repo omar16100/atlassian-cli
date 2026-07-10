@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Automation Beyond the Rules Engine | atlassian-cli Blog</title>
+    <meta name="description" content="When to use Jira automation rules versus scripted CLI automation. A tradeoffs guide to the built-in rules engine, batch scripting, and driving Jira from the terminal.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Jira Automation Beyond the Rules Engine: A CLI Approach">
+    <meta property="og:description" content="When to use Jira automation rules versus scripted CLI automation. A tradeoffs guide to the built-in rules engine, batch scripting, and driving Jira from the terminal.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/jira-automation-guide.html">
+    <meta property="article:published_time" content="2026-07-10T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Jira Automation Beyond the Rules Engine: A CLI Approach">
+    <meta name="twitter:description" content="When to use Jira automation rules versus scripted CLI automation. A tradeoffs guide to the built-in rules engine, batch scripting, and driving Jira from the terminal.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/jira-automation-guide.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Breadcrumb -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Jira Automation Beyond the Rules Engine", "item": "https://atlassiancli.com/blog/jira-automation-guide.html"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Jira Automation Beyond the Rules Engine: A CLI Approach",
+      "description": "When to use Jira automation rules versus scripted CLI automation. A tradeoffs guide to the built-in rules engine, batch scripting, and driving Jira from the terminal.",
+      "datePublished": "2026-07-10T00:00:00Z",
+      "dateModified": "2026-07-10T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/jira-automation-guide.html"
+      },
+      "url": "https://atlassiancli.com/blog/jira-automation-guide.html",
+      "inLanguage": "en-US",
+      "keywords": "jira automation, jira automation rules, jira cli automation, automation for jira, scripted jira automation"
+    }
+    </script>
+
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Should I use Jira's automation rules or a script?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Use the built-in rules engine for things that must happen the instant an event fires inside Jira: auto-assigning a new bug, transitioning a parent when subtasks close, posting a comment on status change. Reach for scripted CLI automation when the work is a batch, spans multiple tools, needs to run on a schedule, or should live in version control and code review. Most teams end up using both, with the rules engine handling reactive event logic and scripts handling scheduled or ad hoc jobs."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can Jira automation rules do bulk backfills?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The rules engine is event-driven, so it is a poor fit for one-off backfills across thousands of existing issues. It also has per-rule and per-plan execution limits. For a large historical change, a CLI batch is a better tool: atlassian-cli jira bulk transition takes a JQL query, supports a --dry-run preview, and processes issues with controlled concurrency and rate-limit backoff, so you can run the whole set once and walk away."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What can a CLI do that Automation for Jira can't?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A CLI runs outside Jira, so it can pipe issue data to jq, commit scripts to git, run inside CI next to your build, and coordinate Jira with other systems in the same script. It also makes automation reviewable and versioned: the logic is text you can diff, not a rule buried in a project setting. atlassian-cli exposes JSON and CSV output and a quiet mode for CI gating that the in-app rules editor does not."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli the same as Jira's automation engine?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Automation for Jira is Atlassian's built-in no-code rules engine that runs inside the product. atlassian-cli is an independent, community open-source binary you run from your own terminal or pipeline. It does not replace the rules engine and cannot register in-app triggers; it drives the same REST and Agile APIs from the outside, and can even list your existing rules with jira automation list so you can audit them alongside scripted jobs."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment {
+            color: var(--text-muted);
+        }
+
+        .article-body pre .string {
+            color: var(--accent-cyan);
+        }
+
+        /* Comparison table */
+        .comparison-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.825rem;
+            min-width: 680px;
+        }
+
+        .comparison-table thead {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table th {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.775rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .comparison-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+
+        .comparison-table tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table .tool-name {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        /* Decision cards */
+        .decision-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .decision-card h4 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+
+        .decision-card p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* FAQ section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .faq-item h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .faq-item p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* Article CTA */
+        .article-cta {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .article-cta h3 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+        }
+
+        .article-cta p {
+            margin-bottom: 1.25rem;
+        }
+
+        .article-cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--accent-cyan);
+            color: #000;
+            padding: 0.625rem 1.25rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            border-bottom: none !important;
+        }
+
+        .article-cta-btn:hover {
+            background: #00e6b8;
+            transform: translateY(-1px);
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1rem 4rem;
+            }
+
+            .article-body h2 {
+                font-size: 1.25rem;
+            }
+
+            .toc {
+                padding: 1.25rem;
+            }
+
+            .related-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="article-meta">
+                <span class="article-meta-item">July 10, 2026</span>
+                <span class="article-meta-item">~7 min read</span>
+                <span class="article-keyword">jira automation</span>
+            </div>
+            <h1 class="article-title">Jira Automation Beyond the Rules Engine: A CLI Approach</h1>
+            <p class="article-subtitle">The built-in rules engine is not the whole story. Here is how to decide between no-code Jira automation rules and scripted CLI automation, and where each one earns its keep.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#two-kinds">Two Kinds of Jira Automation</a></li>
+                <li><a href="#rules-engine">Where the Rules Engine Wins</a></li>
+                <li><a href="#rules-wall">Where the Rules Engine Hits a Wall</a></li>
+                <li><a href="#cli-adds">What CLI-Driven Automation Adds</a></li>
+                <li><a href="#comparison">Rules Engine vs. CLI Script</a></li>
+                <li><a href="#in-practice">What CLI Automation Looks Like</a></li>
+                <li><a href="#both">Using Both Together</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- Section 1 -->
+        <h2 id="two-kinds">Two Kinds of Jira Automation</h2>
+
+        <p>When people say <strong>Jira automation</strong>, they usually mean one thing: the built-in rules engine, Automation for Jira, where you assemble a trigger, some conditions, and actions in a visual editor. That engine is genuinely good, and for a large share of everyday work it is the right answer. But it is only half the picture.</p>
+
+        <p>There is a second model: <strong>scripted automation</strong> that runs outside Jira and drives its REST and Agile APIs from your own terminal, a cron job, or a CI pipeline. This post is a decision guide, not a recipe list. The short version: use the rules engine for reactive, event-driven logic that must fire the moment something changes inside Jira, and reach for a CLI or script when the work is a batch, spans several tools, needs to run on a schedule, or should live in version control. Most mature teams run both.</p>
+
+        <p>A note on tooling before we go further. <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> is an independent, community open-source project. It is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/">acli</a>) and is not affiliated with Atlassian. Use the official <code>acli</code> if you want first-party vendor support; use atlassian-cli if you want a single free Rust binary spanning Jira, Confluence, Bitbucket, and JSM. Neither one is the rules engine. Both drive the same public APIs from the outside.</p>
+
+        <!-- Section 2 -->
+        <h2 id="rules-engine">Where the Rules Engine Wins</h2>
+
+        <p>The rules engine's core strength is that it lives inside Jira and reacts to events in real time. When an issue is created, transitioned, commented on, or edited, a rule can respond within the same request cycle. Nothing you run from the outside can match that latency, because there is no polling gap: the trigger is the event itself.</p>
+
+        <p>It shines for logic like:</p>
+
+        <ul>
+            <li><strong>Reactive field and status changes:</strong> auto-assign a new bug to the on-call engineer, set a due date when priority becomes Highest, or move a parent to "In Progress" the moment its first subtask starts.</li>
+            <li><strong>Cross-issue linking rules:</strong> close a parent when all subtasks are done, or clone an issue into another project on a specific transition.</li>
+            <li><strong>Low-code accessibility:</strong> a project admin can build and edit rules without touching an API token, a script, or a deploy pipeline.</li>
+        </ul>
+
+        <p>If a non-developer owns the workflow and the logic is "when X happens inside this project, do Y," the rules engine is almost always the correct and cheapest tool. Do not script something the visual editor already does well.</p>
+
+        <!-- Section 3 -->
+        <h2 id="rules-wall">Where the Rules Engine Hits a Wall</h2>
+
+        <p>The same design that makes the rules engine great at reacting to single events makes it awkward for other jobs. Three limits show up repeatedly:</p>
+
+        <p><strong>It is event-driven, so backfills are painful.</strong> Rules fire when something changes. If you need to apply a one-time change across ten thousand existing issues, there is no natural trigger. Teams end up faking one by bulk-editing issues just to make rules fire, which is fragile and hard to reason about.</p>
+
+        <p><strong>Execution is metered and bounded.</strong> Automation runs against per-plan execution limits, and heavy rules can consume budget quickly. A giant historical sweep is exactly the kind of work that bumps into those ceilings.</p>
+
+        <p><strong>Logic lives in a setting, not in version control.</strong> A rule is configuration inside a project. You cannot easily diff it, code-review a change, or roll it back the way you would a file in git. For teams that treat infrastructure as code, that opacity is a real cost. Auditing "what automation do we even have?" across many projects is tedious in the UI.</p>
+
+        <p>None of this makes the rules engine bad. It means the rules engine is the wrong shape for batch work, versioned logic, and anything that has to reach beyond Jira.</p>
+
+        <!-- Section 4 -->
+        <h2 id="cli-adds">What CLI-Driven Automation Adds</h2>
+
+        <p>Running automation from a command line flips every one of those constraints. Because the logic lives in a script you own, it is text you can commit, diff, and review. Because it runs outside Jira, it can talk to other systems in the same breath, and it treats a batch of ten thousand issues as a normal Tuesday.</p>
+
+        <p>The properties that matter:</p>
+
+        <ul>
+            <li><strong>Batch-native.</strong> A single command takes a JQL query and acts on the whole result set, with a preview step and concurrency control built in.</li>
+            <li><strong>Composable.</strong> JSON output pipes straight into <code>jq</code>, spreadsheets, or another tool. The automation is a shell pipeline, not a walled garden.</li>
+            <li><strong>Scheduled and reproducible.</strong> The same script runs from your laptop, a cron job, or a CI stage. There is no hidden state: what you read is what runs.</li>
+            <li><strong>Versioned and reviewable.</strong> Because it is a file, a change to your automation goes through the same pull request and review as any other code.</li>
+        </ul>
+
+        <p>Crucially, a CLI does not compete with the rules engine on latency. It is not trying to react to a single event in milliseconds. It is for the jobs the rules engine was never meant to do.</p>
+
+        <!-- Section 5 -->
+        <h2 id="comparison">Rules Engine vs. CLI Script</h2>
+
+        <p>Here is the tradeoff at a glance. Read it as "which shape fits the job," not "which is better."</p>
+
+        <div class="comparison-table-wrapper">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Dimension</th>
+                        <th>Rules engine (Automation for Jira)</th>
+                        <th>Scripted CLI automation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="tool-name">Trigger model</td>
+                        <td>Real-time, event-driven inside Jira</td>
+                        <td>You invoke it: manual, cron, or CI</td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Best for</td>
+                        <td>Reactive single-issue logic</td>
+                        <td>Batches, reports, scheduled jobs</td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Backfills</td>
+                        <td>Awkward, no natural trigger</td>
+                        <td>Native, one JQL query</td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Version control</td>
+                        <td>Config in a project setting</td>
+                        <td>A file you diff and review</td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Reaches other tools</td>
+                        <td>Limited to configured integrations</td>
+                        <td>Any tool in the same shell pipeline</td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Who owns it</td>
+                        <td>Project admins, no code needed</td>
+                        <td>Anyone comfortable in a terminal</td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Latency</td>
+                        <td>Instant on the triggering event</td>
+                        <td>Whenever the job runs</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Section 6 -->
+        <h2 id="in-practice">What CLI Automation Looks Like</h2>
+
+        <p>To make the second model concrete, here are the building blocks with real atlassian-cli commands. These are illustrative primitives, not a copy-paste playbook; the sibling posts below collect worked examples.</p>
+
+        <p>First, audit the automation you already have. The CLI can list existing rules and webhooks so you can inventory reactive logic before you decide what to script:</p>
+
+        <pre><code><span class="comment"># See the rules and webhooks that already run inside Jira</span>
+atlassian-cli jira automation list
+atlassian-cli jira webhooks list</code></pre>
+
+        <p>Next, the batch job that the rules engine struggles with. Every bulk command previews with <code>--dry-run</code> before it changes anything, so you always see the blast radius first:</p>
+
+        <pre><code><span class="comment"># Backfill a status change across a large historical set</span>
+atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = DEV AND status = 'In Review' AND updated < -90d"</span> \
+  --transition <span class="string">"Done"</span> \
+  --dry-run</code></pre>
+
+        <p>Then a scheduled reporting job. Because output is machine-readable, the automation is just a pipeline into <code>jq</code>:</p>
+
+        <pre><code><span class="comment"># Count open bugs by priority for a weekly digest</span>
+atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV AND type = Bug AND statusCategory != Done"</span> \
+  --format json | jq <span class="string">'group_by(.fields.priority.name)
+    | map({priority: .[0].fields.priority.name, count: length})'</span></code></pre>
+
+        <p>And a CI gate, using the <code>quiet</code> format so the exit code is the whole signal:</p>
+
+        <pre><code><span class="comment"># Fail a pipeline stage if credentials are not valid</span>
+atlassian-cli auth test --profile prod --format quiet &amp;&amp; echo <span class="string">"Jira reachable"</span></code></pre>
+
+        <p>Finally, the compliance angle the rules engine cannot give you directly: an exportable trail of who changed what. The <code>audit</code> and <code>--envelope</code> flags make the data downstream-friendly:</p>
+
+        <pre><code><span class="comment"># Pull the audit log for review, wrapped for easy parsing</span>
+atlassian-cli jira audit list --from 2026-01-01 --limit 200 \
+  --format json --envelope</code></pre>
+
+        <p>Every one of these lives in a file you can commit. If you want a hardened version of the batch pattern with confirmation prompts and error handling, see the <a href="/runbooks/jira-sprint-report.html">sprint report runbook</a>, and the full flag list is in the <a href="/docs/commands.html">command reference</a>.</p>
+
+        <!-- Section 7 -->
+        <h2 id="both">Using Both Together</h2>
+
+        <p>The best setups do not choose. They split responsibilities along the grain of each tool. A simple rule of thumb:</p>
+
+        <div class="decision-card">
+            <h4>Let the rules engine own reactions</h4>
+            <p>Anything that must respond to a live event stays in Automation for Jira: assignment on create, transition on subtask completion, notifications on status change. It is instant and any project admin can maintain it.</p>
+        </div>
+
+        <div class="decision-card">
+            <h4>Let scripts own batches and schedules</h4>
+            <p>Nightly cleanups, weekly reports, quarterly backfills, and cross-tool sync belong in a CLI script run by cron or CI. These are versioned, reviewable, and unbounded by rule execution budgets.</p>
+        </div>
+
+        <div class="decision-card">
+            <h4>Let the CLI keep the rules engine honest</h4>
+            <p>Use <code>jira automation list</code> and <code>jira audit list</code> to inventory and audit your reactive rules from the outside, so the automation you cannot easily diff in the UI still shows up in a report you can.</p>
+        </div>
+
+        <p>Framed this way, the CLI is not a rival to the rules engine. It is the layer that covers the batch, scheduled, and auditable work the rules engine was never built for, while the rules engine keeps doing the instant, in-product reactions it does best. For deeper end-to-end walkthroughs, the <a href="/blog/jira-cli-complete-guide.html">complete Jira CLI guide</a> and the <a href="/jira/">Jira CLI reference</a> cover the full command surface, and <a href="/blog/jira-bulk-operations.html">bulk Jira operations</a> goes deep on the batch side specifically.</p>
+
+        <!-- FAQ -->
+        <h2 id="faq">FAQ</h2>
+
+        <div class="faq-item">
+            <h3>Should I use Jira's automation rules or a script?</h3>
+            <p>Use the built-in rules engine for things that must happen the instant an event fires inside Jira: auto-assigning a new bug, transitioning a parent when subtasks close, posting a comment on status change. Reach for scripted CLI automation when the work is a batch, spans multiple tools, needs to run on a schedule, or should live in version control and code review. Most teams end up using both, with the rules engine handling reactive event logic and scripts handling scheduled or ad hoc jobs.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Can Jira automation rules do bulk backfills?</h3>
+            <p>The rules engine is event-driven, so it is a poor fit for one-off backfills across thousands of existing issues. It also has per-rule and per-plan execution limits. For a large historical change, a CLI batch is a better tool: <code>atlassian-cli jira bulk transition</code> takes a JQL query, supports a <code>--dry-run</code> preview, and processes issues with controlled concurrency and rate-limit backoff, so you can run the whole set once and walk away.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>What can a CLI do that Automation for Jira can't?</h3>
+            <p>A CLI runs outside Jira, so it can pipe issue data to <code>jq</code>, commit scripts to git, run inside CI next to your build, and coordinate Jira with other systems in the same script. It also makes automation reviewable and versioned: the logic is text you can diff, not a rule buried in a project setting. atlassian-cli exposes JSON and CSV output and a quiet mode for CI gating that the in-app rules editor does not.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Is atlassian-cli the same as Jira's automation engine?</h3>
+            <p>No. Automation for Jira is Atlassian's built-in no-code rules engine that runs inside the product. atlassian-cli is an independent, community open-source binary you run from your own terminal or pipeline. It does not replace the rules engine and cannot register in-app triggers; it drives the same REST and Agile APIs from the outside, and can even list your existing rules with <code>jira automation list</code> so you can audit them alongside scripted jobs.</p>
+        </div>
+
+        <!-- CTA -->
+        <div class="article-cta">
+            <h3>Try atlassian-cli</h3>
+            <p>One free, MIT-licensed Rust binary for scripted Jira, Confluence, Bitbucket, and JSM automation. No account required to install.</p>
+            <a href="/install/" class="article-cta-btn">Install Now</a>
+        </div>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/blog/jira-automation-rules-examples.html" class="related-link">
+                <div class="related-link-title">Jira Automation Rules Examples</div>
+                <div class="related-link-desc">Worked examples of rules-engine automations and how to recreate them as scripts.</div>
+            </a>
+            <a href="/blog/jira-automation-examples.html" class="related-link">
+                <div class="related-link-title">Jira Automation Examples</div>
+                <div class="related-link-desc">Practical, copy-pasteable automation recipes for the terminal and CI.</div>
+            </a>
+            <a href="/blog/jira-cli-complete-guide.html" class="related-link">
+                <div class="related-link-title">Complete Jira CLI Guide</div>
+                <div class="related-link-desc">Everything you need to know about managing Jira from the terminal.</div>
+            </a>
+            <a href="/jira/" class="related-link">
+                <div class="related-link-title">Jira CLI Reference</div>
+                <div class="related-link-desc">Full command reference for Jira issue search, transitions, bulk, and automation listing.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.4.2</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

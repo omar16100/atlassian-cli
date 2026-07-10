@@ -1,0 +1,3779 @@
+{
+  "id": "07101843-1272-0399-0000-1128455d7c32",
+  "status_code": 20000,
+  "status_message": "Ok.",
+  "items": [
+    {
+      "se_type": "google",
+      "keyword": "service management jira",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-14 14:21:45 +00:00",
+        "competition": 0.51,
+        "competition_level": "MEDIUM",
+        "cpc": 19.09,
+        "search_volume": 6600,
+        "low_top_of_page_bid": 11.05,
+        "high_top_of_page_bid": 40,
+        "categories": [
+          10004,
+          10276
+        ],
+        "monthly_searches": {
+          "2026-05": 6600,
+          "2026-04": 6600,
+          "2026-03": 6600,
+          "2026-02": 6600,
+          "2026-01": 6600,
+          "2025-12": 5400,
+          "2025-11": 5400,
+          "2025-10": 6600,
+          "2025-09": 6600,
+          "2025-08": 6600,
+          "2025-07": 6600,
+          "2025-06": 6600
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 37,
+        "detected_language": "en",
+        "words_count": 3
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11399.4,
+        "dofollow": 2575.9,
+        "referring_pages": 2621.7,
+        "referring_domains": 119.2,
+        "referring_main_domains": 106.9,
+        "rank": 213.5,
+        "main_domain_rank": 565,
+        "last_updated_time": "2026-06-18 20:09:14 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-28 22:17:57 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 16:26:20 +00:00",
+        "competition": 0.51,
+        "competition_level": "MEDIUM",
+        "cpc": 19.09,
+        "search_volume": 6600,
+        "low_top_of_page_bid": 11.05,
+        "high_top_of_page_bid": 40,
+        "categories": [
+          10004,
+          10276
+        ],
+        "monthly_searches": {
+          "2026-05": 6600,
+          "2026-04": 6600,
+          "2026-03": 6600,
+          "2026-02": 6600,
+          "2026-01": 6600,
+          "2025-12": 5400,
+          "2025-11": 5400,
+          "2025-10": 6600,
+          "2025-09": 6600,
+          "2025-08": 6600,
+          "2025-07": 6600,
+          "2025-06": 6600
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 29,
+        "detected_language": "en",
+        "words_count": 3
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11022.7,
+        "dofollow": 2416.6,
+        "referring_pages": 2459.8,
+        "referring_domains": 109.9,
+        "referring_main_domains": 98.7,
+        "rank": 171,
+        "main_domain_rank": 645.6,
+        "last_updated_time": "2026-05-16 05:32:13 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 01:44:21 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management pricing",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-15 06:34:44 +00:00",
+        "competition": 0.34,
+        "competition_level": "MEDIUM",
+        "cpc": 8.55,
+        "search_volume": 880,
+        "low_top_of_page_bid": 1.89,
+        "high_top_of_page_bid": 32.64,
+        "categories": [
+          10004,
+          10276,
+          11098
+        ],
+        "monthly_searches": {
+          "2026-05": 720,
+          "2026-04": 720,
+          "2026-03": 1000,
+          "2026-02": 880,
+          "2026-01": 880,
+          "2025-12": 720,
+          "2025-11": 720,
+          "2025-10": 1600,
+          "2025-09": 1300,
+          "2025-08": 1000,
+          "2025-07": 1000,
+          "2025-06": 1000
+        },
+        "search_volume_trend": {
+          "quarterly": -28,
+          "yearly": -28
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 29,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11239.9,
+        "dofollow": 2540.6,
+        "referring_pages": 2654,
+        "referring_domains": 173.5,
+        "referring_main_domains": 157.5,
+        "rank": 176.2,
+        "main_domain_rank": 590.4,
+        "last_updated_time": "2026-05-19 07:48:57 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "last_updated_time": "2026-04-28 01:33:25 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "atlassian jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-16 01:18:08 +00:00",
+        "competition": 0.07,
+        "competition_level": "LOW",
+        "cpc": 7.07,
+        "search_volume": 480,
+        "low_top_of_page_bid": 7.52,
+        "high_top_of_page_bid": 32.53,
+        "categories": [
+          10004,
+          10276,
+          11088
+        ],
+        "monthly_searches": {
+          "2026-05": 590,
+          "2026-04": 590,
+          "2026-03": 480,
+          "2026-02": 720,
+          "2026-01": 480,
+          "2025-12": 390,
+          "2025-11": 590,
+          "2025-10": 480,
+          "2025-09": 480,
+          "2025-08": 480,
+          "2025-07": 480,
+          "2025-06": 390
+        },
+        "search_volume_trend": {
+          "quarterly": 23,
+          "yearly": 84
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 32,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11404.1,
+        "dofollow": 2551.1,
+        "referring_pages": 2600.2,
+        "referring_domains": 121.6,
+        "referring_main_domains": 109.5,
+        "rank": 185.4,
+        "main_domain_rank": 644.7,
+        "last_updated_time": "2026-07-04 00:24:15 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-29 08:41:55 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "what is jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-18 05:26:33 +00:00",
+        "competition": 0.35,
+        "competition_level": "MEDIUM",
+        "cpc": 6.78,
+        "search_volume": 260,
+        "low_top_of_page_bid": 1.63,
+        "high_top_of_page_bid": 19.82,
+        "categories": [
+          10004,
+          10276,
+          11092
+        ],
+        "monthly_searches": {
+          "2026-05": 210,
+          "2026-04": 260,
+          "2026-03": 260,
+          "2026-02": 210,
+          "2026-01": 260,
+          "2025-12": 210,
+          "2025-11": 260,
+          "2025-10": 260,
+          "2025-09": 390,
+          "2025-08": 260,
+          "2025-07": 320,
+          "2025-06": 260
+        },
+        "search_volume_trend": {
+          "monthly": -19,
+          "quarterly": -19,
+          "yearly": -34
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 23,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11320.2,
+        "dofollow": 2479.3,
+        "referring_pages": 2524.1,
+        "referring_domains": 116,
+        "referring_main_domains": 105,
+        "rank": 148.1,
+        "main_domain_rank": 594.3,
+        "last_updated_time": "2026-07-06 04:19:18 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "last_updated_time": "2026-04-30 00:37:41 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management itsm",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 17:34:07 +00:00",
+        "competition": 0.01,
+        "competition_level": "LOW",
+        "cpc": 7.28,
+        "search_volume": 210,
+        "low_top_of_page_bid": 7.99,
+        "high_top_of_page_bid": 21.96,
+        "categories": [
+          10004,
+          10276
+        ],
+        "monthly_searches": {
+          "2026-05": 210,
+          "2026-04": 260,
+          "2026-03": 480,
+          "2026-02": 170,
+          "2026-01": 140,
+          "2025-12": 110,
+          "2025-11": 110,
+          "2025-10": 70,
+          "2025-09": 260,
+          "2025-08": 170,
+          "2025-07": 320,
+          "2025-06": 260
+        },
+        "search_volume_trend": {
+          "monthly": -19,
+          "quarterly": -56
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 24,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11369,
+        "dofollow": 2512.9,
+        "referring_pages": 2569.9,
+        "referring_domains": 138.2,
+        "referring_main_domains": 125.7,
+        "rank": 142,
+        "main_domain_rank": 626.9,
+        "last_updated_time": "2026-07-07 14:15:55 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-29 14:47:44 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management logo",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 15:11:01 +00:00",
+        "competition": 0.01,
+        "competition_level": "LOW",
+        "search_volume": 170,
+        "categories": [
+          10004,
+          10276,
+          11088
+        ],
+        "monthly_searches": {
+          "2026-05": 110,
+          "2026-04": 170,
+          "2026-03": 140,
+          "2026-02": 110,
+          "2026-01": 140,
+          "2025-12": 90,
+          "2025-11": 140,
+          "2025-10": 210,
+          "2025-09": 260,
+          "2025-08": 170,
+          "2025-07": 170,
+          "2025-06": 170
+        },
+        "search_volume_trend": {
+          "monthly": -35,
+          "quarterly": -21,
+          "yearly": -21
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 70,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 405627.3,
+        "dofollow": 108314.9,
+        "referring_pages": 362608.1,
+        "referring_domains": 2762.4,
+        "referring_main_domains": 2497.6,
+        "rank": 348.6,
+        "main_domain_rank": 631.5,
+        "last_updated_time": "2026-07-09 06:52:07 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 04:40:58 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management free plan",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 14:00:49 +00:00",
+        "competition": 0.01,
+        "competition_level": "LOW",
+        "search_volume": 170,
+        "categories": [
+          10007,
+          10878,
+          11511,
+          12764,
+          13419
+        ],
+        "monthly_searches": {
+          "2026-05": 70,
+          "2026-04": 140,
+          "2026-03": 320,
+          "2026-02": 170,
+          "2026-01": 70,
+          "2025-12": 90,
+          "2025-11": 170,
+          "2025-10": 140,
+          "2025-09": 210,
+          "2025-08": 260,
+          "2025-07": 170,
+          "2025-06": 70
+        },
+        "search_volume_trend": {
+          "monthly": -50,
+          "quarterly": -78,
+          "yearly": 250
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 14,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 106.1,
+        "dofollow": 69.5,
+        "referring_pages": 98.3,
+        "referring_domains": 27.5,
+        "referring_main_domains": 25.5,
+        "rank": 114.5,
+        "main_domain_rank": 568.3,
+        "last_updated_time": "2026-07-09 06:51:55 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "last_updated_time": "2026-04-28 15:51:05 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management ticketing system",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-16 08:33:45 +00:00",
+        "competition": 0.06,
+        "competition_level": "LOW",
+        "search_volume": 140,
+        "low_top_of_page_bid": 8.31,
+        "high_top_of_page_bid": 48.25,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 70,
+          "2026-04": 110,
+          "2026-03": 140,
+          "2026-02": 70,
+          "2026-01": 210,
+          "2025-12": 480,
+          "2025-11": 70,
+          "2025-10": 90,
+          "2025-09": 70,
+          "2025-08": 210,
+          "2025-07": 110,
+          "2025-06": 170
+        },
+        "search_volume_trend": {
+          "monthly": -36,
+          "quarterly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 21,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11074.4,
+        "dofollow": 2469.9,
+        "referring_pages": 2533.9,
+        "referring_domains": 131.5,
+        "referring_main_domains": 119.7,
+        "rank": 133.7,
+        "main_domain_rank": 640.5,
+        "last_updated_time": "2026-05-27 02:35:39 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 09:10:21 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "atlassian jira service management pricing",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-15 05:31:34 +00:00",
+        "competition": 0.02,
+        "competition_level": "LOW",
+        "cpc": 6.75,
+        "search_volume": 140,
+        "low_top_of_page_bid": 2.12,
+        "high_top_of_page_bid": 29.32,
+        "categories": [
+          10004,
+          10276,
+          11098
+        ],
+        "monthly_searches": {
+          "2026-05": 320,
+          "2026-04": 50,
+          "2026-03": 480,
+          "2026-02": 70,
+          "2026-01": 30,
+          "2025-12": 50,
+          "2025-11": 20,
+          "2025-10": 170,
+          "2025-09": 70,
+          "2025-08": 110,
+          "2025-07": 110,
+          "2025-06": 90
+        },
+        "search_volume_trend": {
+          "monthly": 540,
+          "quarterly": -33,
+          "yearly": 540
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 7,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 14.7,
+        "dofollow": 7.5,
+        "referring_pages": 12.4,
+        "referring_domains": 5,
+        "referring_main_domains": 4,
+        "rank": 87.2,
+        "main_domain_rank": 500.8,
+        "last_updated_time": "2026-05-04 03:49:59 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-29 02:43:19 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management jsm",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 12:41:18 +00:00",
+        "competition": 0.17,
+        "competition_level": "LOW",
+        "cpc": 27.59,
+        "search_volume": 110,
+        "low_top_of_page_bid": 10.3,
+        "high_top_of_page_bid": 43.68,
+        "categories": [
+          10007,
+          11493,
+          13418
+        ],
+        "monthly_searches": {
+          "2026-06": 140,
+          "2026-05": 110,
+          "2026-04": 110,
+          "2026-03": 170,
+          "2026-02": 140,
+          "2026-01": 140,
+          "2025-12": 110,
+          "2025-11": 70,
+          "2025-10": 110,
+          "2025-09": 90,
+          "2025-08": 110,
+          "2025-07": 50
+        },
+        "search_volume_trend": {
+          "monthly": 27,
+          "quarterly": 27,
+          "yearly": 250
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 37,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 10874.7,
+        "dofollow": 2420,
+        "referring_pages": 2469,
+        "referring_domains": 111.4,
+        "referring_main_domains": 100.2,
+        "rank": 206,
+        "main_domain_rank": 637,
+        "last_updated_time": "2026-05-05 04:27:45 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 04:40:05 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management api",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-14 18:32:06 +00:00",
+        "competition": 0.05,
+        "competition_level": "LOW",
+        "cpc": 6.51,
+        "search_volume": 110,
+        "categories": [
+          10019,
+          10168,
+          12156
+        ],
+        "monthly_searches": {
+          "2026-05": 70,
+          "2026-04": 90,
+          "2026-03": 140,
+          "2026-02": 90,
+          "2026-01": 90,
+          "2025-12": 90,
+          "2025-11": 110,
+          "2025-10": 110,
+          "2025-09": 170,
+          "2025-08": 90,
+          "2025-07": 140,
+          "2025-06": 140
+        },
+        "search_volume_trend": {
+          "monthly": -22,
+          "quarterly": -50,
+          "yearly": -36
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 84.7,
+        "dofollow": 44.6,
+        "referring_pages": 51.7,
+        "referring_domains": 4.1,
+        "referring_main_domains": 3.2,
+        "rank": 27.9,
+        "main_domain_rank": 631.2,
+        "last_updated_time": "2026-05-27 22:29:50 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-28 03:19:35 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management licensing",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 04:22:30 +00:00",
+        "competition": 0.15,
+        "competition_level": "LOW",
+        "cpc": 1.21,
+        "search_volume": 90,
+        "low_top_of_page_bid": 0.66,
+        "high_top_of_page_bid": 14,
+        "categories": [
+          10008
+        ],
+        "monthly_searches": {
+          "2026-05": 50,
+          "2026-04": 70,
+          "2026-03": 110,
+          "2026-02": 110,
+          "2026-01": 90,
+          "2025-12": 50,
+          "2025-11": 90,
+          "2025-10": 110,
+          "2025-09": 170,
+          "2025-08": 90,
+          "2025-07": 110,
+          "2025-06": 90
+        },
+        "search_volume_trend": {
+          "monthly": -29,
+          "quarterly": -55,
+          "yearly": -29
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management licenses",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 19,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 22.1,
+        "dofollow": 8.5,
+        "referring_pages": 20.3,
+        "referring_domains": 6.6,
+        "referring_main_domains": 5.3,
+        "rank": 123.1,
+        "main_domain_rank": 656.7,
+        "last_updated_time": "2026-05-05 04:28:04 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-28 07:54:42 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management login",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-18 08:31:27 +00:00",
+        "competition": 0.01,
+        "competition_level": "LOW",
+        "search_volume": 90,
+        "categories": [
+          10019,
+          10168,
+          12202
+        ],
+        "monthly_searches": {
+          "2026-05": 70,
+          "2026-04": 110,
+          "2026-03": 140,
+          "2026-02": 110,
+          "2026-01": 140,
+          "2025-12": 90,
+          "2025-11": 40,
+          "2025-10": 70,
+          "2025-09": 170,
+          "2025-08": 50,
+          "2025-07": 70,
+          "2025-06": 70
+        },
+        "search_volume_trend": {
+          "monthly": -36,
+          "quarterly": -50,
+          "yearly": -22
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 65,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 244540.6,
+        "dofollow": 11656.8,
+        "referring_pages": 220245.1,
+        "referring_domains": 1807,
+        "referring_main_domains": 1634.5,
+        "rank": 272.8,
+        "main_domain_rank": 661.6,
+        "last_updated_time": "2026-05-28 21:27:25 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 04:28:33 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management premium",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-15 17:51:44 +00:00",
+        "competition": 0.14,
+        "competition_level": "LOW",
+        "cpc": 0.82,
+        "search_volume": 90,
+        "low_top_of_page_bid": 0.9,
+        "high_top_of_page_bid": 19.51,
+        "categories": [
+          10004,
+          10276
+        ],
+        "monthly_searches": {
+          "2026-05": 50,
+          "2026-04": 50,
+          "2026-03": 70,
+          "2026-02": 110,
+          "2026-01": 90,
+          "2025-12": 70,
+          "2025-11": 70,
+          "2025-10": 140,
+          "2025-09": 140,
+          "2025-08": 110,
+          "2025-07": 90,
+          "2025-06": 70
+        },
+        "search_volume_trend": {
+          "quarterly": -29,
+          "yearly": -55
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 4,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 22,
+        "dofollow": 8.9,
+        "referring_pages": 19.2,
+        "referring_domains": 6.7,
+        "referring_main_domains": 5.4,
+        "rank": 62.9,
+        "main_domain_rank": 607.1,
+        "last_updated_time": "2026-05-03 08:30:08 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "commercial"
+        ],
+        "last_updated_time": "2026-04-28 01:33:25 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira vs jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 13:12:56 +00:00",
+        "competition": 0.12,
+        "competition_level": "LOW",
+        "cpc": 18.55,
+        "search_volume": 90,
+        "low_top_of_page_bid": 3.66,
+        "high_top_of_page_bid": 25,
+        "categories": [
+          10004,
+          10276
+        ],
+        "monthly_searches": {
+          "2026-06": 90,
+          "2026-05": 70,
+          "2026-04": 70,
+          "2026-03": 110,
+          "2026-02": 70,
+          "2026-01": 90,
+          "2025-12": 70,
+          "2025-11": 90,
+          "2025-10": 110,
+          "2025-09": 170,
+          "2025-08": 110,
+          "2025-07": 110
+        },
+        "search_volume_trend": {
+          "monthly": 29,
+          "quarterly": 29,
+          "yearly": -18
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 1.8,
+        "dofollow": 1.2,
+        "referring_pages": 1.6,
+        "referring_domains": 1.1,
+        "referring_main_domains": 1.1,
+        "rank": 22.1,
+        "main_domain_rank": 659.8,
+        "last_updated_time": "2026-05-03 08:41:05 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-28 16:32:46 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management licenses",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 22:21:41 +00:00",
+        "competition": 0.15,
+        "competition_level": "LOW",
+        "cpc": 1.21,
+        "search_volume": 90,
+        "low_top_of_page_bid": 0.66,
+        "high_top_of_page_bid": 14,
+        "categories": [
+          10008
+        ],
+        "monthly_searches": {
+          "2026-05": 50,
+          "2026-04": 70,
+          "2026-03": 110,
+          "2026-02": 110,
+          "2026-01": 90,
+          "2025-12": 50,
+          "2025-11": 90,
+          "2025-10": 110,
+          "2025-09": 170,
+          "2025-08": 90,
+          "2025-07": 110,
+          "2025-06": 90
+        },
+        "search_volume_trend": {
+          "monthly": -29,
+          "quarterly": -55,
+          "yearly": -29
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 29,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 1590,
+        "dofollow": 1439.7,
+        "referring_pages": 1554.4,
+        "referring_domains": 87.4,
+        "referring_main_domains": 80.3,
+        "rank": 170.2,
+        "main_domain_rank": 644.8,
+        "last_updated_time": "2025-08-30 16:25:35 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-28 11:03:29 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management license",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 15:28:45 +00:00",
+        "competition": 0.15,
+        "competition_level": "LOW",
+        "cpc": 1.21,
+        "search_volume": 90,
+        "low_top_of_page_bid": 0.66,
+        "high_top_of_page_bid": 14,
+        "categories": [
+          10016,
+          10141,
+          10758
+        ],
+        "monthly_searches": {
+          "2026-05": 50,
+          "2026-04": 70,
+          "2026-03": 110,
+          "2026-02": 110,
+          "2026-01": 90,
+          "2025-12": 50,
+          "2025-11": 90,
+          "2025-10": 110,
+          "2025-09": 170,
+          "2025-08": 90,
+          "2025-07": 110,
+          "2025-06": 90
+        },
+        "search_volume_trend": {
+          "monthly": -29,
+          "quarterly": -55,
+          "yearly": -29
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management licenses",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 19,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 1046.4,
+        "dofollow": 1008,
+        "referring_pages": 1041.1,
+        "referring_domains": 21.9,
+        "referring_main_domains": 19.3,
+        "rank": 129.5,
+        "main_domain_rank": 623.1,
+        "last_updated_time": "2024-11-26 19:08:23 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-29 14:22:02 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management training",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 22:40:41 +00:00",
+        "competition": 0.33,
+        "competition_level": "LOW",
+        "cpc": 5.99,
+        "search_volume": 70,
+        "low_top_of_page_bid": 3.44,
+        "high_top_of_page_bid": 12.28,
+        "categories": [
+          10016,
+          10141,
+          10758
+        ],
+        "monthly_searches": {
+          "2026-05": 40,
+          "2026-04": 30,
+          "2026-03": 90,
+          "2026-02": 50,
+          "2026-01": 40,
+          "2025-12": 40,
+          "2025-11": 40,
+          "2025-10": 50,
+          "2025-09": 210,
+          "2025-08": 50,
+          "2025-07": 70,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "monthly": 33,
+          "quarterly": -56,
+          "yearly": -43
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 13,
+        "dofollow": 12,
+        "referring_pages": 12.9,
+        "referring_domains": 2.1,
+        "referring_main_domains": 1.8,
+        "rank": 46.2,
+        "main_domain_rank": 612.2,
+        "last_updated_time": "2026-05-07 10:07:51 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-28 12:10:11 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management cost",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 23:02:13 +00:00",
+        "competition": 0.49,
+        "competition_level": "MEDIUM",
+        "cpc": 4.3,
+        "search_volume": 70,
+        "low_top_of_page_bid": 2.54,
+        "high_top_of_page_bid": 36.23,
+        "categories": [
+          10004,
+          10276,
+          11098
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 70,
+          "2026-03": 90,
+          "2026-02": 50,
+          "2026-01": 70,
+          "2025-12": 50,
+          "2025-11": 50,
+          "2025-10": 50,
+          "2025-09": 70,
+          "2025-08": 50,
+          "2025-07": 70,
+          "2025-06": 70
+        },
+        "search_volume_trend": {
+          "monthly": -57,
+          "quarterly": -67,
+          "yearly": -57
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 6,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 245.4,
+        "dofollow": 139.6,
+        "referring_pages": 216.8,
+        "referring_domains": 70.7,
+        "referring_main_domains": 65.4,
+        "rank": 85.2,
+        "main_domain_rank": 484.7,
+        "last_updated_time": "2026-05-30 20:55:33 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "last_updated_time": "2026-04-28 12:10:11 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management costs",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-14 15:18:57 +00:00",
+        "competition": 0.49,
+        "competition_level": "MEDIUM",
+        "cpc": 4.3,
+        "search_volume": 70,
+        "low_top_of_page_bid": 2.54,
+        "high_top_of_page_bid": 36.23,
+        "categories": [
+          10004,
+          10276,
+          11098
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 70,
+          "2026-03": 90,
+          "2026-02": 50,
+          "2026-01": 70,
+          "2025-12": 50,
+          "2025-11": 50,
+          "2025-10": 50,
+          "2025-09": 70,
+          "2025-08": 50,
+          "2025-07": 70,
+          "2025-06": 70
+        },
+        "search_volume_trend": {
+          "monthly": -57,
+          "quarterly": -67,
+          "yearly": -57
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management cost",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 6,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "last_updated_time": "2026-04-28 04:50:52 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira customer service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 02:55:32 +00:00",
+        "competition": 0.59,
+        "competition_level": "MEDIUM",
+        "cpc": 12.6,
+        "search_volume": 70,
+        "low_top_of_page_bid": 7.89,
+        "high_top_of_page_bid": 26.93,
+        "categories": [
+          10004,
+          10276,
+          11092
+        ],
+        "monthly_searches": {
+          "2026-05": 110,
+          "2026-04": 140,
+          "2026-03": 110,
+          "2026-02": 70,
+          "2026-01": 50,
+          "2025-12": 50,
+          "2025-11": 70,
+          "2025-10": 70,
+          "2025-09": 30,
+          "2025-08": 10,
+          "2025-07": 20,
+          "2025-06": 20
+        },
+        "search_volume_trend": {
+          "monthly": -21,
+          "yearly": 450
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management customers",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 11,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11031.5,
+        "dofollow": 2436,
+        "referring_pages": 2480.7,
+        "referring_domains": 112.2,
+        "referring_main_domains": 100.2,
+        "rank": 90.4,
+        "main_domain_rank": 632.4,
+        "last_updated_time": "2026-06-03 03:16:58 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 20:56:37 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management alternative",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-14 14:17:38 +00:00",
+        "competition": 0.19,
+        "competition_level": "LOW",
+        "cpc": 42.76,
+        "search_volume": 50,
+        "low_top_of_page_bid": 17,
+        "high_top_of_page_bid": 45.85,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 70,
+          "2026-04": 70,
+          "2026-03": 140,
+          "2026-02": 30,
+          "2026-01": 30,
+          "2025-12": 40,
+          "2025-11": 20,
+          "2025-10": 30,
+          "2025-09": 50,
+          "2025-08": 30,
+          "2025-07": 50,
+          "2025-06": 70
+        },
+        "search_volume_trend": {
+          "quarterly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management alternatives",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 23.9,
+        "dofollow": 21.4,
+        "referring_pages": 21.4,
+        "referring_domains": 3.1,
+        "referring_main_domains": 3,
+        "rank": 31,
+        "main_domain_rank": 633.1,
+        "last_updated_time": "2024-09-14 13:32:08 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-29 14:49:27 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management vs jira software",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-14 16:10:46 +00:00",
+        "competition": 0.13,
+        "competition_level": "LOW",
+        "search_volume": 50,
+        "low_top_of_page_bid": 7.17,
+        "high_top_of_page_bid": 40,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 40,
+          "2026-02": 40,
+          "2026-01": 30,
+          "2025-12": 30,
+          "2025-11": 40,
+          "2025-10": 50,
+          "2025-09": 170,
+          "2025-08": 50,
+          "2025-07": 70,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "quarterly": -25,
+          "yearly": -57
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 8,
+        "detected_language": "en",
+        "words_count": 6
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11022.8,
+        "dofollow": 2430.7,
+        "referring_pages": 2472.3,
+        "referring_domains": 109,
+        "referring_main_domains": 98.4,
+        "rank": 83.9,
+        "main_domain_rank": 590.3,
+        "last_updated_time": "2026-06-03 07:15:09 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-28 01:55:42 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management vs servicenow",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 16:00:59 +00:00",
+        "competition": 0.28,
+        "competition_level": "LOW",
+        "search_volume": 50,
+        "low_top_of_page_bid": 4.95,
+        "high_top_of_page_bid": 24.02,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 40,
+          "2026-04": 50,
+          "2026-03": 70,
+          "2026-02": 50,
+          "2026-01": 30,
+          "2025-12": 30,
+          "2025-11": 20,
+          "2025-10": 40,
+          "2025-09": 140,
+          "2025-08": 40,
+          "2025-07": 40,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "monthly": -20,
+          "quarterly": -43,
+          "yearly": -43
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 1,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 6.1,
+        "dofollow": 5.4,
+        "referring_pages": 5.7,
+        "referring_domains": 4.3,
+        "referring_main_domains": 4.1,
+        "rank": 59,
+        "main_domain_rank": 534.3,
+        "last_updated_time": "2026-05-09 11:02:51 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "commercial"
+        ],
+        "last_updated_time": "2026-04-28 02:09:51 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management form",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 04:54:02 +00:00",
+        "competition": 0.06,
+        "competition_level": "LOW",
+        "search_volume": 50,
+        "categories": [
+          10018,
+          10161,
+          10163
+        ],
+        "monthly_searches": {
+          "2026-05": 40,
+          "2026-04": 30,
+          "2026-03": 70,
+          "2026-02": 90,
+          "2026-01": 40,
+          "2025-12": 30,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 40,
+          "2025-08": 40,
+          "2025-07": 50,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "monthly": 33,
+          "quarterly": -43
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management forms",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 2,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 27.1,
+        "dofollow": 10.8,
+        "referring_pages": 26.7,
+        "referring_domains": 5.3,
+        "referring_main_domains": 3.2,
+        "rank": 46.9,
+        "main_domain_rank": 663.1,
+        "last_updated_time": "2026-05-09 11:13:36 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-29 14:45:50 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management asset",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 00:38:15 +00:00",
+        "competition": 0.27,
+        "competition_level": "LOW",
+        "cpc": 3.54,
+        "search_volume": 50,
+        "low_top_of_page_bid": 1.8,
+        "high_top_of_page_bid": 25.65,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 140,
+          "2026-02": 40,
+          "2026-01": 50,
+          "2025-12": 20,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 50,
+          "2025-08": 50,
+          "2025-07": 40,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "quarterly": -79,
+          "yearly": -40
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 19,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 83.2,
+        "dofollow": 47.2,
+        "referring_pages": 77.9,
+        "referring_domains": 28.4,
+        "referring_main_domains": 25.1,
+        "rank": 118.1,
+        "main_domain_rank": 731.4,
+        "last_updated_time": "2026-03-25 21:44:11 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 07:21:46 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira software vs jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 09:08:54 +00:00",
+        "competition": 0.1,
+        "competition_level": "LOW",
+        "search_volume": 50,
+        "low_top_of_page_bid": 5.77,
+        "high_top_of_page_bid": 25,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-06": 50,
+          "2026-05": 20,
+          "2026-04": 30,
+          "2026-03": 40,
+          "2026-02": 30,
+          "2026-01": 20,
+          "2025-12": 30,
+          "2025-11": 10,
+          "2025-10": 40,
+          "2025-09": 260,
+          "2025-08": 30,
+          "2025-07": 30
+        },
+        "search_volume_trend": {
+          "monthly": 150,
+          "quarterly": 67,
+          "yearly": 25
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management vs jira software",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 6
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 1.7,
+        "dofollow": 1.1,
+        "referring_pages": 1.5,
+        "referring_domains": 1,
+        "referring_main_domains": 1,
+        "rank": 21.1,
+        "main_domain_rank": 571.7,
+        "last_updated_time": "2026-05-09 11:02:43 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-28 07:00:05 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management data center",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 13:05:47 +00:00",
+        "competition": 0.16,
+        "competition_level": "LOW",
+        "cpc": 4.15,
+        "search_volume": 50,
+        "low_top_of_page_bid": 9.13,
+        "high_top_of_page_bid": 116.15,
+        "categories": [
+          10019,
+          10168,
+          12156
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 50,
+          "2026-02": 20,
+          "2026-01": 30,
+          "2025-12": 30,
+          "2025-11": 20,
+          "2025-10": 50,
+          "2025-09": 210,
+          "2025-08": 70,
+          "2025-07": 50,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "quarterly": -40,
+          "yearly": -67
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 17,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 800.7,
+        "dofollow": 428.7,
+        "referring_pages": 467.9,
+        "referring_domains": 4.2,
+        "referring_main_domains": 2.4,
+        "rank": 105.8,
+        "main_domain_rank": 629.7,
+        "last_updated_time": "2026-05-30 20:51:44 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 01:33:25 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management cloud",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 07:21:30 +00:00",
+        "competition": 0.34,
+        "competition_level": "MEDIUM",
+        "cpc": 11.39,
+        "search_volume": 50,
+        "low_top_of_page_bid": 11.72,
+        "high_top_of_page_bid": 40.49,
+        "categories": [
+          10019,
+          10168,
+          12156
+        ],
+        "monthly_searches": {
+          "2026-06": 30,
+          "2026-05": 50,
+          "2026-04": 70,
+          "2026-03": 90,
+          "2026-02": 50,
+          "2026-01": 50,
+          "2025-12": 30,
+          "2025-11": 50,
+          "2025-10": 50,
+          "2025-09": 70,
+          "2025-08": 70,
+          "2025-07": 70
+        },
+        "search_volume_trend": {
+          "monthly": -40,
+          "quarterly": -57,
+          "yearly": -67
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 40,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11071,
+        "dofollow": 2459.8,
+        "referring_pages": 2512.4,
+        "referring_domains": 118.5,
+        "referring_main_domains": 106.4,
+        "rank": 215.2,
+        "main_domain_rank": 681.4,
+        "last_updated_time": "2026-05-30 20:55:15 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 04:32:55 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management alternatives",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 10:01:40 +00:00",
+        "competition": 0.19,
+        "competition_level": "LOW",
+        "cpc": 42.76,
+        "search_volume": 50,
+        "low_top_of_page_bid": 17,
+        "high_top_of_page_bid": 45.85,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 70,
+          "2026-04": 70,
+          "2026-03": 140,
+          "2026-02": 30,
+          "2026-01": 30,
+          "2025-12": 40,
+          "2025-11": 20,
+          "2025-10": 30,
+          "2025-09": 50,
+          "2025-08": 30,
+          "2025-07": 50,
+          "2025-06": 70
+        },
+        "search_volume_trend": {
+          "quarterly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 4.8,
+        "dofollow": 2.3,
+        "referring_pages": 2.3,
+        "referring_domains": 1.6,
+        "referring_main_domains": 1.6,
+        "rank": 11.1,
+        "main_domain_rank": 507.3,
+        "last_updated_time": "2026-06-03 04:27:51 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-29 14:14:39 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management demo",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 02:20:55 +00:00",
+        "competition": 0.51,
+        "competition_level": "MEDIUM",
+        "cpc": 10.66,
+        "search_volume": 50,
+        "low_top_of_page_bid": 5.55,
+        "high_top_of_page_bid": 60.99,
+        "categories": [
+          10019,
+          10168,
+          12202
+        ],
+        "monthly_searches": {
+          "2026-05": 50,
+          "2026-04": 50,
+          "2026-03": 70,
+          "2026-02": 40,
+          "2026-01": 50,
+          "2025-12": 30,
+          "2025-11": 40,
+          "2025-10": 50,
+          "2025-09": 140,
+          "2025-08": 50,
+          "2025-07": 70,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "quarterly": -29,
+          "yearly": -44
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 27,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 96.4,
+        "dofollow": 91.5,
+        "referring_pages": 96,
+        "referring_domains": 6.9,
+        "referring_main_domains": 5.8,
+        "rank": 151.8,
+        "main_domain_rank": 717.4,
+        "last_updated_time": "2026-05-30 20:53:28 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 01:26:15 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management forms",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 05:17:48 +00:00",
+        "competition": 0.07,
+        "competition_level": "LOW",
+        "cpc": 30.21,
+        "search_volume": 50,
+        "low_top_of_page_bid": 33.66,
+        "high_top_of_page_bid": 98.68,
+        "categories": [
+          10008
+        ],
+        "monthly_searches": {
+          "2026-06": 40,
+          "2026-05": 40,
+          "2026-04": 30,
+          "2026-03": 70,
+          "2026-02": 90,
+          "2026-01": 40,
+          "2025-12": 30,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 40,
+          "2025-08": 40,
+          "2025-07": 50
+        },
+        "search_volume_trend": {
+          "quarterly": 33
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 9,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 29.8,
+        "dofollow": 12.7,
+        "referring_pages": 29.2,
+        "referring_domains": 5.9,
+        "referring_main_domains": 3.5,
+        "rank": 75,
+        "main_domain_rank": 689.6,
+        "last_updated_time": "2026-06-03 05:53:42 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 14:26:46 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management assets",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 05:14:24 +00:00",
+        "competition": 0.33,
+        "competition_level": "LOW",
+        "cpc": 8.55,
+        "search_volume": 50,
+        "low_top_of_page_bid": 6.06,
+        "high_top_of_page_bid": 27.06,
+        "categories": [
+          10019,
+          10168,
+          12202
+        ],
+        "monthly_searches": {
+          "2026-06": 30,
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 140,
+          "2026-02": 40,
+          "2026-01": 50,
+          "2025-12": 20,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 50,
+          "2025-08": 50,
+          "2025-07": 40
+        },
+        "search_volume_trend": {
+          "yearly": -40
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management asset",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 25,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 72.5,
+        "dofollow": 52.2,
+        "referring_pages": 70.3,
+        "referring_domains": 28.5,
+        "referring_main_domains": 25.5,
+        "rank": 107.7,
+        "main_domain_rank": 531.3,
+        "last_updated_time": "2026-06-03 03:28:01 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-29 14:18:45 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management portal",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 04:29:18 +00:00",
+        "competition": 0.31,
+        "competition_level": "LOW",
+        "cpc": 20.39,
+        "search_volume": 40,
+        "low_top_of_page_bid": 9.5,
+        "high_top_of_page_bid": 36.85,
+        "categories": [
+          10007,
+          13418,
+          13725
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 50,
+          "2026-02": 40,
+          "2026-01": 50,
+          "2025-12": 30,
+          "2025-11": 40,
+          "2025-10": 50,
+          "2025-09": 50,
+          "2025-08": 40,
+          "2025-07": 40,
+          "2025-06": 30
+        },
+        "search_volume_trend": {
+          "quarterly": -40,
+          "yearly": -25
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 27,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11348.9,
+        "dofollow": 2641.6,
+        "referring_pages": 2734.7,
+        "referring_domains": 153.1,
+        "referring_main_domains": 139.3,
+        "rank": 157,
+        "main_domain_rank": 686.4,
+        "last_updated_time": "2026-05-12 00:32:05 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-29 14:35:49 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "aws service management connector for jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 04:35:51 +00:00",
+        "competition": 0,
+        "competition_level": "LOW",
+        "search_volume": 40,
+        "categories": [
+          10019,
+          10168,
+          12156
+        ],
+        "monthly_searches": {
+          "2026-06": 10,
+          "2026-05": 10,
+          "2026-04": 10,
+          "2026-03": 30,
+          "2026-02": 10,
+          "2026-01": 10,
+          "2025-12": 10,
+          "2025-11": 10,
+          "2025-10": 320,
+          "2025-09": 10,
+          "2025-08": 10,
+          "2025-07": 20
+        },
+        "search_volume_trend": {
+          "yearly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 8
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 1.9,
+        "dofollow": 1.1,
+        "referring_pages": 1.9,
+        "referring_domains": 1.4,
+        "referring_main_domains": 1.3,
+        "rank": 15.5,
+        "main_domain_rank": 779.1,
+        "last_updated_time": "2026-06-16 06:22:45 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "last_updated_time": "2026-05-04 08:31:17 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "servicenow vs jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 16:54:41 +00:00",
+        "competition": 0.4,
+        "competition_level": "MEDIUM",
+        "cpc": 50.59,
+        "search_volume": 40,
+        "low_top_of_page_bid": 15.22,
+        "high_top_of_page_bid": 40.47,
+        "categories": [
+          10004,
+          10276,
+          11092
+        ],
+        "monthly_searches": {
+          "2026-05": 10,
+          "2026-04": 20,
+          "2026-03": 30,
+          "2026-02": 20,
+          "2026-01": 30,
+          "2025-12": 30,
+          "2025-11": 10,
+          "2025-10": 40,
+          "2025-09": 170,
+          "2025-08": 20,
+          "2025-07": 40,
+          "2025-06": 20
+        },
+        "search_volume_trend": {
+          "monthly": -50,
+          "quarterly": -67,
+          "yearly": -67
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management vs servicenow",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 6.2,
+        "dofollow": 5.5,
+        "referring_pages": 5.8,
+        "referring_domains": 4.3,
+        "referring_main_domains": 4.1,
+        "rank": 59,
+        "main_domain_rank": 475,
+        "last_updated_time": "2026-05-11 11:17:21 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "commercial"
+        ],
+        "last_updated_time": "2026-04-30 02:08:26 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management integrations",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 17:26:48 +00:00",
+        "competition": 0.22,
+        "competition_level": "LOW",
+        "search_volume": 40,
+        "low_top_of_page_bid": 5.5,
+        "high_top_of_page_bid": 34.83,
+        "categories": [
+          10019,
+          10168,
+          10885,
+          12205,
+          13098
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 40,
+          "2026-02": 30,
+          "2026-01": 30,
+          "2025-12": 20,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 70,
+          "2025-08": 40,
+          "2025-07": 50,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "quarterly": -25
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management integration",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 3,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 6.1,
+        "dofollow": 5,
+        "referring_pages": 5.8,
+        "referring_domains": 2.9,
+        "referring_main_domains": 2.1,
+        "rank": 53.4,
+        "main_domain_rank": 664.9,
+        "last_updated_time": "2026-06-08 18:36:36 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 16:32:46 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management standard pricing",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 06:20:48 +00:00",
+        "competition": 0.01,
+        "competition_level": "LOW",
+        "cpc": 0.09,
+        "search_volume": 40,
+        "categories": [
+          10002,
+          10028
+        ],
+        "monthly_searches": {
+          "2026-05": 20,
+          "2026-04": 90,
+          "2026-03": 70,
+          "2026-02": 20,
+          "2026-01": 10,
+          "2025-12": 70,
+          "2025-11": 90,
+          "2025-10": 10,
+          "2025-09": 10,
+          "2025-08": 10,
+          "2025-07": 70,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "monthly": -78,
+          "quarterly": -71,
+          "yearly": 100
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 6,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 239.6,
+        "dofollow": 136.5,
+        "referring_pages": 212.2,
+        "referring_domains": 69.1,
+        "referring_main_domains": 63.9,
+        "rank": 84.6,
+        "main_domain_rank": 500.3,
+        "last_updated_time": "2026-05-12 00:43:00 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "commercial"
+        ],
+        "last_updated_time": "2026-04-28 01:48:40 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management download",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 01:53:42 +00:00",
+        "competition": 0.22,
+        "competition_level": "LOW",
+        "cpc": 31.66,
+        "search_volume": 40,
+        "low_top_of_page_bid": 12.81,
+        "high_top_of_page_bid": 52.76,
+        "categories": [
+          10019,
+          10168,
+          10885,
+          13816
+        ],
+        "monthly_searches": {
+          "2026-06": 20,
+          "2026-05": 30,
+          "2026-04": 40,
+          "2026-03": 30,
+          "2026-02": 20,
+          "2026-01": 30,
+          "2025-12": 30,
+          "2025-11": 30,
+          "2025-10": 50,
+          "2025-09": 140,
+          "2025-08": 30,
+          "2025-07": 30
+        },
+        "search_volume_trend": {
+          "monthly": -33,
+          "quarterly": -50,
+          "yearly": -60
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 33,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 216.7,
+        "dofollow": 76.8,
+        "referring_pages": 194,
+        "referring_domains": 29.3,
+        "referring_main_domains": 26,
+        "rank": 173.6,
+        "main_domain_rank": 777.6,
+        "last_updated_time": "2026-06-08 18:36:26 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 02:26:18 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management icon",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 11:24:11 +00:00",
+        "competition": 0,
+        "competition_level": "LOW",
+        "search_volume": 40,
+        "categories": [
+          10004,
+          10276,
+          11088
+        ],
+        "monthly_searches": {
+          "2026-05": 40,
+          "2026-04": 30,
+          "2026-03": 40,
+          "2026-02": 40,
+          "2026-01": 40,
+          "2025-12": 20,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 50,
+          "2025-08": 40,
+          "2025-07": 30,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "monthly": 33
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 13,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 317.4,
+        "dofollow": 24.9,
+        "referring_pages": 174.7,
+        "referring_domains": 10.4,
+        "referring_main_domains": 9.2,
+        "rank": 101.7,
+        "main_domain_rank": 627.6,
+        "last_updated_time": "2026-06-08 18:34:06 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 19:45:43 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management automation",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 23:24:03 +00:00",
+        "competition": 0.12,
+        "competition_level": "LOW",
+        "search_volume": 40,
+        "low_top_of_page_bid": 8.02,
+        "high_top_of_page_bid": 22.44,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 40,
+          "2026-03": 50,
+          "2026-02": 40,
+          "2026-01": 30,
+          "2025-12": 40,
+          "2025-11": 40,
+          "2025-10": 40,
+          "2025-09": 30,
+          "2025-08": 50,
+          "2025-07": 30,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "monthly": -25,
+          "quarterly": -40,
+          "yearly": -40
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 6.4,
+        "dofollow": 3.5,
+        "referring_pages": 5.3,
+        "referring_domains": 2.5,
+        "referring_main_domains": 2.1,
+        "rank": 35.4,
+        "main_domain_rank": 555.7,
+        "last_updated_time": "2026-05-12 00:41:42 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 20:24:44 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management integration",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 21:06:05 +00:00",
+        "competition": 0.22,
+        "competition_level": "LOW",
+        "search_volume": 40,
+        "low_top_of_page_bid": 5.5,
+        "high_top_of_page_bid": 34.83,
+        "categories": [
+          10019,
+          10168,
+          10885,
+          12205,
+          13098
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 40,
+          "2026-02": 30,
+          "2026-01": 30,
+          "2025-12": 20,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 70,
+          "2025-08": 40,
+          "2025-07": 50,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "quarterly": -25
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 10,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 7.2,
+        "dofollow": 5.8,
+        "referring_pages": 6.6,
+        "referring_domains": 3.4,
+        "referring_main_domains": 2.6,
+        "rank": 90.4,
+        "main_domain_rank": 615.4,
+        "last_updated_time": "2026-05-12 00:42:40 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 06:24:23 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management free",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 19:12:41 +00:00",
+        "competition": 0.44,
+        "competition_level": "MEDIUM",
+        "cpc": 2.4,
+        "search_volume": 30,
+        "low_top_of_page_bid": 6.41,
+        "high_top_of_page_bid": 31.34,
+        "categories": [
+          10019,
+          10168,
+          10885,
+          13816
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 20,
+          "2026-03": 20,
+          "2026-02": 20,
+          "2026-01": 40,
+          "2025-12": 30,
+          "2025-11": 20,
+          "2025-10": 20,
+          "2025-09": 30,
+          "2025-08": 30,
+          "2025-07": 20,
+          "2025-06": 30
+        },
+        "search_volume_trend": {
+          "monthly": 50,
+          "quarterly": 50,
+          "yearly": 50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 29,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 148.9,
+        "dofollow": 71.6,
+        "referring_pages": 140.7,
+        "referring_domains": 30.2,
+        "referring_main_domains": 27.2,
+        "rank": 148.1,
+        "main_domain_rank": 642.7,
+        "last_updated_time": "2026-06-16 15:52:09 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-28 20:22:44 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "help center jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 06:29:20 +00:00",
+        "competition": 0.35,
+        "competition_level": "MEDIUM",
+        "cpc": 27.39,
+        "search_volume": 30,
+        "low_top_of_page_bid": 3.89,
+        "high_top_of_page_bid": 26.3,
+        "categories": [
+          10004,
+          10276,
+          11092
+        ],
+        "monthly_searches": {
+          "2026-06": 50,
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 30,
+          "2026-02": 30,
+          "2026-01": 40,
+          "2025-12": 40,
+          "2025-11": 30,
+          "2025-10": 30,
+          "2025-09": 30,
+          "2025-08": 20,
+          "2025-07": 40
+        },
+        "search_volume_trend": {
+          "monthly": 67,
+          "quarterly": 67,
+          "yearly": 67
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 20,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 277.8,
+        "dofollow": 250.3,
+        "referring_pages": 252,
+        "referring_domains": 3.8,
+        "referring_main_domains": 2.5,
+        "rank": 124.5,
+        "main_domain_rank": 701.1,
+        "last_updated_time": "2026-03-11 00:46:25 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-05-07 13:57:21 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management price",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-16 14:18:26 +00:00",
+        "competition": 0.27,
+        "competition_level": "LOW",
+        "cpc": 28.13,
+        "search_volume": 30,
+        "low_top_of_page_bid": 1.31,
+        "high_top_of_page_bid": 34.14,
+        "categories": [
+          10004,
+          10276,
+          11098
+        ],
+        "monthly_searches": {
+          "2026-05": 20,
+          "2026-04": 10,
+          "2026-03": 30,
+          "2026-02": 20,
+          "2026-01": 20,
+          "2025-12": 20,
+          "2025-11": 10,
+          "2025-10": 30,
+          "2025-09": 30,
+          "2025-08": 40,
+          "2025-07": 40,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "monthly": 100,
+          "quarterly": -33,
+          "yearly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management pricing",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 17,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 255.8,
+        "dofollow": 149.4,
+        "referring_pages": 227.1,
+        "referring_domains": 73.2,
+        "referring_main_domains": 67,
+        "rank": 124,
+        "main_domain_rank": 598.7,
+        "last_updated_time": "2026-06-16 15:52:10 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "last_updated_time": "2026-04-28 19:32:03 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management application",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-16 08:57:27 +00:00",
+        "competition": 0.25,
+        "competition_level": "LOW",
+        "cpc": 6.4,
+        "search_volume": 30,
+        "low_top_of_page_bid": 2.63,
+        "high_top_of_page_bid": 25,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 20,
+          "2026-04": 30,
+          "2026-03": 50,
+          "2026-02": 40,
+          "2026-01": 30,
+          "2025-12": 30,
+          "2025-11": 20,
+          "2025-10": 20,
+          "2025-09": 30,
+          "2025-08": 20,
+          "2025-07": 40,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "monthly": -33,
+          "quarterly": -60,
+          "yearly": -33
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 16,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11248.3,
+        "dofollow": 2456.6,
+        "referring_pages": 2497.9,
+        "referring_domains": 113.9,
+        "referring_main_domains": 102.2,
+        "rank": 112.9,
+        "main_domain_rank": 658.9,
+        "last_updated_time": "2026-06-16 15:52:04 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 10:20:07 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management free tier",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 12:22:55 +00:00",
+        "competition": 0.08,
+        "competition_level": "LOW",
+        "search_volume": 30,
+        "categories": [
+          10008
+        ],
+        "monthly_searches": {
+          "2026-06": 30,
+          "2026-05": 20,
+          "2026-04": 70,
+          "2026-03": 50,
+          "2026-02": 40,
+          "2026-01": 10,
+          "2025-12": 10,
+          "2025-11": 10,
+          "2025-10": 10,
+          "2025-09": 10,
+          "2025-08": 40,
+          "2025-07": 10
+        },
+        "search_volume_trend": {
+          "monthly": 50,
+          "quarterly": -57,
+          "yearly": 50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 25,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 345.7,
+        "dofollow": 209.7,
+        "referring_pages": 311.4,
+        "referring_domains": 94.9,
+        "referring_main_domains": 87.7,
+        "rank": 150,
+        "main_domain_rank": 562.3,
+        "last_updated_time": "2026-06-16 15:52:18 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "last_updated_time": "2026-04-28 06:39:46 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management certification",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-07-10 01:12:26 +00:00",
+        "competition": 0.16,
+        "competition_level": "LOW",
+        "cpc": 1.15,
+        "search_volume": 30,
+        "categories": [
+          10016,
+          10141,
+          10758
+        ],
+        "monthly_searches": {
+          "2026-06": 10,
+          "2026-05": 20,
+          "2026-04": 20,
+          "2026-03": 30,
+          "2026-02": 20,
+          "2026-01": 40,
+          "2025-12": 20,
+          "2025-11": 20,
+          "2025-10": 30,
+          "2025-09": 110,
+          "2025-08": 10,
+          "2025-07": 20
+        },
+        "search_volume_trend": {
+          "monthly": -50,
+          "quarterly": -50,
+          "yearly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 11,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 3136.9,
+        "dofollow": 1840.2,
+        "referring_pages": 1854.1,
+        "referring_domains": 12.4,
+        "referring_main_domains": 11.8,
+        "rank": 79.5,
+        "main_domain_rank": 742.8,
+        "last_updated_time": "2026-06-16 15:52:23 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-29 14:47:44 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management cloud pricing",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 05:32:42 +00:00",
+        "competition": 0.1,
+        "competition_level": "LOW",
+        "cpc": 0.68,
+        "search_volume": 30,
+        "categories": [
+          10019,
+          10168,
+          12156
+        ],
+        "monthly_searches": {
+          "2026-05": 10,
+          "2026-04": 90,
+          "2026-03": 90,
+          "2026-02": 10,
+          "2026-01": 10,
+          "2025-12": 10,
+          "2025-11": 10,
+          "2025-10": 10,
+          "2025-09": 10,
+          "2025-08": 70,
+          "2025-07": 10,
+          "2025-06": 20
+        },
+        "search_volume_trend": {
+          "monthly": -89,
+          "quarterly": -89,
+          "yearly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 14,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 255.8,
+        "dofollow": 149.4,
+        "referring_pages": 227.1,
+        "referring_domains": 73.2,
+        "referring_main_domains": 67,
+        "rank": 124,
+        "main_domain_rank": 455.7,
+        "last_updated_time": "2026-06-16 15:53:04 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "commercial",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-29 14:00:12 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management status",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-16 12:21:19 +00:00",
+        "competition": 0.11,
+        "competition_level": "LOW",
+        "search_volume": 30,
+        "categories": [
+          10018,
+          13414,
+          13508
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 20,
+          "2026-03": 30,
+          "2026-02": 30,
+          "2026-01": 40,
+          "2025-12": 30,
+          "2025-11": 20,
+          "2025-10": 50,
+          "2025-09": 30,
+          "2025-08": 20,
+          "2025-07": 20,
+          "2025-06": 20
+        },
+        "search_volume_trend": {
+          "monthly": 50,
+          "yearly": 200
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 26,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 762.3,
+        "dofollow": 664.7,
+        "referring_pages": 742.5,
+        "referring_domains": 42.2,
+        "referring_main_domains": 37.2,
+        "rank": 156.6,
+        "main_domain_rank": 652.1,
+        "last_updated_time": "2026-06-16 15:53:01 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 17:53:34 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management ai",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-18 19:14:38 +00:00",
+        "competition": 0.13,
+        "competition_level": "LOW",
+        "cpc": 16.91,
+        "search_volume": 30,
+        "low_top_of_page_bid": 10.84,
+        "high_top_of_page_bid": 48.17,
+        "categories": [
+          10019,
+          10168,
+          12202
+        ],
+        "monthly_searches": {
+          "2026-05": 40,
+          "2026-04": 10,
+          "2026-03": 30,
+          "2026-02": 30,
+          "2026-01": 20,
+          "2025-12": 20,
+          "2025-11": 20,
+          "2025-10": 30,
+          "2025-09": 30,
+          "2025-08": 30,
+          "2025-07": 40,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "monthly": 300,
+          "quarterly": 33
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "ai in jira service management",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 27,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 11274.7,
+        "dofollow": 2464.6,
+        "referring_pages": 2522.7,
+        "referring_domains": 133.3,
+        "referring_main_domains": 116.4,
+        "rank": 141.9,
+        "main_domain_rank": 685.3,
+        "last_updated_time": "2026-06-16 15:55:16 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 19:51:03 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management features",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 09:44:28 +00:00",
+        "competition": 0.43,
+        "competition_level": "MEDIUM",
+        "cpc": 1.82,
+        "search_volume": 30,
+        "low_top_of_page_bid": 1.55,
+        "high_top_of_page_bid": 21.21,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 20,
+          "2026-04": 10,
+          "2026-03": 30,
+          "2026-02": 20,
+          "2026-01": 10,
+          "2025-12": 10,
+          "2025-11": 10,
+          "2025-10": 20,
+          "2025-09": 30,
+          "2025-08": 20,
+          "2025-07": 70,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "monthly": 100,
+          "quarterly": -33
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 13.6,
+        "dofollow": 9,
+        "referring_pages": 12.9,
+        "referring_domains": 7.8,
+        "referring_main_domains": 7.5,
+        "rank": 50.2,
+        "main_domain_rank": 419.1,
+        "last_updated_time": "2026-06-16 15:52:24 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-28 01:44:21 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management asset management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-14 01:02:11 +00:00",
+        "competition": 0.25,
+        "competition_level": "LOW",
+        "cpc": 2.95,
+        "search_volume": 30,
+        "low_top_of_page_bid": 3.9,
+        "high_top_of_page_bid": 25.79,
+        "categories": [
+          10012,
+          10092,
+          10526
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 10,
+          "2026-03": 20,
+          "2026-02": 20,
+          "2026-01": 30,
+          "2025-12": 50,
+          "2025-11": 10,
+          "2025-10": 30,
+          "2025-09": 20,
+          "2025-08": 40,
+          "2025-07": 40,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "monthly": 200,
+          "quarterly": 50,
+          "yearly": -40
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira service management asset",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 25,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 80.4,
+        "dofollow": 55.6,
+        "referring_pages": 76.2,
+        "referring_domains": 31.2,
+        "referring_main_domains": 27.7,
+        "rank": 128.6,
+        "main_domain_rank": 652.6,
+        "last_updated_time": "2026-06-16 15:51:36 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-29 14:22:02 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "extension for jira service management",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-18 09:19:15 +00:00",
+        "competition": 0.09,
+        "competition_level": "LOW",
+        "search_volume": 30,
+        "categories": [
+          10008
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 20,
+          "2026-03": 30,
+          "2026-02": 40,
+          "2026-01": 50,
+          "2025-12": 20,
+          "2025-11": 50,
+          "2025-10": 20,
+          "2025-09": 30,
+          "2025-08": 20,
+          "2025-07": 20,
+          "2025-06": 30
+        },
+        "search_volume_trend": {
+          "monthly": 50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 5,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 17.2,
+        "dofollow": 14.3,
+        "referring_pages": 15.6,
+        "referring_domains": 1.1,
+        "referring_main_domains": 0.9,
+        "rank": 65,
+        "main_domain_rank": 646,
+        "last_updated_time": "2026-03-11 13:22:41 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-29 07:44:40 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management free trial",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-12 13:18:22 +00:00",
+        "competition": 0.1,
+        "competition_level": "LOW",
+        "search_volume": 30,
+        "categories": [
+          10019,
+          10168,
+          10885,
+          13816
+        ],
+        "monthly_searches": {
+          "2026-05": 10,
+          "2026-04": 20,
+          "2026-03": 30,
+          "2026-02": 70,
+          "2026-01": 10,
+          "2025-12": 20,
+          "2025-11": 110,
+          "2025-10": 30,
+          "2025-09": 20,
+          "2025-08": 20,
+          "2025-07": 20,
+          "2025-06": 20
+        },
+        "search_volume_trend": {
+          "monthly": -50,
+          "quarterly": -67,
+          "yearly": -50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 25,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 146.1,
+        "dofollow": 70,
+        "referring_pages": 137.9,
+        "referring_domains": 28.2,
+        "referring_main_domains": 25.5,
+        "rank": 129.7,
+        "main_domain_rank": 662.3,
+        "last_updated_time": "2026-06-16 15:52:02 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "last_updated_time": "2026-04-29 14:47:44 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management vs jira",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 03:31:29 +00:00",
+        "competition": 0.1,
+        "competition_level": "LOW",
+        "search_volume": 30,
+        "categories": [
+          10004,
+          10276
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 40,
+          "2026-03": 50,
+          "2026-02": 40,
+          "2026-01": 30,
+          "2025-12": 20,
+          "2025-11": 30,
+          "2025-10": 20,
+          "2025-09": 20,
+          "2025-08": 20,
+          "2025-07": 20,
+          "2025-06": 30
+        },
+        "search_volume_trend": {
+          "monthly": -25,
+          "quarterly": -40
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "core_keyword": "jira vs jira service management",
+        "synonym_clustering_algorithm": "text_processing",
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 2.2,
+        "dofollow": 1.6,
+        "referring_pages": 2.1,
+        "referring_domains": 1.5,
+        "referring_main_domains": 1.5,
+        "rank": 23.7,
+        "main_domain_rank": 530.1,
+        "last_updated_time": "2026-06-16 15:52:38 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "foreign_intent": [
+          "navigational"
+        ],
+        "last_updated_time": "2026-04-28 02:34:49 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management knowledge base",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-17 08:22:49 +00:00",
+        "competition": 0.06,
+        "competition_level": "LOW",
+        "search_volume": 30,
+        "categories": [
+          10019,
+          10168,
+          10296,
+          10885,
+          11270,
+          12209,
+          12578
+        ],
+        "monthly_searches": {
+          "2026-05": 20,
+          "2026-04": 30,
+          "2026-03": 30,
+          "2026-02": 30,
+          "2026-01": 30,
+          "2025-12": 20,
+          "2025-11": 30,
+          "2025-10": 40,
+          "2025-09": 40,
+          "2025-08": 40,
+          "2025-07": 40,
+          "2025-06": 50
+        },
+        "search_volume_trend": {
+          "monthly": -33,
+          "quarterly": -33,
+          "yearly": -60
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "text_processing",
+        "keyword_difficulty": 9,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 86.8,
+        "dofollow": 54.7,
+        "referring_pages": 81.3,
+        "referring_domains": 23.6,
+        "referring_main_domains": 21.8,
+        "rank": 77.2,
+        "main_domain_rank": 681.3,
+        "last_updated_time": "2026-06-08 18:40:35 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "foreign_intent": [
+          "informational"
+        ],
+        "last_updated_time": "2026-04-28 04:32:55 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "jira service management app",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-13 09:36:45 +00:00",
+        "competition": 0.25,
+        "competition_level": "LOW",
+        "cpc": 6.4,
+        "search_volume": 30,
+        "low_top_of_page_bid": 2.63,
+        "high_top_of_page_bid": 25,
+        "categories": [
+          10007,
+          10878
+        ],
+        "monthly_searches": {
+          "2026-05": 20,
+          "2026-04": 30,
+          "2026-03": 50,
+          "2026-02": 40,
+          "2026-01": 30,
+          "2025-12": 30,
+          "2025-11": 20,
+          "2025-10": 20,
+          "2025-09": 30,
+          "2025-08": 20,
+          "2025-07": 40,
+          "2025-06": 40
+        },
+        "search_volume_trend": {
+          "monthly": -33,
+          "quarterly": -60,
+          "yearly": -33
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "synonym_clustering_algorithm": "keyword_metrics",
+        "keyword_difficulty": 17,
+        "detected_language": "en",
+        "words_count": 4
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 25.7,
+        "dofollow": 17.5,
+        "referring_pages": 24.5,
+        "referring_domains": 8.6,
+        "referring_main_domains": 7.3,
+        "rank": 109.3,
+        "main_domain_rank": 723.5,
+        "last_updated_time": "2026-06-16 15:52:06 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "navigational",
+        "last_updated_time": "2026-04-28 08:16:22 +00:00"
+      }
+    },
+    {
+      "se_type": "google",
+      "keyword": "is jira service management free",
+      "location_code": 2840,
+      "language_code": "en",
+      "keyword_info": {
+        "se_type": "google",
+        "last_updated_time": "2026-06-16 18:20:15 +00:00",
+        "competition": 0.13,
+        "competition_level": "LOW",
+        "search_volume": 30,
+        "low_top_of_page_bid": 7.47,
+        "high_top_of_page_bid": 23.89,
+        "categories": [
+          10019,
+          10168,
+          10885,
+          12204,
+          13092,
+          13314
+        ],
+        "monthly_searches": {
+          "2026-05": 30,
+          "2026-04": 30,
+          "2026-03": 30,
+          "2026-02": 40,
+          "2026-01": 40,
+          "2025-12": 20,
+          "2025-11": 10,
+          "2025-10": 20,
+          "2025-09": 20,
+          "2025-08": 30,
+          "2025-07": 20,
+          "2025-06": 30
+        },
+        "search_volume_trend": {
+          "yearly": 50
+        }
+      },
+      "keyword_properties": {
+        "se_type": "google",
+        "keyword_difficulty": 16,
+        "detected_language": "en",
+        "words_count": 5
+      },
+      "avg_backlinks_info": {
+        "se_type": "google",
+        "backlinks": 105,
+        "dofollow": 68.6,
+        "referring_pages": 97.8,
+        "referring_domains": 27,
+        "referring_main_domains": 24.9,
+        "rank": 113.4,
+        "main_domain_rank": 624.1,
+        "last_updated_time": "2026-06-16 19:34:11 +00:00"
+      },
+      "search_intent_info": {
+        "se_type": "google",
+        "main_intent": "informational",
+        "last_updated_time": "2026-04-29 15:04:45 +00:00"
+      }
+    }
+  ]
+}

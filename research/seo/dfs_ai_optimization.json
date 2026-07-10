@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "task": "AI/LLM search demand for target terms (ChatGPT traffic channel)",
+    "target_site": "atlassiancli.com",
+    "location_name": "United States",
+    "location_code": 2840,
+    "language_name": "English",
+    "language_code": "en",
+    "platform": "chat_gpt",
+    "captured_date": "2026-07-10",
+    "source": "DataForSEO AI Optimization API"
+  },
+  "ai_optimization_keyword_data_search_volume": {
+    "id": "07101843-1272-0619-0000-b89faef79d29",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "items": [
+      {
+        "keyword": "jira cli",
+        "ai_search_volume": 13,
+        "ai_monthly_searches": {
+          "2026-06": 13,
+          "2026-05": 14,
+          "2026-04": 10,
+          "2026-03": 12,
+          "2026-02": 13,
+          "2026-01": 12,
+          "2025-12": 13,
+          "2025-11": 6,
+          "2025-10": 7,
+          "2025-09": 7,
+          "2025-08": 7,
+          "2025-07": 5
+        }
+      },
+      {
+        "keyword": "atlassian cli",
+        "ai_search_volume": 4,
+        "ai_monthly_searches": {
+          "2026-06": 4,
+          "2026-05": 4,
+          "2026-04": 2
+        }
+      },
+      {
+        "keyword": "confluence cli",
+        "ai_search_volume": 3,
+        "ai_monthly_searches": {
+          "2026-06": 3,
+          "2026-05": 3,
+          "2026-04": 3,
+          "2026-03": 2,
+          "2026-02": 3,
+          "2026-01": 2,
+          "2025-12": 2
+        }
+      },
+      {
+        "keyword": "bitbucket cli",
+        "ai_search_volume": 5,
+        "ai_monthly_searches": {
+          "2026-06": 5,
+          "2026-05": 5,
+          "2026-04": 4,
+          "2026-03": 4,
+          "2026-02": 6,
+          "2026-01": 9,
+          "2025-12": 12,
+          "2025-11": 8,
+          "2025-10": 12,
+          "2025-09": 8,
+          "2025-08": 8,
+          "2025-07": 7
+        }
+      },
+      {
+        "keyword": "jira automation",
+        "ai_search_volume": 132,
+        "ai_monthly_searches": {
+          "2026-06": 132,
+          "2026-05": 174,
+          "2026-04": 188,
+          "2026-03": 223,
+          "2026-02": 212,
+          "2026-01": 251,
+          "2025-12": 282,
+          "2025-11": 289,
+          "2025-10": 305,
+          "2025-09": 334,
+          "2025-08": 347,
+          "2025-07": 332
+        }
+      },
+      {
+        "keyword": "jira service management cli",
+        "note": "no ai_search_volume returned (no data / below reporting threshold)"
+      }
+    ]
+  },
+  "ai_opt_llm_ment_top_domains": {
+    "id": "07101843-1272-0637-0000-ed5b0e4f0366",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "targets_queried": ["jira cli", "atlassian cli"],
+    "platform": "chat_gpt",
+    "items": [
+      {
+        "total": {
+          "location": [{ "key": "2840", "mentions": 2, "ai_search_volume": 36 }],
+          "language": [{ "key": "en", "mentions": 2, "ai_search_volume": 36 }],
+          "platform": [{ "key": "chat_gpt", "mentions": 2, "ai_search_volume": 36 }],
+          "sources_domain": [
+            { "key": "thesoftwarescout.com", "mentions": 2, "ai_search_volume": 36 },
+            { "key": "techyorker.com", "mentions": 2, "ai_search_volume": 36 }
+          ],
+          "search_results_domain": [
+            { "key": "www.scmgalaxy.com", "mentions": 2, "ai_search_volume": 36 },
+            { "key": "www.hostinger.com", "mentions": 2, "ai_search_volume": 36 },
+            { "key": "www.git-tower.com", "mentions": 2, "ai_search_volume": 36 },
+            { "key": "www.geeksforgeeks.org", "mentions": 2, "ai_search_volume": 36 },
+            { "key": "www.devtoolsguide.com", "mentions": 2, "ai_search_volume": 36 }
+          ]
+        },
+        "items": [
+          {
+            "key": "techyorker.com",
+            "mentions": 1,
+            "ai_search_volume": 18,
+            "sources_domain": ["thesoftwarescout.com", "techyorker.com"],
+            "search_results_domain": ["www.scmgalaxy.com", "www.hostinger.com", "www.git-tower.com", "www.geeksforgeeks.org", "www.devtoolsguide.com"]
+          },
+          {
+            "key": "thesoftwarescout.com",
+            "mentions": 1,
+            "ai_search_volume": 18,
+            "sources_domain": ["thesoftwarescout.com", "techyorker.com"],
+            "search_results_domain": ["www.scmgalaxy.com", "www.hostinger.com", "www.git-tower.com", "www.geeksforgeeks.org", "www.devtoolsguide.com"]
+          }
+        ]
+      }
+    ]
+  },
+  "ai_opt_llm_ment_top_pages": {
+    "id": "07101843-1272-0638-0000-53ae584ae09b",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "targets_queried": ["jira cli", "atlassian cli"],
+    "platform": "chat_gpt",
+    "items": [
+      {
+        "total": {
+          "location": [{ "key": "2840", "mentions": 2, "ai_search_volume": 36 }],
+          "language": [{ "key": "en", "mentions": 2, "ai_search_volume": 36 }],
+          "platform": [{ "key": "chat_gpt", "mentions": 2, "ai_search_volume": 36 }],
+          "sources_domain": [
+            { "key": "thesoftwarescout.com", "mentions": 2, "ai_search_volume": 36 },
+            { "key": "techyorker.com", "mentions": 2, "ai_search_volume": 36 }
+          ]
+        },
+        "items": [
+          {
+            "key": "https://techyorker.com/best-git-gui-clients-to-easily-merge-git-branches-2026/?utm_source=chatgpt.com",
+            "mentions": 1,
+            "ai_search_volume": 18
+          },
+          {
+            "key": "https://thesoftwarescout.com/best-git-clients-2026-top-gui-tools-for-version-control/?utm_source=chatgpt.com",
+            "mentions": 1,
+            "ai_search_volume": 18
+          }
+        ]
+      }
+    ]
+  }
+}

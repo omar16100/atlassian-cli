@@ -1,0 +1,900 @@
+{
+  "generated": "2026-07-10",
+  "queries": [
+    "jira cli command line",
+    "jira automation script api bulk",
+    "atlassian cli confluence bitbucket",
+    "confluence api automation export",
+    "bitbucket pipelines cli automation"
+  ],
+  "location": "United States",
+  "total": 59,
+  "posts": [
+    {
+      "id": "w540vd",
+      "subreddit": "sysadmin",
+      "score": 896,
+      "num_comments": 176,
+      "title": "Atlassian reveals critical flaws in almost everything it makes and touches",
+      "selftext_preview": "Amazing headline courtesy of [https://www.theregister.com/2022/07/21/atlassian\\_critical\\_security\\_advisories/](https://www.theregister.com/2022/07/21/atlassian_critical_security_advisories/)  \nDisclosure: [https://confluence.atlassian.com/security/july-2022-atlassian-security-advisories-overview-1142446703.html](https://confluence.atlassian.com/security/july-2022-atlassian-security-advisories-ov",
+      "permalink": "https://www.reddit.com/r/sysadmin/comments/w540vd/atlassian_reveals_critical_flaws_in_almost/",
+      "url": "https://www.reddit.com/r/sysadmin/comments/w540vd/atlassian_reveals_critical_flaws_in_almost/",
+      "created_utc": 1658473774,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "5izhyc",
+      "subreddit": "ruby",
+      "score": 82,
+      "num_comments": 20,
+      "title": "Anyone use JIRA? I just released command line application for JIRA.",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/ruby/comments/5izhyc/anyone_use_jira_i_just_released_command_line/",
+      "url": "https://github.com/keepcosmos/terjira",
+      "created_utc": 1482052656,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "1rcqdyr",
+      "subreddit": "investing",
+      "score": 81,
+      "num_comments": 112,
+      "title": "Atlassian stock, oversold?",
+      "selftext_preview": "Right now at 70 USD, down 55% YTD, -75% 1Y. Same price as july 2018. \n\nExcluding like 40% inflation since then if not more. And USD being lower compared to many currencies (should actually give them more value).\n\nAm I missing why? \n\nThis whole bear case is completely relying on massive layoffs for white collar workers that won't get rehired in another role where they still need to use confluence/j",
+      "permalink": "https://www.reddit.com/r/investing/comments/1rcqdyr/atlassian_stock_oversold/",
+      "url": "https://www.reddit.com/r/investing/comments/1rcqdyr/atlassian_stock_oversold/",
+      "created_utc": 1771873130,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "81ep68",
+      "subreddit": "sysadmin",
+      "score": 63,
+      "num_comments": 27,
+      "title": "Atlassian Cloud - Down (JIRA, Confluence, Marketplace)",
+      "selftext_preview": "More info here -- https://status.atlassian.com/\n\nHipChat is up and other tools. Just those 3 specifically.\n\n**edit 2** looks like it's a provider/backbone type issue? Seeing some updates on both Atlassian's status and AWS status page. \n\n\n",
+      "permalink": "https://www.reddit.com/r/sysadmin/comments/81ep68/atlassian_cloud_down_jira_confluence_marketplace/",
+      "url": "https://www.reddit.com/r/sysadmin/comments/81ep68/atlassian_cloud_down_jira_confluence_marketplace/",
+      "created_utc": 1520002051,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/jira"
+    },
+    {
+      "id": "1l9sqv2",
+      "subreddit": "ChatGPTCoding",
+      "score": 27,
+      "num_comments": 32,
+      "title": "Atlassian launches Rovo Dev CLI - a terminal dev agent in free open beta",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/ChatGPTCoding/comments/1l9sqv2/atlassian_launches_rovo_dev_cli_a_terminal_dev/",
+      "url": "https://www.atlassian.com/blog/announcements/rovo-dev-command-line-interface",
+      "created_utc": 1749750074,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "fkuoa6",
+      "subreddit": "atlassian",
+      "score": 26,
+      "num_comments": 6,
+      "title": "Atlassian offering free versions of Jira Cloud, JSD, and Confluence for cloud",
+      "selftext_preview": "Also offering Trello Business Class for free for K-12 and higher-ed instructors\n\n [https://www.atlassian.com/blog/announcements/atlassian-cloud-remote-friendly-tools-free-small-teams](https://www.atlassian.com/blog/announcements/atlassian-cloud-remote-friendly-tools-free-small-teams) \n\n [https://www.atlassian.com/software/free](https://www.atlassian.com/software/free) \n\n# We\u2019re making our remote-f",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/fkuoa6/atlassian_offering_free_versions_of_jira_cloud/",
+      "url": "https://www.reddit.com/r/atlassian/comments/fkuoa6/atlassian_offering_free_versions_of_jira_cloud/",
+      "created_utc": 1584556885,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/jira"
+    },
+    {
+      "id": "1o153z7",
+      "subreddit": "singularity",
+      "score": 24,
+      "num_comments": 5,
+      "title": "Atlassian announces Rovo Dev in general availability - full SDLC context-aware AI agent in Jira, CLI, IDE, Github and Bitbucket",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/singularity/comments/1o153z7/atlassian_announces_rovo_dev_in_general/",
+      "url": "https://www.atlassian.com/software/rovo-dev",
+      "created_utc": 1759913005,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket/jira"
+    },
+    {
+      "id": "1qk2yas",
+      "subreddit": "embedded",
+      "score": 17,
+      "num_comments": 9,
+      "title": "European alternatives to atlassian (confluence, jira, bitbucket) that allows traceability good for commercial products and iso certification of code?",
+      "selftext_preview": "European alternative, but that will also allow me to have traceability good for iso certification of code. Something that will allow me to have CI/CD pipelines for automatic tests for software and hardware, and all the other aspects needed to get certifications?\n\n\n\n",
+      "permalink": "https://www.reddit.com/r/embedded/comments/1qk2yas/european_alternatives_to_atlassian_confluence/",
+      "url": "https://www.reddit.com/r/embedded/comments/1qk2yas/european_alternatives_to_atlassian_confluence/",
+      "created_utc": 1769107547,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1tkwcw5",
+      "subreddit": "opensource",
+      "score": 16,
+      "num_comments": 2,
+      "title": "confluence2md - Open source CLI to export Confluence spaces to local Markdown",
+      "selftext_preview": "I just open-sourced `confluence2md`, a Go CLI for exporting Confluence spaces to local Markdown files.\n\n**What it does:**\n- Crawls Confluence from seed pages, follows links up to configurable depth\n- Writes clean Markdown with stable filenames (includes page ID for tracking renames)\n- Rewrites internal links as relative local paths, preserves external URLs\n- Downloads attachments and rewrites refe",
+      "permalink": "https://www.reddit.com/r/opensource/comments/1tkwcw5/confluence2md_open_source_cli_to_export/",
+      "url": "https://github.com/gkoos/confluence2md",
+      "created_utc": 1779484848,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "1o153la",
+      "subreddit": "ChatGPTCoding",
+      "score": 14,
+      "num_comments": 23,
+      "title": "Atlassian announces Rovo Dev in general availability - full SDLC context-aware AI agent in Jira, CLI, IDE, Github and Bitbucket",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/ChatGPTCoding/comments/1o153la/atlassian_announces_rovo_dev_in_general/",
+      "url": "https://www.atlassian.com/software/rovo-dev",
+      "created_utc": 1759912960,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket/jira"
+    },
+    {
+      "id": "1sv98ir",
+      "subreddit": "git",
+      "score": 14,
+      "num_comments": 2,
+      "title": "Made a Bitbucket CLI because gh spoiled me and Atlassian still hasn\u2019t shipped one",
+      "selftext_preview": "For the last few years I\u2019ve been spoiled rotten by GitHub\u2019s\u00a0`gh`\u00a0CLI.\u00a0`gh pr create`,\u00a0`gh pr list`,\u00a0`gh repo clone` never leave the terminal, never touch the web UI for the boring stuff. It just works.\n\nThen work happened, and work uses Bitbucket Cloud. And Bitbucket\u2026 does not have an official CLI. There\u2019s the REST API, there\u2019s\u00a0`curl`, there\u2019s a handful of half-abandoned community tools, and there",
+      "permalink": "https://www.reddit.com/r/git/comments/1sv98ir/made_a_bitbucket_cli_because_gh_spoiled_me_and/",
+      "url": "https://www.reddit.com/r/git/comments/1sv98ir/made_a_bitbucket_cli_because_gh_spoiled_me_and/",
+      "created_utc": 1777115269,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket"
+    },
+    {
+      "id": "1q6ntjy",
+      "subreddit": "atlassian",
+      "score": 11,
+      "num_comments": 3,
+      "title": "Got tired of waiting for Atlassian to make a Bitbucket CLI like GitHub's `gh`, so I built my own in Rust",
+      "selftext_preview": "I've been a GitHub user for years and absolutely love the `gh` CLI. Being able to create PRs, manage issues, and interact with repos entirely from the terminal is *chef's kiss*. \n\nBut here's the thing\u2014at work and for professional projects, we use **Bitbucket Cloud** because of the tight integration with Jira. When you're in an enterprise environment with proper issue tracking, sprint planning, and",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/1q6ntjy/got_tired_of_waiting_for_atlassian_to_make_a/",
+      "url": "https://www.reddit.com/r/atlassian/comments/1q6ntjy/got_tired_of_waiting_for_atlassian_to_make_a/",
+      "created_utc": 1767811523,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket/jira/automation"
+    },
+    {
+      "id": "xtvoxl",
+      "subreddit": "rust",
+      "score": 11,
+      "num_comments": 0,
+      "title": "[Code review request] My first CLI tool in Rust for migrating repositories from Bitbucket to GitHub",
+      "selftext_preview": "Hi all!\n\nI'm fairly new to Rust (coming from the JS/TS world with a few years of mobile dev experience, both Android and iOS) and I'm trying to hack some utility things to learn more about the language and how to write idiomatic Rust.\n\nI want to share with you my first \"real\" CLI I've built that me and my teammates used at work to migrate a bunch of repositories from our Bitbucket to a new GitHub ",
+      "permalink": "https://www.reddit.com/r/rust/comments/xtvoxl/code_review_request_my_first_cli_tool_in_rust_for/",
+      "url": "https://www.reddit.com/r/rust/comments/xtvoxl/code_review_request_my_first_cli_tool_in_rust_for/",
+      "created_utc": 1664734611,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket"
+    },
+    {
+      "id": "1n4rdrs",
+      "subreddit": "AIcliCoding",
+      "score": 10,
+      "num_comments": 9,
+      "title": "CLI alternatives to Claude Code and Codex",
+      "selftext_preview": "**Atlassian Command Line Interface ROVODEV** \\- [https://developer.atlassian.com/cloud/acli/guides/introduction/](https://developer.atlassian.com/cloud/acli/guides/introduction/) \\- 5 million tokens per day free. 20 million tokens per day for $8 jira teams membership.\n\n**AgentAPI by Coder**\u00a0\\- [https://github.com/coder/agentapi](https://github.com/coder/agentapi) \\- new to me so untested yet.\n\n**A",
+      "permalink": "https://www.reddit.com/r/AIcliCoding/comments/1n4rdrs/cli_alternatives_to_claude_code_and_codex/",
+      "url": "https://www.reddit.com/r/AIcliCoding/comments/1n4rdrs/cli_alternatives_to_claude_code_and_codex/",
+      "created_utc": 1756636412,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira/auth"
+    },
+    {
+      "id": "fjr6rg",
+      "subreddit": "atlassian",
+      "score": 9,
+      "num_comments": 7,
+      "title": "Atlassian changing automation engine for JSD",
+      "selftext_preview": "Figured I'd flag in case people had missed...\n\nLooks like they've made some other changes following their recent acquisition of Automation for Jira too.\n\nAutomation for Jira will eventually become the new engine for JSD\n\n [https://confluence.atlassian.com/jirasoftwarecloud/faqs-for-previous-automation-for-jira-app-customers-993925346.html?utm\\_source=announcement-email&utm\\_medium=email&utm\\_campa",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/fjr6rg/atlassian_changing_automation_engine_for_jsd/",
+      "url": "https://www.reddit.com/r/atlassian/comments/fjr6rg/atlassian_changing_automation_engine_for_jsd/",
+      "created_utc": 1584388354,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/jira/automation"
+    },
+    {
+      "id": "nr1con",
+      "subreddit": "confluence",
+      "score": 8,
+      "num_comments": 7,
+      "title": "First Atlassian Marketplace App: Secret Scanner for Confluence. Would love some feedback",
+      "selftext_preview": "[https://marketplace.atlassian.com/apps/1225345/secret-scanner-for-confluence-cloud?hosting=cloud&tab=overview](https://marketplace.atlassian.com/apps/1225345/secret-scanner-for-confluence-cloud?hosting=cloud&tab=overview)\n\nI thought I would dip my toes into the world of Atlassian plugins. I had started work on a Bitbucket one which I still want to publish, but seeing as there is no PvA there yet ",
+      "permalink": "https://www.reddit.com/r/confluence/comments/nr1con/first_atlassian_marketplace_app_secret_scanner/",
+      "url": "https://www.reddit.com/r/confluence/comments/nr1con/first_atlassian_marketplace_app_secret_scanner/",
+      "created_utc": 1622682692,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket"
+    },
+    {
+      "id": "1lcwtic",
+      "subreddit": "jira",
+      "score": 8,
+      "num_comments": 4,
+      "title": "Jira ACLI on Windows - PowerShell Helpers",
+      "selftext_preview": "Hi folks, in case you missed it, Atlassian has released their [command line interface](https://www.atlassian.com/blog/jira/atlassian-command-line-interface) and it's pretty slick. I'm definitely looking forward to seeing how they expand it further.  It's not quite as powerful as their API endpoints, but for quick and dirty things it's pretty darn slick.\n\nI've submitted feedback on improving their ",
+      "permalink": "https://www.reddit.com/r/jira/comments/1lcwtic/jira_acli_on_windows_powershell_helpers/",
+      "url": "https://www.reddit.com/r/jira/comments/1lcwtic/jira_acli_on_windows_powershell_helpers/",
+      "created_utc": 1750089985,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "1psdt5h",
+      "subreddit": "atlassian",
+      "score": 8,
+      "num_comments": 4,
+      "title": "I am Atlassian Administrator having access to Jira and Confluence. However, Bitbucket is managed by separate devops team. I am planning switch job and feel like Jira and Confluence are not enough. Experts Please suggest a roadmap. I have learned git basics to start with.",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/1psdt5h/i_am_atlassian_administrator_having_access_to/",
+      "url": "https://www.reddit.com/r/atlassian/comments/1psdt5h/i_am_atlassian_administrator_having_access_to/",
+      "created_utc": 1766342819,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1uk1v4p",
+      "subreddit": "Tidra",
+      "score": 8,
+      "num_comments": 0,
+      "title": "Migrating Bitbucket Pipelines to GitHub Actions: a practical mapping guide. CI configs do not migrate themselves. Or can they?",
+      "selftext_preview": "When an org consolidates onto GitHub, the CI configs do not move themselves. Every repo carries its own [bitbucket-pipelines.yml](https://support.atlassian.com/bitbucket-cloud/docs/configure-bitbucket-pipelinesyml/), and each one has to be rewritten as a GitHub Actions workflow before the old Bitbucket repos get archived. If you have ten repos, that is annoying. If you have two hundred, it is a pr",
+      "permalink": "https://www.reddit.com/r/Tidra/comments/1uk1v4p/migrating_bitbucket_pipelines_to_github_actions_a/",
+      "url": "https://i.redd.it/zxgozivbkhah1.png",
+      "created_utc": 1782854096,
+      "queries": [
+        "bitbucket pipelines cli automation"
+      ],
+      "topic_tag": "bitbucket/ci"
+    },
+    {
+      "id": "1t7alit",
+      "subreddit": "technicalwriting",
+      "score": 6,
+      "num_comments": 10,
+      "title": "I created mkdocs2confluence \u2014 a CLI tool that compiles MkDocs to native Confluence storage format [looking for feedback]",
+      "selftext_preview": "# Why\n\nI'm a **docs-as-code advocate** \u2014 if it's not in git, it doesn't exist. Confluence is great for visibility, but the native Confluence workflow doesn't really work for me, as a software architect and developer.\n\nIf you maintain docs in MkDocs and also need them in Confluence, as it's the company developer and documentation portal. You know the pain: copy-paste, reformatting, drift between th",
+      "permalink": "https://www.reddit.com/r/technicalwriting/comments/1t7alit/i_created_mkdocs2confluence_a_cli_tool_that/",
+      "url": "https://www.reddit.com/r/technicalwriting/comments/1t7alit/i_created_mkdocs2confluence_a_cli_tool_that/",
+      "created_utc": 1778252651,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "1lhcnjq",
+      "subreddit": "AIAGENTSNEWS",
+      "score": 5,
+      "num_comments": 1,
+      "title": "Rovo Dev by Atlassian: An AI Coding Agent to Automate Repetitive Dev Tasks",
+      "selftext_preview": "Rovo Dev\u00a0by Atlassian was once an internal AI agent that has been made available to the public. Rovo Dev is available as a command-line interface (CLI) tool designed for developers who are most comfortable and productive in a terminal environment.\n\nIt's tightly integrated with the Atlassian stack, customized for the terminal, and built with the actual needs of developers in mind. For teams that li",
+      "permalink": "https://www.reddit.com/r/AIAGENTSNEWS/comments/1lhcnjq/rovo_dev_by_atlassian_an_ai_coding_agent_to/",
+      "url": "https://v.redd.it/d8ohahpmxd8f1",
+      "created_utc": 1750557373,
+      "queries": [
+        "jira cli command line",
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "automation"
+    },
+    {
+      "id": "1qwf95k",
+      "subreddit": "Daily_TechJobs_India",
+      "score": 5,
+      "num_comments": 1,
+      "title": "Hiring freelance trainers to train on Atlassian Confluence Development / Remote",
+      "selftext_preview": "Hi All,\nGreetings from The Unicorn People.\n\nWe are seeking an experienced and certified Trainer for an upcoming training program. \n\nClient - Client is using Atlassian Data Centre version for this\n\nTraining Subject  - Atlassian Confluence Development Professionals\n\nStart Date - TBD\n\nTotal Duration - TBD\n\nSkills - PTC pro, Scroll Doc (1. PDF and 2. Word) , Posgress DB , Python JavaScript and Comala ",
+      "permalink": "https://www.reddit.com/r/Daily_TechJobs_India/comments/1qwf95k/hiring_freelance_trainers_to_train_on_atlassian/",
+      "url": "https://www.reddit.com/r/Daily_TechJobs_India/comments/1qwf95k/hiring_freelance_trainers_to_train_on_atlassian/",
+      "created_utc": 1770277902,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/automation"
+    },
+    {
+      "id": "1m8rdak",
+      "subreddit": "RovoDev",
+      "score": 4,
+      "num_comments": 8,
+      "title": "Getting error even though rovo dev is enabled:",
+      "selftext_preview": "rovodev is enabled on my site i still keep getting this error why? what is the issue?\n\n\n\n\u256d\u2500 Rovo Dev Agents is not installed on your site \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\n\u2502                                                                                                                      \u2502\n\n\u2502 To use Rovo Dev CLI, your organization administrator needs to ins",
+      "permalink": "https://www.reddit.com/r/RovoDev/comments/1m8rdak/getting_error_even_though_rovo_dev_is_enabled/",
+      "url": "https://www.reddit.com/r/RovoDev/comments/1m8rdak/getting_error_even_though_rovo_dev_is_enabled/",
+      "created_utc": 1753422977,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "1svdr93",
+      "subreddit": "atlassian",
+      "score": 4,
+      "num_comments": 3,
+      "title": "Made a Bitbucket CLI because gh spoiled me and Atlassian still hasn\u2019t shipped one",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/1svdr93/made_a_bitbucket_cli_because_gh_spoiled_me_and/",
+      "url": "/r/git/comments/1sv98ir/made_a_bitbucket_cli_because_gh_spoiled_me_and/",
+      "created_utc": 1777127491,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket"
+    },
+    {
+      "id": "1q4y3cs",
+      "subreddit": "AZURE",
+      "score": 4,
+      "num_comments": 2,
+      "title": "How to Build an AI Agent to Automate Release Notes (Azure DevOps \u2192 Confluence, Google ADK + MCP)",
+      "selftext_preview": "Learn how to build an AI agent that automates release notes creation from Azure DevOps user stories and publishes them to Confluence. This hands-on tutorial uses Google ADK with Azure DevOps MCP and Atlassian MCP to connect your product management tools directly to your documentation platform.\n\n[https://www.youtube.com/watch?v=dkxzehq6E8o](https://www.youtube.com/watch?v=dkxzehq6E8o)",
+      "permalink": "https://www.reddit.com/r/AZURE/comments/1q4y3cs/how_to_build_an_ai_agent_to_automate_release/",
+      "url": "https://www.reddit.com/r/AZURE/comments/1q4y3cs/how_to_build_an_ai_agent_to_automate_release/",
+      "created_utc": 1767647186,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/automation"
+    },
+    {
+      "id": "1o77bvw",
+      "subreddit": "GithubCopilot",
+      "score": 3,
+      "num_comments": 5,
+      "title": "Copilot CLI + Atlassian MCP",
+      "selftext_preview": "Hey all ,\n\nCan anyone help me on getting the Atlassian (jira ) MCP setup with copilot cli ?\n\nBit of context , I\u2019m not on tools daily , but I\u2019ve been using Claude Code for few weeks now . I have some of my teams working with Claude and some with Copilot .\n\nMy workflow is , I get Claude code agent to wad from the JIRA ticket  -> create a implementation plan in confluence -> get the Claude to go thou",
+      "permalink": "https://www.reddit.com/r/GithubCopilot/comments/1o77bvw/copilot_cli_atlassian_mcp/",
+      "url": "https://www.reddit.com/r/GithubCopilot/comments/1o77bvw/copilot_cli_atlassian_mcp/",
+      "created_utc": 1760524108,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/jira"
+    },
+    {
+      "id": "1oxbfd7",
+      "subreddit": "jira",
+      "score": 3,
+      "num_comments": 1,
+      "title": "Export huge OneNote notebook (5GB+) with embedded email attachments \u2192 create JSM tickets (locked-down gov PC, no installs). Any proven workflows?",
+      "selftext_preview": "Hey folks \u2014 looking for battle-tested ways to get a very large OneNote notebook (\u22485GB) exported with the embedded email attachments and ingest it into Jira Service Management (JSM) as issues + attachments.\n\nEnvironment / constraints\n\t\u2022\tGov workstation (USAF) with CAC auth, strict controls, no local admin, minimal ability to install software.\n\t\u2022\tOneNote desktop (Win32). Notebook currently local/Sha",
+      "permalink": "https://www.reddit.com/r/jira/comments/1oxbfd7/export_huge_onenote_notebook_5gb_with_embedded/",
+      "url": "https://www.reddit.com/r/jira/comments/1oxbfd7/export_huge_onenote_notebook_5gb_with_embedded/",
+      "created_utc": 1763161260,
+      "queries": [
+        "jira automation script api bulk"
+      ],
+      "topic_tag": "jsm/jira/auth"
+    },
+    {
+      "id": "1psdup4",
+      "subreddit": "jira",
+      "score": 3,
+      "num_comments": 0,
+      "title": "I am Atlassian Administrator having access to Jira and Confluence. However, Bitbucket is managed by separate devops team. I am planning switch job and feel like Jira and Confluence are not enough. Experts Please suggest a roadmap. I have learned git basics to start with.",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/jira/comments/1psdup4/i_am_atlassian_administrator_having_access_to/",
+      "url": "/r/atlassian/comments/1psdt5h/i_am_atlassian_administrator_having_access_to/",
+      "created_utc": 1766342927,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "ri0apb",
+      "subreddit": "sysadmin",
+      "score": 3,
+      "num_comments": 0,
+      "title": "Atlassian updates their advisory for Bitbucket (CVE-2021-44228)",
+      "selftext_preview": "In case you missed it, Atlassian just [updated their blog post](https://confluence.atlassian.com/security/multiple-products-security-advisory-log4j-vulnerable-to-remote-code-execution-cve-2021-44228-1103069934.html) regarding CVE-2021-44228. Both Bitbucket Server & Data Center versions are affected.\n\nFixed versions:\n\n* 6.10.16\n* 7.6.12\n* 7.14.2\n* 7.15.3\n* 7.16.3\n* 7.17.4\n* 7.18.3\n* 7.19.1",
+      "permalink": "https://www.reddit.com/r/sysadmin/comments/ri0apb/atlassian_updates_their_advisory_for_bitbucket/",
+      "url": "https://www.reddit.com/r/sysadmin/comments/ri0apb/atlassian_updates_their_advisory_for_bitbucket/",
+      "created_utc": 1639688949,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket"
+    },
+    {
+      "id": "1t7t6lx",
+      "subreddit": "SideProject",
+      "score": 2,
+      "num_comments": 19,
+      "title": "i automated my daily social media routine with python scripts + claude code",
+      "selftext_preview": "got tired of context-switching between x, reddit, slack, jira just to stay on top of things. so i wrote python scripts that call each platform's API directly, then wrapped them as claude code skills.\n\nnow i just tell my agent \"check what's trending on x\" or \"reply to that thread\" and it picks the right script, runs it, gives me results. no browser automation, no screenshots, no MCP server to maint",
+      "permalink": "https://www.reddit.com/r/SideProject/comments/1t7t6lx/i_automated_my_daily_social_media_routine_with/",
+      "url": "https://www.reddit.com/r/SideProject/comments/1t7t6lx/i_automated_my_daily_social_media_routine_with/",
+      "created_utc": 1778296535,
+      "queries": [
+        "bitbucket pipelines cli automation"
+      ],
+      "topic_tag": "jira/automation"
+    },
+    {
+      "id": "1hv8caa",
+      "subreddit": "github",
+      "score": 2,
+      "num_comments": 8,
+      "title": "Migrating Bitbucket Cloud to Github Enterprise with CLI/Tools",
+      "selftext_preview": "Hi all. I am trying to migrate numerous repositories from Bitbucket Cloud to an Organization under a Github Enterprise account. Ideally I'd like to automate this rather than having to through the Github Importer web interface for each repo/project individually. Also, the Github Enterprise Importer tool only works for Bitbucket Server, not Cloud. Now that Atlassian has dropped support for Bitbucket",
+      "permalink": "https://www.reddit.com/r/github/comments/1hv8caa/migrating_bitbucket_cloud_to_github_enterprise/",
+      "url": "https://www.reddit.com/r/github/comments/1hv8caa/migrating_bitbucket_cloud_to_github_enterprise/",
+      "created_utc": 1736193911,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket/automation"
+    },
+    {
+      "id": "1oxbm38",
+      "subreddit": "OneNote",
+      "score": 2,
+      "num_comments": 3,
+      "title": "Export huge OneNote notebook (5GB+) with embedded email attachments \u2192 create JSM tickets (locked-down gov PC, no installs). Any proven workflows?",
+      "selftext_preview": "Hey folks \u2014 looking for battle-tested ways to get a very large OneNote notebook (\u22485GB) exported with the embedded email attachments and ingest it into Jira Service Management (JSM) as issues + attachments.\n\nEnvironment / constraints\n\t\u2022\tGov workstation (USAF) with CAC auth, strict controls, no local admin, minimal ability to install software.\n\t\u2022\tOneNote desktop (Win32). Notebook currently local/Sha",
+      "permalink": "https://www.reddit.com/r/OneNote/comments/1oxbm38/export_huge_onenote_notebook_5gb_with_embedded/",
+      "url": "https://www.reddit.com/r/OneNote/comments/1oxbm38/export_huge_onenote_notebook_5gb_with_embedded/",
+      "created_utc": 1763161700,
+      "queries": [
+        "jira automation script api bulk"
+      ],
+      "topic_tag": "jsm/jira/auth"
+    },
+    {
+      "id": "1rz4wmy",
+      "subreddit": "technicalwriting",
+      "score": 2,
+      "num_comments": 3,
+      "title": "Bitbucket --> static site (because Confluence is awful)",
+      "selftext_preview": "Looking for advice from folks who have more experience with site/knowledge management than I do.\n\n**Background**\n\nMy company is looking to improve its internal knowledgebase. Easier said than done, because our main content system is SharePoint, I don't have the rights/privileges to improve our SharePoint experience, and the folks who do (enterprise IT) don't care and/or aren't getting asked to mak",
+      "permalink": "https://www.reddit.com/r/technicalwriting/comments/1rz4wmy/bitbucket_static_site_because_confluence_is_awful/",
+      "url": "https://www.reddit.com/r/technicalwriting/comments/1rz4wmy/bitbucket_static_site_because_confluence_is_awful/",
+      "created_utc": 1774032947,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket"
+    },
+    {
+      "id": "1mk9lc",
+      "subreddit": "atlassian",
+      "score": 2,
+      "num_comments": 2,
+      "title": "Command line interface for Jira, Confluence, Stash and Team calendars",
+      "selftext_preview": "Hi guys.\n\nI've recently installed Jira, Confluence, Stash and team calendars on my company server. What we ideally want is to be able to write a batch scripts which will create a new jira project, a matching confluence space, a new repo in stash and a jira calendar in team calendars. I imagine the best way to do this is via the command line but the cli plugins are incredibly pricey. \n\nDoes anyone ",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/1mk9lc/command_line_interface_for_jira_confluence_stash/",
+      "url": "https://www.reddit.com/r/atlassian/comments/1mk9lc/command_line_interface_for_jira_confluence_stash/",
+      "created_utc": 1379409921,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "confluence/jira/automation"
+    },
+    {
+      "id": "17k3k39",
+      "subreddit": "JavaScriptTips",
+      "score": 2,
+      "num_comments": 1,
+      "title": "Searching for any tips/tricks for Java and atlassian confluence",
+      "selftext_preview": "Hey! \n\nFirst of all I\u2019m self-learned, I\u2019m a product manager who has been learning amateur design coding with knowledge in SQL for the past ~3 years and spend most of my time working with HTML5 and CSS. \n\nI recently started at a different company and they primarily use confluence for team documentation/resources and I\u2019ve been tasked with building centralized documentation of standard terminology. C",
+      "permalink": "https://www.reddit.com/r/JavaScriptTips/comments/17k3k39/searching_for_any_tipstricks_for_java_and/",
+      "url": "https://www.reddit.com/r/JavaScriptTips/comments/17k3k39/searching_for_any_tipstricks_for_java_and/",
+      "created_utc": 1698699594,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "1rr8wwp",
+      "subreddit": "atlassian",
+      "score": 2,
+      "num_comments": 0,
+      "title": "CLI for Atlassian products - Jira, Confluence, and Bitbucket",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/1rr8wwp/cli_for_atlassian_products_jira_confluence_and/",
+      "url": "https://github.com/chinmaymk/acli",
+      "created_utc": 1773268643,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1qnadrt",
+      "subreddit": "passkey",
+      "score": 2,
+      "num_comments": 0,
+      "title": "Atlassian passkeys are finally live across the whole cloud stack (Jira, Confluence, Bitbucket, Trello)",
+      "selftext_preview": "B2B SaaS accounts are a top phishing target and AiTM kits can bypass a lot of classic MFA. Passkeys prevent this because they are origin-bound (\u2192phishing-resistant), so lookalike domains just fail.\n\nPlus,[ passkeys in Atlassian](https://www.corbado.com/blog/atlassian-passkeys-jira-confluence-trello-bitbucket) products help fewer password resets, fewer locked out tickets, and faster logins for ever",
+      "permalink": "https://www.reddit.com/r/passkey/comments/1qnadrt/atlassian_passkeys_are_finally_live_across_the/",
+      "url": "https://www.reddit.com/r/passkey/comments/1qnadrt/atlassian_passkeys_are_finally_live_across_the/",
+      "created_utc": 1769415695,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1gawarc",
+      "subreddit": "GitProtect",
+      "score": 2,
+      "num_comments": 0,
+      "title": "Atlassian patches security vulnerabilities in Jira, Bitbucket, and Confluence",
+      "selftext_preview": "In its October bulletin, Atlassian patched six high-severity vulnerabilities that could lead to information leakage or denial of service:\n\n* Bundled JRE Dependency in Bitbucket Data Center and Server tracked as CVE-2024-21147 with the CVSS severity of 7.4\n* Stored XSS in Confluence and Data Center and Server tracked as CVE 2024-4367 with\u00a0 CVSS severity of 8.1\n* Regular Expression Denial of Service",
+      "permalink": "https://www.reddit.com/r/GitProtect/comments/1gawarc/atlassian_patches_security_vulnerabilities_in/",
+      "url": "https://www.reddit.com/r/GitProtect/comments/1gawarc/atlassian_patches_security_vulnerabilities_in/",
+      "created_utc": 1729751669,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1rr8wgk",
+      "subreddit": "commandline",
+      "score": 1,
+      "num_comments": 4,
+      "title": "CLI for Atlassian products - Jira, Confluence, and Bitbucket",
+      "selftext_preview": "I wanted a CLI for my AI agents to talk to bitbucket and JIRA, so ended up building one myself, it works for cloud hosted jira/bb/confluence with personal access tokens",
+      "permalink": "https://www.reddit.com/r/commandline/comments/1rr8wgk/cli_for_atlassian_products_jira_confluence_and/",
+      "url": "https://github.com/chinmaymk/acli",
+      "created_utc": 1773268615,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1m0xbjj",
+      "subreddit": "atlassian",
+      "score": 1,
+      "num_comments": 3,
+      "title": "Jira -> Confluence Automation for Jira Work Items table",
+      "selftext_preview": "I'm trying to set up some automation that does the following:\n\n1. Create a Release in JIRA\n2. Confluence page gets created related to the release version\n3. Create a table in Confluence that automatically updates when work items are assigned to that release/fix version\n\nSteps 1 and 2, easy-peasy\n\nStep 3 is making me want to throw my keyboard through the window.\n\nI can't seem to find a way to injec",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/1m0xbjj/jira_confluence_automation_for_jira_work_items/",
+      "url": "https://www.reddit.com/r/atlassian/comments/1m0xbjj/jira_confluence_automation_for_jira_work_items/",
+      "created_utc": 1752622353,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/jira/automation"
+    },
+    {
+      "id": "1qk2vd3",
+      "subreddit": "Buy_European",
+      "score": 1,
+      "num_comments": 2,
+      "title": "Alternatives to atlassian suite jira confluence bitbucket?",
+      "selftext_preview": "Something that would allow to have iso certification for traceability of code as well? something which would work for embedded systems",
+      "permalink": "https://www.reddit.com/r/Buy_European/comments/1qk2vd3/alternatives_to_atlassian_suite_jira_confluence/",
+      "url": "https://www.reddit.com/r/Buy_European/comments/1qk2vd3/alternatives_to_atlassian_suite_jira_confluence/",
+      "created_utc": 1769107370,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1sjfx78",
+      "subreddit": "SideProject",
+      "score": 1,
+      "num_comments": 1,
+      "title": "I built a CLI JIRA(-ish) clone",
+      "selftext_preview": "Hi Everyone,\n\nI built [Git Product Manager (GPM)](https://github.com/ditsara/git-product-manager), an open source, command line project management system that lives in your git repo.\n\nhttps://github.com/ditsara/git-product-manager\n\nThe core concept is that all tickets are stored as files within your code repo, so LLMs have direct access to everything about your project. This tool simply helps you ",
+      "permalink": "https://www.reddit.com/r/SideProject/comments/1sjfx78/i_built_a_cli_jiraish_clone/",
+      "url": "https://www.reddit.com/r/SideProject/comments/1sjfx78/i_built_a_cli_jiraish_clone/",
+      "created_utc": 1776003869,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "x0npmr",
+      "subreddit": "k12cybersecurity",
+      "score": 1,
+      "num_comments": 1,
+      "title": "A Vulnerability in Atlassian Bitbucket Server and Data Center Could Allow For Remote Code Execution",
+      "selftext_preview": "**MS-ISAC CYBERSECURITY ADVISORY**\n\n**MS-ISAC ADVISORY NUMBER:**  \n2022-0107\n\n**DATE(S) ISSUED:**  \n08/27/2022\n\n**SUBJECT:**  \nA Vulnerability in Atlassian Bitbucket Server and Data Center Could Allow For Remote Code Execution\n\n**OVERVIEW:**  \nA Vulnerability has been discovered in Atlassian Bitbucket Server and Data Center which could allow for remote code execution. Bitbucket is a Git-based sour",
+      "permalink": "https://www.reddit.com/r/k12cybersecurity/comments/x0npmr/a_vulnerability_in_atlassian_bitbucket_server_and/",
+      "url": "https://www.reddit.com/r/k12cybersecurity/comments/x0npmr/a_vulnerability_in_atlassian_bitbucket_server_and/",
+      "created_utc": 1661776667,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket"
+    },
+    {
+      "id": "hhwyve",
+      "subreddit": "test",
+      "score": 1,
+      "num_comments": 1,
+      "title": "Top 5 test management tools inside Jira",
+      "selftext_preview": "Test organization and efficient management are indispensable to the overall quality of your product or release. To match the faster release velocity and high volume of production required in the era of digital transformation, everything from the processes, to resources and testing tools need to be Agile.\n\nMany businesses using Jira to organize and manage projects and tasks within the organization ",
+      "permalink": "https://www.reddit.com/r/test/comments/hhwyve/top_5_test_management_tools_inside_jira/",
+      "url": "https://www.reddit.com/r/test/comments/hhwyve/top_5_test_management_tools_inside_jira/",
+      "created_utc": 1593423890,
+      "queries": [
+        "confluence api automation export"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "wmgrzi",
+      "subreddit": "hypeurlsposts",
+      "score": 1,
+      "num_comments": 0,
+      "title": "JiraCLI: The Interactive Command Line Tool for Atlassian Jira",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/hypeurlsposts/comments/wmgrzi/jiracli_the_interactive_command_line_tool_for/",
+      "url": "https://hypeurls.com/share/25158/jiracli-the-interactive-command-line-tool-for-atlassian-jira/",
+      "created_utc": 1660295934,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "1oktzn8",
+      "subreddit": "jira",
+      "score": 1,
+      "num_comments": 0,
+      "title": "Automate branch naming from Jira issues with gibr \ud83e\ude84",
+      "selftext_preview": "Hey everyone \ud83d\udc4b\n\nI built **gibr**, a small CLI tool that connects your command line git to **Jira**\n\nYou just run:  \n\n\n    gibr PROJ-123\n    # or even shorter (if you pre-configured your project key)\n    gibr 123\n\nand it automatically:  \n\u2705 Fetches the Jira issue title  \n\u2705 Generates a clean, consistent branch name like\n\n    PROJ-123/feature/add-oauth2-login\n    \n\n\u2705 Creates, checks out, and pushes th",
+      "permalink": "https://www.reddit.com/r/jira/comments/1oktzn8/automate_branch_naming_from_jira_issues_with_gibr/",
+      "url": "https://www.reddit.com/r/jira/comments/1oktzn8/automate_branch_naming_from_jira_issues_with_gibr/",
+      "created_utc": 1761915759,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira/auth/automation"
+    },
+    {
+      "id": "1u2rq08",
+      "subreddit": "alphaandbetausers",
+      "score": 1,
+      "num_comments": 0,
+      "title": "Looking for testers to trial out my Atlassian bot Synco (Jira + Confluence install required)",
+      "selftext_preview": "Hi all,\n\nSynco automatically updates Confluence Pages that are linked to Jira tickets once these transition to DONE state.\n\nAs a PM, I always struggled to keep documentation up to date and in every company I joined, I saw the same problem.\n\nI'm hoping Synco can help solve this proble by automating the doc update process.\n\nWould have my company test it but unfortunately we use AzDo\n\nThere's a 30 da",
+      "permalink": "https://www.reddit.com/r/alphaandbetausers/comments/1u2rq08/looking_for_testers_to_trial_out_my_atlassian_bot/",
+      "url": "https://www.reddit.com/r/alphaandbetausers/comments/1u2rq08/looking_for_testers_to_trial_out_my_atlassian_bot/",
+      "created_utc": 1781161317,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/jira/automation"
+    },
+    {
+      "id": "1tbw0c3",
+      "subreddit": "mcp",
+      "score": 1,
+      "num_comments": 0,
+      "title": "I built a small MCP app that uses MCP Atlassian for Jira automation",
+      "selftext_preview": "Hey everyone,\n\nI built a small open-source app called MCP Jira Automation. It uses MCP Atlassian to read Jira issues and helps automate API test workflows around them. The basic flow is: it reads a Jira issue, generates or updates API tests, runs them in Docker, opens a PR, and then comments the result back to Jira.\n\nIt supports GitHub, GitLab, Bitbucket, OpenAI, Anthropic, Gemini, vLLM, Aider, lo",
+      "permalink": "https://www.reddit.com/r/mcp/comments/1tbw0c3/i_built_a_small_mcp_app_that_uses_mcp_atlassian/",
+      "url": "https://www.reddit.com/r/mcp/comments/1tbw0c3/i_built_a_small_mcp_app_that_uses_mcp_atlassian/",
+      "created_utc": 1778669379,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket/jira/automation"
+    },
+    {
+      "id": "1rr8ya9",
+      "subreddit": "jira",
+      "score": 1,
+      "num_comments": 0,
+      "title": "CLI for Atlassian products - Jira, Confluence, and Bitbucket",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/jira/comments/1rr8ya9/cli_for_atlassian_products_jira_confluence_and/",
+      "url": "https://github.com/chinmaymk/acli",
+      "created_utc": 1773268728,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1q4y2a1",
+      "subreddit": "atlassian",
+      "score": 1,
+      "num_comments": 0,
+      "title": "How to Build an AI Agent to Automate Release Notes (Azure DevOps \u2192 Confluence, Google ADK + MCP)",
+      "selftext_preview": "Learn how to build an AI agent that automates release notes creation from Azure DevOps user stories and publishes them to Confluence. This hands-on tutorial uses Google ADK with Azure DevOps MCP and Atlassian MCP to connect your product management tools directly to your documentation platform.\n\n[https://www.youtube.com/watch?v=dkxzehq6E8o](https://www.youtube.com/watch?v=dkxzehq6E8o)",
+      "permalink": "https://www.reddit.com/r/atlassian/comments/1q4y2a1/how_to_build_an_ai_agent_to_automate_release/",
+      "url": "https://www.reddit.com/r/atlassian/comments/1q4y2a1/how_to_build_an_ai_agent_to_automate_release/",
+      "created_utc": 1767647122,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/automation"
+    },
+    {
+      "id": "1p70vpo",
+      "subreddit": "jobhuntify",
+      "score": 1,
+      "num_comments": 0,
+      "title": "Remote Job - Atlassian - Senior Product Manager, Bitbucket Pipelines",
+      "selftext_preview": "\ud83e\uddd1\u200d\ud83d\udcbb Level: senior\n\n\ud83d\udccc Location: remote\n\n\ud83c\udf06 City: Sydney, AU\n\n\ud83d\uddd3 Type: fullTime\n\n\ud83d\udcb5 Salary: 0k - 0k AUD (annual)\n\nDescription: Close\nView this page in your language?\nAll languages\nChoose your language\n\n\n# Senior Product Manager, Bitbucket Pipelines\nProduct Management | Sydney, Australia | Remote, Remote | \nApply for this job\nAs Senior Product Manager on the Bitbucket Pipelines team, your mission is to ",
+      "permalink": "https://www.reddit.com/r/jobhuntify/comments/1p70vpo/remote_job_atlassian_senior_product_manager/",
+      "url": "https://www.reddit.com/r/jobhuntify/comments/1p70vpo/remote_job_atlassian_senior_product_manager/",
+      "created_utc": 1764139564,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "bitbucket/ci/automation"
+    },
+    {
+      "id": "199r8dq",
+      "subreddit": "k12cybersecurity",
+      "score": 1,
+      "num_comments": 0,
+      "title": "MS-ISAC CYBERSECURITY ADVISORY - A Vulnerability in Atlassian Confluence Data Center and Server Could Allow for Remote Code Execution - PATCH NOW",
+      "selftext_preview": "**MS-ISAC CYBERSECURITY ADVISORY**\n\n**MS-ISAC ADVISORY NUMBER:**  \n2024-006\n\n**DATE(S) ISSUED:**  \n01/17/2024\n\n**SUBJECT:**  \nA Vulnerability in Atlassian Confluence Data Center and Server Could Allow for Remote Code Execution\n\n**OVERVIEW:**  \nA vulnerability has been discovered in Atlassian Confluence Server and Data Center which could allow for remote code execution. Confluence\u00a0is a collaboratio",
+      "permalink": "https://www.reddit.com/r/k12cybersecurity/comments/199r8dq/msisac_cybersecurity_advisory_a_vulnerability_in/",
+      "url": "https://www.reddit.com/r/k12cybersecurity/comments/199r8dq/msisac_cybersecurity_advisory_a_vulnerability_in/",
+      "created_utc": 1705587709,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "17p215y",
+      "subreddit": "k12cybersecurity",
+      "score": 1,
+      "num_comments": 0,
+      "title": "MS-ISAC CYBERSECURITY ADVISORY - A Vulnerability in Atlassian Confluence Server and Data Center Could Allow for Data Destruction - PATCH NOW",
+      "selftext_preview": "**MS-ISAC CYBERSECURITY ADVISORY**\n\n**MS-ISAC ADVISORY NUMBER:**  \n2023-129\n\n**DATE(S) ISSUED:**  \n11/03/2023\n\n**SUBJECT:**  \nA Vulnerability in Atlassian Confluence Server and Data Center Could Allow for Data Destruction\n\n**OVERVIEW:**  \nA vulnerability has been discovered in Atlassian Confluence Server and Data Center which could allow for data destruction. Confluence\u00a0is a collaboration tool tha",
+      "permalink": "https://www.reddit.com/r/k12cybersecurity/comments/17p215y/msisac_cybersecurity_advisory_a_vulnerability_in/",
+      "url": "https://www.reddit.com/r/k12cybersecurity/comments/17p215y/msisac_cybersecurity_advisory_a_vulnerability_in/",
+      "created_utc": 1699275086,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "17d0488",
+      "subreddit": "ArcBrowser",
+      "score": 1,
+      "num_comments": 0,
+      "title": "Can't login on Atlassian/Bitbucket using Arc Browser",
+      "selftext_preview": "Ok so I use Safari as my main browser and wanted to try the Arc browser. Installed it and moved everything to it.\n\nNow I have a set of tabs that are always open, and one of them is the Bitbucket/Jura/Confluence pages. However I am unable to login to the work account on any of Atlassian's pages. I am able to login on Safari fine, Chrome fine, Brave fine, as well as Firefox fine (yes, I installed th",
+      "permalink": "https://www.reddit.com/r/ArcBrowser/comments/17d0488/cant_login_on_atlassianbitbucket_using_arc_browser/",
+      "url": "https://www.reddit.com/r/ArcBrowser/comments/17d0488/cant_login_on_atlassianbitbucket_using_arc_browser/",
+      "created_utc": 1697886392,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/auth"
+    },
+    {
+      "id": "170p5sa",
+      "subreddit": "k12cybersecurity",
+      "score": 1,
+      "num_comments": 0,
+      "title": "MS-ISAC CYBERSECURITY ADVISORY - A Vulnerability in Atlassian Confluence Server and Data Center Could Allow for Privilege Escalation - PATCH NOW",
+      "selftext_preview": "**MS-ISAC CYBERSECURITY ADVISORY**\n\n**MS-ISAC ADVISORY NUMBER:**  \n2023-115\n\n**DATE(S) ISSUED:**  \n10/04/2023\n\n**SUBJECT:**  \nA Vulnerability in Atlassian Confluence Server and Data Center Could Allow for Privilege Escalation\n\n**OVERVIEW:**  \nA vulnerability has been discovered in Atlassian Confluence Server and Data Center, which could allow for Privilege Escalation. Confluence\u00a0is a collaboration",
+      "permalink": "https://www.reddit.com/r/k12cybersecurity/comments/170p5sa/msisac_cybersecurity_advisory_a_vulnerability_in/",
+      "url": "https://www.reddit.com/r/k12cybersecurity/comments/170p5sa/msisac_cybersecurity_advisory_a_vulnerability_in/",
+      "created_utc": 1696529976,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence"
+    },
+    {
+      "id": "w7uruu",
+      "subreddit": "ifuckinghatejira",
+      "score": 1,
+      "num_comments": 0,
+      "title": "Atlassian fixes critical flaws in Confluence, Jira, Bitbucket and other products, update quickly! - Help Net Security",
+      "selftext_preview": "",
+      "permalink": "https://www.reddit.com/r/ifuckinghatejira/comments/w7uruu/atlassian_fixes_critical_flaws_in_confluence_jira/",
+      "url": "https://www.helpnetsecurity.com/2022/07/21/atlassian-confluence-jira-bitbucket-critical/",
+      "created_utc": 1658769915,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/jira"
+    },
+    {
+      "id": "1upxopf",
+      "subreddit": "YT_Faceless",
+      "score": 0,
+      "num_comments": 11,
+      "title": "I automated the entire faceless-YouTube-Shorts pipeline.",
+      "selftext_preview": "    If you\u2019re running (or trying to start) a faceless YouTube, Shorts, or TikTok channel, you already know the ugly truth: the real bottleneck is never ideas\u2014it\u2019s the crushing 3-hour manual grind. \n    \n    Scripting, recording voiceovers, finding non-copyright images, animating subtitles, and rendering eats up your entire day. If you don't post daily, the algorithm forgets you. If you do try to k",
+      "permalink": "https://www.reddit.com/r/YT_Faceless/comments/1upxopf/i_automated_the_entire_facelessyoutubeshorts/",
+      "url": "https://www.reddit.com/r/YT_Faceless/comments/1upxopf/i_automated_the_entire_facelessyoutubeshorts/",
+      "created_utc": 1783436527,
+      "queries": [
+        "bitbucket pipelines cli automation"
+      ],
+      "topic_tag": "bitbucket/ci/automation"
+    },
+    {
+      "id": "1ldbwzk",
+      "subreddit": "SideProject",
+      "score": 0,
+      "num_comments": 0,
+      "title": "Tired of Jira?",
+      "selftext_preview": "I made a tool that gives developers a new but familiar way to update jira using markdownn files and the command line.\n\nMy very first customer bought 32 seats and the team loves it!\n\nCheck it out: https://imdone.io/imdone-cli",
+      "permalink": "https://www.reddit.com/r/SideProject/comments/1ldbwzk/tired_of_jira/",
+      "url": "https://www.reddit.com/r/SideProject/comments/1ldbwzk/tired_of_jira/",
+      "created_utc": 1750127578,
+      "queries": [
+        "jira cli command line"
+      ],
+      "topic_tag": "jira"
+    },
+    {
+      "id": "1tkw81f",
+      "subreddit": "SideProject",
+      "score": 0,
+      "num_comments": 0,
+      "title": "confluence2md - I built a CLI to export Confluence spaces to local Markdown",
+      "selftext_preview": "I've been running a lot of experiments with RAG pipelines and local LLMs, and exporting Confluence docs into a usable format was a constant pain point. The API is slow, the export format is messy, and nothing quite gave me what I wanted: local Markdown files that could be version-controlled and fed into AI pipelines cleanly.\n\nSo I built `confluence2md`, a Go CLI that:\n\n- Crawls your Confluence spa",
+      "permalink": "https://www.reddit.com/r/SideProject/comments/1tkw81f/confluence2md_i_built_a_cli_to_export_confluence/",
+      "url": "https://github.com/gkoos/confluence2md",
+      "created_utc": 1779484554,
+      "queries": [
+        "atlassian cli confluence bitbucket"
+      ],
+      "topic_tag": "confluence/bitbucket/ci"
+    }
+  ]
+}

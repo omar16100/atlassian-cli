@@ -64,3 +64,55 @@ Author: Omar Shabab (https://omarshabab.com)
 ## Affiliation
 
 Independent open-source project. Not affiliated with, endorsed by, sponsored by, or maintained by Atlassian. "Atlassian", "Jira", "Confluence", "Bitbucket", and "Jira Service Management" are trademarks of Atlassian Pty Ltd or its affiliates, used only to identify compatibility.
+
+## New guides (2026-07-11)
+- https://atlassiancli.com/blog/jira-rest-api-guide.html : Jira REST API: A Practical Guide with Examples
+- https://atlassiancli.com/blog/jira-api-from-command-line.html : How to Use the Jira API from the Command Line
+- https://atlassiancli.com/blog/jira-automation-guide.html : Jira Automation Beyond the Rules Engine
+- https://atlassiancli.com/blog/jql-query-cheat-sheet.html : JQL Query Cheat Sheet (2026)
+- https://atlassiancli.com/blog/jira-branch-names-from-issue-keys.html : Automate Git Branch Names from Jira Issue Keys
+- https://atlassiancli.com/blog/jira-issue-hierarchy-epics.html : Jira Hierarchy and Epics Explained (with CLI queries)
+- https://atlassiancli.com/blog/confluence-rest-api-guide.html : Confluence REST API: A Practical Guide
+- https://atlassiancli.com/blog/confluence-automation-guide.html : Confluence Automation from the Terminal
+- https://atlassiancli.com/blog/export-confluence-to-markdown.html : Export Confluence to Markdown from the CLI
+- https://atlassiancli.com/blog/markdown-to-confluence.html : Convert Markdown to Confluence Pages
+- https://atlassiancli.com/blog/bitbucket-cli-like-gh.html : The Bitbucket CLI Like gh: A gh-Style Workflow
+- https://atlassiancli.com/blog/bitbucket-cli-commands.html : Bitbucket CLI Commands Reference
+- https://atlassiancli.com/blog/bitbucket-rest-api-guide.html : Bitbucket REST API: A Practical Guide
+- https://atlassiancli.com/blog/create-bitbucket-pr-command-line.html : Create and Merge Bitbucket Pull Requests from the CLI
+- https://atlassiancli.com/blog/jsm-service-desk-automation-cli.html : Service Desk Automation from the CLI (JSM)
+- https://atlassiancli.com/blog/one-cli-jira-confluence-bitbucket.html : One CLI for Jira, Confluence, and Bitbucket
+- https://atlassiancli.com/blog/atlassian-api-token-vs-pat.html : Atlassian API Tokens vs PATs: Authenticating a CLI
+- https://atlassiancli.com/blog/acli-vs-atlassian-cli.html : acli vs atlassian-cli: Official Tool vs Independent CLI
+- https://atlassiancli.com/blog/best-atlassian-cli-tools-2026.html : The Best Atlassian CLI Tools in 2026
+- https://atlassiancli.com/blog/jira-automation-rules-examples.html : Jira Automation Rules: Examples and CLI Equivalents
+- https://atlassiancli.com/blog/jira-automation-examples.html : 15 Jira Automation Examples You Can Script Today
+- https://atlassiancli.com/blog/jira-jql-command-line.html : Run and Save Jira JQL Queries from the Command Line
+- https://atlassiancli.com/blog/jira-command-line-getting-started.html : Getting Started with Jira on the Command Line
+- https://atlassiancli.com/blog/jira-markdown-formatting.html : Jira Markdown: Formatting Descriptions with ADF
+- https://atlassiancli.com/blog/jira-cli-in-github-actions.html : Jira CLI in GitHub Actions and CI/CD
+- https://atlassiancli.com/blog/create-jira-issues-from-csv.html : Create Jira Issues from CSV (CLI Import)
+- https://atlassiancli.com/blog/jira-task-management-cli.html : Jira Task Management from the CLI
+- https://atlassiancli.com/blog/confluence-api-from-cli.html : Working with the Confluence API from the Command Line
+- https://atlassiancli.com/blog/confluence-cql-search-cli.html : Search Confluence with CQL from the Command Line
+- https://atlassiancli.com/blog/confluence-space-export-backup.html : Confluence Space Export & Backup from the CLI
+- https://atlassiancli.com/blog/sync-jira-to-confluence.html : Sync Jira to Confluence: Auto-Update Pages
+- https://atlassiancli.com/blog/bitbucket-api-from-cli.html : Using the Bitbucket API from the Command Line
+- https://atlassiancli.com/blog/bitbucket-pr-review-automation.html : Automating Bitbucket PR Reviews and Checks
+- https://atlassiancli.com/blog/bitbucket-pipelines-trigger-cli.html : Bitbucket Pipelines CLI: Trigger and Monitor Builds
+- https://atlassiancli.com/blog/migrate-bitbucket-to-github.html : How to Migrate Bitbucket to GitHub (Scripted)
+- https://atlassiancli.com/blog/jira-service-management-api.html : The Jira Service Management REST API, with Examples
+- https://atlassiancli.com/blog/jsm-integrations-cli.html : Jira Service Management Integrations via CLI
+- https://atlassiancli.com/blog/jsm-request-management-cli.html : JSM Request CLI: Manage Service Desk Requests
+- https://atlassiancli.com/blog/atlassian-rest-api-guide.html : The Atlassian REST API Across Jira, Confluence, and Bitbucket
+- https://atlassiancli.com/blog/acli-jira-commands.html : Using Atlassian's acli for Jira (and Open-Source Alternatives)
+- https://atlassiancli.com/blog/atlassian-cli-cheat-sheet.html : Atlassian CLI Cheat Sheet: Jira, Confluence, Bitbucket, JSM
+- https://atlassiancli.com/blog/jira-worklog-time-tracking-cli.html : Track Time in Jira from the Terminal
+- https://atlassiancli.com/blog/jira-webhooks-automation.html : Reacting to Jira Webhooks in Scripts
+- https://atlassiancli.com/blog/docs-as-code-confluence.html : MkDocs to Confluence: Docs-as-Code
+- https://atlassiancli.com/blog/bitbucket-pipelines-to-github-actions.html : Convert Bitbucket Pipelines to GitHub Actions
+- https://atlassiancli.com/blog/jsm-queue-sla-reporting.html : JSM SLA Reporting from the CLI
+- https://atlassiancli.com/blog/jsm-knowledge-base-cli.html : Automating a Jira Service Management Knowledge Base
+- https://atlassiancli.com/blog/jsm-customer-service-cli.html : Customer Service Automation with Jira Service Management
+- https://atlassiancli.com/blog/rovo-dev-cli-explained.html : What Atlassian's Rovo Dev CLI Does (and Doesn't)
+- https://atlassiancli.com/blog/automate-atlassian-with-scripts.html : Automating Atlassian with Scripts: Automation for Jira
