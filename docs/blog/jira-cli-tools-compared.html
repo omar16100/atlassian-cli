@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Best Jira CLI Tools Compared (2026) | atlassian-cli Blog</title>
-    <meta name="description" content="An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.">
+    <title>5 Best Jira CLI Tools Compared (2026): Free &amp; Open Source</title>
+    <meta name="description" content="We compare the 5 best Jira CLI tools of 2026: atlassian-cli, jira-cli, go-jira, ACLI, and Atlassian's official acli. Free, open source, features, auth, and an honest verdict.">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Best Jira CLI Tools Compared (2026)">
-    <meta property="og:description" content="An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.">
+    <meta property="og:title" content="5 Best Jira CLI Tools Compared (2026): Free &amp; Open Source">
+    <meta property="og:description" content="We compare the 5 best Jira CLI tools of 2026: atlassian-cli, jira-cli, go-jira, ACLI, and Atlassian's official acli. Free, open source, features, auth, and an honest verdict.">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://atlassiancli.com/blog/jira-cli-tools-compared.html">
     <meta property="article:published_time" content="2026-03-14T00:00:00Z">
@@ -16,8 +16,8 @@
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Best Jira CLI Tools Compared (2026)">
-    <meta name="twitter:description" content="An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.">
+    <meta name="twitter:title" content="5 Best Jira CLI Tools Compared (2026): Free &amp; Open Source">
+    <meta name="twitter:description" content="We compare the 5 best Jira CLI tools of 2026: atlassian-cli, jira-cli, go-jira, ACLI, and Atlassian's official acli. Free, open source, features, auth, and an honest verdict.">
 
     <!-- Canonical -->
     <link rel="canonical" href="https://atlassiancli.com/blog/jira-cli-tools-compared.html" />
@@ -53,7 +53,7 @@
       "@context": "https://schema.org",
       "@type": "Article",
       "headline": "Best Jira CLI Tools Compared (2026)",
-      "description": "An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI — features, install, auth, and verdict.",
+      "description": "An honest comparison of the best Jira CLI tools in 2026. atlassian-cli vs jira-cli vs go-jira vs ACLI, features, install, auth, and verdict.",
       "datePublished": "2026-03-14T00:00:00Z",
       "dateModified": "2026-06-14T00:00:00Z",
       "author": {
@@ -70,7 +70,7 @@
         "@type": "WebPage",
         "@id": "https://atlassiancli.com/blog/jira-cli-tools-compared.html"
       },
-      "keywords": ["jira cli tool", "tools like jira", "tools similar to jira", "jira cli", "jira command line"]
+      "keywords": ["jira cli tool", "jira cli", "jira command line"]
     }
     </script>
 
@@ -469,9 +469,11 @@
     <!-- Article Body -->
     <article class="article-body">
 
-        <h2>Why the CLI Space for Jira Is Booming</h2>
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<h2>Why the CLI Space for Jira Is Booming</h2>
 
-        <p>Search interest in "jira cli" has grown over 300% since 2023. The reason is straightforward: teams are automating more, CI/CD pipelines need to interact with Jira, and developers want to stay in their terminal instead of context-switching to a browser. Whether it is creating issues from a commit hook, transitioning tickets during a deploy, or exporting sprint data for a retro, a Jira CLI tool saves time.</p>
+        <p>Interest in Jira command-line tools has grown steadily. The reason is straightforward: teams are automating more, CI/CD pipelines need to interact with Jira, and developers want to stay in their terminal instead of context-switching to a browser. Whether it is creating issues from a commit hook, transitioning tickets during a deploy, or exporting sprint data for a retro, a Jira CLI tool saves time.</p>
 
         <p>But which one should you pick? There are four serious contenders in 2026, each with different strengths. This guide compares them honestly&mdash;including the trade-offs of our own tool, <a href="/blog/atlassian-cli-guide.html">atlassian-cli</a>.</p>
 
@@ -535,7 +537,7 @@
                     </tr>
                     <tr>
                         <td>Bulk Operations</td>
-                        <td class="check">Yes (transition, assign, label, export, import)</td>
+                        <td class="check">Yes (transition, assign, export)</td>
                         <td class="cross">Limited</td>
                         <td class="cross">No</td>
                         <td class="check">Yes</td>
@@ -590,9 +592,9 @@
 
         <h3>atlassian-cli</h3>
 
-        <p><a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> is the only open-source CLI that covers Jira, Confluence, Bitbucket, and JSM in a single binary. Written in Rust with a modular crate architecture, it ships as a zero-dependency native executable.</p>
+        <p><a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> is the only open-source CLI that covers Jira, Confluence, Bitbucket, and JSM in a single binary. Written in Rust with a modular crate architecture, it ships as a zero-dependency native executable. Browse the full <a href="/jira/">Jira CLI</a> command reference to see every supported operation.</p>
 
-        <p><strong>Jira strengths:</strong> Full issue CRUD, JQL search, bulk operations (transition, assign, label, export, import) with concurrent execution and dry-run mode, automation rules management, webhook CRUD, audit log access, project role management, custom fields, and workflow export.</p>
+        <p><strong>Jira strengths:</strong> Full issue CRUD, JQL search, bulk operations (transition, assign, export) with concurrent execution and dry-run mode, automation list (list only), webhooks list (list only), audit log access, project role management, custom fields, and workflow export.</p>
 
         <pre><code><span class="comment"># Search with JQL, output as JSON</span>
 atlassian-cli jira issue search \
@@ -657,9 +659,9 @@ jira issue create --project DEV --issuetype Task -s <span class="string">"Summar
 
         <h3>Atlassian's official acli</h3>
 
-        <p>Atlassian now ships its own official command-line tool, <a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener"><code>acli</code></a> — a separate, first-party product maintained by Atlassian. If you specifically want the vendor-supported, official CLI, <code>acli</code> is the canonical choice and the right starting point.</p>
+        <p>Atlassian now ships its own official command-line tool, <a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener"><code>acli</code></a>, a separate, first-party product maintained by Atlassian. If you specifically want the vendor-supported, official CLI, <code>acli</code> is the canonical choice and the right starting point.</p>
 
-        <p><strong>How this project differs:</strong> <strong>atlassian-cli</strong> (this site) is an <em>independent, community open-source</em> project. It is not <code>acli</code>, not affiliated with Atlassian, and not a replacement for the official tool — it is a separate MIT-licensed option for people who want a single Rust binary spanning Jira, Confluence, Bitbucket, and JSM, with consistent <code>--format json/csv/yaml</code> output and no runtime dependencies. Pick the official <code>acli</code> for first-party support; pick atlassian-cli if you want a free, unified, scriptable OSS tool. The two can happily coexist.</p>
+        <p><strong>How this project differs:</strong> <strong>atlassian-cli</strong> (this site) is an <em>independent, community open-source</em> project. It is not <code>acli</code>, not affiliated with Atlassian, and not a replacement for the official tool, it is a separate MIT-licensed option for people who want a single Rust binary spanning Jira, Confluence, Bitbucket, and JSM, with consistent <code>--format json/csv/yaml</code> output and no runtime dependencies. Pick the official <code>acli</code> for first-party support; pick atlassian-cli if you want a free, unified, scriptable OSS tool. The two can happily coexist.</p>
 
         <h2>Which Tool Should You Choose?</h2>
 
@@ -675,12 +677,12 @@ jira issue create --project DEV --issuetype Task -s <span class="string">"Summar
 
         <div class="decision-card">
             <h4>"I need bulk Jira operations with safety guards"</h4>
-            <p>Go with <strong>atlassian-cli</strong>. Bulk transition, assign, label, export, and import with <code>--dry-run</code> and concurrent execution. See the <a href="/runbooks/jira-bulk-transition.html">bulk transition runbook</a>.</p>
+            <p>Go with <strong>atlassian-cli</strong>. Bulk transition, assign, and export with <code>--dry-run</code> and concurrent execution. See the <a href="/runbooks/jira-bulk-transition.html">bulk transition runbook</a>.</p>
         </div>
 
         <div class="decision-card">
             <h4>"I need enterprise support and vendor SLAs"</h4>
-            <p>Go with <strong>ACLI</strong> (Appfire). Commercial license with support, broadest product coverage, Marketplace-certified.</p>
+            <p>Go with <strong>ACLI</strong> (Appfire). Commercial license with support, broadest product coverage, listed on the Atlassian Marketplace.</p>
         </div>
 
         <div class="decision-card">

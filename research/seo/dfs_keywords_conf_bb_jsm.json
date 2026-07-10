@@ -1,0 +1,563 @@
+{
+  "meta": {
+    "target_site": "atlassiancli.com",
+    "location_name": "United States",
+    "language_name": "English",
+    "sources": {
+      "keyword_ideas_multiseed": "raw_keyword_ideas_multiseed.json",
+      "suggestions_confluence_cli": "embedded below (live)",
+      "suggestions_bitbucket_cli": "embedded below (live)",
+      "suggestions_jira_service_management": "raw_suggestions_jira_service_management.json",
+      "bulk_keyword_difficulty": "embedded below (live)"
+    },
+    "notes": "bulk_keyword_difficulty returns KD only (no volume). KD=null means DataForSEO returned no KD for that term (typically zero/near-zero data)."
+  },
+  "confluence_suggestions": [
+    {
+      "keyword": "confluence-cli",
+      "search_volume": 320,
+      "keyword_difficulty": 3,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "confluence cli",
+      "search_volume": 320,
+      "keyword_difficulty": 3,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "confluence cli tool",
+      "search_volume": 20,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "atlassian cli confluence",
+      "search_volume": 20,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "confluence cli examples",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "informational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "confluence cli brew",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "confluence cli download",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "confluence cli github",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "markdown confluence cli",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "confluence"
+    },
+    {
+      "keyword": "confluence cli skill",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "transactional",
+      "product": "confluence"
+    },
+    {
+      "keyword": "jira confluence cli",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "confluence"
+    }
+  ],
+  "bitbucket_suggestions": [
+    {
+      "keyword": "bitbucket cli commands",
+      "search_volume": 320,
+      "keyword_difficulty": null,
+      "main_intent": "informational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket-cli",
+      "search_volume": 320,
+      "keyword_difficulty": 1,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket cli",
+      "search_volume": 320,
+      "keyword_difficulty": 17,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket pipelines aws cli",
+      "search_volume": 10,
+      "keyword_difficulty": 18,
+      "main_intent": "informational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket-cli mac",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket cli bb",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket cli official",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket cli login",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket cloud cli",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket login cli",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket aws cli",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    },
+    {
+      "keyword": "bitbucket-cli github",
+      "search_volume": 10,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "bitbucket"
+    }
+  ],
+  "jsm_suggestions": [
+    {
+      "keyword": "service management jira",
+      "search_volume": 6600,
+      "keyword_difficulty": 37,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management",
+      "search_volume": 6600,
+      "keyword_difficulty": 29,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management pricing",
+      "search_volume": 880,
+      "keyword_difficulty": 29,
+      "main_intent": "commercial",
+      "product": "jsm"
+    },
+    {
+      "keyword": "atlassian jira service management",
+      "search_volume": 480,
+      "keyword_difficulty": 32,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "what is jira service management",
+      "search_volume": 260,
+      "keyword_difficulty": 23,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management itsm",
+      "search_volume": 210,
+      "keyword_difficulty": 24,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management free plan",
+      "search_volume": 170,
+      "keyword_difficulty": 14,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management ticketing system",
+      "search_volume": 140,
+      "keyword_difficulty": 21,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management jsm",
+      "search_volume": 110,
+      "keyword_difficulty": 37,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management api",
+      "search_volume": 110,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management licensing",
+      "search_volume": 90,
+      "keyword_difficulty": 19,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management license",
+      "search_volume": 90,
+      "keyword_difficulty": 19,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management licenses",
+      "search_volume": 90,
+      "keyword_difficulty": 29,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management cost",
+      "search_volume": 70,
+      "keyword_difficulty": 6,
+      "main_intent": "commercial",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira customer service management",
+      "search_volume": 70,
+      "keyword_difficulty": 11,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management vs servicenow",
+      "search_volume": 50,
+      "keyword_difficulty": 1,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management vs jira software",
+      "search_volume": 50,
+      "keyword_difficulty": 8,
+      "main_intent": "commercial",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management data center",
+      "search_volume": 50,
+      "keyword_difficulty": 17,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management demo",
+      "search_volume": 50,
+      "keyword_difficulty": 27,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management assets",
+      "search_volume": 50,
+      "keyword_difficulty": 25,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management asset",
+      "search_volume": 50,
+      "keyword_difficulty": 19,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management forms",
+      "search_volume": 50,
+      "keyword_difficulty": 9,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management portal",
+      "search_volume": 40,
+      "keyword_difficulty": 27,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management integrations",
+      "search_volume": 40,
+      "keyword_difficulty": 3,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management integration",
+      "search_volume": 40,
+      "keyword_difficulty": 10,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management standard pricing",
+      "search_volume": 40,
+      "keyword_difficulty": 6,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management automation",
+      "search_volume": 40,
+      "keyword_difficulty": null,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management icon",
+      "search_volume": 40,
+      "keyword_difficulty": 13,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management download",
+      "search_volume": 40,
+      "keyword_difficulty": 33,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management knowledge base",
+      "search_volume": 30,
+      "keyword_difficulty": 9,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management free",
+      "search_volume": 30,
+      "keyword_difficulty": 29,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management free tier",
+      "search_volume": 30,
+      "keyword_difficulty": 25,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management free trial",
+      "search_volume": 30,
+      "keyword_difficulty": 25,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management certification",
+      "search_volume": 30,
+      "keyword_difficulty": 11,
+      "main_intent": "informational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management ai",
+      "search_volume": 30,
+      "keyword_difficulty": 27,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management app",
+      "search_volume": 30,
+      "keyword_difficulty": 17,
+      "main_intent": "navigational",
+      "product": "jsm"
+    },
+    {
+      "keyword": "jira service management cloud pricing",
+      "search_volume": 30,
+      "keyword_difficulty": 14,
+      "main_intent": "commercial",
+      "product": "jsm"
+    }
+  ],
+  "bulk_keyword_difficulty": [
+    {
+      "keyword": "atlassian automation",
+      "keyword_difficulty": 42
+    },
+    {
+      "keyword": "atlassian cli",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "atlassian cli confluence",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "atlassian rest api",
+      "keyword_difficulty": 27
+    },
+    {
+      "keyword": "bitbucket api",
+      "keyword_difficulty": 26
+    },
+    {
+      "keyword": "bitbucket cli",
+      "keyword_difficulty": 17
+    },
+    {
+      "keyword": "bitbucket cli commands",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "bitbucket cloud cli",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "bitbucket create pull request",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "bitbucket pipelines",
+      "keyword_difficulty": 37
+    },
+    {
+      "keyword": "bitbucket pr",
+      "keyword_difficulty": 14
+    },
+    {
+      "keyword": "bitbucket pull request",
+      "keyword_difficulty": 12
+    },
+    {
+      "keyword": "bitbucket rest api",
+      "keyword_difficulty": 6
+    },
+    {
+      "keyword": "confluence api",
+      "keyword_difficulty": 25
+    },
+    {
+      "keyword": "confluence automation",
+      "keyword_difficulty": 2
+    },
+    {
+      "keyword": "confluence cli",
+      "keyword_difficulty": 3
+    },
+    {
+      "keyword": "confluence cli tool",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "confluence markdown",
+      "keyword_difficulty": 10
+    },
+    {
+      "keyword": "confluence markdown export",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "confluence rest api",
+      "keyword_difficulty": 9
+    },
+    {
+      "keyword": "confluence-cli",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "jira service management alternative",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "jira service management api",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "jira service management automation",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "jira service management features",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "jira vs jira service management",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "markdown confluence cli",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "service desk automation",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "servicenow vs jira service management",
+      "keyword_difficulty": null
+    },
+    {
+      "keyword": "jira service management cli",
+      "keyword_difficulty": null
+    }
+  ]
+}

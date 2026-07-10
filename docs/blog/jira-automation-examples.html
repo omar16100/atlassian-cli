@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>15 Jira Automation Examples You Can Script Today | atlassian-cli Blog</title>
+    <meta name="description" content="15 copy-paste Jira automation examples you can script today: auto-close stale issues, bulk reassign, export reports, CI gates, and Confluence release notes.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="15 Jira Automation Examples You Can Script Today">
+    <meta property="og:description" content="15 copy-paste Jira automation examples you can script today: auto-close stale issues, bulk reassign, export reports, CI gates, and Confluence release notes.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/jira-automation-examples.html">
+    <meta property="article:published_time" content="2026-07-10T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="15 Jira Automation Examples You Can Script Today">
+    <meta name="twitter:description" content="15 copy-paste Jira automation examples you can script today: auto-close stale issues, bulk reassign, export reports, CI gates, and Confluence release notes.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/jira-automation-examples.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Breadcrumb -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "15 Jira Automation Examples You Can Script Today", "item": "https://atlassiancli.com/blog/jira-automation-examples.html"}
+      ]
+    }
+    </script>
+    <!-- Structured Data: Article -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "15 Jira Automation Examples You Can Script Today",
+      "description": "15 copy-paste Jira automation examples you can script today: auto-close stale issues, bulk reassign, export reports, CI gates, and Confluence release notes.",
+      "datePublished": "2026-07-10T00:00:00Z",
+      "dateModified": "2026-07-10T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/jira-automation-examples.html"
+      },
+      "url": "https://atlassiancli.com/blog/jira-automation-examples.html",
+      "inLanguage": "en-US",
+      "keywords": "jira automation examples, jira automation script, jira cli automation, automate jira, jira bulk transition, jira cron"
+    }
+    </script>
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Can I automate Jira without paying for automation rules?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Anything you can express as a JQL query, you can script with atlassian-cli and schedule with cron or run in CI. That covers the majority of these Jira automation examples: closing stale issues, reassigning work, exporting reports, and gating releases. Jira's built-in automation rules and the CLI are complementary, not mutually exclusive, so you can use whichever fits each task."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I schedule these Jira automations to run on their own?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Wrap the command in a shell script and add a line to your crontab, or drop it into a CI pipeline stage. For example, 0 2 * * * atlassian-cli jira bulk transition ... runs a cleanup every night at 2am. Because atlassian-cli is a single binary with no interactive prompts when flags are supplied, it runs unattended in cron, systemd timers, GitHub Actions, or Bitbucket Pipelines."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Are these Jira automation scripts safe to run on production?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Every bulk command supports a --dry-run flag that runs the same query and shows exactly what would change without modifying anything. The recommended pattern is to run once with --dry-run, confirm the issue count and sample keys, then remove the flag. Point commands at a specific profile with --profile so you never touch the wrong instance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need a separate tool for each Atlassian product to automate them?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. atlassian-cli is one binary that spans Jira, Confluence, Bitbucket, and Jira Service Management, so a single script can read closed Jira issues and publish a Confluence release-notes page in the same run. You authenticate once per profile and reuse it across every product command."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .breadcrumb {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            font-family: var(--font-mono);
+        }
+
+        .breadcrumb a {
+            color: var(--text-muted);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            color: var(--text-secondary);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code:not(pre code) {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment { color: var(--text-muted); }
+        .article-body pre .string { color: var(--accent-cyan); }
+
+        /* Recipe cards */
+        .recipe {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem 0.25rem;
+            margin-bottom: 1.5rem;
+            background: var(--bg-secondary);
+        }
+
+        .recipe h3 {
+            margin-top: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .recipe-num {
+            font-family: var(--font-mono);
+            color: var(--accent-cyan);
+            font-size: 0.85rem;
+            margin-right: 0.4rem;
+        }
+
+        /* Comparison / reference table */
+        .comparison-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.825rem;
+            min-width: 620px;
+        }
+
+        .comparison-table thead {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table th {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.775rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .comparison-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+
+        .comparison-table tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table .cmd {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+
+        /* FAQ section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .faq-item h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .faq-item p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* CTA */
+        .article-cta {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .article-cta h3 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+        }
+
+        .article-cta p {
+            margin-bottom: 1.25rem;
+        }
+
+        .article-cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--accent-cyan);
+            color: #000;
+            padding: 0.625rem 1.25rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            border-bottom: none;
+        }
+
+        .article-cta-btn:hover {
+            background: #00e6b8;
+            transform: translateY(-1px);
+            border-bottom: none;
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header { padding: 6rem 0 2rem; }
+            .article-body { padding: 2rem 1rem 4rem; }
+            .article-body h2 { font-size: 1.25rem; }
+            .toc { padding: 1.25rem; }
+            .related-links { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="breadcrumb">
+                <a href="/">Home</a> / <a href="/blog/">Blog</a> / 15 Jira Automation Examples
+            </div>
+            <div class="article-meta">
+                <span class="article-meta-item">July 10, 2026</span>
+                <span class="article-meta-item">~7 min read</span>
+                <span class="article-keyword">jira automation examples</span>
+            </div>
+            <h1 class="article-title">15 Jira Automation Examples You Can Script Today</h1>
+            <p class="article-subtitle">A copy-paste recipe book. Fifteen real, scriptable Jira automations built from a single free CLI binary. Grab the command, swap the project key, schedule it.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#intro">Before you copy-paste</a></li>
+                <li><a href="#blocks">The building blocks</a></li>
+                <li><a href="#cleanup">Cleanup and hygiene</a></li>
+                <li><a href="#routing">Assignment and routing</a></li>
+                <li><a href="#reporting">Reporting and export</a></li>
+                <li><a href="#alerts">Alerts and CI gates</a></li>
+                <li><a href="#crossproduct">Compliance and cross-product</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- Intro -->
+        <h2 id="intro">Before you copy-paste</h2>
+
+        <p>These <strong>Jira automation examples</strong> are complete, runnable commands, not pseudo-code. Each one uses <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a>, a single free binary, and each is built to drop straight into cron, a CI stage, or a git hook. Swap the project key, the JQL, and the profile name for your own, and they work.</p>
+
+        <p>Two ground rules before you run any of them against a live instance. First, every <code>jira bulk</code> command supports <code>--dry-run</code>: run it once to see the matched issue count and a sample of keys, then remove the flag to execute. Second, pin every command to a named auth profile with <code>--profile</code> so you never point a cleanup script at the wrong site. See <a href="/docs/auth.html">Authentication</a> to set profiles up, and the <a href="/docs/commands.html">command reference</a> for every flag.</p>
+
+        <p>A quick note on what this is not: atlassian-cli is an independent, community, MIT-licensed open-source project. It is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>) and is not affiliated with, endorsed by, or sponsored by Atlassian. Use the official <code>acli</code> if you want first-party vendor support; use atlassian-cli if you want one scriptable binary spanning Jira, Confluence, Bitbucket, and Jira Service Management. For a broader walkthrough of the approach, see the <a href="/blog/jira-automation-guide.html">Jira automation guide</a>.</p>
+
+        <!-- Building blocks -->
+        <h2 id="blocks">The building blocks</h2>
+
+        <p>Nearly all fifteen recipes are combinations of seven commands. Learn these and you can compose your own automations without memorizing anything else.</p>
+
+        <p>Two JQL habits show up in almost every recipe below. Relative dates like <code>updated &lt; -7d</code> or <code>created &lt; -180d</code> let a scheduled query stay accurate forever without editing the script. And <code>statusCategory != Done</code> matches every "not finished" state at once, so you never have to spell out <code>status not in (Done, Closed, Resolved, ...)</code> for each project's custom workflow. Add <code>--format json</code> to any search to pipe results into <code>jq</code>, or <code>--envelope</code> to wrap list output in a <code>{"data": [...], "count": N}</code> object when a downstream tool wants the count alongside the rows.</p>
+
+        <div class="comparison-table-wrapper">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Building block</th>
+                        <th>Command</th>
+                        <th>Use it for</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Search</td><td class="cmd">jira issue search --jql</td><td>Read and filter issues; pipe JSON to jq</td></tr>
+                    <tr><td>Bulk transition</td><td class="cmd">jira bulk transition</td><td>Move many issues between workflow states</td></tr>
+                    <tr><td>Bulk assign</td><td class="cmd">jira bulk assign</td><td>Reassign many issues in one call</td></tr>
+                    <tr><td>Bulk export</td><td class="cmd">jira bulk export</td><td>Snapshot matched issues to JSON or CSV</td></tr>
+                    <tr><td>Update</td><td class="cmd">jira issue update</td><td>Set sprint, summary, or custom fields per issue</td></tr>
+                    <tr><td>Create</td><td class="cmd">jira issue create</td><td>Generate recurring or templated tickets</td></tr>
+                    <tr><td>Audit</td><td class="cmd">jira audit list</td><td>Pull the change log for compliance exports</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Cleanup and hygiene -->
+        <h2 id="cleanup">Cleanup and hygiene</h2>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">01</span>Auto-close stale "Done" issues every night</h3>
+            <p>Issues sit in <code>Done</code> long after the work shipped. Preview once, then schedule the live run in cron so the board stays tidy without anyone clicking.</p>
+            <pre><code><span class="comment"># Preview first</span>
+atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = DEV AND status = Done AND updated < -7d"</span> \
+  --transition <span class="string">"Closed"</span> \
+  --dry-run
+
+<span class="comment"># crontab -e: run for real every night at 2am</span>
+0 2 * * * atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = DEV AND status = Done AND updated < -7d"</span> \
+  --transition <span class="string">"Closed"</span> --profile prod --format quiet</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">02</span>Archive abandoned open tickets</h3>
+            <p>Anything <code>Open</code> and untouched for six months is almost certainly dead. Close it in one pass instead of one click at a time.</p>
+            <pre><code>atlassian-cli jira bulk transition \
+  --jql <span class="string">"project = DEV AND status = Open AND updated < -180d"</span> \
+  --transition <span class="string">"Closed"</span> \
+  --dry-run</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">03</span>Export a "backlog rot" report</h3>
+            <p>Find the issues that have gone quiet: not done, not touched in 90 days, oldest first. Drop them into a CSV your team can triage together.</p>
+            <pre><code>atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV AND statusCategory != Done AND updated < -90d ORDER BY updated ASC"</span> \
+  --format csv --output backlog-rot.csv</code></pre>
+        </div>
+
+        <!-- Assignment and routing -->
+        <h2 id="routing">Assignment and routing</h2>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">04</span>Route unassigned bugs to a triage lead</h3>
+            <p>New bugs with no owner slip through the cracks. Sweep them to a triage lead on a schedule so nothing sits unassigned overnight.</p>
+            <pre><code>atlassian-cli jira bulk assign \
+  --jql <span class="string">"project = DEV AND type = Bug AND assignee is EMPTY"</span> \
+  --assignee triage-lead@example.com \
+  --dry-run</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">05</span>Reassign a departing teammate's open work</h3>
+            <p>When someone leaves, hand off everything they still own in a single command instead of reopening each ticket by hand.</p>
+            <pre><code>atlassian-cli jira bulk assign \
+  --jql <span class="string">"assignee = leaver@example.com AND statusCategory != Done"</span> \
+  --assignee new-owner@example.com \
+  --dry-run</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">06</span>Move a labeled set of issues into a sprint</h3>
+            <p>There is no bulk sprint verb, but search plus a loop does the job. Pull the keys, then set the sprint per issue with the numeric sprint id.</p>
+            <pre><code>atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV AND labels = next-sprint AND sprint is EMPTY"</span> \
+  --format json | jq -r <span class="string">'.[].key'</span> | while read key; do
+    atlassian-cli jira issue update <span class="string">"$key"</span> --sprint 25446
+done</code></pre>
+        </div>
+
+        <!-- Reporting and export -->
+        <h2 id="reporting">Reporting and export</h2>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">07</span>Ship a weekly closed-sprint report</h3>
+            <p>Every Friday, snapshot what the team finished in the last closed sprint to a dated CSV for the retro. See the <a href="/runbooks/jira-sprint-report.html">sprint report runbook</a> for a fuller version.</p>
+            <pre><code>atlassian-cli jira bulk export \
+  --jql <span class="string">"project = DEV AND sprint in closedSprints() AND status = Done"</span> \
+  --output <span class="string">"sprint-report-$(date +%F).csv"</span> \
+  --format csv</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">08</span>Nightly JSON backup of a project</h3>
+            <p>A dated JSON snapshot of every issue gives you a diffable history and a fallback you control. JSON preserves the full field structure.</p>
+            <pre><code>atlassian-cli jira bulk export \
+  --jql <span class="string">"project = DEV"</span> \
+  --output <span class="string">"/backups/dev-$(date +%F).json"</span> \
+  --format json</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">09</span>Count issues by status with jq</h3>
+            <p>Skip the dashboard. Pipe JSON search results through <code>jq</code> to get a live status breakdown you can print anywhere.</p>
+            <pre><code>atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV"</span> --format json \
+  | jq -r <span class="string">'group_by(.fields.status.name)[] | "\(.[0].fields.status.name): \(length)"'</span></code></pre>
+        </div>
+
+        <!-- Alerts and CI gates -->
+        <h2 id="alerts">Alerts and CI gates</h2>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">10</span>Print your standup digest</h3>
+            <p>Start the day with your own open work, freshest first, as clean Markdown you can paste into a standup channel.</p>
+            <pre><code>atlassian-cli jira issue search \
+  --jql <span class="string">"assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"</span> \
+  --format markdown</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">11</span>Alert a chat channel on new blockers</h3>
+            <p>Count open blockers, and only post to a webhook when there is something worth interrupting people for.</p>
+            <pre><code>COUNT=$(atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV AND priority = Blocker AND status != Done"</span> \
+  --format json | jq <span class="string">'length'</span>)
+
+if [ <span class="string">"$COUNT"</span> -gt 0 ]; then
+  curl -s -X POST -H <span class="string">'Content-Type: application/json'</span> \
+    -d <span class="string">"{\"text\":\"$COUNT open blocker(s) in DEV\"}"</span> \
+    <span class="string">"$SLACK_WEBHOOK_URL"</span>
+fi</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">12</span>Gate a release on open blockers</h3>
+            <p>Drop this into a CI stage. If any blocker is still open, the pipeline fails with a non-zero exit and the release stops.</p>
+            <pre><code>COUNT=$(atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV AND priority = Blocker AND status != Done"</span> \
+  --format json | jq <span class="string">'length'</span>)
+
+if [ <span class="string">"$COUNT"</span> -gt 0 ]; then
+  echo <span class="string">"Release blocked: $COUNT open blocker(s)"</span>
+  exit 1
+fi</code></pre>
+        </div>
+
+        <!-- Compliance and cross-product -->
+        <h2 id="crossproduct">Compliance and cross-product</h2>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">13</span>Export the audit log for compliance</h3>
+            <p>Pull the change log from a start date into a monthly CSV. Schedule it and you have an unattended compliance trail.</p>
+            <pre><code>atlassian-cli jira audit list \
+  --from 2026-06-01 --limit 1000 \
+  --format csv &gt; audit-2026-06.csv</code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">14</span>Publish release notes to Confluence</h3>
+            <p>One binary spans products, so a single script can read closed Jira issues and publish a Confluence page in the same run.</p>
+            <pre><code>BODY=$(atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV AND fixVersion = 2.4.0 AND status = Done"</span> \
+  --format json \
+  | jq -r <span class="string">'"&lt;ul&gt;" + (map("&lt;li&gt;" + .key + " " + .fields.summary + "&lt;/li&gt;") | join("")) + "&lt;/ul&gt;"'</span>)
+
+atlassian-cli confluence page create \
+  --space DOCS --title <span class="string">"Release 2.4.0 notes"</span> --body <span class="string">"$BODY"</span></code></pre>
+        </div>
+
+        <div class="recipe">
+            <h3><span class="recipe-num">15</span>Roll up open incidents across instances</h3>
+            <p>Loop over profiles to report the same query across every site you manage, from one terminal.</p>
+            <pre><code>for p in prod staging eu; do
+  echo <span class="string">"== $p =="</span>
+  atlassian-cli jira issue search --profile <span class="string">"$p"</span> \
+    --jql <span class="string">"type = Incident AND status != Done"</span> \
+    --format table
+done</code></pre>
+        </div>
+
+        <p>That is fifteen. The pattern underneath all of them is the same: a JQL query selects the issues, a verb acts on them, and cron or CI decides when. Change the verb and you get a new automation for free. Recipe 1 becomes a "reopen everything mistakenly closed" script by flipping the transition; recipe 9 becomes a priority breakdown by grouping on <code>.fields.priority.name</code> instead of status. Start from the recipe closest to your problem and mutate it rather than writing from scratch.</p>
+
+        <p>Once the pattern clicks, the <a href="/docs/commands.html">command reference</a> is the only page you need. For heavier mutation workflows, the <a href="/blog/jira-bulk-operations.html">bulk operations deep-dive</a> covers concurrency control and error recovery when you are moving thousands of issues at once.</p>
+
+        <!-- CTA -->
+        <div class="article-cta">
+            <h3>Try atlassian-cli</h3>
+            <p>One free MIT-licensed binary for Jira, Confluence, Bitbucket, and JSM. Install it and run the first recipe in under a minute.</p>
+            <a href="/install/" class="article-cta-btn">Install atlassian-cli &rarr;</a>
+        </div>
+
+        <!-- FAQ -->
+        <h2 id="faq">FAQ</h2>
+
+        <div class="faq-item">
+            <h3>Can I automate Jira without paying for automation rules?</h3>
+            <p>Yes. Anything you can express as a JQL query, you can script with atlassian-cli and schedule with cron or run in CI. That covers the majority of these Jira automation examples: closing stale issues, reassigning work, exporting reports, and gating releases. Jira's built-in automation rules and the CLI are complementary, not mutually exclusive, so you can use whichever fits each task.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>How do I schedule these Jira automations to run on their own?</h3>
+            <p>Wrap the command in a shell script and add a line to your crontab, or drop it into a CI pipeline stage. For example, <code>0 2 * * * atlassian-cli jira bulk transition ...</code> runs a cleanup every night at 2am. Because atlassian-cli is a single binary with no interactive prompts when flags are supplied, it runs unattended in cron, systemd timers, GitHub Actions, or Bitbucket Pipelines.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Are these Jira automation scripts safe to run on production?</h3>
+            <p>Every bulk command supports a <code>--dry-run</code> flag that runs the same query and shows exactly what would change without modifying anything. The recommended pattern is to run once with <code>--dry-run</code>, confirm the issue count and sample keys, then remove the flag. Point commands at a specific profile with <code>--profile</code> so you never touch the wrong instance.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Do I need a separate tool for each Atlassian product to automate them?</h3>
+            <p>No. atlassian-cli is one binary that spans Jira, Confluence, Bitbucket, and Jira Service Management, so a single script can read closed Jira issues and publish a Confluence release-notes page in the same run. You authenticate once per profile and reuse it across every product command.</p>
+        </div>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/jira/" class="related-link">
+                <div class="related-link-title">Jira CLI Reference</div>
+                <div class="related-link-desc">The full Jira command set: search, create, transition, assign, bulk, and audit.</div>
+            </a>
+            <a href="/blog/jira-automation-guide.html" class="related-link">
+                <div class="related-link-title">Jira Automation Guide</div>
+                <div class="related-link-desc">The concepts behind these recipes: JQL, scheduling, dry-run safety, and profiles.</div>
+            </a>
+            <a href="/blog/create-jira-issues-from-csv.html" class="related-link">
+                <div class="related-link-title">Create Jira Issues from CSV</div>
+                <div class="related-link-desc">Bulk-generate tickets from a spreadsheet instead of one form at a time.</div>
+            </a>
+            <a href="/runbooks/jira-sprint-report.html" class="related-link">
+                <div class="related-link-title">Sprint Report Runbook</div>
+                <div class="related-link-desc">A production-ready weekly export script with arguments and error handling.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.4.2</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

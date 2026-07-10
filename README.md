@@ -16,6 +16,17 @@ multi-instance support.
 [![crates.io](https://img.shields.io/crates/v/atlassian-cli.svg)](https://crates.io/crates/atlassian-cli)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+## Documentation & guides
+
+Full documentation, command references, and how-to guides live on the project site:
+
+- [Jira guide](https://atlassiancli.com/jira/) — issues, projects, bulk operations, workflows
+- [Confluence guide](https://atlassiancli.com/confluence/) — spaces, pages, blog posts, attachments
+- [Bitbucket guide](https://atlassiancli.com/bitbucket/) — repos, branches, pull requests, pipelines
+- [Jira Service Management guide](https://atlassiancli.com/jsm/) — service desks and requests
+- [Installation guide](https://atlassiancli.com/install/) — Homebrew, Cargo, and pre-built binaries
+- [Blog](https://atlassiancli.com/blog/) — release notes, tips, and workflow recipes
+
 ## Installation
 
 ### Homebrew (macOS/Linux)

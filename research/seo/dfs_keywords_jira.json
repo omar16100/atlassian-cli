@@ -1,0 +1,659 @@
+{
+  "meta": {
+    "site": "atlassiancli.com",
+    "location": "United States",
+    "language": "English",
+    "date": "2026-07-10",
+    "cluster": "jira",
+    "sources": [
+      "keyword_suggestions:jira cli",
+      "keyword_ideas:jira automation/jira api/jira jql",
+      "keyword_suggestions:jira automation",
+      "bulk_keyword_difficulty",
+      "keyword_overview:seeds"
+    ],
+    "notes": "volume=monthly US Google search volume; kd=keyword difficulty 0-100; no-data seeds: 'jira bulk','jira service management cli'"
+  },
+  "keywords": [
+    {
+      "keyword": "jira",
+      "volume": 246000,
+      "kd": 54,
+      "intent": "informational",
+      "comp": "MEDIUM",
+      "cpc": 2.43
+    },
+    {
+      "keyword": "jira software",
+      "volume": 8100,
+      "kd": 48,
+      "intent": "commercial",
+      "comp": "LOW",
+      "cpc": 6.19
+    },
+    {
+      "keyword": "jira ticket",
+      "volume": 4400,
+      "kd": 25,
+      "intent": "transactional",
+      "comp": "LOW",
+      "cpc": 11.05
+    },
+    {
+      "keyword": "jira kanban board",
+      "volume": 2900,
+      "kd": 26,
+      "intent": "navigational",
+      "comp": "LOW",
+      "cpc": 12.06
+    },
+    {
+      "keyword": "jira api",
+      "volume": 2900,
+      "kd": 13,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira cloud",
+      "volume": 2400,
+      "kd": 64,
+      "intent": "informational",
+      "comp": "MEDIUM",
+      "cpc": 8.29
+    },
+    {
+      "keyword": "jira status",
+      "volume": 2400,
+      "kd": 39,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 13.56
+    },
+    {
+      "keyword": "cli jira",
+      "volume": 1900,
+      "kd": 10,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira cli",
+      "volume": 1900,
+      "kd": 10,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira-cli",
+      "volume": 1900,
+      "kd": 6,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira icon",
+      "volume": 1600,
+      "kd": 6,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 9.25
+    },
+    {
+      "keyword": "jira automation",
+      "volume": 1300,
+      "kd": 17,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira epic",
+      "volume": 1000,
+      "kd": 10,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 17.07
+    },
+    {
+      "keyword": "jira plans",
+      "volume": 1000,
+      "kd": 15,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 8.61
+    },
+    {
+      "keyword": "jira rest api",
+      "volume": 1000,
+      "kd": 7,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira free",
+      "volume": 880,
+      "kd": 44,
+      "intent": "informational",
+      "comp": "MEDIUM",
+      "cpc": 13
+    },
+    {
+      "keyword": "jira admin",
+      "volume": 880,
+      "kd": 6,
+      "intent": "navigational",
+      "comp": "LOW",
+      "cpc": 5.49
+    },
+    {
+      "keyword": "confluence jira",
+      "volume": 720,
+      "kd": 70,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 1.87
+    },
+    {
+      "keyword": "agile jira",
+      "volume": 720,
+      "kd": 31,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 6.51
+    },
+    {
+      "keyword": "jira agile project management",
+      "volume": 590,
+      "kd": 38,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 10.56
+    },
+    {
+      "keyword": "jira data center",
+      "volume": 590,
+      "kd": 37,
+      "intent": "navigational",
+      "comp": "LOW",
+      "cpc": 6.53
+    },
+    {
+      "keyword": "jira hierarchy",
+      "volume": 590,
+      "kd": 2,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 66.89
+    },
+    {
+      "keyword": "jira editor",
+      "volume": 480,
+      "kd": 4,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "jira issues",
+      "volume": 480,
+      "kd": 49,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 4.49
+    },
+    {
+      "keyword": "jql query",
+      "volume": 480,
+      "kd": 6,
+      "intent": "navigational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "jira automation rule",
+      "volume": 480,
+      "kd": 22,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation rules",
+      "volume": 480,
+      "kd": 15,
+      "intent": "informational"
+    },
+    {
+      "keyword": "slack jira",
+      "volume": 390,
+      "kd": 13,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 13.68
+    },
+    {
+      "keyword": "jira jql",
+      "volume": 390,
+      "kd": 14,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira task",
+      "volume": 320,
+      "kd": 27,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 29.29
+    },
+    {
+      "keyword": "jira assets",
+      "volume": 320,
+      "kd": 23,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 10.69
+    },
+    {
+      "keyword": "jira markdown",
+      "volume": 320,
+      "kd": null,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "announcement banner jira",
+      "volume": 320,
+      "kd": null,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "format jira",
+      "volume": 320,
+      "kd": 6,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "jira task management",
+      "volume": 320,
+      "kd": 18,
+      "intent": "informational",
+      "comp": "MEDIUM",
+      "cpc": 24.18
+    },
+    {
+      "keyword": "automation jira",
+      "volume": 320,
+      "kd": 17,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "automation in jira",
+      "volume": 320,
+      "kd": 18,
+      "intent": "informational"
+    },
+    {
+      "keyword": "automation with jira",
+      "volume": 320,
+      "kd": 17,
+      "intent": "informational"
+    },
+    {
+      "keyword": "automation for jira",
+      "volume": 320,
+      "kd": 15,
+      "intent": "commercial"
+    },
+    {
+      "keyword": "jira agile tools",
+      "volume": 260,
+      "kd": 64,
+      "intent": "navigational",
+      "comp": "LOW",
+      "cpc": 8.12
+    },
+    {
+      "keyword": "open source jira",
+      "volume": 260,
+      "kd": 25,
+      "intent": "informational",
+      "comp": "MEDIUM",
+      "cpc": 36.48
+    },
+    {
+      "keyword": "asana jira",
+      "volume": 260,
+      "kd": null,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 12.29
+    },
+    {
+      "keyword": "issue key jira",
+      "volume": 260,
+      "kd": null,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "jira open source",
+      "volume": 260,
+      "kd": 24,
+      "intent": "informational",
+      "comp": "MEDIUM",
+      "cpc": 11.06
+    },
+    {
+      "keyword": "jira issuekey",
+      "volume": 260,
+      "kd": 3,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "jira calendar",
+      "volume": 260,
+      "kd": 9,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 8.2
+    },
+    {
+      "keyword": "jira alternative",
+      "volume": 260,
+      "kd": null,
+      "intent": "informational",
+      "comp": "MEDIUM",
+      "cpc": 25.43
+    },
+    {
+      "keyword": "jira wiki",
+      "volume": 260,
+      "kd": 67,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 7.47
+    },
+    {
+      "keyword": "jira asana",
+      "volume": 260,
+      "kd": null,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 12.29
+    },
+    {
+      "keyword": "atlassian jira kanban board",
+      "volume": 260,
+      "kd": null,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": 7.01
+    },
+    {
+      "keyword": "jira comments",
+      "volume": 210,
+      "kd": null,
+      "intent": "informational",
+      "comp": "LOW",
+      "cpc": null
+    },
+    {
+      "keyword": "jira cli tool",
+      "volume": 110,
+      "kd": 10,
+      "intent": "transactional"
+    },
+    {
+      "keyword": "automation for jira cloud",
+      "volume": 110,
+      "kd": 48,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira cloud automation",
+      "volume": 110,
+      "kd": 41,
+      "intent": "commercial"
+    },
+    {
+      "keyword": "jira automation smart values",
+      "volume": 90,
+      "kd": 10,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira workflow automation",
+      "volume": 90,
+      "kd": 18,
+      "intent": "commercial"
+    },
+    {
+      "keyword": "jira-cli commands",
+      "volume": 70,
+      "kd": 5,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira cli commands",
+      "volume": 70,
+      "kd": 7,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation tool",
+      "volume": 70,
+      "kd": 48,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira automation for jira",
+      "volume": 70,
+      "kd": 48,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira automation tools",
+      "volume": 70,
+      "kd": 48,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "test automation jira",
+      "volume": 70,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira automation examples",
+      "volume": 70,
+      "kd": 6,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation template",
+      "volume": 70,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira automation testing",
+      "volume": 70,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira test automation",
+      "volume": 70,
+      "kd": 11,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation templates",
+      "volume": 70,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira command line",
+      "volume": 70,
+      "kd": 10,
+      "intent": "informational"
+    },
+    {
+      "keyword": "automation plugin for jira",
+      "volume": 50,
+      "kd": 26,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jsu automation suite for jira workflows",
+      "volume": 50,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "automation for jira plugin",
+      "volume": 50,
+      "kd": 10,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "project automation jira",
+      "volume": 50,
+      "kd": 13,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "automation plugin jira",
+      "volume": 50,
+      "kd": 26,
+      "intent": "transactional"
+    },
+    {
+      "keyword": "jira automation plugin",
+      "volume": 50,
+      "kd": 33,
+      "intent": "transactional"
+    },
+    {
+      "keyword": "jira project automation",
+      "volume": 50,
+      "kd": 15,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "install jira-cli",
+      "volume": 40,
+      "kd": 11,
+      "intent": "informational"
+    },
+    {
+      "keyword": "install jira cli",
+      "volume": 40,
+      "kd": 11,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation documentation",
+      "volume": 40,
+      "kd": 42,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira automation if/else",
+      "volume": 40,
+      "kd": null,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation limit",
+      "volume": 40,
+      "kd": 3,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation limits",
+      "volume": 40,
+      "kd": null,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira automation if else",
+      "volume": 40,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira automation triggers",
+      "volume": 40,
+      "kd": 3,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira service management automation",
+      "volume": 40,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "automation for jira documentation",
+      "volume": 40,
+      "kd": 48,
+      "intent": "informational"
+    },
+    {
+      "keyword": "ankitpokhrel jira cli",
+      "volume": 30,
+      "kd": null,
+      "intent": "transactional"
+    },
+    {
+      "keyword": "ankitpokhrel/jira-cli",
+      "volume": 30,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "atlassian jira cli",
+      "volume": 30,
+      "kd": null,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira cli install",
+      "volume": 20,
+      "kd": 11,
+      "intent": "informational"
+    },
+    {
+      "keyword": "does jira have a cli",
+      "volume": 20,
+      "kd": null,
+      "intent": "informational"
+    },
+    {
+      "keyword": "jira cli github",
+      "volume": 20,
+      "kd": 57,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira ticket automation",
+      "volume": 20,
+      "kd": 17,
+      "intent": "navigational"
+    },
+    {
+      "keyword": "jira bulk",
+      "volume": null,
+      "kd": null,
+      "intent": null
+    },
+    {
+      "keyword": "jira service management cli",
+      "volume": null,
+      "kd": null,
+      "intent": null
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "target": "atlassiancli.com",
+    "location_name": "United States",
+    "language_name": "English",
+    "language_code": "en",
+    "fetched_at": "2026-07-10",
+    "keywords": ["jira cli", "atlassian cli", "confluence cli", "bitbucket cli"]
+  },
+  "serp_competitors": {
+    "id": "07101842-1272-0383-0000-69c4f9abce7b",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "items": [
+      {"se_type": "google", "domain": "github.com", "avg_position": 1.75, "median_position": 1, "rating": 393, "etv": 728.408, "keywords_count": 4, "visibility": 3.7, "relevant_serp_items": 4, "keywords_positions": {"jira cli": [1], "confluence cli": [1], "bitbucket cli": [1], "atlassian cli": [4]}},
+      {"se_type": "google", "domain": "appfire.atlassian.net", "avg_position": 3.5, "median_position": 3, "rating": 386, "etv": 227.72, "keywords_count": 4, "visibility": 3, "relevant_serp_items": 4, "keywords_positions": {"jira cli": [4], "confluence cli": [4], "bitbucket cli": [3], "atlassian cli": [3]}},
+      {"se_type": "google", "domain": "www.reddit.com", "avg_position": 8.5, "median_position": 7, "rating": 366, "etv": 41.704, "keywords_count": 4, "visibility": 1.05, "relevant_serp_items": 4, "keywords_positions": {"jira cli": [11], "confluence cli": [6], "bitbucket cli": [7], "atlassian cli": [10]}},
+      {"se_type": "google", "domain": "atlassiancli.com", "avg_position": 21.25, "median_position": 14, "rating": 315, "etv": 10.56, "keywords_count": 4, "visibility": 0.15, "relevant_serp_items": 4, "keywords_positions": {"jira cli": [40], "confluence cli": [14], "bitbucket cli": [17], "atlassian cli": [14]}},
+      {"se_type": "google", "domain": "appfire.com", "avg_position": 5.333, "median_position": 6, "rating": 284, "etv": 188.208, "keywords_count": 3, "visibility": 1.7, "relevant_serp_items": 3, "keywords_positions": {"jira cli": [3], "confluence cli": [7], "atlassian cli": [6]}},
+      {"se_type": "google", "domain": "crates.io", "avg_position": 8.333, "median_position": 9, "rating": 275, "etv": 33.696, "keywords_count": 3, "visibility": 0.8, "relevant_serp_items": 3, "keywords_positions": {"jira cli": [10], "confluence cli": [9], "bitbucket cli": [6]}},
+      {"se_type": "google", "domain": "www.youtube.com", "avg_position": 15.333, "median_position": 13, "rating": 254, "etv": 20.992, "keywords_count": 3, "visibility": 0.45, "relevant_serp_items": 3, "keywords_positions": {"confluence cli": [26], "bitbucket cli": [13], "atlassian cli": [7]}},
+      {"se_type": "google", "domain": "mcpmarket.com", "avg_position": 30, "median_position": 30, "rating": 210, "etv": 5.544, "keywords_count": 3, "visibility": 0, "relevant_serp_items": 3, "keywords_positions": {"jira cli": [37], "confluence cli": [23], "atlassian cli": [30]}},
+      {"se_type": "google", "domain": "developer.atlassian.com", "avg_position": 1.5, "median_position": 1, "rating": 197, "etv": 270.72, "keywords_count": 2, "visibility": 1.9, "relevant_serp_items": 2, "keywords_positions": {"confluence cli": [2], "atlassian cli": [1]}},
+      {"se_type": "google", "domain": "lobehub.com", "avg_position": 17, "median_position": 12, "rating": 166, "etv": 13.584, "keywords_count": 2, "visibility": 0.05, "relevant_serp_items": 2, "keywords_positions": {"jira cli": [12], "atlassian cli": [22]}},
+      {"se_type": "google", "domain": "www.npmjs.com", "avg_position": 18.5, "median_position": 5, "rating": 163, "etv": 18.368, "keywords_count": 2, "visibility": 0.6, "relevant_serp_items": 2, "keywords_positions": {"jira cli": [32], "confluence cli": [5]}},
+      {"se_type": "google", "domain": "pypi.org", "avg_position": 20, "median_position": 15, "rating": 160, "etv": 4.992, "keywords_count": 2, "visibility": 0.05, "relevant_serp_items": 2, "keywords_positions": {"jira cli": [25], "bitbucket cli": [15]}},
+      {"se_type": "google", "domain": "atlcli.sh", "avg_position": 21.5, "median_position": 16, "rating": 157, "etv": 2.888, "keywords_count": 2, "visibility": 0.05, "relevant_serp_items": 2, "keywords_positions": {"confluence cli": [16], "atlassian cli": [27]}},
+      {"se_type": "google", "domain": "snapcraft.io", "avg_position": 22, "median_position": 11, "rating": 156, "etv": 6.272, "keywords_count": 2, "visibility": 0.05, "relevant_serp_items": 2, "keywords_positions": {"jira cli": [33], "bitbucket cli": [11]}},
+      {"se_type": "google", "domain": "composio.dev", "avg_position": 22.5, "median_position": 21, "rating": 155, "etv": 1.408, "keywords_count": 2, "visibility": 0, "relevant_serp_items": 2, "keywords_positions": {"confluence cli": [21], "bitbucket cli": [24]}},
+      {"se_type": "google", "domain": "www.onpointserv.com", "avg_position": 23.5, "median_position": 17, "rating": 153, "etv": 6.456, "keywords_count": 2, "visibility": 0.05, "relevant_serp_items": 2, "keywords_positions": {"jira cli": [30], "atlassian cli": [17]}},
+      {"se_type": "google", "domain": "www.atlassian.com", "avg_position": 2, "median_position": 2, "rating": 98, "etv": 259.2, "keywords_count": 1, "visibility": 0.9, "relevant_serp_items": 1, "keywords_positions": {"jira cli": [2]}},
+      {"se_type": "google", "domain": "marketplace.atlassian.com", "avg_position": 2, "median_position": 2, "rating": 98, "etv": 51.84, "keywords_count": 1, "visibility": 0.9, "relevant_serp_items": 1, "keywords_positions": {"bitbucket cli": [2]}},
+      {"se_type": "google", "domain": "jiracli.com", "avg_position": 5, "median_position": 5, "rating": 95, "etv": 75.04, "keywords_count": 1, "visibility": 0.6, "relevant_serp_items": 1, "keywords_positions": {"jira cli": [5]}},
+      {"se_type": "google", "domain": "medium.com", "avg_position": 7, "median_position": 7, "rating": 93, "etv": 40.96, "keywords_count": 1, "visibility": 0.4, "relevant_serp_items": 1, "keywords_positions": {"jira cli": [7]}}
+    ]
+  },
+  "backlinks_summary": {
+    "id": "07101842-1272-0265-0000-a5b00a2dd009",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "items": [
+      {
+        "target": "atlassiancli.com",
+        "first_seen": "2026-06-16 07:48:27 +00:00",
+        "backlinks": 1,
+        "backlinks_spam_score": 35,
+        "referring_domains": 1,
+        "referring_main_domains": 1,
+        "referring_ips": 1,
+        "referring_subnets": 1,
+        "referring_pages": 1,
+        "referring_links_tld": {"com": 1},
+        "referring_links_types": {"anchor": 1},
+        "referring_links_platform_types": {"unknown": 1},
+        "referring_links_semantic_locations": {"": 1},
+        "referring_links_countries": {"": 1}
+      }
+    ]
+  },
+  "backlinks_referring_domains": {
+    "id": "07101842-1272-0273-0000-5d41cdb5071b",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "items": [
+      {
+        "type": "backlinks_referring_domain",
+        "domain": "robuta.com",
+        "backlinks": 1,
+        "first_seen": "2026-06-16 07:48:27 +00:00",
+        "backlinks_spam_score": 35,
+        "referring_domains": 1,
+        "referring_main_domains": 1,
+        "referring_ips": 1,
+        "referring_subnets": 1,
+        "referring_pages": 1,
+        "referring_links_tld": {"com": 1},
+        "referring_links_types": {"anchor": 1},
+        "referring_links_platform_types": {"unknown": 1},
+        "referring_links_semantic_locations": {"": 1},
+        "referring_links_countries": {"": 1}
+      }
+    ]
+  }
+}
