@@ -33,8 +33,11 @@ early-2026 baseline of 51 clicks/3mo), avg pos ~8.5, but 0 top-10 rankings and a
   ("300% since 2023", "single most upvoted"), wrong acli product coverage, a bad --output flag / bbpr arg order,
   and added above-the-fold non-affiliation notices. Removed false "Atlassian Never Shipped" claim.
 
-### Deploy
-- Branch seo/content-expansion-50-blogs -> merge to main (GitHub Pages /docs) -> verify live. (pending)
+### Deploy (DONE 2026-07-11)
+- Merged seo/content-expansion-50-blogs -> main, pushed (a039319..34ec806). GitHub Pages build for 34ec806
+  completed cleanly (status=built, error=None). Published main source verified via API: sitemap 82 <loc>,
+  all sampled new posts + 404.html present. Browser-render check not performed from this env (outbound network
+  blocked here); recommend a manual eyeball of 2-3 live URLs.
 
 ### Risk noted
 - 50 same-day posts on a ~0-backlink domain carries Google scaled-content risk; mitigated via distinct keywords,
