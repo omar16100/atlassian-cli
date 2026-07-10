@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Complete Guide to Jira CLI Tools in 2026 | atlassian-cli</title>
-    <meta name="description" content="The definitive guide to Jira CLI tools in 2026. Compare top tools, learn installation, authentication, JQL queries, bulk operations, and CI/CD automation.">
+    <title>Jira CLI: The Complete Guide (2026) | atlassian-cli</title>
+    <meta name="description" content="Jira CLI guide for 2026. Compare the top Jira CLI tools and learn installation, authentication, JQL queries, bulk operations, and CI/CD automation from the terminal.">
 
     <!-- Open Graph -->
     <meta property="og:title" content="The Complete Guide to Jira CLI Tools in 2026">
@@ -87,7 +87,7 @@
           "name": "What is the best Jira CLI tool?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "For multi-product Atlassian automation (Jira + Confluence + Bitbucket + JSM), atlassian-cli is the best choice — it's a single Rust binary covering all four products with bulk operations and dry-run safety. For a Jira-only TUI experience, ankitpokhrel/jira-cli offers a nice interactive interface written in Go."
+            "text": "For multi-product Atlassian automation (Jira + Confluence + Bitbucket + JSM), atlassian-cli is the best choice, it's a single Rust binary covering all four products with bulk operations and dry-run safety. For a Jira-only TUI experience, ankitpokhrel/jira-cli offers a nice interactive interface written in Go."
           }
         },
         {
@@ -495,7 +495,9 @@
     <!-- Article Body -->
     <article class="article-body">
 
-        <!-- Table of Contents -->
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
         <nav class="toc">
             <div class="toc-title">Contents</div>
             <ol>
@@ -515,7 +517,7 @@
 
         <p>A <strong>Jira CLI</strong> (command-line interface) is a tool that lets you interact with Jira directly from your terminal. Instead of clicking through the Jira web UI to search issues, create tickets, or transition workflows, you run commands like <code>atlassian-cli jira issue search --jql "project = DEV"</code> and get results instantly.</p>
 
-        <p>Jira CLI tools are used by <strong>DevOps engineers</strong> who need to automate ticket creation in pipelines, <strong>platform engineers</strong> managing thousands of issues across projects, and <strong>Jira admins</strong> performing bulk operations that would take hours in the browser. If your workflow involves Jira and a terminal, a Jira CLI eliminates context-switching and unlocks automation that the web UI simply cannot provide.</p>
+        <p>Jira CLI tools are used by <strong>DevOps engineers</strong> who need to automate ticket creation in pipelines, <strong>platform engineers</strong> managing thousands of issues across projects, and <strong>Jira admins</strong> performing bulk operations that would take hours in the browser. If your workflow involves Jira and a terminal, a Jira CLI eliminates context-switching and unlocks automation that the web UI simply cannot provide. Jump straight to the full <a href="/jira/">Jira CLI</a> command reference, or read on for the complete guide.</p>
 
         <!-- Section 2: Why Use Jira from the Command Line? -->
         <h2 id="why-use-jira-cli">Why Use Jira from the Command Line?</h2>
@@ -596,6 +598,8 @@
         <p><strong>go-jira</strong> was once the most popular Jira CLI, but it's been archived and is no longer maintained. If you're using go-jira today, it's worth migrating to a maintained alternative.</p>
 
         <p><strong>ACLI by Appfire</strong> is an enterprise-focused Java CLI that supports Jira, Confluence, and other Atlassian products. It's powerful but requires a paid license and a Java runtime. Best suited for organizations that already use Appfire's ecosystem.</p>
+
+        <p>For a deeper side-by-side breakdown of each option, see our dedicated <a href="/blog/jira-cli-tools-compared.html">Jira CLI tools compared</a> guide.</p>
 
         <!-- Section 4: Getting Started -->
         <h2 id="getting-started">Getting Started with atlassian-cli</h2>

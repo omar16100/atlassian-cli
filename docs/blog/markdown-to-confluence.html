@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convert Markdown to Confluence Pages | atlassian-cli Blog</title>
+    <meta name="description" content="Convert a markdown to Confluence page from the command line: turn markdown into Confluence storage format with pandoc and publish it with atlassian-cli.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Convert Markdown to Confluence Pages">
+    <meta property="og:description" content="Convert a markdown to Confluence page from the command line: turn markdown into Confluence storage format with pandoc and publish it with atlassian-cli.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/markdown-to-confluence.html">
+    <meta property="article:published_time" content="2026-07-10T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Convert Markdown to Confluence Pages">
+    <meta name="twitter:description" content="Convert a markdown to Confluence page from the command line: turn markdown into Confluence storage format with pandoc and publish it with atlassian-cli.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/markdown-to-confluence.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Breadcrumb -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Convert Markdown to Confluence Pages", "item": "https://atlassiancli.com/blog/markdown-to-confluence.html"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Convert Markdown to Confluence Pages",
+      "description": "Convert a markdown to Confluence page from the command line: turn markdown into Confluence storage format with pandoc and publish it with atlassian-cli.",
+      "datePublished": "2026-07-10T00:00:00Z",
+      "dateModified": "2026-07-10T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/markdown-to-confluence.html"
+      },
+      "url": "https://atlassiancli.com/blog/markdown-to-confluence.html",
+      "inLanguage": "en-US",
+      "keywords": "convert markdown to confluence page, markdown to confluence, confluence storage format, publish markdown confluence, atlassian-cli confluence"
+    }
+    </script>
+
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I convert a markdown file to a Confluence page?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "It is two steps: convert the markdown into Confluence storage format, then publish that markup as a page. Run pandoc -f markdown -t html notes.md > notes.html to produce Confluence-compatible XHTML, then run atlassian-cli confluence page create --space DOCS --title \"Notes\" --body notes.html. The --body flag accepts a file path, so the converted HTML becomes the page content."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is Confluence storage format?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Confluence storage format is the XHTML-based markup Confluence uses to persist page content. Standard HTML tags like p, h1, ul, and table map across almost directly, while Confluence-specific features such as code blocks, info panels, and page includes are represented as ac:structured-macro elements. When you convert markdown to a Confluence page, you are really converting markdown into this storage format."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does Confluence support markdown natively?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Not as a storage format. The Confluence editor lets you paste markdown into a page as a one-time convenience, and it converts the text on paste, but the page is still saved as storage format afterward. There is no way to keep a page as raw markdown, which is why a scripted convert-then-publish pipeline is the reliable path for keeping repo docs in sync."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I update an existing Confluence page from markdown without creating a duplicate?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Look up the page id by title with a CQL search, then run atlassian-cli confluence page update PAGE_ID --title \"Notes\" --body notes.html. Updating by id overwrites the body in place and bumps the version instead of creating a second page, so re-publishing the same file is an idempotent upsert."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I get a Confluence page back as markdown?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Every command accepts a --format flag and markdown is a supported output, so atlassian-cli confluence page get 12345 --format markdown returns the page as markdown. That lets you round-trip content back into a Git repository after it was edited in Confluence."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment {
+            color: var(--text-muted);
+        }
+
+        .article-body pre .string {
+            color: var(--accent-cyan);
+        }
+
+        /* FAQ section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .faq-item h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .faq-item p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Comparison table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0 2rem;
+            font-size: 0.9rem;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .comparison-table th {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .comparison-table td:first-child {
+            color: var(--text-primary);
+        }
+
+        /* CTA */
+        .article-cta {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+
+        .article-cta h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-cta p {
+            margin-bottom: 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1rem 4rem;
+            }
+
+            .article-body h2 {
+                font-size: 1.25rem;
+            }
+
+            .toc {
+                padding: 1.25rem;
+            }
+
+            .related-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="article-meta">
+                <span class="article-meta-item">July 10, 2026</span>
+                <span class="article-meta-item">~6 min read</span>
+                <span class="article-meta-item">Omar Shabab</span>
+                <span class="article-keyword">convert markdown to confluence page</span>
+            </div>
+            <h1 class="article-title">Convert Markdown to Confluence Pages</h1>
+            <p class="article-subtitle">Turn markdown files into Confluence storage format and publish them from the command line, without touching the web editor.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#two-steps">The Two Steps</a></li>
+                <li><a href="#storage-format">What Confluence Storage Format Is</a></li>
+                <li><a href="#convert">Convert Markdown to Storage Format</a></li>
+                <li><a href="#publish">Publish the Page from the CLI</a></li>
+                <li><a href="#update">Update in Place Without Duplicates</a></li>
+                <li><a href="#gotchas">Code Blocks, Tables, and Macros</a></li>
+                <li><a href="#round-trip">Round-Trip Back to Markdown</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- Section 1 -->
+        <h2 id="two-steps">The Two Steps</h2>
+
+        <p>To <strong>convert a markdown to Confluence page</strong>, you do two distinct things: convert the markdown into <strong>Confluence storage format</strong> (Confluence's XHTML-based markup), then publish that markup as a page. Confluence does not store raw markdown, so there is no single "import markdown" button that keeps working at scale. Instead you convert once with a tool like <code>pandoc</code>, then hand the result to the API.</p>
+
+        <p><a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> owns the second step. Its <code>confluence page create</code> and <code>confluence page update</code> commands accept a <code>--body</code> that points at your converted HTML file, so publishing a page becomes one scriptable line. Chain the converter and the CLI together and a markdown file in your Git repo becomes a live Confluence page you can regenerate any time the source changes.</p>
+
+        <p><strong>How this differs from Atlassian's own CLI:</strong> atlassian-cli is an independent, community open-source project. It is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>) and is not affiliated with, endorsed by, or sponsored by Atlassian. Use the official <code>acli</code> for first-party vendor support; use atlassian-cli if you want a single free Rust binary spanning Jira, Confluence, Bitbucket, and Jira Service Management with the same flags everywhere.</p>
+
+        <!-- Section 2 -->
+        <h2 id="storage-format">What Confluence Storage Format Is</h2>
+
+        <p>Before converting anything, it helps to know what you are converting <em>to</em>. Confluence storage format is an XHTML-based markup that Confluence uses to persist page content on disk and over the REST API. Most of it looks like ordinary HTML: paragraphs are <code>&lt;p&gt;</code>, headings are <code>&lt;h1&gt;</code> through <code>&lt;h6&gt;</code>, lists are <code>&lt;ul&gt;</code> and <code>&lt;ol&gt;</code>, and tables are <code>&lt;table&gt;</code>. Those tags map almost directly from what a markdown converter emits, which is exactly why the pipeline works.</p>
+
+        <p>The parts that are not plain HTML are Confluence's own features: code blocks with syntax highlighting, info and warning panels, page includes, tables of contents, and status lozenges. Those are represented as macros using the <code>ac:</code> and <code>ri:</code> namespaces. A code block, for example, is not a bare <code>&lt;pre&gt;</code> tag. It is a structured macro:</p>
+
+        <pre><code><span class="comment">&lt;!-- Confluence storage format: a code macro --&gt;</span>
+&lt;ac:structured-macro ac:name=<span class="string">"code"</span>&gt;
+  &lt;ac:parameter ac:name=<span class="string">"language"</span>&gt;bash&lt;/ac:parameter&gt;
+  &lt;ac:plain-text-body&gt;&lt;![CDATA[cargo build --release]]&gt;&lt;/ac:plain-text-body&gt;
+&lt;/ac:structured-macro&gt;</code></pre>
+
+        <p>You rarely write this by hand. The point is that "converting markdown to a Confluence page" means producing this storage-format XHTML, and the closer your converter gets to it, the less cleanup you do later.</p>
+
+        <!-- Section 3 -->
+        <h2 id="convert">Convert Markdown to Storage Format</h2>
+
+        <p>The most reliable open-source markdown converter is <code>pandoc</code>. Pointed at <code>html</code> output, it produces markup that Confluence's storage format accepts directly: headings, paragraphs, fenced code, links, images, and most tables come across cleanly.</p>
+
+        <pre><code><span class="comment"># Convert a single markdown file to Confluence-ready HTML</span>
+pandoc -f markdown -t html release-notes.md &gt; release-notes.html</code></pre>
+
+        <p>That is the whole conversion step. For a first pass, this output is good enough to publish. Two optional refinements make it read better inside Confluence: a small tweak to give <code>&lt;h1&gt;</code> some top margin, and a class on inline <code>&lt;code&gt;</code> so it picks up Confluence styling.</p>
+
+        <pre><code><span class="comment"># Convert with light cleanup for Confluence storage format</span>
+pandoc -f markdown -t html release-notes.md \
+  | sed <span class="string">'s/&lt;h1&gt;/&lt;h1 style="margin-top: 20px;"&gt;/g'</span> \
+  | sed <span class="string">'s/&lt;code&gt;/&lt;code class="code-inline"&gt;/g'</span> \
+  &gt; release-notes.html</code></pre>
+
+        <p>Everything downstream treats <code>release-notes.html</code> as the page body. If you would rather build the whole scan-convert-publish loop over a docs directory in one go, the <a href="/runbooks/confluence-markdown-sync.html">Confluence markdown sync runbook</a> wraps this exact conversion in a ready-to-run script with dry-run support and auto-labeling.</p>
+
+        <!-- Section 4 -->
+        <h2 id="publish">Publish the Page from the CLI</h2>
+
+        <p>With the storage-format HTML in hand, publishing is a single command. The <code>--body</code> flag accepts a file path, so you pass the converted file straight through:</p>
+
+        <pre><code><span class="comment"># Create a new Confluence page from the converted markdown</span>
+atlassian-cli confluence page create \
+  --space DOCS \
+  --title <span class="string">"Release Notes 1.0"</span> \
+  --body release-notes.html</code></pre>
+
+        <p>For a quick one-off note you can skip the file entirely and pass inline storage format to <code>--body</code>:</p>
+
+        <pre><code><span class="comment"># Inline body for a short page</span>
+atlassian-cli confluence page create \
+  --space DOCS \
+  --title <span class="string">"Deploy Log"</span> \
+  --body <span class="string">"&lt;p&gt;Shipped the &lt;strong&gt;1.0&lt;/strong&gt; release.&lt;/p&gt;"</span></code></pre>
+
+        <p>To nest the new page under an existing parent, add <code>--parent</code> with the parent page id. To place it in the right context first, list the space's pages so you can grab an id:</p>
+
+        <pre><code>atlassian-cli confluence page list --space DOCS --limit 25
+atlassian-cli confluence page create \
+  --space DOCS \
+  --title <span class="string">"Architecture Overview"</span> \
+  --parent 3302031761 \
+  --body architecture.html</code></pre>
+
+        <!-- Section 5 -->
+        <h2 id="update">Update in Place Without Duplicates</h2>
+
+        <p>Running <code>page create</code> twice makes two pages. For docs that regenerate on every commit, you want an <strong>upsert</strong>: create the page the first time, overwrite its body on every run after that. The trick is to look up the page id by title, then update by id.</p>
+
+        <pre><code><span class="comment"># Find the page id by title with a CQL search</span>
+PAGE_ID=$(atlassian-cli confluence search cql \
+  <span class="string">"space = DOCS AND title = \"Release Notes 1.0\""</span> \
+  --format json | jq -r <span class="string">'.results[0].content.id // empty'</span>)
+
+<span class="comment"># Update in place if it exists, otherwise create it</span>
+if [ -n <span class="string">"$PAGE_ID"</span> ]; then
+  atlassian-cli confluence page update <span class="string">"$PAGE_ID"</span> \
+    --title <span class="string">"Release Notes 1.0"</span> \
+    --body release-notes.html
+else
+  atlassian-cli confluence page create \
+    --space DOCS \
+    --title <span class="string">"Release Notes 1.0"</span> \
+    --body release-notes.html
+fi</code></pre>
+
+        <p>Updating by id overwrites the body and bumps the page version rather than spawning a duplicate. Because pandoc produces the same storage-format output for unchanged input, re-running with an identical source file is effectively a no-op: same title, same body, one clean version bump. That idempotency is what lets you wire the pipeline into CI and forget about it.</p>
+
+        <p>You can also tag synced pages so they are easy to find and audit later:</p>
+
+        <pre><code>atlassian-cli confluence page add-label <span class="string">"$PAGE_ID"</span> auto-synced</code></pre>
+
+        <!-- Section 6 -->
+        <h2 id="gotchas">Code Blocks, Tables, and Macros</h2>
+
+        <p>Most markdown converts cleanly, but three constructs deserve a look before you publish widely. Here is how the common cases behave when you convert markdown to a Confluence page.</p>
+
+        <div style="overflow-x:auto;">
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Markdown</th>
+                    <th>Storage format result</th>
+                    <th>Watch for</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Fenced code block</td>
+                    <td><code>&lt;pre&gt;</code> or code macro</td>
+                    <td>Syntax highlighting needs the code macro; plain <code>&lt;pre&gt;</code> renders without a language.</td>
+                </tr>
+                <tr>
+                    <td>Pipe table</td>
+                    <td><code>&lt;table&gt;</code></td>
+                    <td>Simple tables convert cleanly; complex GitHub-flavored tables can need manual review.</td>
+                </tr>
+                <tr>
+                    <td>Inline HTML</td>
+                    <td>Passed through</td>
+                    <td>Raw HTML that is not valid XHTML may be rejected by the storage-format parser.</td>
+                </tr>
+                <tr>
+                    <td>Images</td>
+                    <td><code>&lt;img&gt;</code> / attachment ref</td>
+                    <td>Relative image paths need to be uploaded as attachments separately.</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p>The practical rule: keep markdown reasonably standard and it converts without fuss. If a page relies on Confluence-native rendering like syntax-highlighted code, expect to post-process pandoc's <code>&lt;pre&gt;</code> output into a <code>code</code> macro, or accept plain preformatted blocks. Always preview a representative page before running the pipeline across a whole space. Local images referenced by relative path are worth handling explicitly: upload them with <code>confluence attachment upload</code> so the published page is not left with broken links.</p>
+
+        <!-- Section 7 -->
+        <h2 id="round-trip">Round-Trip Back to Markdown</h2>
+
+        <p>Conversion works in both directions, which matters when someone edits a page in the Confluence web editor and you want that change back in Git. Every command accepts a <code>--format</code> flag, and <code>markdown</code> is a supported output, so a single command pulls a page back out as markdown:</p>
+
+        <pre><code><span class="comment"># Export a Confluence page back to a markdown file</span>
+atlassian-cli confluence page get 12345 --format markdown &gt; release-notes.md</code></pre>
+
+        <p>That closes the loop: publish markdown to Confluence for readers, export it back to keep version control authoritative. For a deeper walkthrough of the reverse direction, including whole-space exports and cleaning up the output, see <a href="/blog/export-confluence-to-markdown.html">Export Confluence to Markdown</a>. And if you want to run this as an automated docs pipeline on every merge rather than by hand, the <a href="/blog/docs-as-code-confluence.html">docs-as-code with Confluence</a> guide covers wiring it into CI.</p>
+
+        <!-- FAQ -->
+        <h2 id="faq">FAQ</h2>
+
+        <div class="faq-item">
+            <h3>How do I convert a markdown file to a Confluence page?</h3>
+            <p>It is two steps: convert the markdown into Confluence storage format, then publish that markup as a page. Run <code>pandoc -f markdown -t html notes.md &gt; notes.html</code> to produce Confluence-compatible XHTML, then run <code>atlassian-cli confluence page create --space DOCS --title "Notes" --body notes.html</code>. The <code>--body</code> flag accepts a file path, so the converted HTML becomes the page content.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>What is Confluence storage format?</h3>
+            <p>Confluence storage format is the XHTML-based markup Confluence uses to persist page content. Standard HTML tags like <code>p</code>, <code>h1</code>, <code>ul</code>, and <code>table</code> map across almost directly, while Confluence-specific features such as code blocks, info panels, and page includes are represented as <code>ac:structured-macro</code> elements. When you convert markdown to a Confluence page, you are really converting markdown into this storage format.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Does Confluence support markdown natively?</h3>
+            <p>Not as a storage format. The Confluence editor lets you paste markdown into a page as a one-time convenience, and it converts the text on paste, but the page is still saved as storage format afterward. There is no way to keep a page as raw markdown, which is why a scripted convert-then-publish pipeline is the reliable path for keeping repo docs in sync.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Can I update an existing Confluence page from markdown without creating a duplicate?</h3>
+            <p>Yes. Look up the page id by title with a CQL search, then run <code>atlassian-cli confluence page update PAGE_ID --title "Notes" --body notes.html</code>. Updating by id overwrites the body in place and bumps the version instead of creating a second page, so re-publishing the same file is an idempotent upsert.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>How do I get a Confluence page back as markdown?</h3>
+            <p>Every command accepts a <code>--format</code> flag and markdown is a supported output, so <code>atlassian-cli confluence page get 12345 --format markdown</code> returns the page as markdown. That lets you round-trip content back into a Git repository after it was edited in Confluence.</p>
+        </div>
+
+        <!-- CTA -->
+        <div class="article-cta">
+            <p>Ready to publish your docs from the terminal? <a href="/install/">Install atlassian-cli</a> and convert your first markdown file to a Confluence page in minutes.</p>
+        </div>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/confluence/" class="related-link">
+                <div class="related-link-title">Confluence CLI Reference</div>
+                <div class="related-link-desc">Full command reference for Confluence pages, spaces, search, folders, and bulk operations.</div>
+            </a>
+            <a href="/runbooks/confluence-markdown-sync.html" class="related-link">
+                <div class="related-link-title">Markdown Sync Runbook</div>
+                <div class="related-link-desc">A ready-to-run script that scans a docs directory and syncs every markdown file to Confluence.</div>
+            </a>
+            <a href="/blog/confluence-cli-guide.html" class="related-link">
+                <div class="related-link-title">Confluence CLI Guide</div>
+                <div class="related-link-desc">Step-by-step guide to managing Confluence pages and spaces from the command line.</div>
+            </a>
+            <a href="/docs/commands.html" class="related-link">
+                <div class="related-link-title">Command Reference</div>
+                <div class="related-link-desc">Every atlassian-cli command with flags and examples across Jira, Confluence, Bitbucket, and JSM.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.4.2</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

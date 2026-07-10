@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reacting to Jira Webhooks in Scripts | atlassian-cli Blog</title>
+    <meta name="description" content="React to Jira webhooks in scripts: parse the payload, run a tiny listener, and call atlassian-cli to transition, assign, or update issues automatically.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Reacting to Jira Webhooks in Scripts">
+    <meta property="og:description" content="React to Jira webhooks in scripts: parse the payload, run a tiny listener, and call atlassian-cli to transition, assign, or update issues automatically.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/jira-webhooks-automation.html">
+    <meta property="article:published_time" content="2026-07-10T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Reacting to Jira Webhooks in Scripts">
+    <meta name="twitter:description" content="React to Jira webhooks in scripts: parse the payload, run a tiny listener, and call atlassian-cli to transition, assign, or update issues automatically.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/jira-webhooks-automation.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Breadcrumb -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Reacting to Jira Webhooks in Scripts", "item": "https://atlassiancli.com/blog/jira-webhooks-automation.html"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Reacting to Jira Webhooks in Scripts",
+      "description": "React to Jira webhooks in scripts: parse the payload, run a tiny listener, and call atlassian-cli to transition, assign, or update issues automatically.",
+      "datePublished": "2026-07-10T00:00:00Z",
+      "dateModified": "2026-07-10T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/jira-webhooks-automation.html"
+      },
+      "url": "https://atlassiancli.com/blog/jira-webhooks-automation.html",
+      "inLanguage": "en-US",
+      "keywords": "jira webhooks, jira webhook payload, jira webhook listener, jira webhook automation, react to jira events"
+    }
+    </script>
+
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I trigger a script when a Jira issue changes?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Register a Jira webhook that points at a URL you control, then run a small HTTP listener at that URL. Jira Cloud POSTs a JSON payload to your endpoint on each matching event. Your listener parses the payload, pulls out the issue key and event type, and shells out to atlassian-cli to take action, for example atlassian-cli jira issue transition or atlassian-cli jira issue assign."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What does a Jira webhook payload look like?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A Jira issue webhook payload is a JSON object with a webhookEvent field (such as jira:issue_created or jira:issue_updated), a user object for whoever triggered it, and an issue object containing the key and fields. Update events also include a changelog object listing which fields changed, with fromString and toString values."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I stop a Jira webhook from causing an infinite loop?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A loop happens when your listener reacts to an update event by writing back to the same issue, which fires another update event. Guard against it two ways: ignore events triggered by your automation account by checking user.accountId in the payload, and make your action idempotent so re-processing the same state changes nothing. Both together keep the reaction from feeding itself."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I secure a Jira webhook without HMAC signing?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Admin-registered Jira Cloud webhooks do not HMAC-sign their requests, so the pragmatic guard is a shared secret embedded in the webhook URL as a query parameter. Your listener rejects any request whose token does not match, using a constant-time comparison. Terminate TLS at your endpoint and optionally restrict inbound traffic to Atlassian source ranges for defense in depth."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment {
+            color: var(--text-muted);
+        }
+
+        .article-body pre .string {
+            color: var(--accent-cyan);
+        }
+
+        /* Comparison table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0 2rem;
+            font-size: 0.9rem;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .comparison-table th {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .comparison-table td:first-child {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .comparison-table code {
+            font-size: 0.8em;
+        }
+
+        /* FAQ section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .faq-item h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .faq-item p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* Article CTA */
+        .article-cta {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+
+        .article-cta h3 {
+            font-size: 1.25rem;
+            margin: 0 0 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .article-cta p {
+            margin: 0 0 1.25rem;
+            color: var(--text-secondary);
+        }
+
+        .article-cta .nav-btn {
+            display: inline-block;
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1rem 4rem;
+            }
+
+            .article-body h2 {
+                font-size: 1.25rem;
+            }
+
+            .toc {
+                padding: 1.25rem;
+            }
+
+            .related-links {
+                grid-template-columns: 1fr;
+            }
+
+            .comparison-table {
+                font-size: 0.8rem;
+            }
+
+            .comparison-table th,
+            .comparison-table td {
+                padding: 0.5rem 0.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="article-meta">
+                <span class="article-meta-item">July 10, 2026</span>
+                <span class="article-meta-item">~8 min read</span>
+                <span class="article-keyword">jira webhooks</span>
+            </div>
+            <h1 class="article-title">Reacting to Jira Webhooks in Scripts</h1>
+            <p class="article-subtitle">Read the payload, run a small listener, and call atlassian-cli to transition, assign, or update issues the moment something changes.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#what-are">What Are Jira Webhooks?</a></li>
+                <li><a href="#payload">Anatomy of the Payload</a></li>
+                <li><a href="#inspect">Inspect Registered Webhooks</a></li>
+                <li><a href="#listener">A Minimal Listener</a></li>
+                <li><a href="#react">Calling atlassian-cli in Response</a></li>
+                <li><a href="#loops">Guarding Against Loops</a></li>
+                <li><a href="#secure">Securing the Endpoint</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- Section 1 -->
+        <h2 id="what-are">What Are Jira Webhooks?</h2>
+
+        <p><strong>Jira webhooks</strong> are outbound HTTP callbacks: when something happens in your Jira project (an issue is created, transitioned, commented on, or deleted), Jira Cloud sends an HTTP POST with a JSON body to a URL you register. To react to one in a script you need three things: a webhook pointed at a URL you control, a small listener running at that URL, and a command to run when the payload arrives. This post wires all three together and uses <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a> as the "do something" step, so a status change in Jira can automatically assign, transition, or update the affected issue.</p>
+
+        <p>The mental model is simple. Jira is the event source. Your listener is a translator that turns raw JSON into a decision. atlassian-cli is the actuator that carries the decision back into Jira (or into Confluence, Bitbucket, or JSM). Because the actuator is a plain command-line binary, the whole reaction fits in a few lines of Bash or Python with no SDK, no framework, and no build step.</p>
+
+        <p><strong>How this differs from Atlassian's own tooling:</strong> atlassian-cli is an independent, community open-source project. It is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/">acli</a>) and is not affiliated with, endorsed by, or sponsored by Atlassian. Use the official <code>acli</code> for first-party vendor support; use atlassian-cli if you want a single free Rust binary spanning Jira, Confluence, Bitbucket, and JSM that you can drop into a webhook handler.</p>
+
+        <!-- Section 2 -->
+        <h2 id="payload">Anatomy of the Payload</h2>
+
+        <p>Before you can react to anything you need to know what Jira sends. An issue webhook payload is a JSON object. The two fields you will read on almost every event are <code>webhookEvent</code> (what happened) and <code>issue.key</code> (which issue). Update events add a <code>changelog</code> that tells you exactly which fields moved and from what to what.</p>
+
+        <pre><code><span class="comment">// jira:issue_updated payload (trimmed to the useful parts)</span>
+{
+  <span class="string">"timestamp"</span>: 1752105600000,
+  <span class="string">"webhookEvent"</span>: <span class="string">"jira:issue_updated"</span>,
+  <span class="string">"issue_event_type_name"</span>: <span class="string">"issue_generic"</span>,
+  <span class="string">"user"</span>: {
+    <span class="string">"accountId"</span>: <span class="string">"5f8a1b2c3d4e"</span>,
+    <span class="string">"displayName"</span>: <span class="string">"Dana Ops"</span>
+  },
+  <span class="string">"issue"</span>: {
+    <span class="string">"key"</span>: <span class="string">"DEV-482"</span>,
+    <span class="string">"fields"</span>: {
+      <span class="string">"summary"</span>: <span class="string">"Payment retry fails on timeout"</span>,
+      <span class="string">"status"</span>:   { <span class="string">"name"</span>: <span class="string">"Done"</span> },
+      <span class="string">"priority"</span>: { <span class="string">"name"</span>: <span class="string">"High"</span> },
+      <span class="string">"assignee"</span>: null
+    }
+  },
+  <span class="string">"changelog"</span>: {
+    <span class="string">"items"</span>: [
+      { <span class="string">"field"</span>: <span class="string">"status"</span>, <span class="string">"fromString"</span>: <span class="string">"In Review"</span>, <span class="string">"toString"</span>: <span class="string">"Done"</span> }
+    ]
+  }
+}</code></pre>
+
+        <p>The common event names are worth memorizing because your listener will branch on them:</p>
+
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>webhookEvent</th>
+                    <th>Fires when</th>
+                    <th>Has changelog?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>jira:issue_created</code></td>
+                    <td>A new issue is created</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td><code>jira:issue_updated</code></td>
+                    <td>A field changes (status, assignee, priority, ...)</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td><code>jira:issue_deleted</code></td>
+                    <td>An issue is deleted</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td><code>comment_created</code></td>
+                    <td>A comment is added to an issue</td>
+                    <td>No</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>Because the payload is ordinary JSON, you can parse it with <code>jq</code> in a shell script or with the standard library in any language. There is nothing Jira-specific about reading it.</p>
+
+        <!-- Section 3 -->
+        <h2 id="inspect">Inspect Registered Webhooks</h2>
+
+        <p>You register the webhook itself in Jira's admin settings (System &rarr; WebHooks), where you set the target URL and the events it should fire on. Once it exists, atlassian-cli can list the registered webhooks so you can confirm the URL and event scope from the terminal instead of clicking through the admin UI:</p>
+
+        <pre><code><span class="comment"># List webhooks registered on this Jira instance</span>
+atlassian-cli jira webhooks list
+
+<span class="comment"># Machine-readable output for auditing or diffing</span>
+atlassian-cli jira webhooks list --format json | jq <span class="string">'.[] | {name, url, events}'</span></code></pre>
+
+        <p>This is handy in review: before you trust a listener in production, dump the webhook list to JSON and check that the URL, the events, and any JQL filter are exactly what you expect. If you also drive Jira automation rules, <code>atlassian-cli jira automation list</code> shows those alongside, and <code>atlassian-cli jira audit list --from 2025-01-01 --limit 100</code> lets you cross-check that the changes your listener made actually landed. See the full <a href="/docs/commands.html">command reference</a> for every flag.</p>
+
+        <!-- Section 4 -->
+        <h2 id="listener">A Minimal Listener</h2>
+
+        <p>You do not need a web framework to receive a webhook. Python's standard library ships an HTTP server that is more than enough for a single endpoint. The listener below reads the POST body, parses it, extracts the event and issue key, and delegates the actual decision to a handler function.</p>
+
+        <pre><code><span class="comment">#!/usr/bin/env python3</span>
+<span class="comment"># jira_hook.py -- a minimal Jira webhook listener (stdlib only)</span>
+import json, os, subprocess, hmac
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+SECRET = os.environ[<span class="string">"HOOK_SECRET"</span>]  <span class="comment"># shared token set on the webhook URL</span>
+
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        <span class="comment"># 1. Reject anything without the correct shared token</span>
+        token = self.path.split(<span class="string">"token="</span>)[-1]
+        if not hmac.compare_digest(token, SECRET):
+            self.send_response(403); self.end_headers(); return
+
+        <span class="comment"># 2. Read and parse the JSON body</span>
+        length = int(self.headers.get(<span class="string">"Content-Length"</span>, 0))
+        payload = json.loads(self.rfile.read(length))
+
+        <span class="comment"># 3. Acknowledge fast, then act</span>
+        self.send_response(200); self.end_headers()
+        handle_event(payload)
+
+def handle_event(payload):
+    event = payload.get(<span class="string">"webhookEvent"</span>)
+    key = payload.get(<span class="string">"issue"</span>, {}).get(<span class="string">"key"</span>)
+    if not key:
+        return
+    if event == <span class="string">"jira:issue_created"</span>:
+        on_created(key, payload)
+    elif event == <span class="string">"jira:issue_updated"</span>:
+        on_updated(key, payload)
+
+if __name__ == <span class="string">"__main__"</span>:
+    HTTPServer((<span class="string">"0.0.0.0"</span>, 8000), Handler).serve_forever()</code></pre>
+
+        <p>Two design choices matter here. First, the listener <strong>acknowledges the request before doing work</strong> by sending the 200 response, then calling the handler. Jira expects a prompt response and may retry if you are slow; for anything heavier than a couple of commands you would push the payload onto a queue and return immediately. Second, the token check uses <code>hmac.compare_digest</code> for a constant-time comparison, which we come back to in the security section.</p>
+
+        <!-- Section 5 -->
+        <h2 id="react">Calling atlassian-cli in Response</h2>
+
+        <p>Now the interesting part: the handler functions that turn an event into a Jira action. These shell out to atlassian-cli. Every command below is a real subcommand, so you can copy them straight into your handler.</p>
+
+        <p><strong>Auto-triage new high-priority issues.</strong> When an issue is created at High or Highest priority, assign it to the triage lead so it never sits unowned:</p>
+
+        <pre><code>def on_created(key, payload):
+    priority = (payload[<span class="string">"issue"</span>][<span class="string">"fields"</span>]
+                       .get(<span class="string">"priority"</span>) or {}).get(<span class="string">"name"</span>, <span class="string">""</span>)
+    if priority in (<span class="string">"Highest"</span>, <span class="string">"High"</span>):
+        subprocess.run([
+            <span class="string">"atlassian-cli"</span>, <span class="string">"jira"</span>, <span class="string">"issue"</span>, <span class="string">"assign"</span>, key,
+            <span class="string">"--assignee"</span>, <span class="string">"triage-lead@example.com"</span>,
+        ], check=True)</code></pre>
+
+        <p><strong>Close issues once review is done.</strong> When a status transition to "Done" arrives, move the issue on to "Closed" automatically:</p>
+
+        <pre><code>def on_updated(key, payload):
+    changes = payload.get(<span class="string">"changelog"</span>, {}).get(<span class="string">"items"</span>, [])
+    moved_to_done = any(
+        c[<span class="string">"field"</span>] == <span class="string">"status"</span> and c[<span class="string">"toString"</span>] == <span class="string">"Done"</span>
+        for c in changes
+    )
+    if moved_to_done:
+        subprocess.run([
+            <span class="string">"atlassian-cli"</span>, <span class="string">"jira"</span>, <span class="string">"issue"</span>, <span class="string">"transition"</span>, key,
+            <span class="string">"--transition"</span>, <span class="string">"Closed"</span>, <span class="string">"--profile"</span>, <span class="string">"prod"</span>,
+        ], check=True)</code></pre>
+
+        <p>Prefer pure shell? The same reaction works with <code>jq</code> reading the payload from stdin. This is the entire logic of a Bash listener body:</p>
+
+        <pre><code><span class="comment"># react.sh -- reads a webhook payload on stdin and acts</span>
+payload="$(cat)"
+event="$(echo "$payload" | jq -r <span class="string">'.webhookEvent'</span>)"
+key="$(echo "$payload"   | jq -r <span class="string">'.issue.key'</span>)"
+
+if [ "$event" = <span class="string">"jira:issue_updated"</span> ]; then
+  status="$(echo "$payload" | jq -r <span class="string">'.issue.fields.status.name'</span>)"
+  if [ "$status" = <span class="string">"Done"</span> ]; then
+    atlassian-cli jira issue transition "$key" --transition <span class="string">"Closed"</span>
+  fi
+fi</code></pre>
+
+        <p>Notice you are never limited to Jira. Because the same binary spans products, a Jira event can drive a cross-product reaction: a released issue could trigger <code>atlassian-cli confluence page create</code> for release notes, or a merge event could feed back into Jira. That is the whole appeal of an actuator that speaks every API. For a broader look at rule-based flows, see the <a href="/blog/jira-automation-guide.html">Jira automation guide</a>.</p>
+
+        <!-- Section 6 -->
+        <h2 id="loops">Guarding Against Loops</h2>
+
+        <p>The single most common mistake with webhook reactions is the feedback loop. Your listener reacts to <code>jira:issue_updated</code> by writing back to the same issue with atlassian-cli. That write is itself a change, so Jira fires another <code>jira:issue_updated</code>, which your listener reacts to again. Left unguarded, one human edit can spiral into an endless chain of API calls.</p>
+
+        <p>Two guards, used together, stop this cold:</p>
+
+        <ol>
+            <li><strong>Ignore your own account.</strong> The token you authenticate atlassian-cli with belongs to an account with its own <code>accountId</code>. Every payload includes <code>user.accountId</code> for whoever triggered the event. If that ID is your automation account, return early and do nothing. Your bot never reacts to itself.</li>
+            <li><strong>Make actions idempotent.</strong> Check the current state before writing. If the transition to "Closed" only runs when the status actually changed <em>to</em> "Done" this event (which you read from the <code>changelog</code>), re-processing a stale duplicate delivery changes nothing.</li>
+        </ol>
+
+        <pre><code>BOT_ACCOUNT = <span class="string">"5f8a1b2c3d4e"</span>  <span class="comment"># the account atlassian-cli authenticates as</span>
+
+def handle_event(payload):
+    <span class="comment"># Guard 1: never react to changes our own bot made</span>
+    if payload.get(<span class="string">"user"</span>, {}).get(<span class="string">"accountId"</span>) == BOT_ACCOUNT:
+        return
+    ...</code></pre>
+
+        <p>Jira may also deliver the same event more than once, so idempotency is not optional even without loops. Reading the <code>changelog</code> to confirm the specific transition happened this event, rather than reacting to whatever the current status is, gives you both loop protection and duplicate protection in one check.</p>
+
+        <!-- Section 7 -->
+        <h2 id="secure">Securing the Endpoint</h2>
+
+        <p>Your listener is a public URL that runs commands. Treat it accordingly. Admin-registered Jira Cloud webhooks do not HMAC-sign their requests the way some other systems do, so the pragmatic approach is a shared secret baked into the webhook URL as a query parameter, for example <code>https://hooks.example.com/jira?token=LONG_RANDOM_STRING</code>. Your listener rejects any request whose token does not match, and it compares with a constant-time function so the check cannot be timed.</p>
+
+        <p>Layer these practices on top:</p>
+
+        <ul>
+            <li><strong>TLS only.</strong> Terminate HTTPS at your endpoint or reverse proxy so the token is never sent in the clear.</li>
+            <li><strong>Least-privilege token.</strong> Authenticate atlassian-cli with a dedicated account and API token that can only touch the projects it needs. Configure it once with <a href="/docs/auth.html">a named profile</a> and reference it via <code>--profile</code>.</li>
+            <li><strong>Validate before acting.</strong> Confirm the payload has the fields you expect before shelling out. A malformed body should be a no-op, not a crash.</li>
+            <li><strong>Network allow-listing.</strong> For defense in depth, restrict inbound traffic to Atlassian's published source ranges at your firewall or proxy.</li>
+        </ul>
+
+        <p>The secret in the URL is not a substitute for TLS or network controls; it is the layer that answers "did this request really come from my Jira?" while the others limit blast radius if something slips through. Running the listener in CI or a container? The same command patterns apply, and the companion post on <a href="/blog/jira-cli-in-github-actions.html">running the Jira CLI in GitHub Actions</a> covers token handling in that setting.</p>
+
+        <!-- CTA -->
+        <div class="article-cta">
+            <h3>Turn Jira events into actions</h3>
+            <p>Install the single Rust binary and wire it into your webhook handler in minutes.</p>
+            <a href="/install/" class="nav-btn">Try atlassian-cli</a>
+        </div>
+
+        <!-- FAQ -->
+        <h2 id="faq">FAQ</h2>
+
+        <div class="faq-item">
+            <h3>How do I trigger a script when a Jira issue changes?</h3>
+            <p>Register a Jira webhook that points at a URL you control, then run a small HTTP listener at that URL. Jira Cloud POSTs a JSON payload to your endpoint on each matching event. Your listener parses the payload, pulls out the issue key and event type, and shells out to atlassian-cli to take action, for example <code>atlassian-cli jira issue transition</code> or <code>atlassian-cli jira issue assign</code>.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>What does a Jira webhook payload look like?</h3>
+            <p>A Jira issue webhook payload is a JSON object with a <code>webhookEvent</code> field (such as <code>jira:issue_created</code> or <code>jira:issue_updated</code>), a <code>user</code> object for whoever triggered it, and an <code>issue</code> object containing the key and fields. Update events also include a <code>changelog</code> object listing which fields changed, with <code>fromString</code> and <code>toString</code> values.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>How do I stop a Jira webhook from causing an infinite loop?</h3>
+            <p>A loop happens when your listener reacts to an update event by writing back to the same issue, which fires another update event. Guard against it two ways: ignore events triggered by your automation account by checking <code>user.accountId</code> in the payload, and make your action idempotent so re-processing the same state changes nothing. Both together keep the reaction from feeding itself.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Can I secure a Jira webhook without HMAC signing?</h3>
+            <p>Admin-registered Jira Cloud webhooks do not HMAC-sign their requests, so the pragmatic guard is a shared secret embedded in the webhook URL as a query parameter. Your listener rejects any request whose token does not match, using a constant-time comparison. Terminate TLS at your endpoint and optionally restrict inbound traffic to Atlassian source ranges for defense in depth.</p>
+        </div>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/jira/" class="related-link">
+                <div class="related-link-title">Jira CLI Reference</div>
+                <div class="related-link-desc">Full command reference for Jira issue search, transition, assign, and webhook listing.</div>
+            </a>
+            <a href="/blog/jira-automation-guide.html" class="related-link">
+                <div class="related-link-title">Jira Automation Guide</div>
+                <div class="related-link-desc">Rule-based and scripted automation patterns for Jira from the command line.</div>
+            </a>
+            <a href="/blog/jira-cli-in-github-actions.html" class="related-link">
+                <div class="related-link-title">Jira CLI in GitHub Actions</div>
+                <div class="related-link-desc">Run atlassian-cli in CI with tokens handled safely, the same patterns a listener needs.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.4.2</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

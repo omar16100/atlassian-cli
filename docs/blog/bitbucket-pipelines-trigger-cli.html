@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitbucket Pipelines CLI: Trigger and Monitor Builds | atlassian-cli Blog</title>
+    <meta name="description" content="Use the bitbucket pipelines cli in atlassian-cli to trigger builds, run custom pipelines, stream logs, and watch runs to completion with real exit codes.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Trigger and Monitor Bitbucket Pipelines from the CLI">
+    <meta property="og:description" content="Use the bitbucket pipelines cli in atlassian-cli to trigger builds, run custom pipelines, stream logs, and watch runs to completion with real exit codes.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/bitbucket-pipelines-trigger-cli.html">
+    <meta property="article:published_time" content="2026-07-10T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Trigger and Monitor Bitbucket Pipelines from the CLI">
+    <meta name="twitter:description" content="Use the bitbucket pipelines cli in atlassian-cli to trigger builds, run custom pipelines, stream logs, and watch runs to completion with real exit codes.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/bitbucket-pipelines-trigger-cli.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Breadcrumb -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "Trigger and Monitor Bitbucket Pipelines from the CLI", "item": "https://atlassiancli.com/blog/bitbucket-pipelines-trigger-cli.html"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Trigger and Monitor Bitbucket Pipelines from the CLI",
+      "description": "Use the bitbucket pipelines cli in atlassian-cli to trigger builds, run custom pipelines, stream logs, and watch runs to completion with real exit codes.",
+      "datePublished": "2026-07-10T00:00:00Z",
+      "dateModified": "2026-07-10T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/bitbucket-pipelines-trigger-cli.html"
+      },
+      "url": "https://atlassiancli.com/blog/bitbucket-pipelines-trigger-cli.html",
+      "inLanguage": "en-US",
+      "keywords": "bitbucket pipelines cli, trigger bitbucket pipeline, bitbucket custom pipeline cli, bitbucket pipeline logs, watch bitbucket pipeline"
+    }
+    </script>
+
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I trigger a Bitbucket pipeline from the command line?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Run atlassian-cli bitbucket pipeline trigger --ref-name main. The --ref-name flag is required and names the branch (or tag, with --ref-type tag) to build. Pass --workspace and --repo if you are not inside a cloned Bitbucket repo, otherwise both are auto-detected from your git remote and profile. The command returns the new build number so you can watch or fetch logs for it."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I run a custom pipeline instead of the default branch pipeline?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Add --custom-pipeline <name> where the name matches a selector under the custom: section of your bitbucket-pipelines.yml. For example, atlassian-cli bitbucket pipeline trigger --ref-name main --custom-pipeline s3-access-test runs that named pipeline against the main ref. You can also inject variables for the run with repeated --var KEY=VALUE flags, and mark them all secret with --secured."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I watch a Bitbucket pipeline and fail my script if the build fails?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Use atlassian-cli bitbucket pipeline watch to poll a run until it reaches a terminal state, or pipeline status --wait for a script-friendly JSON output. Both map the final state to an exit code: 0 for a successful or completed run, 1 for failed, error, stopped, or expired, and 2 for still in progress or timed out. Because the exit code is meaningful, a plain shell if-check or set -e is enough to fail your script when the build fails."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I read Bitbucket pipeline logs in the terminal?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. atlassian-cli bitbucket pipeline logs prints the step logs for a run without opening a browser. Pass a build number to target a specific run, use --failed-only to skip the passing steps, --step to match a step by name, and --grep <pattern> (with -i for case-insensitive) to filter log lines. That makes it practical to pull just the error lines out of a long build."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment {
+            color: var(--text-muted);
+        }
+
+        .article-body pre .string {
+            color: var(--accent-cyan);
+        }
+
+        /* Comparison table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1.5rem 0 2rem;
+            font-size: 0.9rem;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .comparison-table th {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .comparison-table td code {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* CTA */
+        .article-cta {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            margin: 3rem 0;
+        }
+
+        .article-cta h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-cta p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            max-width: 480px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-cta .btn-primary {
+            display: inline-block;
+            background: var(--accent-cyan);
+            color: #001b16;
+            font-weight: 600;
+            padding: 0.75rem 1.75rem;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+
+        .article-cta .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        /* FAQ section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .faq-item h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .faq-item p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1rem 4rem;
+            }
+
+            .article-body h2 {
+                font-size: 1.25rem;
+            }
+
+            .toc {
+                padding: 1.25rem;
+            }
+
+            .comparison-table {
+                font-size: 0.8rem;
+            }
+
+            .comparison-table th,
+            .comparison-table td {
+                padding: 0.6rem 0.6rem;
+            }
+
+            .related-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="article-meta">
+                <span class="article-meta-item">July 10, 2026</span>
+                <span class="article-meta-item">~7 min read</span>
+                <span class="article-meta-item">atlassian-cli team</span>
+                <span class="article-keyword">bitbucket pipelines cli</span>
+            </div>
+            <h1 class="article-title">Trigger and Monitor Bitbucket Pipelines from the CLI</h1>
+            <p class="article-subtitle">Start builds, run custom pipelines, stream logs, and watch runs to completion without leaving the terminal or opening the Bitbucket web UI.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#how-it-works">How the Bitbucket Pipelines CLI Works</a></li>
+                <li><a href="#trigger">Trigger a Pipeline</a></li>
+                <li><a href="#custom">Run a Custom Pipeline</a></li>
+                <li><a href="#watch">Watch a Run Until It Finishes</a></li>
+                <li><a href="#logs">Stream and Filter Logs</a></li>
+                <li><a href="#status">Status and Exit Codes for CI</a></li>
+                <li><a href="#inspect">Inspect and Re-run Failed Builds</a></li>
+                <li><a href="#reference">Command Reference</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- Intro -->
+        <p>To trigger and monitor Bitbucket Pipelines from the command line, use the <strong>bitbucket pipelines cli</strong> built into <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a>: run <code>atlassian-cli bitbucket pipeline trigger --ref-name main</code> to start a build, then <code>pipeline watch</code> or <code>pipeline status --wait</code> to follow it to completion. No dashboard, no manual clicking, no polling a browser tab.</p>
+
+        <p>This post focuses on the operator's workflow: kicking off runs (including named custom pipelines from <code>bitbucket-pipelines.yml</code>), reading logs in your terminal, and wiring the results into scripts through real process exit codes. Every command below is copy-pasteable and matches the actual subcommands the binary ships.</p>
+
+        <p><strong>How this differs from acli:</strong> atlassian-cli is an independent, community, MIT-licensed open-source project. It is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>) and is not affiliated with Atlassian. Use the official <code>acli</code> if you want first-party vendor support; use atlassian-cli if you want a single free Rust binary that spans Jira, Confluence, Bitbucket, and Jira Service Management with pipeline control included.</p>
+
+        <!-- Section 1 -->
+        <h2 id="how-it-works">How the Bitbucket Pipelines CLI Works</h2>
+
+        <p>Pipeline commands live under <code>atlassian-cli bitbucket pipeline</code> (the shorter <code>bb</code> alias works everywhere too). Each command needs to know two things: the <strong>workspace</strong> and the <strong>repository</strong>. You can pass them explicitly:</p>
+
+        <pre><code><span class="comment"># Explicit workspace and repo</span>
+atlassian-cli bitbucket --workspace myteam --repo api-service \
+  pipeline list</code></pre>
+
+        <p>Or you can skip both. When you run inside a cloned repository, <code>--repo</code> is auto-detected from the git remote and the workspace resolves from your configured profile. So from a project directory the same command collapses to:</p>
+
+        <pre><code><span class="comment"># Inside a cloned Bitbucket repo, both are inferred</span>
+cd api-service
+atlassian-cli bb pipeline list --recent 5</code></pre>
+
+        <p>Before any of this works you need to be authenticated. If you have not set up a profile yet, run <code>atlassian-cli auth login</code> once and follow the <a href="/docs/auth.html">authentication guide</a>. The examples below use the explicit <code>--workspace</code>/<code>--repo</code> form so they are unambiguous, but you can drop those flags whenever you are inside the repo.</p>
+
+        <!-- Section 2 -->
+        <h2 id="trigger">Trigger a Pipeline</h2>
+
+        <p>The core command is <code>pipeline trigger</code>. The only required flag is <code>--ref-name</code>, which names the branch or tag to build:</p>
+
+        <pre><code><span class="comment"># Run the default branch pipeline on main</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline trigger --ref-name main</code></pre>
+
+        <p>By default the ref is treated as a branch. To build a tag instead, add <code>--ref-type tag</code>:</p>
+
+        <pre><code><span class="comment"># Build a release tag</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline trigger --ref-name v1.4.0 --ref-type tag</code></pre>
+
+        <p>You can inject variables into the run with repeated <code>--var KEY=VALUE</code> flags. These behave like the variables you would normally set in the Bitbucket UI, but they are scoped to this single run. Add <code>--secured</code> to mark all of them as secret so they are masked in the logs:</p>
+
+        <pre><code><span class="comment"># Pass build-time variables into a single run</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline trigger --ref-name main \
+  --var DEPLOY_ENV=staging \
+  --var RELEASE_NOTES=<span class="string">"hotfix 1.4.1"</span></code></pre>
+
+        <p>Every trigger returns the new build number. That number (or the pipeline UUID) is the handle you pass to <code>watch</code>, <code>logs</code>, <code>get</code>, and <code>stop</code>.</p>
+
+        <!-- Section 3 -->
+        <h2 id="custom">Run a Custom Pipeline</h2>
+
+        <p>Bitbucket lets you define named pipelines under the <code>custom:</code> section of <code>bitbucket-pipelines.yml</code> that never run automatically on a push. They exist to be invoked on demand: a nightly integration suite, a one-off data migration, a manual deploy gate. The <code>--custom-pipeline</code> flag runs exactly one of them by name.</p>
+
+        <pre><code><span class="comment"># bitbucket-pipelines.yml</span>
+<span class="comment"># pipelines:</span>
+<span class="comment">#   custom:</span>
+<span class="comment">#     s3-access-test:</span>
+<span class="comment">#       - step:</span>
+<span class="comment">#           script:</span>
+<span class="comment">#             - ./scripts/check-s3.sh</span>
+
+<span class="comment"># Trigger that custom pipeline against main</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline trigger --ref-name main \
+  --custom-pipeline s3-access-test</code></pre>
+
+        <p>The selector name after <code>--custom-pipeline</code> must match a key under <code>custom:</code> exactly. You can combine it with <code>--var</code> and <code>--secured</code> in the same way as a normal trigger, which is how you parameterize a manual deploy without editing the YAML:</p>
+
+        <pre><code><span class="comment"># Manual deploy pipeline, parameterized per run</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline trigger --ref-name main \
+  --custom-pipeline deploy \
+  --var TARGET=production --secured</code></pre>
+
+        <!-- Section 4 -->
+        <h2 id="watch">Watch a Run Until It Finishes</h2>
+
+        <p>Triggering a build is only half the job. <code>pipeline watch</code> polls a run and prints its state until it reaches a terminal result, then exits. With no argument it follows the most recent pipeline; pass a build number to follow a specific one.</p>
+
+        <pre><code><span class="comment"># Watch the latest run, refreshing every 10 seconds, with per-step status</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline watch --interval 10 --steps</code></pre>
+
+        <p>The poll interval defaults to 5 seconds. A few flags make <code>watch</code> useful in unattended contexts:</p>
+
+        <ul>
+            <li><code>--timeout &lt;seconds&gt;</code> caps how long you will wait. If the run has not finished in time, the command exits with code 2 so you can treat a hung build as a failure.</li>
+            <li><code>--on-complete &lt;command&gt;</code> runs a shell command the moment the pipeline finishes. It receives the environment variables <code>PIPELINE_STATUS</code>, <code>PIPELINE_BUILD_NUMBER</code>, <code>PIPELINE_UUID</code>, and <code>PIPELINE_REF_NAME</code>.</li>
+            <li><code>--log</code> switches to one line per poll with no ANSI escape codes, which is what you want when the output is captured to a file. It is enabled automatically when stdout is not a terminal.</li>
+        </ul>
+
+        <pre><code><span class="comment"># Watch build 412, notify on completion, give up after 30 minutes</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline watch 412 \
+  --timeout 1800 \
+  --on-complete <span class="string">'echo "Build #$PIPELINE_BUILD_NUMBER finished: $PIPELINE_STATUS"'</span></code></pre>
+
+        <p>Because <code>--on-complete</code> gets the status and build number as environment variables, it is a natural hook for a Slack message, a desktop notification, or triggering a downstream step.</p>
+
+        <!-- Section 5 -->
+        <h2 id="logs">Stream and Filter Logs</h2>
+
+        <p>When a build breaks you want the log, not a browser tab. <code>pipeline logs</code> prints the step output for a run directly in your terminal. With no positional argument it targets the latest pipeline; pass a build number to pick one.</p>
+
+        <pre><code><span class="comment"># Print logs for the latest run</span>
+atlassian-cli bb --workspace myteam --repo api-service pipeline logs
+
+<span class="comment"># Logs for a specific build</span>
+atlassian-cli bb --workspace myteam --repo api-service pipeline logs 412</code></pre>
+
+        <p>Full logs from a multi-step build get long fast, so there are flags to narrow them down. <code>--failed-only</code> skips the steps that passed, <code>--step</code> matches a step by name, and <code>--grep</code> filters individual log lines (add <code>-i</code> for case-insensitive matching):</p>
+
+        <pre><code><span class="comment"># Only the failed steps of a broken build</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline logs 412 --failed-only
+
+<span class="comment"># Just the error lines, case-insensitive</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline logs 412 --grep <span class="string">"error"</span> -i
+
+<span class="comment"># Logs from a single named step</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline logs 412 --step <span class="string">"Run tests"</span></code></pre>
+
+        <p>Combining <code>--failed-only</code> with <code>--grep</code> is the fastest way to answer "why did the last build fail?" without scrolling through a green build's worth of noise first.</p>
+
+        <!-- Section 6 -->
+        <h2 id="status">Status and Exit Codes for CI</h2>
+
+        <p>The reason the pipeline commands are scriptable is that they map pipeline state onto meaningful process exit codes. <code>pipeline status</code> prints the latest run as JSON and exits with a code you can branch on:</p>
+
+        <div style="overflow-x:auto;">
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Exit code</th>
+                    <th>Pipeline state</th>
+                    <th>Meaning</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>0</code></td>
+                    <td>Successful / Completed</td>
+                    <td>The run passed.</td>
+                </tr>
+                <tr>
+                    <td><code>1</code></td>
+                    <td>Failed / Error / Stopped / Expired</td>
+                    <td>The run did not pass.</td>
+                </tr>
+                <tr>
+                    <td><code>2</code></td>
+                    <td>Pending / In progress / Timeout</td>
+                    <td>Not finished yet (or timed out under <code>--wait</code>).</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p>Add <code>--wait</code> to block until the run reaches a terminal state before returning, polling on the <code>--interval</code> you set (default 10 seconds). That gives you a single command that both waits for the build and reports its verdict through <code>$?</code>:</p>
+
+        <pre><code><span class="comment"># Wait for the latest run, then act on the result</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline status --wait --interval 15
+
+if [ $? -eq 0 ]; then
+  echo <span class="string">"Pipeline green, promoting build"</span>
+else
+  echo <span class="string">"Pipeline not green, aborting"</span> &gt;&amp;2
+  exit 1
+fi</code></pre>
+
+        <p>Because the exit code is real, you rarely need the <code>if</code> at all. Under <code>set -e</code>, a non-zero status halts the script on its own. And since <code>status</code> emits JSON, you can also pull specific fields with <code>jq</code> when you need more than the exit code:</p>
+
+        <pre><code><span class="comment"># Extract the build number of the latest run</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline status --format json | jq <span class="string">'.build_number'</span></code></pre>
+
+        <!-- Section 7 -->
+        <h2 id="inspect">Inspect and Re-run Failed Builds</h2>
+
+        <p>Alongside triggering and watching, the CLI covers the inspect-and-retry loop. <code>pipeline list</code> shows recent runs, <code>pipeline latest</code> jumps straight to the newest run on a branch, and <code>pipeline get</code> shows one run in detail. Add <code>--steps</code> to any of them to include per-step status.</p>
+
+        <pre><code><span class="comment"># Five most recent runs with step summaries</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline list --recent 5 --steps
+
+<span class="comment"># Latest run on a specific branch</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline latest --branch main --steps
+
+<span class="comment"># Full detail of one run by build number</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline get 412 --steps</code></pre>
+
+        <p><code>pipeline list</code> also filters by <code>--branch</code>, by time window with <code>--since</code> and <code>--before</code> (accepting values like <code>24h</code>, <code>7d</code>, or an ISO timestamp), and by pull request with <code>--pr</code>. When a flaky run needs another attempt, <code>pipeline rerun</code> re-runs the same commit:</p>
+
+        <pre><code><span class="comment"># Re-run a specific build on the same commit</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline rerun 412
+
+<span class="comment"># Re-run only the failed steps of a PR's latest pipeline</span>
+atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline rerun --pr 128 --failed-only</code></pre>
+
+        <p>And to abort a run that is going nowhere, <code>pipeline stop</code> takes the same build-number or UUID handle:</p>
+
+        <pre><code>atlassian-cli bb --workspace myteam --repo api-service \
+  pipeline stop 412</code></pre>
+
+        <!-- CTA -->
+        <div class="article-cta">
+            <h3>Drive Bitbucket Pipelines from your terminal</h3>
+            <p>atlassian-cli is a single free binary for Jira, Confluence, Bitbucket, and JSM. Install it and trigger your first pipeline in minutes.</p>
+            <a href="/install/" class="btn-primary">Try atlassian-cli</a>
+        </div>
+
+        <!-- Section 8 -->
+        <h2 id="reference">Command Reference</h2>
+
+        <p>The full set of pipeline subcommands and their most useful flags:</p>
+
+        <div style="overflow-x:auto;">
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Command</th>
+                    <th>What it does</th>
+                    <th>Key flags</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>pipeline trigger</code></td>
+                    <td>Start a new run.</td>
+                    <td><code>--ref-name</code>, <code>--ref-type</code>, <code>--custom-pipeline</code>, <code>--var</code>, <code>--secured</code></td>
+                </tr>
+                <tr>
+                    <td><code>pipeline watch</code></td>
+                    <td>Poll a run to completion.</td>
+                    <td><code>--interval</code>, <code>--timeout</code>, <code>--on-complete</code>, <code>--steps</code>, <code>--log</code></td>
+                </tr>
+                <tr>
+                    <td><code>pipeline status</code></td>
+                    <td>Latest run as JSON with smart exit codes.</td>
+                    <td><code>--wait</code>, <code>--interval</code>, <code>--steps</code></td>
+                </tr>
+                <tr>
+                    <td><code>pipeline logs</code></td>
+                    <td>Print step logs in the terminal.</td>
+                    <td><code>--failed-only</code>, <code>--step</code>, <code>--grep</code>, <code>-i</code></td>
+                </tr>
+                <tr>
+                    <td><code>pipeline list</code></td>
+                    <td>List recent runs.</td>
+                    <td><code>--recent</code>, <code>--branch</code>, <code>--since</code>, <code>--pr</code>, <code>--steps</code></td>
+                </tr>
+                <tr>
+                    <td><code>pipeline get</code> / <code>latest</code> / <code>steps</code></td>
+                    <td>Inspect one run in detail.</td>
+                    <td><code>--branch</code>, <code>--steps</code></td>
+                </tr>
+                <tr>
+                    <td><code>pipeline rerun</code></td>
+                    <td>Re-run the same commit.</td>
+                    <td><code>--pr</code>, <code>--failed-only</code>, <code>--var</code></td>
+                </tr>
+                <tr>
+                    <td><code>pipeline stop</code></td>
+                    <td>Stop a running pipeline.</td>
+                    <td>build number / UUID</td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <p>For the complete flag list across every Bitbucket command, see the <a href="/docs/commands.html">commands reference</a>, and for the wider Bitbucket workflow (repos, branches, pull requests, permissions) start at the <a href="/bitbucket/">Bitbucket CLI hub</a>.</p>
+
+        <!-- FAQ -->
+        <h2 id="faq">FAQ</h2>
+
+        <div class="faq-item">
+            <h3>How do I trigger a Bitbucket pipeline from the command line?</h3>
+            <p>Run <code>atlassian-cli bitbucket pipeline trigger --ref-name main</code>. The <code>--ref-name</code> flag is required and names the branch (or tag, with <code>--ref-type tag</code>) to build. Pass <code>--workspace</code> and <code>--repo</code> if you are not inside a cloned Bitbucket repo, otherwise both are auto-detected from your git remote and profile. The command returns the new build number so you can watch or fetch logs for it.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Can I run a custom pipeline instead of the default branch pipeline?</h3>
+            <p>Yes. Add <code>--custom-pipeline &lt;name&gt;</code> where the name matches a selector under the <code>custom:</code> section of your <code>bitbucket-pipelines.yml</code>. For example, <code>atlassian-cli bitbucket pipeline trigger --ref-name main --custom-pipeline s3-access-test</code> runs that named pipeline against the main ref. You can also inject variables for the run with repeated <code>--var KEY=VALUE</code> flags, and mark them all secret with <code>--secured</code>.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>How do I watch a Bitbucket pipeline and fail my script if the build fails?</h3>
+            <p>Use <code>atlassian-cli bitbucket pipeline watch</code> to poll a run until it reaches a terminal state, or <code>pipeline status --wait</code> for a script-friendly JSON output. Both map the final state to an exit code: 0 for a successful or completed run, 1 for failed, error, stopped, or expired, and 2 for still in progress or timed out. Because the exit code is meaningful, a plain shell if-check or <code>set -e</code> is enough to fail your script when the build fails.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Can I read Bitbucket pipeline logs in the terminal?</h3>
+            <p>Yes. <code>atlassian-cli bitbucket pipeline logs</code> prints the step logs for a run without opening a browser. Pass a build number to target a specific run, use <code>--failed-only</code> to skip the passing steps, <code>--step</code> to match a step by name, and <code>--grep &lt;pattern&gt;</code> (with <code>-i</code> for case-insensitive) to filter log lines. That makes it practical to pull just the error lines out of a long build.</p>
+        </div>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/bitbucket/" class="related-link">
+                <div class="related-link-title">Bitbucket CLI Hub</div>
+                <div class="related-link-desc">Repos, branches, pull requests, pipelines, and permissions from one binary.</div>
+            </a>
+            <a href="/blog/bitbucket-cli-guide.html" class="related-link">
+                <div class="related-link-title">Bitbucket CLI Guide</div>
+                <div class="related-link-desc">A broad tour of managing Bitbucket from the command line.</div>
+            </a>
+            <a href="/blog/bitbucket-pr-review-automation.html" class="related-link">
+                <div class="related-link-title">Automate PR Reviews</div>
+                <div class="related-link-desc">Approve, comment on, and merge pull requests from scripts.</div>
+            </a>
+            <a href="/blog/bitbucket-pipelines-to-github-actions.html" class="related-link">
+                <div class="related-link-title">Pipelines vs GitHub Actions</div>
+                <div class="related-link-desc">How Bitbucket Pipelines concepts map onto GitHub Actions.</div>
+            </a>
+            <a href="/runbooks/bitbucket-pr-automation.html" class="related-link">
+                <div class="related-link-title">PR Automation Runbook</div>
+                <div class="related-link-desc">A production-ready script for the pull request lifecycle.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.4.2</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

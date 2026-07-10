@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>One CLI for Jira, Confluence, and Bitbucket | atlassian-cli Blog</title>
+    <meta name="description" content="One CLI for Jira, Confluence, and Bitbucket: install a single Rust binary, set up one config, and write scripts that span all three Atlassian products.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="One CLI for Jira, Confluence, and Bitbucket">
+    <meta property="og:description" content="One CLI for Jira, Confluence, and Bitbucket: install a single Rust binary, set up one config, and write scripts that span all three Atlassian products.">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://atlassiancli.com/blog/one-cli-jira-confluence-bitbucket.html">
+    <meta property="article:published_time" content="2026-07-10T00:00:00Z">
+    <meta property="article:author" content="Omar Shabab">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="One CLI for Jira, Confluence, and Bitbucket">
+    <meta name="twitter:description" content="One CLI for Jira, Confluence, and Bitbucket: a single binary, one config, and scripts that span all three Atlassian products.">
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://atlassiancli.com/blog/one-cli-jira-confluence-bitbucket.html" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SHR43YZK8C"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-SHR43YZK8C');
+    </script>
+
+    <!-- Structured Data: Breadcrumb -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {"@type": "ListItem", "position": 1, "name": "atlassian-cli", "item": "https://atlassiancli.com/"},
+        {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://atlassiancli.com/blog/"},
+        {"@type": "ListItem", "position": 3, "name": "One CLI for Jira, Confluence, and Bitbucket", "item": "https://atlassiancli.com/blog/one-cli-jira-confluence-bitbucket.html"}
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "One CLI for Jira, Confluence, and Bitbucket",
+      "description": "One CLI for Jira, Confluence, and Bitbucket: install a single Rust binary, set up one config, and write scripts that span all three Atlassian products.",
+      "datePublished": "2026-07-10T00:00:00Z",
+      "dateModified": "2026-07-10T00:00:00Z",
+      "author": {
+        "@type": "Person",
+        "name": "Omar Shabab",
+        "url": "https://omarshabab.com"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "atlassian-cli",
+        "url": "https://atlassiancli.com"
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": "https://atlassiancli.com/blog/one-cli-jira-confluence-bitbucket.html"
+      },
+      "url": "https://atlassiancli.com/blog/one-cli-jira-confluence-bitbucket.html",
+      "inLanguage": "en-US",
+      "keywords": "cli for jira confluence bitbucket, atlassian cli, jira confluence bitbucket cli, one cli atlassian, cross-product cli"
+    }
+    </script>
+
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is there a single CLI that works with Jira, Confluence, and Bitbucket?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. atlassian-cli is a single binary that spans Jira, Confluence, Bitbucket, and Jira Service Management. You install one tool, run atlassian-cli jira, atlassian-cli confluence, atlassian-cli bitbucket, or atlassian-cli jsm, and every command shares the same flags, output formats, and config file."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need separate logins for each Atlassian product?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. All four products authenticate through one profile stored in ~/.atlassian-cli/config.yaml. Run atlassian-cli auth login once per site, and the same profile drives Jira, Confluence, Bitbucket, and JSM commands. Add --profile <name> to switch between sites or accounts."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I script across Jira, Confluence, and Bitbucket in one shell script?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Because every product shares one binary and one auth model, a single shell script can merge a Bitbucket pull request, transition a Jira issue, and publish a Confluence page in sequence. Add --format json to any command to pipe structured output into jq or another tool."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is atlassian-cli the same as Atlassian's official acli?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. atlassian-cli is an independent, community, MIT-licensed open-source project. It is not Atlassian's official CLI (acli) and is not affiliated with Atlassian. Use acli for first-party vendor support; use atlassian-cli if you want a single free binary spanning Jira, Confluence, Bitbucket, and JSM."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="../styles.css">
+
+    <style>
+        /* Article layout */
+        .article-header {
+            padding: 8rem 0 3rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .article-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .article-meta-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .article-keyword {
+            display: inline-block;
+            background: rgba(0, 212, 170, 0.08);
+            color: var(--accent-cyan);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+
+        .article-title {
+            font-size: clamp(1.75rem, 5vw, 2.75rem);
+            font-weight: 600;
+            line-height: 1.2;
+            margin-bottom: 1.25rem;
+            letter-spacing: -0.03em;
+            max-width: 780px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .article-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.7;
+        }
+
+        /* Article body */
+        .article-body {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem 6rem;
+        }
+
+        .article-body h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 3rem 0 1rem;
+            letter-spacing: -0.02em;
+            color: var(--text-primary);
+        }
+
+        .article-body h2:first-child {
+            margin-top: 0;
+        }
+
+        .article-body h3 {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 2rem 0 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .article-body p {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 1.25rem;
+        }
+
+        .article-body ul, .article-body ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        .article-body li {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            margin-bottom: 0.375rem;
+        }
+
+        .article-body a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+            border-bottom: 1px solid rgba(0, 212, 170, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .article-body a:hover {
+            border-bottom-color: var(--accent-cyan);
+        }
+
+        .article-body strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .article-body code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+            background: var(--bg-tertiary);
+            padding: 0.15em 0.4em;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+
+        /* Table of Contents */
+        .toc {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .toc-title {
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .toc ol {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            counter-reset: toc-counter;
+        }
+
+        .toc li {
+            counter-increment: toc-counter;
+            margin-bottom: 0.375rem;
+        }
+
+        .toc li::before {
+            content: counter(toc-counter) ".";
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.925rem;
+            transition: color 0.2s;
+            border-bottom: none !important;
+        }
+
+        .toc a:hover {
+            color: var(--accent-cyan);
+        }
+
+        /* Code blocks inside article */
+        .article-body pre {
+            background: var(--bg-terminal);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+        }
+
+        .article-body pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: var(--text-primary);
+            font-size: inherit;
+        }
+
+        .article-body pre .comment {
+            color: var(--text-muted);
+        }
+
+        .article-body pre .string {
+            color: var(--accent-cyan);
+        }
+
+        /* Comparison table */
+        .comparison-table-wrapper {
+            overflow-x: auto;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.825rem;
+            min-width: 680px;
+        }
+
+        .comparison-table thead {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table th {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.775rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .comparison-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tbody tr {
+            background: var(--bg-secondary);
+            transition: background 0.15s;
+        }
+
+        .comparison-table tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .comparison-table .tool-name {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        /* FAQ section */
+        .faq-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: var(--bg-secondary);
+        }
+
+        .faq-item h3 {
+            margin: 0 0 0.75rem;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .faq-item p {
+            margin-bottom: 0;
+            font-size: 0.925rem;
+        }
+
+        /* Article CTA */
+        .article-cta {
+            margin-top: 3rem;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .article-cta h3 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+        }
+
+        .article-cta p {
+            margin-bottom: 1.25rem;
+        }
+
+        .article-cta-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--accent-cyan);
+            color: #000;
+            padding: 0.625rem 1.25rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            border-bottom: none;
+        }
+
+        .article-cta-btn:hover {
+            background: #00e6b8;
+            transform: translateY(-1px);
+            border-bottom: none;
+        }
+
+        /* Related resources */
+        .related-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .related-link {
+            display: block;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+        }
+
+        .related-link:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .related-link-title {
+            font-size: 0.925rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .related-link-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .article-header {
+                padding: 6rem 0 2rem;
+            }
+
+            .article-body {
+                padding: 2rem 1rem 4rem;
+            }
+
+            .article-body h2 {
+                font-size: 1.25rem;
+            }
+
+            .toc {
+                padding: 1.25rem;
+            }
+
+            .related-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <img src="../assets/logo.svg" alt="atlassian-cli" height="24">
+            </a>
+            <div class="nav-links">
+                <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener" class="nav-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                </a>
+                <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener" class="nav-link">Docs</a>
+                <a href="/blog/" class="nav-link" style="color: var(--text-primary);">Blog</a>
+                <a href="/install/" class="nav-btn">Install</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Header -->
+    <header class="article-header">
+        <div class="container">
+            <div class="article-meta">
+                <span class="article-meta-item">July 10, 2026</span>
+                <span class="article-meta-item">~7 min read</span>
+                <span class="article-meta-item">Omar Shabab</span>
+                <span class="article-keyword">cli for jira confluence bitbucket</span>
+            </div>
+            <h1 class="article-title">One CLI for Jira, Confluence, and Bitbucket</h1>
+            <p class="article-subtitle">One binary, one config file, one auth model. Stop juggling three separate tools and script your whole Atlassian workflow from a single command line.</p>
+        </div>
+    </header>
+
+    <!-- Article Body -->
+    <article class="article-body">
+
+        
+        <p class="affiliation-note" style="font-size:0.8rem;color:var(--text-muted);background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.9rem;margin-bottom:1.5rem;">atlassian-cli is an independent, community open-source project, not affiliated with, endorsed by, or sponsored by Atlassian, and is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>). Product names are used only to identify compatibility.</p>
+<!-- Table of Contents -->
+        <nav class="toc">
+            <div class="toc-title">Contents</div>
+            <ol>
+                <li><a href="#why-one">Why one CLI for Jira, Confluence, and Bitbucket?</a></li>
+                <li><a href="#one-config">One install, one config, one auth profile</a></li>
+                <li><a href="#not-acli">How this differs from Atlassian's acli</a></li>
+                <li><a href="#coverage">What one binary covers</a></li>
+                <li><a href="#cross-script">A script that spans all three products</a></li>
+                <li><a href="#one-format">One output format for every product</a></li>
+                <li><a href="#ci">Wiring it into CI</a></li>
+                <li><a href="#faq">FAQ</a></li>
+            </ol>
+        </nav>
+
+        <!-- Section 1 -->
+        <h2 id="why-one">Why one CLI for Jira, Confluence, and Bitbucket?</h2>
+
+        <p>If you want a single <strong>CLI for Jira, Confluence, and Bitbucket</strong>, the short answer is <a href="https://github.com/omar16100/atlassian-cli">atlassian-cli</a>: one binary that talks to all of them, plus Jira Service Management, using the same flags and the same config file. You install one tool, authenticate once per site, and every product becomes a subcommand.</p>
+
+        <p>Most teams end up with a drawer full of half-scripts. A Python snippet hits the Jira REST API. A separate curl loop pushes pages to Confluence. Bitbucket gets its own token and its own wrapper. Each one has different auth, different pagination, and different output shapes, so gluing them together means writing adapter code before you write anything useful.</p>
+
+        <p>A single cross-product CLI collapses that. The Jira, Confluence, Bitbucket, and JSM command groups all live under one <code>atlassian-cli</code> entry point. They share global flags like <code>--profile</code> and <code>--format</code>, they read the same credentials, and they emit the same JSON envelope. That means a release script, an audit job, or a nightly cron can move data <em>between</em> products without translation glue.</p>
+
+        <!-- Section 2 -->
+        <h2 id="one-config">One install, one config, one auth profile</h2>
+
+        <p>The whole idea rests on one config file. atlassian-cli stores credentials in <code>~/.atlassian-cli/config.yaml</code>, keyed by named profiles. You log in once for a site, and that single profile authenticates Jira, Confluence, and JSM (which all share an Atlassian Cloud API token), plus Bitbucket.</p>
+
+        <pre><code><span class="comment"># Authenticate once for a site, drives Jira, Confluence, and JSM</span>
+atlassian-cli auth login \
+  --profile work \
+  --base-url https://your-team.atlassian.net \
+  --email you@company.com \
+  --token <span class="string">"$ATLASSIAN_TOKEN"</span> \
+  --default
+
+<span class="comment"># Confirm which profiles exist and which is the default</span>
+atlassian-cli auth list
+atlassian-cli auth status
+atlassian-cli auth whoami --profile work</code></pre>
+
+        <p>From that point on, every product is a subcommand of the same binary, and every command accepts <code>--profile &lt;name&gt;</code> if you need to target a second site or a personal account:</p>
+
+        <pre><code><span class="comment"># Jira</span>
+atlassian-cli jira issue search --jql <span class="string">"project = DEV order by created desc"</span> --limit 5
+
+<span class="comment"># Confluence</span>
+atlassian-cli confluence page list --space DEV --limit 25
+
+<span class="comment"># Bitbucket (bb is an alias for bitbucket)</span>
+atlassian-cli bitbucket --workspace myteam pr list api-service --state OPEN --limit 5
+
+<span class="comment"># Jira Service Management</span>
+atlassian-cli jsm request list --servicedesk-id 10 --limit 25</code></pre>
+
+        <p>A single profile can hold both an Atlassian API token (for Jira, Confluence, and JSM) and a Bitbucket token, so <code>--profile work</code> resolves the right credential for whichever product you call. You can manage them independently when you need to: <code>atlassian-cli auth logout --profile old --bitbucket</code> removes only the Bitbucket token and leaves the rest of the profile intact.</p>
+
+        <p>To switch the default profile later, re-run <code>auth login --default</code> for the profile you want, or edit <code>default_profile:</code> in the config file directly. See the <a href="/docs/auth.html">Authentication &amp; Profiles guide</a> for token setup and multi-site patterns, and if you are weighing token types, the <a href="/blog/atlassian-api-token-vs-pat.html">API token vs PAT comparison</a> explains which one to use where.</p>
+
+        <!-- Section 3 -->
+        <h2 id="not-acli">How this differs from Atlassian's acli</h2>
+
+        <p>atlassian-cli is an independent, community open-source project. It is not Atlassian's official CLI (<a href="https://developer.atlassian.com/cloud/acli/" target="_blank" rel="noopener">acli</a>) and is not affiliated with Atlassian. Use the official <code>acli</code> for first-party vendor support; use atlassian-cli if you want a single free Rust binary spanning Jira, Confluence, Bitbucket, and JSM with one config file and one output format.</p>
+
+        <p>The project is MIT-licensed and distributed as a single self-contained binary, so there is no runtime to install and nothing to keep in sync across machines. That is the practical reason it works well in CI: drop the binary in, point it at a profile, and run.</p>
+
+        <!-- Section 4 -->
+        <h2 id="coverage">What one binary covers</h2>
+
+        <p>Here is the mental model. One executable, four product namespaces, each with its own verbs. Every row below is driven by the same install and the same credentials.</p>
+
+        <div class="comparison-table-wrapper">
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Command group</th>
+                        <th>Example command</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="tool-name">Jira</td>
+                        <td><code>jira issue</code></td>
+                        <td><code>atlassian-cli jira issue transition DEV-123 --transition "Done"</code></td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Confluence</td>
+                        <td><code>confluence page</code></td>
+                        <td><code>atlassian-cli confluence page create --space DEV --title "Notes"</code></td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Bitbucket</td>
+                        <td><code>bitbucket pr</code></td>
+                        <td><code>atlassian-cli bitbucket --workspace myteam pr merge api-service 123</code></td>
+                    </tr>
+                    <tr>
+                        <td class="tool-name">Jira Service Management</td>
+                        <td><code>jsm request</code></td>
+                        <td><code>atlassian-cli jsm request list --servicedesk-id 10</code></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <p>Each namespace goes much deeper than these examples: Jira has search, create, transition, assign, sprints, and <a href="/runbooks/jira-bulk-transition.html">bulk operations</a>; Confluence covers spaces, pages, blog posts, folders, attachments, and CQL search; Bitbucket handles repos, branches, pull requests, pipelines, and permissions. The full list lives in the <a href="/docs/commands.html">command reference</a>, and the <a href="/blog/atlassian-cli-cheat-sheet.html">atlassian-cli cheat sheet</a> is the quickest way to keep the common ones handy.</p>
+
+        <!-- Section 5 -->
+        <h2 id="cross-script">A script that spans all three products</h2>
+
+        <p>This is where a single CLI earns its keep. A typical release touches all three products: you merge a reviewed pull request in Bitbucket, close the linked Jira issue, then publish a release note in Confluence. With three separate tools that is three auth setups and three output formats to reconcile. With one binary it is one script.</p>
+
+        <pre><code><span class="comment">#!/bin/bash</span>
+<span class="comment"># Ship a release: merge the PR, close the Jira issue, publish release notes</span>
+set -euo pipefail
+
+WORKSPACE=<span class="string">"myteam"</span>
+REPO=<span class="string">"api-service"</span>
+PR=123
+ISSUE=<span class="string">"DEV-742"</span>
+SPACE=<span class="string">"DOCS"</span>
+
+<span class="comment"># 1. Merge the reviewed pull request in Bitbucket</span>
+atlassian-cli bitbucket --workspace "$WORKSPACE" pr merge "$REPO" "$PR" \
+  --strategy merge_commit
+
+<span class="comment"># 2. Move the linked Jira issue to Done</span>
+atlassian-cli jira issue transition "$ISSUE" --transition <span class="string">"Done"</span>
+
+<span class="comment"># 3. Publish a release note as a Confluence blog post</span>
+atlassian-cli confluence blog create \
+  --space "$SPACE" \
+  --title <span class="string">"Release: api-service $(date +%Y-%m-%d)"</span> \
+  --body <span class="string">"&lt;p&gt;Merged PR #$PR, closed $ISSUE.&lt;/p&gt;"</span>
+
+echo <span class="string">"Release shipped."</span></code></pre>
+
+        <p>Because it is one tool, there is nothing to translate between steps. The same <code>--profile</code> flag would target a staging site; the same error handling wraps all three calls. You can drop this into a Bitbucket Pipeline or a GitHub Actions job and it runs the same way it does on your laptop.</p>
+
+        <p>The reverse direction works too. Say you run a weekly audit that pulls open bugs from Jira, checks which repos have stale pull requests, and confirms the docs space still exists:</p>
+
+        <pre><code><span class="comment"># Weekly cross-product audit</span>
+atlassian-cli jira issue search \
+  --jql <span class="string">"project = DEV AND type = Bug AND status != Done"</span> \
+  --format json | jq <span class="string">'length'</span>
+
+atlassian-cli bitbucket --workspace myteam pr list api-service \
+  --state OPEN --format json | jq <span class="string">'.[].id'</span>
+
+atlassian-cli confluence search cql \
+  <span class="string">"space = DOCS and type = page"</span> --limit 1</code></pre>
+
+        <!-- Section 6 -->
+        <h2 id="one-format">One output format for every product</h2>
+
+        <p>The other payoff of a single CLI is a single output contract. Every command accepts <code>--format</code> (or <code>-f</code>) with the same choices: <code>table</code>, <code>json</code>, <code>csv</code>, <code>yaml</code>, <code>quiet</code>, and <code>markdown</code>. Learn the flag once and it works the same across Jira, Confluence, Bitbucket, and JSM.</p>
+
+        <pre><code><span class="comment"># Human-readable table (default)</span>
+atlassian-cli jira issue search --jql <span class="string">"project = DEV"</span>
+
+<span class="comment"># JSON for piping into jq, identical shape across products</span>
+atlassian-cli bitbucket --workspace myteam pr list api-service --format json | jq <span class="string">'.[].title'</span>
+
+<span class="comment"># CSV for a spreadsheet</span>
+atlassian-cli jira issue search --jql <span class="string">"project = DEV"</span> --format csv --output issues.csv
+
+<span class="comment"># Quiet, exit code only, useful for CI gating</span>
+atlassian-cli auth test --profile prod --format quiet &amp;&amp; echo OK</code></pre>
+
+        <p>For list output, add <code>--envelope</code> to wrap JSON or YAML in <code>{"data": [...], "count": N}</code>. That gives downstream scripts a stable place to read the count and the rows, no matter which product produced them. When every command speaks the same JSON dialect, chaining them together stops being an integration project and becomes a two-line pipe.</p>
+
+        <p>New to the whole tool? Start with the <a href="/blog/atlassian-cli-guide.html">atlassian-cli guide</a> for the full walkthrough, then keep the <a href="/blog/atlassian-cli-cheat-sheet.html">cheat sheet</a> open while you work.</p>
+
+        <!-- Section 7 -->
+        <h2 id="ci">Wiring it into CI</h2>
+
+        <p>A single binary is easiest to appreciate in automation, where installing three separate tools and managing three sets of secrets is real friction. In a pipeline you do not run <code>auth login</code> interactively; you feed the token in from a secret and log in non-interactively, then gate the rest of the job on a health check.</p>
+
+        <pre><code><span class="comment"># In CI: authenticate from a secret, then verify before doing work</span>
+atlassian-cli auth login \
+  --profile ci \
+  --base-url https://your-team.atlassian.net \
+  --email <span class="string">"$ATLASSIAN_EMAIL"</span> \
+  --token <span class="string">"$ATLASSIAN_TOKEN"</span> \
+  --default
+
+<span class="comment"># Fail fast if credentials are wrong, exit code only, no noise</span>
+atlassian-cli auth test --profile ci --format quiet || exit 1
+
+<span class="comment"># Now any product command runs against the same profile</span>
+atlassian-cli jira issue transition <span class="string">"$ISSUE"</span> --transition <span class="string">"In Review"</span></code></pre>
+
+        <p>The same binary works in a Bitbucket Pipeline, a GitHub Actions job, or a plain cron entry. Because there is no runtime to provision, the install step is a single download, and the credential story is one token (two if you also touch Bitbucket) rather than a different auth flow per product. If something misbehaves, add the global <code>--debug</code> flag to any command to log the underlying HTTP request and response, which is usually enough to see whether a 4xx is an auth problem or a bad JQL query.</p>
+
+        <p>That consistency is the quiet advantage of a cross-product CLI. You are not learning three tools, memorising three flag conventions, or reconciling three output shapes. You learn one set of verbs, one config, and one JSON envelope, and it applies whether you are closing a sprint, backing up a Confluence space, or auditing pull requests across a workspace.</p>
+
+        <!-- CTA -->
+        <div class="article-cta">
+            <h3>Try atlassian-cli</h3>
+            <p>One binary for Jira, Confluence, Bitbucket, and JSM. MIT-licensed, no runtime to install.</p>
+            <a href="/install/" class="article-cta-btn">Install atlassian-cli</a>
+        </div>
+
+        <!-- FAQ -->
+        <h2 id="faq">FAQ</h2>
+
+        <div class="faq-item">
+            <h3>Is there a single CLI that works with Jira, Confluence, and Bitbucket?</h3>
+            <p>Yes. atlassian-cli is a single binary that spans Jira, Confluence, Bitbucket, and Jira Service Management. You install one tool, run <code>atlassian-cli jira</code>, <code>atlassian-cli confluence</code>, <code>atlassian-cli bitbucket</code>, or <code>atlassian-cli jsm</code>, and every command shares the same flags, output formats, and config file.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Do I need separate logins for each Atlassian product?</h3>
+            <p>No. All four products authenticate through one profile stored in <code>~/.atlassian-cli/config.yaml</code>. Run <code>atlassian-cli auth login</code> once per site, and the same profile drives Jira, Confluence, Bitbucket, and JSM commands. Add <code>--profile &lt;name&gt;</code> to switch between sites or accounts.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Can I script across Jira, Confluence, and Bitbucket in one shell script?</h3>
+            <p>Yes. Because every product shares one binary and one auth model, a single shell script can merge a Bitbucket pull request, transition a Jira issue, and publish a Confluence page in sequence. Add <code>--format json</code> to any command to pipe structured output into jq or another tool.</p>
+        </div>
+
+        <div class="faq-item">
+            <h3>Is atlassian-cli the same as Atlassian's official acli?</h3>
+            <p>No. atlassian-cli is an independent, community, MIT-licensed open-source project. It is not Atlassian's official CLI (<code>acli</code>) and is not affiliated with Atlassian. Use <code>acli</code> for first-party vendor support; use atlassian-cli if you want a single free binary spanning Jira, Confluence, Bitbucket, and JSM.</p>
+        </div>
+
+        <!-- Related Resources -->
+        <h2>Related Resources</h2>
+
+        <div class="related-links">
+            <a href="/blog/atlassian-cli-guide.html" class="related-link">
+                <div class="related-link-title">The atlassian-cli Guide</div>
+                <div class="related-link-desc">The full walkthrough: install, authenticate, and use every product from one tool.</div>
+            </a>
+            <a href="/docs/commands.html" class="related-link">
+                <div class="related-link-title">Command Reference</div>
+                <div class="related-link-desc">Every Jira, Confluence, Bitbucket, and JSM command with flags and examples.</div>
+            </a>
+            <a href="/blog/atlassian-cli-cheat-sheet.html" class="related-link">
+                <div class="related-link-title">atlassian-cli Cheat Sheet</div>
+                <div class="related-link-desc">The commands you reach for daily, in one printable page.</div>
+            </a>
+        </div>
+
+    </article>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-left">
+                    <span class="footer-logo">atlassian-cli</span>
+                    <span class="footer-version">v0.4.2</span>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/omar16100/atlassian-cli" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/omar16100/atlassian-cli#readme" target="_blank" rel="noopener">Documentation</a>
+                    <a href="https://github.com/omar16100/atlassian-cli/issues" target="_blank" rel="noopener">Issues</a>
+                    <a href="/blog/">Blog</a>
+                </div>
+                <div class="footer-right">
+                    <span class="footer-license">MIT License</span>
+                </div>
+            </div>
+            <div class="footer-credit">
+                Built by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>
+            </div>
+            <div class="footer-legal">
+                <p>atlassian-cli is an independent open-source project maintained by <a href="https://omarshabab.com" target="_blank" rel="noopener">Omar Shabab</a>. It is not affiliated with, endorsed by, sponsored by, or maintained by Atlassian.</p>
+                <p>Atlassian, Jira, Confluence, Bitbucket, and Jira Service Management are trademarks of Atlassian Pty Ltd or its affiliates. Product names are used only to identify compatibility.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

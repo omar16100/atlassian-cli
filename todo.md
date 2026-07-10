@@ -1,5 +1,45 @@
 # Changes Made
 
+## 2026-07-11 — SEO content expansion: 50 blog posts + 5 priority fixes (data-driven)
+
+### Context
+Live GA4 (520368061) + GSC (sc-domain:atlassiancli.com): ~322 clicks / ~18k impr / 28d (up ~20x from the
+early-2026 baseline of 51 clicks/3mo), avg pos ~8.5, but 0 top-10 rankings and a near-zero backlink profile
+(1 referring domain per DataForSEO). DataForSEO + Reddit research drove a content + fix plan, codex-reviewed twice.
+
+### Research & planning (research/seo/, unpublished)
+- DataForSEO: ranked keywords, Jira/Confluence/Bitbucket/JSM keyword universes, SERP competitors, backlinks, AI/LLM demand.
+- Reddit: 59 threads mined (top pain: "no gh-style Bitbucket CLI"; cross-product CLI; Confluence->markdown export).
+- CONTENT_AND_FIX_PLAN.md + BING_RECOVERY_AND_BACKLINKS.md. Codex reviews in /Users/macmini/projects/codex/.
+
+### 50 new blog posts (docs/blog/*.html)
+- One DISTINCT primary keyword each (dev/CLI/API/automation intent), clustered jira/confluence/bitbucket/jsm/cross,
+  interlinked to hubs/runbooks/siblings. Each: BreadcrumbList+Article+FAQPage JSON-LD, canonical, gtag,
+  verbatim non-affiliation footer + above-the-fold affiliation note, acli-differentiation, ~1400-2000 body words.
+- Adversarial QA gate: 49/50 passed; fixed jsm-integrations-cli (removed non-functional ATLASSIAN_CLI_PROFILE env var).
+- All CLI commands verified vs docs/docs/commands.html. 0 em dashes, 0 broken internal links, all JSON-LD parses.
+
+### 5 priority fixes (codex-reordered; backlinks flagged as #1 lever)
+1. /jira/ made the definitive "Jira CLI" page (query-first title/meta, commands table, FAQ, exact-anchor internal
+   links) to fix the homepage-vs-/jira/ URL-selection issue for "jira cli" (1,900/mo).
+2. jira-cli-tools-compared: CTR title rewrite + removed wrong-intent schema keywords.
+3. Hub depth on /jira/ /confluence/ /bitbucket/ /jsm/ (command tables, FAQ, internal links).
+4. confluence-markdown-sync runbook: markdown-cluster keywords + FAQ + interlinks.
+5. Bing recovery + backlinks documented; README deep links; custom docs/404.html.
+
+### Consolidation & compliance
+- sitemap.xml 32->82 urls (valid), blog/index.html +50 cards, llms.txt updated.
+- Codex implementation review caught + fixed: fabricated Jira hub capabilities, unsupported stats
+  ("300% since 2023", "single most upvoted"), wrong acli product coverage, a bad --output flag / bbpr arg order,
+  and added above-the-fold non-affiliation notices. Removed false "Atlassian Never Shipped" claim.
+
+### Deploy
+- Branch seo/content-expansion-50-blogs -> merge to main (GitHub Pages /docs) -> verify live. (pending)
+
+### Risk noted
+- 50 same-day posts on a ~0-backlink domain carries Google scaled-content risk; mitigated via distinct keywords,
+  genuine content, strict QA. Recommend noindex on later waves as an opt-in follow-up.
+
 ## 2026-06-18 — Jira sprint UX: --sprint flag + sprint in issue get (#72)
 
 ### Context

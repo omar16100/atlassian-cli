@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sync Markdown Files to Confluence Pages | atlassian-cli</title>
-    <meta name="description" content="Automatically sync markdown documentation to Confluence pages using the CLI. Build a docs pipeline with pandoc and atlassian-cli.">
+    <title>Markdown to Confluence: Import &amp; Sync Markdown Files | atlassian-cli</title>
+    <meta name="description" content="Import markdown to Confluence from the command line: use pandoc as a markdown converter and atlassian-cli to convert markdown to Confluence storage format and sync pages, with dry-run and auto-labeling.">
+    <meta name="keywords" content="markdown to confluence, confluence import markdown, markdown import, paste markdown, markdown converter, confluence markdown sync, atlassian-cli">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Sync Markdown Files to Confluence Pages | atlassian-cli">
-    <meta property="og:description" content="Automatically sync markdown documentation to Confluence pages using the CLI. Build a docs pipeline with pandoc and atlassian-cli.">
+    <meta property="og:title" content="Markdown to Confluence: Import &amp; Sync Markdown Files | atlassian-cli">
+    <meta property="og:description" content="A scriptable markdown converter and docs pipeline: import markdown to Confluence, convert markdown to Confluence storage format with pandoc, and sync pages with atlassian-cli.">
     <meta property="og:type" content="article">
     <meta property="og:url" content="https://atlassiancli.com/runbooks/confluence-markdown-sync.html">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Sync Markdown Files to Confluence Pages">
-    <meta name="twitter:description" content="Build a docs pipeline that syncs markdown files to Confluence pages with pandoc and atlassian-cli.">
+    <meta name="twitter:title" content="Markdown to Confluence: Import &amp; Sync Markdown Files">
+    <meta name="twitter:description" content="Import markdown to Confluence and sync markdown files as pages with pandoc as a markdown converter and atlassian-cli.">
 
     <!-- Canonical -->
     <link rel="canonical" href="https://atlassiancli.com/runbooks/confluence-markdown-sync.html" />
@@ -102,6 +103,38 @@
       "@context": "https://schema.org",
       "@type": "FAQPage",
       "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How do I import a markdown file into Confluence?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Convert the file with pandoc (pandoc -f markdown -t html) into Confluence storage format, then publish it with atlassian-cli confluence page create --space KEY --title \"Page title\" --body file.html. The runbook script chains both steps so you can import an entire markdown directory to Confluence in one run instead of one page at a time."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What converts the markdown to Confluence format?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "pandoc is the markdown converter. The pipeline runs pandoc -f markdown -t html and then two small sed passes adjust the HTML for Confluence storage format before atlassian-cli creates or updates the page."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can atlassian-cli export a Confluence page back to markdown?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Every command accepts a --format flag and markdown is one of the supported output formats, so atlassian-cli confluence page get 12345 --format markdown returns the page as markdown for round-tripping content back into a Git repository."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I just paste markdown directly into a Confluence page instead?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The Confluence editor lets you paste markdown into a page for a one-off edit, but that is manual and does not scale. This runbook automates the same markdown-to-Confluence conversion so dozens of files stay in sync without copy-paste."
+          }
+        },
         {
           "@type": "Question",
           "name": "Can this runbook delete Confluence pages?",
@@ -306,16 +339,16 @@
             </div>
             <div class="runbook-badge">Runbook</div>
             <h1 class="runbook-title">Sync Markdown Files to Confluence Pages</h1>
-            <p class="runbook-meta">Build a documentation pipeline that converts markdown files to Confluence storage format and publishes them as pages -- with dry-run support and automatic labeling.</p>
+            <p class="runbook-meta">Build a documentation pipeline that goes from markdown to Confluence: convert markdown files to Confluence storage format and import them as pages, with dry-run support and automatic labeling.</p>
         </div>
     </section>
 
     <!-- Content -->
     <div class="runbook-content">
 
-        <h2>What This Does</h2>
-        <p>This runbook scans a local directory for markdown files, converts each one to Confluence-compatible HTML using pandoc, and creates or updates the corresponding Confluence page. It extracts page titles from the first <code># heading</code> in each file and applies tracking labels automatically. Ideal for keeping Git-based docs in sync with Confluence.</p>
-        <p>It solves the recurring problem of documentation drift: when engineering teams write docs in markdown next to their code but stakeholders read those docs in Confluence, the two copies fall out of step. Run this script as the last step of a docs change &mdash; locally before a release, or automatically in CI on every merge to a docs branch &mdash; and Confluence always reflects what is in version control. Because it searches by page title and overwrites the body in place rather than creating duplicates, repeated runs are idempotent: a file whose content has not changed produces byte-identical storage-format HTML, so re-publishing is a safe no-op. For the full command set used here, see the <a href="/docs/commands.html" style="color: var(--accent-cyan);">command reference</a> and the broader <a href="/confluence/" style="color: var(--accent-cyan);">Confluence CLI</a> guide.</p>
+        <h2>What This Does: Import Markdown to Confluence</h2>
+        <p>This runbook is a scripted way to import markdown to Confluence. It scans a local directory for markdown files, uses pandoc as the markdown converter to turn each one into Confluence-compatible HTML, and then creates or updates the corresponding Confluence page. It extracts page titles from the first <code># heading</code> in each file and applies tracking labels automatically. Ideal for keeping Git-based docs in sync with Confluence without any manual markdown import step.</p>
+        <p>It solves the recurring problem of documentation drift: when engineering teams write docs in markdown next to their code but stakeholders read those docs in Confluence, the two copies fall out of step. Run this markdown-to-Confluence script as the last step of a docs change &mdash; locally before a release, or automatically in CI on every merge to a docs branch &mdash; and Confluence always reflects what is in version control. Because it searches by page title and overwrites the body in place rather than creating duplicates, repeated runs are idempotent: a file whose content has not changed produces byte-identical storage-format HTML, so re-publishing is a safe no-op. For the full command set used here, see the <a href="/docs/commands.html" style="color: var(--accent-cyan);">command reference</a>, the broader <a href="/confluence/" style="color: var(--accent-cyan);">Confluence CLI</a> reference, and the step-by-step <a href="/blog/confluence-cli-guide.html" style="color: var(--accent-cyan);">Confluence CLI guide</a>.</p>
 
         <h2>Prerequisites</h2>
         <ul>
@@ -582,6 +615,21 @@ main <span class="string">"$@"</span></code></pre>
             <p><strong>Apply tracking labels.</strong> Tags each synced page with <code>auto-generated</code> and <code>documentation</code> labels so you can easily identify and filter machine-synced content in Confluence.</p>
         </div>
 
+        <h2>Convert, Import, or Paste Markdown</h2>
+        <p>There are three ways to get markdown into Confluence, and this runbook automates the one that scales. Pick the approach that matches how often the content changes:</p>
+        <ul>
+            <li><strong>Paste markdown by hand.</strong> The Confluence editor can accept markdown when you paste it into a page, which is fine for a single ad-hoc note. It does not scale: there is no version history tied to your repo, and every edit is a manual copy-paste.</li>
+            <li><strong>Scripted markdown import (this runbook).</strong> pandoc is the markdown converter that turns each file into Confluence storage format, and <code>atlassian-cli confluence page create</code> / <code>update</code> publishes it. Running the pipeline imports a whole directory of markdown to Confluence at once and keeps it in sync on every change.</li>
+            <li><strong>Export back to markdown.</strong> The conversion also works in reverse for round-tripping. Every command accepts a <code>--format</code> flag, and <code>markdown</code> is one of the supported output formats, so you can pull a page back out as markdown:</li>
+        </ul>
+        <pre class="code-block"><code><span class="comment"># Import: convert one markdown file and create the page</span>
+pandoc -f markdown -t html notes.md &gt; notes.html
+atlassian-cli confluence page create --space DOCS --title <span class="string">"Release notes"</span> --body notes.html
+
+<span class="comment"># Export: pull a Confluence page back out as markdown</span>
+atlassian-cli confluence page get 12345 --format markdown &gt; notes.md</code></pre>
+        <p>Because the same markdown converter runs on every file, a bulk markdown import stays consistent: headings, fenced code blocks, and links all land in the same storage format. For the exact flags on each command, cross-check the <a href="/docs/commands.html" style="color: var(--accent-cyan);">command reference</a>.</p>
+
         <h2>Common Errors &amp; Fixes</h2>
         <ul>
             <li><strong>401 / 403 from the API.</strong> The auth profile is missing or its API token expired &mdash; re-run <code>atlassian-cli auth login</code> (or pass the correct <code>--profile</code>) and confirm the token has space write access.</li>
@@ -617,6 +665,10 @@ jobs:
         <p>GitLab CI achieves the same result with a job that uses an <code>only:&nbsp;changes:&nbsp;["docs/**"]</code> rule and a masked CI/CD variable for the token instead of the <code>on.push.paths</code> trigger and Actions secret.</p>
 
         <h2>FAQ</h2>
+        <p><strong>How do I import a markdown file into Confluence?</strong> Convert the file with pandoc (<code>pandoc -f markdown -t html</code>) into Confluence storage format, then publish it with <code>atlassian-cli confluence page create --space KEY --title "Page title" --body file.html</code>. The runbook script chains both steps so you can import an entire markdown directory to Confluence in one run instead of one page at a time. The <a href="/blog/confluence-cli-guide.html" style="color: var(--accent-cyan);">Confluence CLI guide</a> walks through the same commands in more detail.</p>
+        <p><strong>What converts the markdown to Confluence format?</strong> pandoc is the markdown converter. The pipeline runs <code>pandoc -f markdown -t html</code> and then two small <code>sed</code> passes adjust the HTML for Confluence storage format before <code>atlassian-cli</code> creates or updates the page.</p>
+        <p><strong>Can atlassian-cli export a Confluence page back to markdown?</strong> Yes. Every command accepts a <code>--format</code> flag and <code>markdown</code> is one of the supported output formats, so <code>atlassian-cli confluence page get 12345 --format markdown</code> returns the page as markdown for round-tripping content back into a Git repository.</p>
+        <p><strong>Can I just paste markdown directly into a Confluence page instead?</strong> The Confluence editor lets you paste markdown into a page for a one-off edit, but that is manual and does not scale. This runbook automates the same markdown-to-Confluence conversion so dozens of files stay in sync without copy-paste.</p>
         <p><strong>Can it delete Confluence pages?</strong> No. The script only creates or updates pages &mdash; it never calls a delete endpoint, so removing a markdown file does not remove the corresponding Confluence page. Use the <a href="/runbooks/confluence-bulk-cleanup.html" style="color: var(--accent-cyan);">bulk cleanup runbook</a> for deletions.</p>
         <p><strong>Does it support nested pages or multiple spaces?</strong> All discovered files sync into one target space as a flat set of pages; nesting works only when a parent page ID is passed, and multi-space sync means running the script once per space key.</p>
         <p><strong>How does it detect changes?</strong> It does not diff line by line. It looks up each page by its H1 title via CQL and upserts the converted body, so unchanged markdown re-publishes identical HTML and the run is a safe no-op. Keep an offline copy with the <a href="/runbooks/confluence-backup.html" style="color: var(--accent-cyan);">Confluence backup runbook</a> before large syncs.</p>
