@@ -55,12 +55,12 @@ pub fn markdown_to_adf(text: &str) -> Value {
 
     let mut stack: Vec<NodeBuilder> = vec![NodeBuilder::new("doc")];
     let mut marks: Vec<Value> = Vec::new();
-    let mut in_table_head = false;
+    let mut table = TableState::default();
 
     for event in parser {
         match event {
-            Event::Start(tag) => handle_start(tag, &mut stack, &mut marks, &mut in_table_head),
-            Event::End(tag) => handle_end(tag, &mut stack, &mut marks, &mut in_table_head),
+            Event::Start(tag) => handle_start(tag, &mut stack, &mut marks, &mut table),
+            Event::End(tag) => handle_end(tag, &mut stack, &mut marks, &mut table),
             Event::Text(t) => push_text(&mut stack, &t, &marks),
             Event::Code(t) => {
                 // inline code: a text node carrying a `code` mark. ADF only allows
@@ -99,13 +99,28 @@ pub fn markdown_to_adf(text: &str) -> Value {
     })
 }
 
+/// Table parsing state.
+///
+/// `in_head` distinguishes header cells (`tableHeader`) from body cells
+/// (`tableCell`) — pulldown-cmark emits the same `TableCell` tag for both, and
+/// has no `TableBody` tag, so body rows simply follow the `TableHead` end tag.
+///
+/// `degraded` is set when a table opens inside a listItem/blockquote, where ADF
+/// forbids tables. Markdown allows no nested tables, so a flat pair of flags is
+/// sufficient.
+#[derive(Default)]
+struct TableState {
+    in_head: bool,
+    degraded: bool,
+}
+
 /// Block tags push a container node; inline emphasis/link tags push a mark that
 /// applies to subsequent text until the matching end tag.
 fn handle_start(
     tag: Tag,
     stack: &mut Vec<NodeBuilder>,
     marks: &mut Vec<Value>,
-    in_table_head: &mut bool,
+    table: &mut TableState,
 ) {
     match tag {
         Tag::Paragraph => {
@@ -163,20 +178,38 @@ fn handle_start(
         }
         Tag::Table(_) => {
             close_auto_paragraph(stack);
-            stack.push(NodeBuilder::new("table"));
+            // ADF disallows tables inside list items and blockquotes. Degrade the
+            // whole table to one paragraph per cell so the text survives, rather
+            // than emitting a document the API rejects with a 400.
+            table.degraded = in_restricted_parent(stack);
+            stack.push(NodeBuilder::new(if table.degraded {
+                "__transparent__"
+            } else {
+                "table"
+            }));
         }
         Tag::TableHead => {
             close_auto_paragraph(stack);
-            *in_table_head = true;
-            stack.push(NodeBuilder::new("tableRow"));
+            table.in_head = true;
+            stack.push(NodeBuilder::new(if table.degraded {
+                "__transparent__"
+            } else {
+                "tableRow"
+            }));
         }
         Tag::TableRow => {
             close_auto_paragraph(stack);
-            stack.push(NodeBuilder::new("tableRow"));
+            stack.push(NodeBuilder::new(if table.degraded {
+                "__transparent__"
+            } else {
+                "tableRow"
+            }));
         }
         Tag::TableCell => {
             close_auto_paragraph(stack);
-            let cell_type = if *in_table_head {
+            let cell_type = if table.degraded {
+                "paragraph"
+            } else if table.in_head {
                 "tableHeader"
             } else {
                 "tableCell"
@@ -225,24 +258,38 @@ fn handle_end(
     tag: TagEnd,
     stack: &mut Vec<NodeBuilder>,
     marks: &mut Vec<Value>,
-    in_table_head: &mut bool,
+    table: &mut TableState,
 ) {
     match tag {
         TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock => pop_and_append(stack),
-        TagEnd::Item | TagEnd::BlockQuote(_) | TagEnd::TableCell => {
+        TagEnd::Item | TagEnd::BlockQuote(_) => {
             close_auto_paragraph(stack);
-            // listItem / blockquote / tableCell require non-empty content.
+            // listItem / blockquote require non-empty content.
             ensure_nonempty_block_container(stack);
             pop_and_append(stack);
         }
-        TagEnd::List(_) | TagEnd::TableRow | TagEnd::Table => {
+        TagEnd::TableCell => {
+            close_auto_paragraph(stack);
+            // A degraded cell is itself a paragraph; backfilling it would nest a
+            // paragraph inside a paragraph. A real tableCell needs >=1 block child.
+            if !table.degraded {
+                ensure_nonempty_block_container(stack);
+            }
+            pop_and_append(stack);
+        }
+        TagEnd::List(_) | TagEnd::TableRow => {
             close_auto_paragraph(stack);
             pop_and_append(stack);
+        }
+        TagEnd::Table => {
+            close_auto_paragraph(stack);
+            pop_and_append(stack);
+            table.degraded = false;
         }
         TagEnd::TableHead => {
             close_auto_paragraph(stack);
             pop_and_append(stack);
-            *in_table_head = false;
+            table.in_head = false;
         }
         TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link => {
             marks.pop();
@@ -517,6 +564,64 @@ mod tests {
         assert_eq!(body_cells[0]["type"], "tableCell");
         assert_eq!(body_cells[0]["content"][0]["content"][0]["text"], "1");
         assert_eq!(body_cells[1]["content"][0]["content"][0]["text"], "2");
+    }
+
+    #[test]
+    fn empty_table_cell_gets_empty_paragraph() {
+        let doc = markdown_to_adf("| a |  |\n|---|---|\n| 1 | 2 |");
+        let header_cells = content(&doc)[0]["content"][0]["content"]
+            .as_array()
+            .unwrap();
+        // ADF requires >=1 block child in a cell, so an empty cell holds an empty paragraph.
+        assert_eq!(header_cells[1]["type"], "tableHeader");
+        assert_eq!(header_cells[1]["content"][0]["type"], "paragraph");
+        assert!(header_cells[1]["content"][0].get("content").is_none());
+    }
+
+    // ADF disallows `table` inside listItem/blockquote; emitting one there makes
+    // Jira reject the whole document with a 400. Degrade to paragraphs instead.
+    #[test]
+    fn table_in_list_item_degrades_to_paragraphs() {
+        let doc = markdown_to_adf("- item\n\n  | a |\n  |---|\n  | 1 |");
+        let list_item = &content(&doc)[0]["content"][0];
+        assert_eq!(list_item["type"], "listItem");
+        let blocks = list_item["content"].as_array().unwrap();
+        assert!(
+            blocks.iter().all(|b| b["type"] == "paragraph"),
+            "listItem must contain only paragraphs, got {blocks:?}"
+        );
+        let texts: Vec<&str> = blocks
+            .iter()
+            .filter_map(|b| b["content"][0]["text"].as_str())
+            .collect();
+        assert_eq!(texts, vec!["item", "a", "1"]);
+    }
+
+    #[test]
+    fn table_in_blockquote_degrades_to_paragraphs() {
+        let doc = markdown_to_adf("> | a |\n> |---|\n> | 1 |");
+        let quote = &content(&doc)[0];
+        assert_eq!(quote["type"], "blockquote");
+        let blocks = quote["content"].as_array().unwrap();
+        assert!(
+            blocks.iter().all(|b| b["type"] == "paragraph"),
+            "blockquote must contain only paragraphs, got {blocks:?}"
+        );
+        let texts: Vec<&str> = blocks
+            .iter()
+            .filter_map(|b| b["content"][0]["text"].as_str())
+            .collect();
+        assert_eq!(texts, vec!["a", "1"]);
+    }
+
+    #[test]
+    fn table_after_degraded_table_still_renders_as_table() {
+        // `degraded` must reset on TagEnd::Table, or every later table is degraded too.
+        let doc = markdown_to_adf("> | a |\n> |---|\n> | 1 |\n\n| b |\n|---|\n| 2 |");
+        let c = content(&doc);
+        assert_eq!(c[0]["type"], "blockquote");
+        assert_eq!(c[1]["type"], "table");
+        assert_eq!(c[1]["content"][0]["content"][0]["type"], "tableHeader");
     }
 
     #[test]
