@@ -262,6 +262,9 @@ enum PageCommands {
     Comments {
         /// Page ID
         page_id: String,
+        /// Show full comment body instead of truncated preview
+        #[arg(long)]
+        full: bool,
     },
     /// Add comment to page
     AddComment {
@@ -642,7 +645,9 @@ pub async fn execute(
             PageCommands::RemoveLabel { page_id, label } => {
                 pages::remove_page_label(&ctx, &page_id, &label).await
             }
-            PageCommands::Comments { page_id } => pages::list_page_comments(&ctx, &page_id).await,
+            PageCommands::Comments { page_id, full } => {
+                pages::list_page_comments(&ctx, &page_id, full).await
+            }
             PageCommands::AddComment { page_id, comment } => {
                 pages::add_page_comment(&ctx, &page_id, &comment).await
             }
