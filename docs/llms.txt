@@ -56,7 +56,7 @@ atlassian-cli is an independent open-source project. It is NOT affiliated with, 
 
 ## Version
 
-Current version: 0.4.2
+Current version: 0.4.3
 Recent (0.4): Markdown-to-ADF for Jira descriptions and comments, a Confluence v2 Folder API command group (confluence folder get/create/delete), Bitbucket custom pipeline triggers (pipeline trigger --custom-pipeline), Jira attachments in issue get, comments list --full, and a fix for false errors on HTTP 204 responses.
 License: MIT
 Author: Omar Shabab (https://omarshabab.com)
