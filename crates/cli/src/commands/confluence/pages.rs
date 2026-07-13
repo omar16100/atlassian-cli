@@ -474,20 +474,27 @@ pub async fn remove_page_label(
 
 /// A footer comment as returned by `GET /wiki/api/v2/pages/{id}/footer-comments`.
 ///
-/// Every field beyond `id` is treated as optional. The Confluence Cloud API
-/// omits `createdAt` for some comments (older/system-generated ones), and only
-/// returns `body` when `body-format` is requested. Deserialising these as
-/// required fields previously caused the whole command to fail with
-/// "missing field `createdAt`" on otherwise healthy pages.
+/// Everything beyond `id` is optional. Per the Confluence Cloud v2 schema
+/// (`FooterCommentModel`) a comment has **no top-level `createdAt`** — the
+/// timestamp lives at `version.createdAt`. Deserialising `createdAt` as a
+/// required top-level field made this command fail with
+/// "missing field `createdAt`" on any page that had at least one comment.
+/// `body` is only returned when `body-format` is requested.
 #[derive(Deserialize)]
 struct Comment {
     id: String,
     #[serde(default)]
     title: String,
-    #[serde(rename = "createdAt", default)]
-    created_at: Option<String>,
+    #[serde(default)]
+    version: Option<CommentVersion>,
     #[serde(default)]
     body: Option<CommentBody>,
+}
+
+#[derive(Deserialize)]
+struct CommentVersion {
+    #[serde(rename = "createdAt", default)]
+    created_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -506,6 +513,15 @@ struct CommentBodyValue {
 struct CommentsResponse {
     #[serde(default)]
     results: Vec<Comment>,
+}
+
+/// The comment's creation timestamp, which the v2 API nests under `version`.
+fn comment_created_at(comment: &Comment) -> &str {
+    comment
+        .version
+        .as_ref()
+        .and_then(|v| v.created_at.as_deref())
+        .unwrap_or("")
 }
 
 /// Return the raw storage-format (HTML) body of a comment, if one was returned.
@@ -527,10 +543,28 @@ fn comment_body_markdown(comment: &Comment) -> String {
     }
 }
 
+/// Collapse a body to a single-line preview.
+///
+/// The table renderer does not wrap, `render_csv` does not quote or escape, and
+/// `render_markdown_table` does not escape newlines, so an unbounded multi-line
+/// body would corrupt those outputs. Mirrors `jira issue comments`, which shows
+/// a short preview by default and the full body behind `--full`.
+fn comment_body_preview(body: &str) -> String {
+    let flattened = body.split_whitespace().collect::<Vec<_>>().join(" ");
+    flattened.chars().take(COMMENT_PREVIEW_CHARS).collect()
+}
+
+/// Preview length, matching `jira issue comments`.
+const COMMENT_PREVIEW_CHARS: usize = 50;
+
 // List page comments
-pub async fn list_page_comments(ctx: &ConfluenceContext<'_>, page_id: &str) -> Result<()> {
-    // Request the storage-format body so callers actually get the comment text
-    // (the old confluence-cli captured this); previously only metadata was returned.
+pub async fn list_page_comments(
+    ctx: &ConfluenceContext<'_>,
+    page_id: &str,
+    full: bool,
+) -> Result<()> {
+    // Request the storage-format body so callers actually get the comment text;
+    // previously only metadata was returned.
     let response: CommentsResponse = ctx
         .client
         .get(&format!(
@@ -545,17 +579,29 @@ pub async fn list_page_comments(ctx: &ConfluenceContext<'_>, page_id: &str) -> R
         id: &'a str,
         title: &'a str,
         created_at: &'a str,
-        body: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body_preview: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        body: Option<String>,
     }
 
     let rows: Vec<Row<'_>> = response
         .results
         .iter()
-        .map(|c| Row {
-            id: c.id.as_str(),
-            title: c.title.as_str(),
-            created_at: c.created_at.as_deref().unwrap_or(""),
-            body: comment_body_markdown(c),
+        .map(|c| {
+            let text = comment_body_markdown(c);
+            let (body_preview, body) = if full {
+                (None, Some(text))
+            } else {
+                (Some(comment_body_preview(&text)), None)
+            };
+            Row {
+                id: c.id.as_str(),
+                title: c.title.as_str(),
+                created_at: comment_created_at(c),
+                body_preview,
+                body,
+            }
         })
         .collect();
 
@@ -1051,78 +1097,95 @@ pub async fn delete_blogpost(
 mod comment_tests {
     use super::*;
 
-    // Regression: the API omits `createdAt` for some footer-comments, which used
-    // to fail deserialisation with "missing field `createdAt`" and abort the
-    // whole `page comments` command. It must now parse into `None`.
+    // Regression: per the v2 schema (FooterCommentModel) a comment has NO
+    // top-level `createdAt` -- the timestamp is at `version.createdAt`. The old
+    // code required a top-level `createdAt: String`, so `page comments` failed
+    // with "missing field `createdAt`" on ANY page that had a comment.
     #[test]
-    fn comment_tolerates_missing_created_at() {
+    fn comment_reads_created_at_from_version() {
+        let json = r#"{
+            "id": "42",
+            "title": "Re: X",
+            "version": { "number": 1, "createdAt": "2026-01-02T03:04:05Z" }
+        }"#;
+        let c: Comment = serde_json::from_str(json).unwrap();
+        assert_eq!(c.id, "42");
+        assert_eq!(comment_created_at(&c), "2026-01-02T03:04:05Z");
+    }
+
+    // The real-world payload that used to abort the whole command.
+    #[test]
+    fn comment_without_top_level_created_at_still_parses() {
         let c: Comment = serde_json::from_str(r#"{"id":"42","title":"Re: X"}"#).unwrap();
         assert_eq!(c.id, "42");
-        assert_eq!(c.title, "Re: X");
-        assert!(c.created_at.is_none());
+        assert_eq!(comment_created_at(&c), "");
     }
 
     #[test]
     fn comment_tolerates_missing_title_and_body() {
         let c: Comment = serde_json::from_str(r#"{"id":"1"}"#).unwrap();
-        assert_eq!(c.id, "1");
         assert_eq!(c.title, "");
         assert!(comment_storage_html(&c).is_none());
         assert_eq!(comment_body_markdown(&c), "");
     }
 
-    #[test]
-    fn comment_parses_created_at_when_present() {
-        let c: Comment =
-            serde_json::from_str(r#"{"id":"7","createdAt":"2026-01-02T03:04:05Z"}"#).unwrap();
-        assert_eq!(c.created_at.as_deref(), Some("2026-01-02T03:04:05Z"));
-    }
-
-    // The body is only present when `body-format` is requested; when present we
-    // extract the storage HTML and convert it to markdown for display.
+    // Body is only present when body-format is requested; when present we take the
+    // storage HTML and convert it to markdown.
     #[test]
     fn comment_body_converts_storage_html_to_markdown() {
         let json = r#"{
             "id": "9",
-            "createdAt": "2026-01-01T00:00:00Z",
             "body": { "storage": { "value": "<p>Hello <strong>world</strong></p>", "representation": "storage" } }
         }"#;
         let c: Comment = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            comment_storage_html(&c),
-            Some("<p>Hello <strong>world</strong></p>")
-        );
         let md = comment_body_markdown(&c);
-        assert!(md.contains("Hello"));
-        assert!(md.contains("world"));
+        assert!(md.contains("Hello"), "got {md:?}");
+        assert!(md.contains("world"), "got {md:?}");
     }
 
     #[test]
     fn comment_empty_body_value_is_treated_as_absent() {
-        let json = r#"{"id":"3","body":{"storage":{"value":""}}}"#;
-        let c: Comment = serde_json::from_str(json).unwrap();
+        let c: Comment =
+            serde_json::from_str(r#"{"id":"3","body":{"storage":{"value":""}}}"#).unwrap();
         assert!(comment_storage_html(&c).is_none());
     }
 
-    // A whole response mixing comments with and without createdAt must fully parse
-    // (previously a single bad comment failed the entire list).
+    // A response mixing comments with and without version must fully parse
+    // (previously a single comment failed the entire list).
     #[test]
     fn comments_response_with_mixed_fields_fully_parses() {
         let json = r#"{
             "results": [
-                {"id":"1","title":"a","createdAt":"2026-01-01T00:00:00Z"},
+                {"id":"1","title":"a","version":{"createdAt":"2026-01-01T00:00:00Z"}},
                 {"id":"2","title":"b"},
                 {"id":"3"}
             ]
         }"#;
         let resp: CommentsResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.results.len(), 3);
-        assert!(resp.results[1].created_at.is_none());
+        assert_eq!(comment_created_at(&resp.results[0]), "2026-01-01T00:00:00Z");
+        assert_eq!(comment_created_at(&resp.results[1]), "");
     }
 
     #[test]
     fn comments_response_empty_results_parses() {
         let resp: CommentsResponse = serde_json::from_str(r#"{"results":[]}"#).unwrap();
         assert!(resp.results.is_empty());
+    }
+
+    // The table/CSV/markdown renderers do not wrap, quote or escape newlines, so
+    // the default preview must be a single line and bounded.
+    #[test]
+    fn body_preview_is_single_line_and_bounded() {
+        let body = "line one\nline two\n\nline three";
+        let preview = comment_body_preview(body);
+        assert!(!preview.contains('\n'), "preview must not contain newlines");
+        assert_eq!(preview, "line one line two line three");
+
+        let long = "x".repeat(200);
+        assert_eq!(
+            comment_body_preview(&long).chars().count(),
+            COMMENT_PREVIEW_CHARS
+        );
     }
 }
