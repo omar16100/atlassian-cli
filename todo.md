@@ -43,6 +43,23 @@ early-2026 baseline of 51 clicks/3mo), avg pos ~8.5, but 0 top-10 rankings and a
 - 50 same-day posts on a ~0-backlink domain carries Google scaled-content risk; mitigated via distinct keywords,
   genuine content, strict QA. Recommend noindex on later waves as an opt-in follow-up.
 
+## 2026-07-13 — Jira markdown-to-ADF: GFM table support
+
+### Context
+`--description`/comment `--body` markdown tables rendered as raw pipe text in
+Jira (`| a | b |` dumped literally) instead of a table. Root cause:
+`markdown_to_adf` never enabled pulldown-cmark's `ENABLE_TABLES` option, so
+table syntax was never parsed as a table.
+
+### Change (crates/cli/src/commands/jira/adf.rs)
+- Enabled `Options::ENABLE_TABLES`.
+- Mapped `Table`/`TableHead`/`TableRow`/`TableCell` events to ADF
+  `table`/`tableRow`/`tableHeader`/`tableCell` nodes; headings inside table
+  cells downgrade to paragraphs (same restriction as list items/blockquotes).
+- New unit test `gfm_table_converts_to_adf_table`; manually verified against a
+  live Jira issue (table renders correctly via both `--description` and
+  comment `--body`).
+
 ## 2026-06-18 — Jira sprint UX: --sprint flag + sprint in issue get (#72)
 
 ### Context
