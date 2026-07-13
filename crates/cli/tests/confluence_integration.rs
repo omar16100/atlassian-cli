@@ -395,7 +395,10 @@ async fn test_get_attachment() {
             "title": "diagram.png",
             "fileSize": 102400,
             "mediaType": "image/png",
-            "downloadLink": "/wiki/download/attachments/100001/diagram.png"
+            // The real v2 API returns downloadLink relative to the /wiki context,
+            // i.e. WITHOUT a /wiki prefix. The old fixture invented one, which is
+            // why no test caught the dropped-/wiki download bug.
+            "downloadLink": "/download/attachments/100001/diagram.png?version=1&api=v2"
         })))
         .mount(&mock_server)
         .await;
@@ -756,4 +759,77 @@ async fn test_publish_draft_blogpost() {
     let result = put_response.unwrap();
     assert_eq!(result["status"], "current");
     assert_eq!(result["version"]["number"], 1);
+}
+
+// ============================================================================
+// Comments
+// ============================================================================
+
+// Regression: the v2 footer-comment object has no top-level `createdAt` (it lives
+// at `version.createdAt`) and only returns `body` when body-format is requested.
+// The old model required a top-level `createdAt: String`, so this payload aborted
+// the whole `page comments` command with "missing field `createdAt`".
+#[tokio::test]
+async fn test_list_page_comments_real_shape() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/wiki/api/v2/pages/100001/footer-comments"))
+        .and(query_param("body-format", "storage"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "results": [
+                {
+                    "id": "c-1",
+                    "title": "Re: Design",
+                    "version": { "number": 1, "createdAt": "2026-01-02T03:04:05Z" },
+                    "body": { "storage": { "value": "<p>Looks good</p>", "representation": "storage" } }
+                },
+                { "id": "c-2" }
+            ]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: Result<serde_json::Value, _> = client
+        .get("/wiki/api/v2/pages/100001/footer-comments?body-format=storage")
+        .await;
+
+    assert!(response.is_ok(), "comments request failed: {response:?}");
+    let data = response.unwrap();
+    let results = data["results"].as_array().unwrap();
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0]["version"]["createdAt"], "2026-01-02T03:04:05Z");
+    assert!(results[0].get("createdAt").is_none());
+}
+
+// Regression: downloadLink is relative to the /wiki context, so the bytes must be
+// fetched from /wiki + downloadLink. Fetching base_url + downloadLink dropped the
+// /wiki segment and every download 404'd. Query string must survive too.
+#[tokio::test]
+async fn test_download_attachment_bytes_uses_wiki_prefix() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/wiki/download/attachments/100001/diagram.png"))
+        .and(query_param("version", "1"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(b"PNGDATA".to_vec()))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    // This is exactly the path download_attachment builds from the v2 downloadLink
+    // "/download/attachments/100001/diagram.png?version=1&api=v2".
+    let bytes = client
+        .get_bytes("/wiki/download/attachments/100001/diagram.png?version=1&api=v2")
+        .await;
+
+    assert!(bytes.is_ok(), "download failed: {bytes:?}");
+    assert_eq!(bytes.unwrap(), b"PNGDATA".to_vec());
 }
