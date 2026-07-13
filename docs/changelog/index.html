@@ -46,10 +46,11 @@
         "@type": "ItemList",
         "itemListOrder": "https://schema.org/ItemListOrderDescending",
         "itemListElement": [
-          {"@type": "ListItem", "position": 1, "name": "v0.4.2", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.2"},
-          {"@type": "ListItem", "position": 2, "name": "v0.4.1", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.1"},
-          {"@type": "ListItem", "position": 3, "name": "v0.4.0", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.0"},
-          {"@type": "ListItem", "position": 4, "name": "v0.3.3", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.3.3"}
+          {"@type": "ListItem", "position": 1, "name": "v0.4.3", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.3"},
+          {"@type": "ListItem", "position": 2, "name": "v0.4.2", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.2"},
+          {"@type": "ListItem", "position": 3, "name": "v0.4.1", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.1"},
+          {"@type": "ListItem", "position": 4, "name": "v0.4.0", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.0"},
+          {"@type": "ListItem", "position": 5, "name": "v0.3.3", "url": "https://github.com/omar16100/atlassian-cli/releases/tag/v0.3.3"}
         ]
       }
     }
@@ -200,6 +201,21 @@
 
                 <div class="release">
                     <div class="release-head">
+                        <span class="release-version">0.4.3</span>
+                        <span class="release-date">July 13, 2026</span>
+                        <a class="release-link" href="https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.3" target="_blank" rel="noopener">GitHub release &rarr;</a>
+                    </div>
+                    <ul>
+                        <li><strong>Markdown tables in Jira</strong>: a GFM table in <code>--description</code> or a comment <code>--body</code> now becomes a real Jira table instead of raw pipe characters. Thanks to <a href="https://github.com/fabianderschatta" target="_blank" rel="noopener">@fabianderschatta</a>.</li>
+                        <li><strong>Confluence page comments work again</strong>: <code>confluence page comments</code> failed on any page that had at least one comment. It now also shows the comment body, with a new <code>--full</code> flag for untruncated text. Thanks to <a href="https://github.com/alexevansigg" target="_blank" rel="noopener">@alexevansigg</a>.</li>
+                        <li><strong>Confluence attachment downloads work again</strong>: <code>confluence attachment download</code> dropped the <code>/wiki</code> path segment and always failed with a 404.</li>
+                        <li><strong>Correct CSV and markdown output</strong>: CSV fields are now quoted per RFC 4180, so a comma inside a value (an issue summary, a comment) no longer shifts every later column. Markdown table cells escape newlines.</li>
+                        <li><strong>Maintenance:</strong> bumped <code>aes-gcm</code> to 0.11 and <code>indicatif</code> to 0.18.6, and updated <code>quinn-proto</code>, <code>crossbeam-epoch</code> and <code>anyhow</code> to clear security advisories.</li>
+                    </ul>
+                </div>
+
+                <div class="release">
+                    <div class="release-head">
                         <span class="release-version">0.4.2</span>
                         <span class="release-date">June 18, 2026</span>
                         <a class="release-link" href="https://github.com/omar16100/atlassian-cli/releases/tag/v0.4.2" target="_blank" rel="noopener">GitHub release →</a>
@@ -270,7 +286,7 @@
             <div class="footer-content">
                 <div class="footer-left">
                     <span class="footer-logo">atlassian-cli</span>
-                    <span class="footer-version">v0.4.2</span>
+                    <span class="footer-version">v0.4.3</span>
                 </div>
                 <div class="footer-links">
                     <a href="/jira/">Jira CLI</a>
