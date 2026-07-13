@@ -50,15 +50,17 @@ impl NodeBuilder {
 pub fn markdown_to_adf(text: &str) -> Value {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TABLES);
     let parser = Parser::new_ext(text, options);
 
     let mut stack: Vec<NodeBuilder> = vec![NodeBuilder::new("doc")];
     let mut marks: Vec<Value> = Vec::new();
+    let mut in_table_head = false;
 
     for event in parser {
         match event {
-            Event::Start(tag) => handle_start(tag, &mut stack, &mut marks),
-            Event::End(tag) => handle_end(tag, &mut stack, &mut marks),
+            Event::Start(tag) => handle_start(tag, &mut stack, &mut marks, &mut in_table_head),
+            Event::End(tag) => handle_end(tag, &mut stack, &mut marks, &mut in_table_head),
             Event::Text(t) => push_text(&mut stack, &t, &marks),
             Event::Code(t) => {
                 // inline code: a text node carrying a `code` mark. ADF only allows
@@ -99,7 +101,12 @@ pub fn markdown_to_adf(text: &str) -> Value {
 
 /// Block tags push a container node; inline emphasis/link tags push a mark that
 /// applies to subsequent text until the matching end tag.
-fn handle_start(tag: Tag, stack: &mut Vec<NodeBuilder>, marks: &mut Vec<Value>) {
+fn handle_start(
+    tag: Tag,
+    stack: &mut Vec<NodeBuilder>,
+    marks: &mut Vec<Value>,
+    in_table_head: &mut bool,
+) {
     match tag {
         Tag::Paragraph => {
             close_auto_paragraph(stack);
@@ -154,6 +161,28 @@ fn handle_start(tag: Tag, stack: &mut Vec<NodeBuilder>, marks: &mut Vec<Value>) 
             close_auto_paragraph(stack);
             stack.push(NodeBuilder::new("listItem"));
         }
+        Tag::Table(_) => {
+            close_auto_paragraph(stack);
+            stack.push(NodeBuilder::new("table"));
+        }
+        Tag::TableHead => {
+            close_auto_paragraph(stack);
+            *in_table_head = true;
+            stack.push(NodeBuilder::new("tableRow"));
+        }
+        Tag::TableRow => {
+            close_auto_paragraph(stack);
+            stack.push(NodeBuilder::new("tableRow"));
+        }
+        Tag::TableCell => {
+            close_auto_paragraph(stack);
+            let cell_type = if *in_table_head {
+                "tableHeader"
+            } else {
+                "tableCell"
+            };
+            stack.push(NodeBuilder::new(cell_type));
+        }
         Tag::Emphasis => marks.push(json!({ "type": "em" })),
         Tag::Strong => marks.push(json!({ "type": "strong" })),
         Tag::Strikethrough => marks.push(json!({ "type": "strike" })),
@@ -177,7 +206,7 @@ fn handle_start(tag: Tag, stack: &mut Vec<NodeBuilder>, marks: &mut Vec<Value>) 
 fn in_restricted_parent(stack: &[NodeBuilder]) -> bool {
     matches!(
         stack.last().map(|n| n.node_type),
-        Some("listItem") | Some("blockquote")
+        Some("listItem") | Some("blockquote") | Some("tableCell") | Some("tableHeader")
     )
 }
 
@@ -192,18 +221,28 @@ fn heading_level(level: HeadingLevel) -> u8 {
     }
 }
 
-fn handle_end(tag: TagEnd, stack: &mut Vec<NodeBuilder>, marks: &mut Vec<Value>) {
+fn handle_end(
+    tag: TagEnd,
+    stack: &mut Vec<NodeBuilder>,
+    marks: &mut Vec<Value>,
+    in_table_head: &mut bool,
+) {
     match tag {
         TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock => pop_and_append(stack),
-        TagEnd::Item | TagEnd::BlockQuote(_) => {
+        TagEnd::Item | TagEnd::BlockQuote(_) | TagEnd::TableCell => {
             close_auto_paragraph(stack);
-            // listItem / blockquote require non-empty content.
+            // listItem / blockquote / tableCell require non-empty content.
             ensure_nonempty_block_container(stack);
             pop_and_append(stack);
         }
-        TagEnd::List(_) => {
+        TagEnd::List(_) | TagEnd::TableRow | TagEnd::Table => {
             close_auto_paragraph(stack);
             pop_and_append(stack);
+        }
+        TagEnd::TableHead => {
+            close_auto_paragraph(stack);
+            pop_and_append(stack);
+            *in_table_head = false;
         }
         TagEnd::Emphasis | TagEnd::Strong | TagEnd::Strikethrough | TagEnd::Link => {
             marks.pop();
@@ -460,6 +499,24 @@ mod tests {
         let text = &content(&doc)[0]["content"][0];
         assert_eq!(text["text"], "label");
         assert!(text.get("marks").is_none());
+    }
+
+    #[test]
+    fn gfm_table_converts_to_adf_table() {
+        let doc = markdown_to_adf("| A | B |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |");
+        let table = &content(&doc)[0];
+        assert_eq!(table["type"], "table");
+        let rows = table["content"].as_array().unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0]["type"], "tableRow");
+        let header_cells = rows[0]["content"].as_array().unwrap();
+        assert_eq!(header_cells[0]["type"], "tableHeader");
+        assert_eq!(header_cells[0]["content"][0]["content"][0]["text"], "A");
+        assert_eq!(rows[1]["type"], "tableRow");
+        let body_cells = rows[1]["content"].as_array().unwrap();
+        assert_eq!(body_cells[0]["type"], "tableCell");
+        assert_eq!(body_cells[0]["content"][0]["content"][0]["text"], "1");
+        assert_eq!(body_cells[1]["content"][0]["content"][0]["text"], "2");
     }
 
     #[test]
