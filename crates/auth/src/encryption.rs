@@ -1,12 +1,9 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
-    Aes256Gcm, Nonce,
+    aead::{Aead, Generate, KeyInit, Nonce},
+    Aes256Gcm,
 };
 use anyhow::{anyhow, Context, Result};
-use argon2::{
-    password_hash::{rand_core::RngCore, SaltString},
-    Argon2, PasswordHasher,
-};
+use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -78,18 +75,20 @@ pub fn derive_key() -> Result<[u8; 32]> {
 pub fn encrypt(plaintext: &str, key: &[u8; 32]) -> Result<(String, String)> {
     let cipher = Aes256Gcm::new(key.into());
 
-    // Generate a random nonce
-    let mut nonce_bytes = [0u8; NONCE_SIZE];
-    OsRng.fill_bytes(&mut nonce_bytes);
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    // Generate a random nonce. `Generate` draws from the OS RNG (aes-gcm's
+    // `getrandom` feature, on by default) and replaces the `aead::OsRng` that
+    // aead 0.6 removed. `try_generate` rather than `generate` because the latter
+    // panics if the system RNG fails. Still 12 bytes: the stored format is unchanged.
+    let nonce = Nonce::<Aes256Gcm>::try_generate()
+        .map_err(|e| anyhow!("Failed to generate nonce from system RNG: {}", e))?;
 
     // Encrypt the plaintext
     let ciphertext = cipher
-        .encrypt(nonce, plaintext.as_bytes())
+        .encrypt(&nonce, plaintext.as_bytes())
         .map_err(|e| anyhow!("Encryption failed: {}", e))?;
 
     // Encode as base64 for storage
-    let nonce_b64 = BASE64.encode(nonce_bytes);
+    let nonce_b64 = BASE64.encode(nonce);
     let ciphertext_b64 = BASE64.encode(ciphertext);
 
     Ok((nonce_b64, ciphertext_b64))
@@ -115,11 +114,14 @@ pub fn decrypt(ciphertext_b64: &str, nonce_b64: &str, key: &[u8; 32]) -> Result<
         ));
     }
 
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    // `Array::from_slice` is deprecated in hybrid-array; the length is already
+    // checked above, so TryFrom cannot fail here.
+    let nonce = Nonce::<Aes256Gcm>::try_from(nonce_bytes.as_slice())
+        .map_err(|_| anyhow!("Invalid nonce size: expected {}", NONCE_SIZE))?;
 
     // Decrypt
     let plaintext = cipher
-        .decrypt(nonce, ciphertext.as_ref())
+        .decrypt(&nonce, ciphertext.as_ref())
         .map_err(|e| anyhow!("Decryption failed: {}", e))?;
 
     String::from_utf8(plaintext).context("Decrypted data is not valid UTF-8")
@@ -128,6 +130,31 @@ pub fn decrypt(ciphertext_b64: &str, nonce_b64: &str, key: &[u8; 32]) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Cross-version known-answer test. This nonce/ciphertext pair was produced by
+    /// the aes-gcm 0.10 build (the version that wrote users' existing
+    /// `~/.atlassian-cli/credentials.enc` files). Decrypting it here proves the
+    /// aes-gcm 0.11 upgrade did not change the on-disk format and that stored
+    /// credentials still open. Every other test in this module is a same-process
+    /// round-trip and would pass even if the format silently changed.
+    #[test]
+    fn decrypts_ciphertext_written_by_aes_gcm_0_10() {
+        let key = [7u8; 32];
+        let nonce_b64 = "Rm9oYDGUcR47yGPD";
+        let ciphertext_b64 = "iwXkjpxTMOS8N/vvR/y0Yvt3G7fE0GW4sl7KvlyPIJ3rW50U/81e";
+
+        let plaintext = decrypt(ciphertext_b64, nonce_b64, &key)
+            .expect("aes-gcm 0.11 must decrypt ciphertext written by 0.10");
+        assert_eq!(plaintext, "hunter2-atlassian-token");
+    }
+
+    #[test]
+    fn nonce_is_12_bytes() {
+        // The stored format depends on this; a change would orphan existing files.
+        let (nonce_b64, _) = encrypt("x", &[0u8; 32]).unwrap();
+        assert_eq!(BASE64.decode(nonce_b64).unwrap().len(), NONCE_SIZE);
+        assert_eq!(NONCE_SIZE, 12);
+    }
 
     #[test]
     fn test_derive_key_deterministic() {
