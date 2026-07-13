@@ -133,6 +133,27 @@ pub async fn upload_attachment(
     )
 }
 
+/// Resolve an attachment's `downloadLink` into a path `ApiClient` can fetch.
+///
+/// The Confluence Cloud v2 API returns `downloadLink` relative to the `/wiki`
+/// context path (e.g. `/download/attachments/{id}/{file}?version=1&api=v2`),
+/// while `ApiClient` is rooted at the bare site origin and every Confluence
+/// command spells `/wiki` itself. Concatenating base_url + downloadLink
+/// therefore dropped the `/wiki` segment and every download 404'd.
+///
+/// Idempotent: a link that already carries `/wiki`, or an absolute URL, is
+/// returned unchanged.
+fn attachment_download_path(download_link: &str) -> String {
+    if download_link.starts_with("http://")
+        || download_link.starts_with("https://")
+        || download_link == "/wiki"
+        || download_link.starts_with("/wiki/")
+    {
+        return download_link.to_string();
+    }
+    format!("/wiki/{}", download_link.trim_start_matches('/'))
+}
+
 // Download attachment
 pub async fn download_attachment(
     ctx: &ConfluenceContext<'_>,
@@ -153,30 +174,14 @@ pub async fn download_attachment(
         .await
         .with_context(|| format!("Failed to get attachment {}", attachment_id))?;
 
-    // Download the file
-    let base_url = ctx.client.base_url();
-
-    let mut request = ctx
+    // Fetch through ApiClient rather than a raw request: it applies auth, retries,
+    // rate limiting and the same-origin (SSRF) check, matching bamboo's
+    // download_artifact. The query string on downloadLink is preserved.
+    let content = ctx
         .client
-        .http_client()
-        .get(format!("{}{}", base_url, attachment.download_link));
-
-    // Apply authentication
-    request = ctx.client.apply_auth(request);
-
-    let response = request
-        .send()
+        .get_bytes(&attachment_download_path(&attachment.download_link))
         .await
-        .context("Failed to download attachment")?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to download attachment"));
-    }
-
-    let content = response
-        .bytes()
-        .await
-        .context("Failed to read attachment content")?;
+        .with_context(|| format!("Failed to download attachment {}", attachment_id))?;
 
     fs::write(output, content)
         .with_context(|| format!("Failed to write file: {}", output.display()))?;
@@ -219,4 +224,61 @@ pub async fn delete_attachment(
             attachment_id,
         ),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Regression: the v2 API returns downloadLink relative to the /wiki context
+    // (no /wiki prefix). ApiClient is rooted at the bare origin, so we insert /wiki.
+    #[test]
+    fn bare_relative_link_gets_wiki_prefix() {
+        assert_eq!(
+            attachment_download_path("/download/attachments/100/diagram.png"),
+            "/wiki/download/attachments/100/diagram.png"
+        );
+    }
+
+    // The real v2 downloadLink carries a query string; it must survive intact.
+    #[test]
+    fn query_string_is_preserved() {
+        assert_eq!(
+            attachment_download_path("/download/attachments/1/f.png?version=1&api=v2"),
+            "/wiki/download/attachments/1/f.png?version=1&api=v2"
+        );
+    }
+
+    // Idempotent: a link that already includes /wiki is left untouched.
+    #[test]
+    fn already_wiki_prefixed_link_is_unchanged() {
+        let link = "/wiki/download/attachments/100/diagram.png";
+        assert_eq!(attachment_download_path(link), link);
+    }
+
+    // Absolute links pass through. ApiClient::get_bytes then applies its
+    // same-origin check, so a cross-host link is rejected rather than fetched.
+    #[test]
+    fn absolute_link_is_used_as_is() {
+        let link = "https://example.atlassian.net/wiki/download/attachments/1/a.png";
+        assert_eq!(attachment_download_path(link), link);
+    }
+
+    // Defensive: a link with no leading slash still produces a well-formed path.
+    #[test]
+    fn relative_link_without_leading_slash_is_handled() {
+        assert_eq!(
+            attachment_download_path("download/attachments/1/f.png"),
+            "/wiki/download/attachments/1/f.png"
+        );
+    }
+
+    // No double slash even if the API ever returned one.
+    #[test]
+    fn double_leading_slash_is_normalised() {
+        assert_eq!(
+            attachment_download_path("//download/attachments/1/f.png"),
+            "/wiki/download/attachments/1/f.png"
+        );
+    }
 }

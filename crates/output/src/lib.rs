@@ -136,12 +136,34 @@ impl OutputRenderer {
             None => return Ok(false),
         };
 
-        println!("{}", headers.join(","));
+        println!("{}", Self::csv_record(&headers));
         for row in rows {
-            println!("{}", row.join(","));
+            println!("{}", Self::csv_record(&row));
         }
 
         Ok(true)
+    }
+
+    /// Join one CSV record, quoting per RFC 4180.
+    ///
+    /// Fields routinely contain commas (issue summaries, comment bodies) and can
+    /// contain newlines. Joining them raw shifted columns and broke rows, so any
+    /// field containing a comma, double quote, CR or LF is wrapped in double
+    /// quotes with internal quotes doubled.
+    fn csv_record(fields: &[String]) -> String {
+        fields
+            .iter()
+            .map(|f| Self::csv_field(f))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+
+    fn csv_field(field: &str) -> String {
+        if field.contains([',', '"', '\n', '\r']) {
+            format!("\"{}\"", field.replace('"', "\"\""))
+        } else {
+            field.to_string()
+        }
     }
 
     fn render_quiet(&self, value: &Value) -> bool {
@@ -197,7 +219,7 @@ impl OutputRenderer {
         // Header row
         let header_line: String = headers
             .iter()
-            .map(|h| h.replace('|', "\\|"))
+            .map(|h| Self::markdown_cell(h))
             .collect::<Vec<_>>()
             .join(" | ");
         println!("| {} |", header_line);
@@ -214,13 +236,24 @@ impl OutputRenderer {
         for row in rows {
             let cells: String = row
                 .iter()
-                .map(|c| c.replace('|', "\\|"))
+                .map(|c| Self::markdown_cell(c))
                 .collect::<Vec<_>>()
                 .join(" | ");
             println!("| {} |", cells);
         }
 
         Ok(true)
+    }
+
+    /// Escape one markdown table cell.
+    ///
+    /// A newline terminates the row in markdown, so a multi-line value (a comment
+    /// body, a page description) silently broke the table. Newlines become `<br>`,
+    /// and `|` is escaped so it does not open a new column.
+    fn markdown_cell(cell: &str) -> String {
+        cell.replace('|', "\\|")
+            .replace("\r\n", "<br>")
+            .replace(['\n', '\r'], "<br>")
     }
 
     fn render_markdown_single(&self, value: &Value) -> Result<bool> {
@@ -539,6 +572,49 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Markdown);
         let result = renderer.render(&test_data);
         assert!(result.is_ok());
+    }
+
+    // Regression: render_csv used to `row.join(",")` with no quoting, so any field
+    // containing a comma (issue summaries, comment bodies) shifted every later
+    // column, and a newline destroyed the row outright.
+    #[test]
+    fn test_csv_field_quotes_per_rfc4180() {
+        assert_eq!(OutputRenderer::csv_field("plain"), "plain");
+        assert_eq!(OutputRenderer::csv_field("a,b"), "\"a,b\"");
+        assert_eq!(
+            OutputRenderer::csv_field("say \"hi\""),
+            "\"say \"\"hi\"\"\""
+        );
+        assert_eq!(
+            OutputRenderer::csv_field("line1\nline2"),
+            "\"line1\nline2\""
+        );
+        assert_eq!(OutputRenderer::csv_field("cr\r"), "\"cr\r\"");
+        // Quoting only when required, so unaffected output is byte-identical.
+        assert_eq!(OutputRenderer::csv_field("no-specials"), "no-specials");
+    }
+
+    #[test]
+    fn test_csv_record_keeps_columns_aligned() {
+        let fields = vec![
+            "1".to_string(),
+            "Fix bug, urgently".to_string(),
+            "open".to_string(),
+        ];
+        // Three fields must stay three columns despite the embedded comma.
+        assert_eq!(
+            OutputRenderer::csv_record(&fields),
+            "1,\"Fix bug, urgently\",open"
+        );
+    }
+
+    // Regression: a newline in a cell terminated the markdown table row.
+    #[test]
+    fn test_markdown_cell_escapes_newlines_and_pipes() {
+        assert_eq!(OutputRenderer::markdown_cell("a|b"), "a\\|b");
+        assert_eq!(OutputRenderer::markdown_cell("one\ntwo"), "one<br>two");
+        assert_eq!(OutputRenderer::markdown_cell("one\r\ntwo"), "one<br>two");
+        assert_eq!(OutputRenderer::markdown_cell("plain"), "plain");
     }
 
     #[test]
