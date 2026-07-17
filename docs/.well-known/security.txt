@@ -1,8 +1,0 @@
-# Security contact for atlassian-cli (independent open-source project,
-# not affiliated with Atlassian).
-Contact: https://github.com/omar16100/atlassian-cli/security/advisories/new
-Contact: mailto:omarshabab55@gmail.com
-Expires: 2027-05-16T00:00:00.000Z
-Preferred-Languages: en
-Canonical: https://atlassiancli.com/.well-known/security.txt
-Policy: https://github.com/omar16100/atlassian-cli/blob/main/SECURITY.md
