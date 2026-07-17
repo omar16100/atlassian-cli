@@ -1,5 +1,28 @@
 # Changes Made
 
+## 2026-07-13 — Website separated into private repo; removed from public CLI repo
+
+### Context
+The website was split out into its own private repo, `omar16100/atlassiancli-site`, deployed via
+Cloudflare Pages (`atlassiancli.com` now resolves to Cloudflare via Porkbun nameservers). The public
+`atlassian-cli` repo still carried a stale duplicate of the served site under `docs/`, with GitHub Pages
+enabled from `main/docs` and a `docs/CNAME` claiming `atlassiancli.com`. PR #87 had bumped that stale
+copy to 0.4.3 by mistake; the live private site was still on 0.4.2.
+
+### Live site fix (private repo, direct to main)
+Ported the vetted 0.4.3 changelog entry and version bumps (footer badge, `softwareVersion` JSON-LD,
+install prose, `llms.txt`; JSON-LD ItemList renumbered) into `atlassiancli-site` and pushed to `main`
+so Cloudflare Pages redeploys. 83 files, version-string only.
+
+### Public repo cleanup (chore/remove-public-site)
+Removed the 92 served-website files from `docs/` (all HTML/CSS/JS/assets, `CNAME`, `.well-known`,
+`robots.txt`, `sitemap.xml`, `llms.txt`, blog/changelog/install/runbooks/product pages). Kept the 23
+genuine CLI dev docs (`c4model.md`, `status.md`, `vision.md`, `plan.md`, `todo.md`, dated dev logs,
+`examples/*.sh`). Disabled GitHub Pages on the public repo so it stops building from `main/docs` and
+releases the orphaned `atlassiancli.com` CNAME claim. README/SECURITY links to `atlassiancli.com/*`
+kept as-is (still served by Cloudflare). NOTE: `docs/seo_traffic_growth_plan.md` (website SEO strategy)
+was left in place pending a decision to relocate it to the private repo.
+
 ## 2026-07-13 — Open-PR sweep: 4 PRs triaged, fixed, merged; release 0.4.3
 
 ### Context
