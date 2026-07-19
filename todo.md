@@ -20,8 +20,20 @@ Removed the 92 served-website files from `docs/` (all HTML/CSS/JS/assets, `CNAME
 genuine CLI dev docs (`c4model.md`, `status.md`, `vision.md`, `plan.md`, `todo.md`, dated dev logs,
 `examples/*.sh`). Disabled GitHub Pages on the public repo so it stops building from `main/docs` and
 releases the orphaned `atlassiancli.com` CNAME claim. README/SECURITY links to `atlassiancli.com/*`
-kept as-is (still served by Cloudflare). NOTE: `docs/seo_traffic_growth_plan.md` (website SEO strategy)
-was left in place pending a decision to relocate it to the private repo.
+kept as-is (still served by Cloudflare).
+
+### SEO plan relocated + scrubbed from public history
+`docs/seo_traffic_growth_plan.md` (website SEO strategy) already existed byte-identical in the private
+repo at `research/seo_traffic_growth_plan.md`, so no copy was needed. Removed it from the public repo's
+entire git history with `git filter-repo --invert-paths`, then force-pushed the rewritten `main` and all
+28 tags. Also deleted two stale merged-PR branches (`chore/deps-production-group` #84,
+`fix/confluence-comments-and-attachments` #85) that still carried it, and cleaned 22 stale local
+branches. Verified: a normal `git clone` (branches + tags) has zero references to the file and every
+release kept its 14 assets. Side effects, accepted by the user: the rewrite stripped GPG signatures
+from all 224 signed commits (Verified badges lost repo-wide; no content/author/date/message changed),
+and the file still exists in GitHub's read-only `refs/pull/*` PR-snapshot refs, which git cannot rewrite
+(purging those requires GitHub Support). Pre-scrub backups saved to the session scratchpad
+(`atlassian-cli-pre-scrub.bundle`, `local-branches-backup.bundle`).
 
 ## 2026-07-13 — Open-PR sweep: 4 PRs triaged, fixed, merged; release 0.4.3
 
