@@ -22,3 +22,9 @@
 # Local todo tracking
 docs/todo.md
 .playwright-mcp/
+
+# Cloudflare Wrangler cache (website deploy tooling, not part of the CLI)
+.wrangler/
+
+# Scratch / screenshots
+tmp/
