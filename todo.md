@@ -35,6 +35,13 @@ and the file still exists in GitHub's read-only `refs/pull/*` PR-snapshot refs, 
 (purging those requires GitHub Support). Pre-scrub backups saved to the session scratchpad
 (`atlassian-cli-pre-scrub.bundle`, `local-branches-backup.bundle`).
 
+### .wrangler + tmp gitignored and scrubbed
+Added `.wrangler/` (Cloudflare Pages deploy cache) and `tmp/` (stray Playwright screenshots) to
+`.gitignore`, dropped both from tracking at the tip, then ran a second `git filter-repo --invert-paths`
+to remove them from all history and force-pushed `main` + tags (only `v0.4.3` contained them, so only
+that tag moved; its 14 release assets intact). `.wrangler/cache/wrangler-account.json` had exposed the
+Cloudflare account id and account name (no credential). Same `refs/pull/*` residue caveat applies.
+
 ## 2026-07-13 — Open-PR sweep: 4 PRs triaged, fixed, merged; release 0.4.3
 
 ### Context
