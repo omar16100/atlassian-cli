@@ -43,7 +43,7 @@ get_all_repos() {
     atlassian-cli bitbucket repo list \
         --profile "$PROFILE" \
         "$WORKSPACE" \
-        --output json
+        --format json
 }
 
 # Get repository permissions
@@ -54,7 +54,7 @@ get_repo_permissions() {
         --profile "$PROFILE" \
         "$WORKSPACE" \
         "$repo" \
-        --output json 2>/dev/null || echo "[]"
+        --format json 2>/dev/null || echo "[]"
 }
 
 # Generate CSV report
