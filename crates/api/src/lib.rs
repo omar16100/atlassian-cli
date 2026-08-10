@@ -3,8 +3,10 @@ pub mod pagination;
 pub mod ratelimit;
 pub mod retry;
 
+use backoff::backoff::Backoff;
 use error::{ApiError, Result};
 use ratelimit::RateLimiter;
+use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use retry::{retry_with_backoff, RetryConfig};
 use secrecy::{ExposeSecret, SecretString};
@@ -49,9 +51,69 @@ impl fmt::Debug for AuthMethod {
     }
 }
 
+/// Compare two URLs by full origin: scheme, host **and port**.
+///
+/// Port matters. Comparing scheme and host alone lets `https://site:8443/x`
+/// through on a `https://site` profile, and on a localhost profile it lets any
+/// other local port receive the profile's credentials.
+fn same_origin(a: &Url, b: &Url) -> bool {
+    a.scheme() == b.scheme()
+        && a.host() == b.host()
+        && a.port_or_known_default() == b.port_or_known_default()
+}
+
+/// The `Retry-After` delay in seconds, when the server sent one. The HTTP-date
+/// form is ignored; Atlassian sends seconds.
+fn retry_after(response: &reqwest::Response) -> Option<Duration> {
+    response
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(Duration::from_secs)
+}
+
+/// An arbitrary request for [`ApiClient::request_raw`].
+pub struct RawRequest<'a> {
+    pub method: Method,
+    /// Path (and optional query) relative to the client's base URL.
+    pub path: &'a str,
+    pub headers: HeaderMap,
+    pub body: Option<&'a [u8]>,
+    /// Overrides the client-wide 30s timeout for this request only.
+    pub timeout: Option<Duration>,
+}
+
+/// A response with no status-to-error mapping applied.
+#[derive(Debug, Clone)]
+pub struct RawResponse {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
+impl RawResponse {
+    pub fn is_success(&self) -> bool {
+        (200..300).contains(&self.status)
+    }
+
+    /// Case-insensitive header lookup. Returns the first match.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
+    }
+}
+
 #[derive(Clone)]
 pub struct ApiClient {
     client: Client,
+    /// Same-origin-only redirect policy; used by `request_raw`.
+    raw_client: Client,
     base_url: Url,
     auth: Option<AuthMethod>,
     retry_config: RetryConfig,
@@ -83,8 +145,34 @@ impl ApiClient {
             .build()
             .map_err(ApiError::RequestFailed)?;
 
+        // `request_raw` sends user-chosen methods, bodies and headers, so it gets
+        // a client that refuses to leave the profile's origin. The default
+        // policy would follow a `Location` anywhere: reqwest strips
+        // `Authorization` cross-host, but 307/308 replay the body and custom
+        // `-H` headers are not stripped. A stopped redirect is returned to the
+        // caller as the 3xx itself, which is the transparent answer for a
+        // passthrough. The normal `client` keeps following redirects, because
+        // attachment downloads depend on the cross-host hop to Atlassian's
+        // media host.
+        let origin = url.clone();
+        let raw_client = Client::builder()
+            .user_agent(format!("atlassian-cli/{}", env!("CARGO_PKG_VERSION")))
+            .timeout(Duration::from_secs(30))
+            .redirect(reqwest::redirect::Policy::custom(move |attempt| {
+                if attempt.previous().len() >= 10 {
+                    attempt.error("too many redirects")
+                } else if same_origin(attempt.url(), &origin) {
+                    attempt.follow()
+                } else {
+                    attempt.stop()
+                }
+            }))
+            .build()
+            .map_err(ApiError::RequestFailed)?;
+
         Ok(Self {
             client,
+            raw_client,
             base_url: url,
             auth: None,
             retry_config: RetryConfig::default(),
@@ -92,7 +180,7 @@ impl ApiClient {
         })
     }
 
-    /// Safely join a path to the base URL, ensuring scheme and host remain unchanged
+    /// Safely join a path to the base URL, ensuring the origin remains unchanged
     /// to prevent SSRF attacks.
     fn safe_join(&self, path: &str) -> Result<Url> {
         let joined = self
@@ -100,8 +188,7 @@ impl ApiClient {
             .join(path.strip_prefix('/').unwrap_or(path))
             .map_err(ApiError::InvalidUrl)?;
 
-        // Validate that scheme and host haven't changed (SSRF protection)
-        if joined.scheme() != self.base_url.scheme() || joined.host() != self.base_url.host() {
+        if !same_origin(&joined, &self.base_url) {
             return Err(ApiError::InvalidUrl(
                 url::ParseError::InvalidDomainCharacter,
             ));
@@ -371,6 +458,100 @@ impl ApiClient {
         Ok(result)
     }
 
+    /// Resolve `path` against the base URL, applying the same-origin (SSRF)
+    /// check used by every request. Public so callers can validate or preview a
+    /// path without sending anything.
+    pub fn resolve_url(&self, path: &str) -> Result<Url> {
+        self.safe_join(path)
+    }
+
+    /// Send an arbitrary request and return the status, headers and body bytes.
+    ///
+    /// Unlike [`ApiClient::request`], a non-2xx status is returned as
+    /// `Ok(RawResponse)` rather than mapped to an [`ApiError`], so callers can
+    /// surface the API's own error body. Only transport failures and URL
+    /// validation produce `Err`. Same-origin validation, auth and rate limiting
+    /// still apply.
+    ///
+    /// Retries on 429/5xx are limited to idempotent methods. `request` retries
+    /// POSTs, which can double-create; a raw passthrough must not inherit that.
+    pub async fn request_raw(&self, req: RawRequest<'_>) -> Result<RawResponse> {
+        if let Some(wait_secs) = self.rate_limiter.check_limit().await {
+            warn!(wait_secs, "Rate limit reached, waiting");
+            tokio::time::sleep(Duration::from_secs(wait_secs)).await;
+        }
+
+        let joined = self.safe_join(req.path)?;
+        debug!(method = %req.method, url = %joined, "Sending raw request");
+
+        let idempotent = matches!(
+            req.method,
+            Method::GET | Method::HEAD | Method::PUT | Method::DELETE | Method::OPTIONS
+        );
+        // retry_with_backoff cannot be used here: its closure must signal a
+        // retryable outcome as Err, which would discard the RawResponse we have
+        // to return on the final attempt.
+        let mut backoff = self.retry_config.backoff();
+        let mut attempts = 0usize;
+
+        loop {
+            attempts += 1;
+
+            let mut builder = self.raw_client.request(req.method.clone(), joined.clone());
+            builder = self.apply_auth(builder);
+            builder = builder.headers(req.headers.clone());
+            if let Some(body) = req.body {
+                builder = builder.body(body.to_vec());
+            }
+            if let Some(timeout) = req.timeout {
+                builder = builder.timeout(timeout);
+            }
+
+            let response = builder.send().await.map_err(ApiError::RequestFailed)?;
+            self.rate_limiter.update_from_response(&response).await;
+            let status = response.status();
+
+            let retryable = status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error();
+            if idempotent && retryable && attempts < self.retry_config.max_retries {
+                if let Some(wait) = backoff.next_backoff() {
+                    // A 429 says how long to wait; obey it rather than racing
+                    // back in after a short exponential sleep.
+                    let wait = retry_after(&response).unwrap_or(wait);
+                    warn!(
+                        status = status.as_u16(),
+                        attempt = attempts,
+                        wait_ms = wait.as_millis(),
+                        "Raw request failed, retrying"
+                    );
+                    tokio::time::sleep(wait).await;
+                    continue;
+                }
+            }
+
+            let headers = response
+                .headers()
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        name.as_str().to_string(),
+                        value.to_str().unwrap_or_default().to_string(),
+                    )
+                })
+                .collect();
+            let body = response
+                .bytes()
+                .await
+                .map_err(|err| ApiError::InvalidResponse(err.to_string()))?
+                .to_vec();
+
+            return Ok(RawResponse {
+                status: status.as_u16(),
+                headers,
+                body,
+            });
+        }
+    }
+
     /// Get binary content from an endpoint.
     /// Includes retry logic and rate limiting.
     pub async fn get_bytes(&self, path: &str) -> Result<Vec<u8>> {
@@ -583,7 +764,7 @@ impl ApiClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{body_string, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
@@ -721,5 +902,339 @@ mod tests {
         let client = ApiClient::new(server.uri()).unwrap();
         let result: serde_json::Value = client.get("/issue/AEA-1").await.unwrap();
         assert_eq!(result["key"], "AEA-1");
+    }
+
+    // -----------------------------------------------------------------------
+    // request_raw
+    // -----------------------------------------------------------------------
+
+    /// The point of the raw path: a non-2xx status is data, not an error, so the
+    /// API's own error body survives instead of being replaced by ApiError.
+    #[tokio::test]
+    async fn test_request_raw_surfaces_non_2xx_without_erroring() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/NOPE-1"))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(serde_json::json!({"errorMessages": ["Issue does not exist"]})),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "/rest/api/3/issue/NOPE-1",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 404);
+        assert!(!response.is_success());
+        assert!(response
+            .header("Content-Type")
+            .unwrap()
+            .contains("application/json"));
+        assert!(String::from_utf8_lossy(&response.body).contains("Issue does not exist"));
+    }
+
+    #[tokio::test]
+    async fn test_request_raw_applies_headers_and_body() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue"))
+            .and(header("X-Atlassian-Token", "no-check"))
+            .and(body_string("{\"fields\":{}}"))
+            .respond_with(
+                ResponseTemplate::new(201).set_body_json(serde_json::json!({"key": "A-1"})),
+            )
+            .mount(&server)
+            .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Atlassian-Token", "no-check".parse().unwrap());
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::POST,
+                path: "/rest/api/3/issue",
+                headers,
+                body: Some(b"{\"fields\":{}}"),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 201);
+    }
+
+    #[tokio::test]
+    async fn test_request_raw_retries_5xx_for_get() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/flaky"))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(3)
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri())
+            .unwrap()
+            .with_retry_config(RetryConfig {
+                initial_interval: Duration::from_millis(1),
+                ..RetryConfig::default()
+            });
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "/flaky",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 500);
+    }
+
+    /// Replaying a POST can double-create. `request` does retry POSTs; the raw
+    /// path deliberately does not inherit that.
+    #[tokio::test]
+    async fn test_request_raw_never_retries_post() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/create"))
+            .respond_with(ResponseTemplate::new(503))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri())
+            .unwrap()
+            .with_retry_config(RetryConfig {
+                initial_interval: Duration::from_millis(1),
+                ..RetryConfig::default()
+            });
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::POST,
+                path: "/create",
+                headers: HeaderMap::new(),
+                body: Some(b"{}"),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 503);
+    }
+
+    #[tokio::test]
+    async fn test_request_raw_rejects_cross_host_path() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let err = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "https://evil.example.com/steal",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, ApiError::InvalidUrl(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn test_resolve_url_enforces_same_origin() {
+        let client = ApiClient::new("https://site.atlassian.net").unwrap();
+
+        assert_eq!(
+            client.resolve_url("/rest/api/3/myself").unwrap().as_str(),
+            "https://site.atlassian.net/rest/api/3/myself"
+        );
+        // Relative paths work with or without the leading slash.
+        assert_eq!(
+            client.resolve_url("rest/api/3/myself").unwrap().as_str(),
+            "https://site.atlassian.net/rest/api/3/myself"
+        );
+        // Other hosts, scheme downgrades and userinfo tricks are all rejected.
+        for bad in [
+            "https://evil.example.com/x",
+            "http://site.atlassian.net/x",
+            "https://site.atlassian.net@evil.example.com/",
+            "//evil.example.com/x",
+        ] {
+            let resolved = client.resolve_url(bad);
+            match resolved {
+                Err(_) => {}
+                // A protocol-relative path is not treated as a host by `join`;
+                // pin the behaviour so a future change cannot silently open it up.
+                Ok(url) => assert_eq!(url.host_str(), Some("site.atlassian.net"), "{bad}"),
+            }
+        }
+    }
+
+    /// Regression: comparing scheme and host but not port let any other port on
+    /// the same host receive the profile's credentials.
+    #[tokio::test]
+    async fn test_request_raw_rejects_a_different_port_on_the_same_host() {
+        let victim = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("secrets"))
+            .expect(0)
+            .mount(&victim)
+            .await;
+
+        let server = MockServer::start().await;
+        let client = ApiClient::new(server.uri()).unwrap();
+        let err = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: &format!("{}/steal", victim.uri()),
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, ApiError::InvalidUrl(_)), "got {err:?}");
+    }
+
+    /// `safe_join` only sees the first URL, so a same-origin endpoint could
+    /// otherwise bounce a write-capable request anywhere. The raw client stops
+    /// at the redirect and hands the 3xx back instead of following it.
+    #[tokio::test]
+    async fn test_request_raw_does_not_follow_a_cross_origin_redirect() {
+        let evil = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("pwned"))
+            .expect(0)
+            .mount(&evil)
+            .await;
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/bounce"))
+            .respond_with(
+                ResponseTemplate::new(307)
+                    .insert_header("location", format!("{}/steal", evil.uri()).as_str()),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri())
+            .unwrap()
+            .with_basic_auth("dev@example.com", "token");
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::POST,
+                path: "/rest/api/3/bounce",
+                headers: HeaderMap::new(),
+                body: Some(b"{}"),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 307);
+        assert!(response.header("location").unwrap().contains("/steal"));
+        assert_ne!(response.body, b"pwned".to_vec());
+    }
+
+    /// Same-origin redirects are still followed, so ordinary endpoints work.
+    #[tokio::test]
+    async fn test_request_raw_follows_a_same_origin_redirect() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/from"))
+            .respond_with(ResponseTemplate::new(302).insert_header("location", "/to"))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/to"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("arrived"))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "/from",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, b"arrived".to_vec());
+    }
+
+    /// Attachment downloads depend on the cross-host hop to the media host, so
+    /// the ordinary client must keep following redirects.
+    #[tokio::test]
+    async fn test_get_bytes_still_follows_cross_host_redirects() {
+        let media = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/file/binary"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"BYTES".to_vec()))
+            .mount(&media)
+            .await;
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/content/1"))
+            .respond_with(
+                ResponseTemplate::new(302)
+                    .insert_header("location", format!("{}/file/binary", media.uri()).as_str()),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        assert_eq!(client.get_bytes("/content/1").await.unwrap(), b"BYTES");
+    }
+
+    #[test]
+    fn test_same_origin_compares_scheme_host_and_port() {
+        let base = Url::parse("https://site.atlassian.net").unwrap();
+        assert!(same_origin(
+            &Url::parse("https://site.atlassian.net/x").unwrap(),
+            &base
+        ));
+        // 443 is the known default for https, so an explicit port still matches.
+        assert!(same_origin(
+            &Url::parse("https://site.atlassian.net:443/x").unwrap(),
+            &base
+        ));
+        for other in [
+            "https://site.atlassian.net:8443/x",
+            "http://site.atlassian.net/x",
+            "https://evil.example.com/x",
+        ] {
+            assert!(
+                !same_origin(&Url::parse(other).unwrap(), &base),
+                "{other} must not match"
+            );
+        }
     }
 }
