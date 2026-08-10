@@ -161,9 +161,13 @@ fn init_tracing(debug: bool) -> Result<()> {
     };
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
 
+    // Logs go to stderr, never stdout: commands that stream raw bytes to stdout
+    // (e.g. `jira attachment download <ID> --output -`) must stay byte-exact for
+    // pipes, and tracing-subscriber's default writer is stdout.
     fmt()
         .with_env_filter(filter)
         .with_target(false)
+        .with_writer(std::io::stderr)
         .with_ansi(std::io::stderr().is_terminal())
         .try_init()
         .map_err(|err| anyhow!("failed to initialize logger: {err}"))

@@ -181,6 +181,8 @@ Shows the internal structure of atlassian-cli as a Rust workspace with 6 crates.
 
 **Jira (`commands/jira/`):**
 - `issues.rs` - CRUD, search, transitions, assignments
+- `attachments.rs` - Attachment list/get/download/upload/delete, plus the shared
+  `JiraAttachment` model used by `issues.rs` for `issue get`
 - `projects.rs` - Project management, roles
 - `fields_workflows.rs` - Custom fields, workflow transitions
 - `automation.rs` - Automation rules management
