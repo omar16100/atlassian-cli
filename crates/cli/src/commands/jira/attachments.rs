@@ -141,6 +141,17 @@ fn guard_reserved(name: &str) -> String {
     }
 }
 
+/// Assemble `stem + suffix + ext` within the filesystem's per-component byte
+/// budget, trimming the stem (never the suffix) on a char boundary.
+fn fit_filename(stem: &str, suffix: &str, ext: &str) -> String {
+    let budget = MAX_FILENAME_BYTES.saturating_sub(suffix.len() + ext.len());
+    let mut end = budget.min(stem.len());
+    while end > 0 && !stem.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}{suffix}{ext}", &stem[..end])
+}
+
 fn truncate_filename(name: &str) -> String {
     if name.len() <= MAX_FILENAME_BYTES {
         return name.to_string();
@@ -152,11 +163,7 @@ fn truncate_filename(name: &str) -> String {
     } else {
         ""
     };
-    let mut end = (MAX_FILENAME_BYTES - ext.len()).min(stem.len());
-    while end > 0 && !stem.is_char_boundary(end) {
-        end -= 1;
-    }
-    let out = format!("{}{}", &stem[..end], ext);
+    let out = fit_filename(stem, "", ext);
     if out.is_empty() || out == ext {
         "attachment".to_string()
     } else {
@@ -213,20 +220,41 @@ fn resolve_single_target(output: Option<&Path>) -> TargetSpec {
     }
 }
 
+/// Longest id prefix worth spending on disambiguation.
+const MAX_ID_PREFIX: usize = 32;
+
 /// Jira allows two attachments on one issue to share a filename. Without this,
 /// the second silently clobbers the first during a bulk download.
+///
+/// Every candidate goes through `fit_filename`, so disambiguating never pushes
+/// the name past the per-component byte limit, and the id is filtered rather
+/// than trusted: it reaches this function straight from a server response.
 fn unique_download_name(taken: &HashSet<String>, filename: &str, id: &str) -> String {
     if !taken.contains(filename) {
         return filename.to_string();
     }
-    let prefixed = format!("{id}-{filename}");
-    if !taken.contains(&prefixed) {
-        return prefixed;
-    }
-    let (stem, ext) = split_ext(&prefixed);
+
+    let (stem, ext) = split_ext(filename);
+    let id_prefix: String = id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+        .take(MAX_ID_PREFIX)
+        .collect();
+
+    let base = if id_prefix.is_empty() {
+        filename.to_string()
+    } else {
+        let prefixed = fit_filename(&format!("{id_prefix}-{stem}"), "", ext);
+        if !taken.contains(&prefixed) {
+            return prefixed;
+        }
+        prefixed
+    };
+
+    let (base_stem, base_ext) = split_ext(&base);
     let mut n = 2usize;
     loop {
-        let candidate = format!("{stem}-{n}{ext}");
+        let candidate = fit_filename(base_stem, &format!("-{n}"), base_ext);
         if !taken.contains(&candidate) {
             return candidate;
         }
@@ -347,14 +375,35 @@ async fn fetch_attachment_bytes(ctx: &JiraContext<'_>, attachment_id: &str) -> R
 }
 
 /// Write bytes to `path`, refusing to clobber an existing file without `force`.
+///
+/// The no-force path uses `create_new` rather than an `exists()` check followed
+/// by a write: that would race, and it would happily follow a symlink planted at
+/// the target between the two steps.
 fn write_bytes(path: &Path, bytes: &[u8], force: bool) -> Result<()> {
-    if !force && path.exists() {
-        bail!(
-            "{} already exists. Use --force to overwrite.",
-            path.display()
-        );
-    }
-    fs::write(path, bytes).with_context(|| format!("Failed to write file: {}", path.display()))
+    let mut file = if force {
+        fs::File::create(path)
+            .with_context(|| format!("Failed to write file: {}", path.display()))?
+    } else {
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+        {
+            Ok(file) => file,
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                bail!(
+                    "{} already exists. Use --force to overwrite.",
+                    path.display()
+                );
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("Failed to write file: {}", path.display()))
+            }
+        }
+    };
+    file.write_all(bytes)
+        .with_context(|| format!("Failed to write file: {}", path.display()))
 }
 
 fn write_stdout(bytes: &[u8]) -> Result<()> {
@@ -460,6 +509,23 @@ pub async fn download_issue_attachments(
     for attachment in &attachments {
         let id = attachment.id.as_deref().unwrap_or("");
         let raw = attachment.filename.as_deref().unwrap_or("");
+
+        // The id arrives straight from the server and is interpolated into both
+        // a URL path and a filename, so it is checked before either use. A bad
+        // id fails just its own row rather than the whole run.
+        if let Err(err) = validate_ref("attachment id", id) {
+            failures += 1;
+            tracing::warn!(attachment_id = %id, error = %err, "Skipping attachment with unusable id");
+            rows.push(DownloadRow {
+                id: id.to_string(),
+                filename: safe_filename(raw, ""),
+                size: 0,
+                path: String::new(),
+                status: format!("failed: {err}"),
+            });
+            continue;
+        }
+
         let name = unique_download_name(&taken, &safe_filename(raw, id), id);
         taken.insert(name.clone());
         let path = dir.join(&name);
@@ -794,6 +860,37 @@ mod tests {
         );
     }
 
+    // A hostile id must not be able to smuggle a path separator into the
+    // disambiguated filename. Bulk download validates ids before this point;
+    // this is the second line of defence.
+    #[test]
+    fn unique_name_strips_path_chars_from_a_hostile_id() {
+        let taken: HashSet<String> = ["dup.txt".to_string()].into_iter().collect();
+        let name = unique_download_name(&taken, "dup.txt", "../../owned");
+        assert!(!name.contains('/'), "got {name}");
+        assert!(!name.contains('\\'), "got {name}");
+        assert_eq!(name, "owned-dup.txt");
+    }
+
+    #[test]
+    fn unique_name_falls_back_to_counter_when_id_is_unusable() {
+        let taken: HashSet<String> = ["dup.txt".to_string()].into_iter().collect();
+        assert_eq!(unique_download_name(&taken, "dup.txt", "///"), "dup-2.txt");
+    }
+
+    // Disambiguating must not push the name past the per-component byte limit,
+    // which would make the write fail with ENAMETOOLONG.
+    #[test]
+    fn unique_name_stays_within_the_byte_limit() {
+        let long = safe_filename(&format!("{}.png", "a".repeat(400)), FALLBACK);
+        assert_eq!(long.len(), MAX_FILENAME_BYTES);
+        let taken: HashSet<String> = [long.clone()].into_iter().collect();
+        let name = unique_download_name(&taken, &long, "10002");
+        assert!(name.len() <= MAX_FILENAME_BYTES, "len was {}", name.len());
+        assert!(name.starts_with("10002-"));
+        assert!(name.ends_with(".png"));
+    }
+
     #[test]
     fn validate_ref_accepts_keys_and_ids() {
         assert!(validate_ref("issue key", "PROJ-123").is_ok());
@@ -853,6 +950,36 @@ mod tests {
         let row = attachment_row(&a);
         assert_eq!(row.author, "Ada");
         assert_eq!(row.created, "2026-08-01T10:00:00.000+0000");
+    }
+
+    #[test]
+    fn write_bytes_refuses_to_clobber_without_force() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("f.bin");
+        write_bytes(&path, b"first", false).unwrap();
+
+        let err = write_bytes(&path, b"second", false).unwrap_err();
+        assert!(err.to_string().contains("already exists"), "got {err}");
+        assert_eq!(fs::read(&path).unwrap(), b"first");
+
+        write_bytes(&path, b"second", true).unwrap();
+        assert_eq!(fs::read(&path).unwrap(), b"second");
+    }
+
+    // create_new, unlike an exists() check, refuses to follow a symlink planted
+    // at the target path.
+    #[cfg(unix)]
+    #[test]
+    fn write_bytes_does_not_follow_a_symlink_without_force() {
+        let dir = tempfile::tempdir().unwrap();
+        let victim = dir.path().join("victim.txt");
+        fs::write(&victim, b"original").unwrap();
+        let link = dir.path().join("link.bin");
+        std::os::unix::fs::symlink(&victim, &link).unwrap();
+
+        let err = write_bytes(&link, b"attacker", false).unwrap_err();
+        assert!(err.to_string().contains("already exists"), "got {err}");
+        assert_eq!(fs::read(&victim).unwrap(), b"original");
     }
 
     #[test]

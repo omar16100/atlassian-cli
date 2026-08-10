@@ -537,6 +537,9 @@ async fn test_jira_download_does_not_leak_credentials_across_redirect() {
     let jira = MockServer::start().await;
     Mock::given(method("GET"))
         .and(path("/rest/api/3/attachment/content/10001"))
+        // Requiring auth here keeps the test honest: without it, the assertion
+        // below would also pass if we simply stopped sending credentials at all.
+        .and(header_exists("authorization"))
         .respond_with(ResponseTemplate::new(302).insert_header(
             "location",
             format!("{}/file/abc/binary", media.uri()).as_str(),
