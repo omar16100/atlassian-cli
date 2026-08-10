@@ -373,3 +373,103 @@ async fn overriding_the_authorization_header_is_refused() {
     assert!(!out.status.success());
     assert!(String::from_utf8_lossy(&out.stderr).contains("Authorization"));
 }
+
+/// `--output` must behave like `jira attachment download`: no silent clobber.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn output_refuses_to_clobber_without_force() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/myself"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"ok": true})))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    std::fs::write(dir.path().join("out.json"), b"existing").unwrap();
+
+    let out = run(
+        &config,
+        dir.path(),
+        &["jira", "api", "/rest/api/3/myself", "--output", "out.json"],
+    );
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("already exists"));
+    assert_eq!(
+        std::fs::read(dir.path().join("out.json")).unwrap(),
+        b"existing"
+    );
+
+    let forced = run(
+        &config,
+        dir.path(),
+        &[
+            "jira",
+            "api",
+            "/rest/api/3/myself",
+            "--output",
+            "out.json",
+            "--force",
+        ],
+    );
+    assert!(forced.status.success());
+    assert!(std::fs::read(dir.path().join("out.json"))
+        .unwrap()
+        .starts_with(b"{"));
+}
+
+/// A same-origin endpoint must not be able to bounce a credentialed, body-carrying
+/// request to another host. The 3xx comes back instead.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_cross_origin_redirect_is_returned_not_followed() {
+    let evil = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("pwned"))
+        .expect(0)
+        .mount(&evil)
+        .await;
+
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path_matcher("/rest/api/3/bounce"))
+        .respond_with(
+            ResponseTemplate::new(307)
+                .insert_header("location", format!("{}/steal", evil.uri()).as_str()),
+        )
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        dir.path(),
+        &["jira", "api", "/rest/api/3/bounce", "-d", "{}"],
+    );
+    // 307 is not 2xx, so this exits 1 and the user sees the redirect.
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("HTTP 307"));
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("pwned"));
+}
+
+/// Regression: the origin check compared scheme and host but not port, so any
+/// other port on the same host could receive the profile's credentials.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_different_port_on_the_same_host_is_rejected() {
+    let victim = MockServer::start().await;
+    Mock::given(method("GET"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("secrets"))
+        .expect(0)
+        .mount(&victim)
+        .await;
+
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let target = format!("{}/steal", victim.uri());
+    let out = run(&config, dir.path(), &["jira", "api", &target]);
+    assert!(!out.status.success());
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("secrets"));
+}

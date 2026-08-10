@@ -26,8 +26,9 @@ atlassian-cli jira api <PATH> [-X METHOD] [-d BODY] [-H NAME:VALUE]...
   `project%20%3D%20TEST`.
 - `-i/--include` prints the status and response headers to stderr, with
   `set-cookie` redacted since this output gets pasted into bug reports.
-- `--output FILE` writes the body verbatim, which is what makes this able to
-  fetch an attachment on its own.
+- `--output FILE` writes the body verbatim, refusing to clobber an existing file
+  without `--force` and using `create_new` so it will not follow a planted
+  symlink.
 - `--dry-run` prints the resolved request and sends nothing.
 - `--timeout SECS` overrides the client-wide 30s total-request timeout.
 
@@ -79,8 +80,8 @@ final attempt, so it drives `RetryConfig::backoff()` in a local loop.
 - No `/rest/` prefix requirement. It would break `/secure/attachment/...`,
   `/download/...`, `/wiki/api/v2/...` and `/gateway/api/...`, and adds nothing
   over same-origin.
-- `--force` gates DELETE only. Requiring it for every write would be wrong, since
-  several Jira read endpoints are POST. This stays non-interactive so the command
+- `--force` gates DELETE, and overwriting an existing `--output` file. Requiring
+  it for every write would be wrong, since several Jira read endpoints are POST. This stays non-interactive so the command
   is pipeline-safe, and it exits 1 rather than returning `Ok(())` the way
   `jira issue delete` does: a passthrough that silently no-ops inside a script is
   worse than one that fails.

@@ -51,6 +51,31 @@ impl fmt::Debug for AuthMethod {
     }
 }
 
+/// Compare two URLs by full origin: scheme, host **and port**.
+///
+/// Port matters. Comparing scheme and host alone lets `https://site:8443/x`
+/// through on a `https://site` profile, and on a localhost profile it lets any
+/// other local port receive the profile's credentials.
+fn same_origin(a: &Url, b: &Url) -> bool {
+    a.scheme() == b.scheme()
+        && a.host() == b.host()
+        && a.port_or_known_default() == b.port_or_known_default()
+}
+
+/// The `Retry-After` delay in seconds, when the server sent one. The HTTP-date
+/// form is ignored; Atlassian sends seconds.
+fn retry_after(response: &reqwest::Response) -> Option<Duration> {
+    response
+        .headers()
+        .get(reqwest::header::RETRY_AFTER)?
+        .to_str()
+        .ok()?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(Duration::from_secs)
+}
+
 /// An arbitrary request for [`ApiClient::request_raw`].
 pub struct RawRequest<'a> {
     pub method: Method,
@@ -87,6 +112,8 @@ impl RawResponse {
 #[derive(Clone)]
 pub struct ApiClient {
     client: Client,
+    /// Same-origin-only redirect policy; used by `request_raw`.
+    raw_client: Client,
     base_url: Url,
     auth: Option<AuthMethod>,
     retry_config: RetryConfig,
@@ -118,8 +145,34 @@ impl ApiClient {
             .build()
             .map_err(ApiError::RequestFailed)?;
 
+        // `request_raw` sends user-chosen methods, bodies and headers, so it gets
+        // a client that refuses to leave the profile's origin. The default
+        // policy would follow a `Location` anywhere: reqwest strips
+        // `Authorization` cross-host, but 307/308 replay the body and custom
+        // `-H` headers are not stripped. A stopped redirect is returned to the
+        // caller as the 3xx itself, which is the transparent answer for a
+        // passthrough. The normal `client` keeps following redirects, because
+        // attachment downloads depend on the cross-host hop to Atlassian's
+        // media host.
+        let origin = url.clone();
+        let raw_client = Client::builder()
+            .user_agent(format!("atlassian-cli/{}", env!("CARGO_PKG_VERSION")))
+            .timeout(Duration::from_secs(30))
+            .redirect(reqwest::redirect::Policy::custom(move |attempt| {
+                if attempt.previous().len() >= 10 {
+                    attempt.error("too many redirects")
+                } else if same_origin(attempt.url(), &origin) {
+                    attempt.follow()
+                } else {
+                    attempt.stop()
+                }
+            }))
+            .build()
+            .map_err(ApiError::RequestFailed)?;
+
         Ok(Self {
             client,
+            raw_client,
             base_url: url,
             auth: None,
             retry_config: RetryConfig::default(),
@@ -127,7 +180,7 @@ impl ApiClient {
         })
     }
 
-    /// Safely join a path to the base URL, ensuring scheme and host remain unchanged
+    /// Safely join a path to the base URL, ensuring the origin remains unchanged
     /// to prevent SSRF attacks.
     fn safe_join(&self, path: &str) -> Result<Url> {
         let joined = self
@@ -135,8 +188,7 @@ impl ApiClient {
             .join(path.strip_prefix('/').unwrap_or(path))
             .map_err(ApiError::InvalidUrl)?;
 
-        // Validate that scheme and host haven't changed (SSRF protection)
-        if joined.scheme() != self.base_url.scheme() || joined.host() != self.base_url.host() {
+        if !same_origin(&joined, &self.base_url) {
             return Err(ApiError::InvalidUrl(
                 url::ParseError::InvalidDomainCharacter,
             ));
@@ -445,7 +497,7 @@ impl ApiClient {
         loop {
             attempts += 1;
 
-            let mut builder = self.client.request(req.method.clone(), joined.clone());
+            let mut builder = self.raw_client.request(req.method.clone(), joined.clone());
             builder = self.apply_auth(builder);
             builder = builder.headers(req.headers.clone());
             if let Some(body) = req.body {
@@ -462,6 +514,9 @@ impl ApiClient {
             let retryable = status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error();
             if idempotent && retryable && attempts < self.retry_config.max_retries {
                 if let Some(wait) = backoff.next_backoff() {
+                    // A 429 says how long to wait; obey it rather than racing
+                    // back in after a short exponential sleep.
+                    let wait = retry_after(&response).unwrap_or(wait);
                     warn!(
                         status = status.as_u16(),
                         attempt = attempts,
@@ -1032,6 +1087,154 @@ mod tests {
                 // pin the behaviour so a future change cannot silently open it up.
                 Ok(url) => assert_eq!(url.host_str(), Some("site.atlassian.net"), "{bad}"),
             }
+        }
+    }
+
+    /// Regression: comparing scheme and host but not port let any other port on
+    /// the same host receive the profile's credentials.
+    #[tokio::test]
+    async fn test_request_raw_rejects_a_different_port_on_the_same_host() {
+        let victim = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("secrets"))
+            .expect(0)
+            .mount(&victim)
+            .await;
+
+        let server = MockServer::start().await;
+        let client = ApiClient::new(server.uri()).unwrap();
+        let err = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: &format!("{}/steal", victim.uri()),
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, ApiError::InvalidUrl(_)), "got {err:?}");
+    }
+
+    /// `safe_join` only sees the first URL, so a same-origin endpoint could
+    /// otherwise bounce a write-capable request anywhere. The raw client stops
+    /// at the redirect and hands the 3xx back instead of following it.
+    #[tokio::test]
+    async fn test_request_raw_does_not_follow_a_cross_origin_redirect() {
+        let evil = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("pwned"))
+            .expect(0)
+            .mount(&evil)
+            .await;
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/bounce"))
+            .respond_with(
+                ResponseTemplate::new(307)
+                    .insert_header("location", format!("{}/steal", evil.uri()).as_str()),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri())
+            .unwrap()
+            .with_basic_auth("dev@example.com", "token");
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::POST,
+                path: "/rest/api/3/bounce",
+                headers: HeaderMap::new(),
+                body: Some(b"{}"),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 307);
+        assert!(response.header("location").unwrap().contains("/steal"));
+        assert_ne!(response.body, b"pwned".to_vec());
+    }
+
+    /// Same-origin redirects are still followed, so ordinary endpoints work.
+    #[tokio::test]
+    async fn test_request_raw_follows_a_same_origin_redirect() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/from"))
+            .respond_with(ResponseTemplate::new(302).insert_header("location", "/to"))
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/to"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("arrived"))
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "/from",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, b"arrived".to_vec());
+    }
+
+    /// Attachment downloads depend on the cross-host hop to the media host, so
+    /// the ordinary client must keep following redirects.
+    #[tokio::test]
+    async fn test_get_bytes_still_follows_cross_host_redirects() {
+        let media = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/file/binary"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"BYTES".to_vec()))
+            .mount(&media)
+            .await;
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/content/1"))
+            .respond_with(
+                ResponseTemplate::new(302)
+                    .insert_header("location", format!("{}/file/binary", media.uri()).as_str()),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        assert_eq!(client.get_bytes("/content/1").await.unwrap(), b"BYTES");
+    }
+
+    #[test]
+    fn test_same_origin_compares_scheme_host_and_port() {
+        let base = Url::parse("https://site.atlassian.net").unwrap();
+        assert!(same_origin(
+            &Url::parse("https://site.atlassian.net/x").unwrap(),
+            &base
+        ));
+        // 443 is the known default for https, so an explicit port still matches.
+        assert!(same_origin(
+            &Url::parse("https://site.atlassian.net:443/x").unwrap(),
+            &base
+        ));
+        for other in [
+            "https://site.atlassian.net:8443/x",
+            "http://site.atlassian.net/x",
+            "https://evil.example.com/x",
+        ] {
+            assert!(
+                !same_origin(&Url::parse(other).unwrap(), &base),
+                "{other} must not match"
+            );
         }
     }
 }
