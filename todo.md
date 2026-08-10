@@ -1387,3 +1387,12 @@ Plan: `/Users/macmini/.claude/plans/https-github-com-omar16100-atlassian-cli-bin
 - New doc: `docs/10082026_jira_attachments.md`. README Jira section added; stale Confluence attachment flags in README fixed (they documented `--page-id`/`--id` for positional args).
 - Codex review found a real hole: bulk download used the server-supplied attachment `id` unvalidated, both in the content URL and as the dedup filename prefix, so an id of `../../owned` on a colliding filename escaped `--dir`. Now validated per row (bad id fails only its own row), and `unique_download_name` filters the id and stays within the 255-byte limit via `fit_filename`.
 - Also from review: `write_bytes` uses `create_new` instead of `exists()` + write, closing a TOCTOU and refusing to follow a planted symlink; new `crates/cli/tests/jira_attachment_e2e.rs` drives the real binary against wiremock (the other tests only exercised `ApiClient`); the credential-leak test now requires auth on the Jira mock so it cannot pass vacuously.
+
+## 2026-08-10 — Raw API passthrough `jira api` (issue #93 alternative, branch `feat/jira-api-passthrough`)
+
+- New `crates/cli/src/commands/api.rs` (product-agnostic, wired into `jira` only for now) and `ApiClient::request_raw` / `RawRequest` / `RawResponse` / `resolve_url` in `crates/api`.
+- `request_raw` returns non-2xx as `Ok` so the API's own error body survives, and retries 429/5xx only for idempotent methods. The existing `request` retries POSTs, which can double-create. It cannot reuse `retry_with_backoff`: that closure must signal retryable outcomes as `Err`, which would discard the `RawResponse` needed on the final attempt.
+- Output bypasses `OutputRenderer::render`. `--format table/csv/markdown/quiet` are ignored because a top-level JSON array would render as a table and silently drop nested fields.
+- `--force` gates DELETE only (several Jira read endpoints are POST). Exits 1 rather than returning Ok like `jira issue delete`, so it cannot silently no-op in a script.
+- Deferred: `--field`/`--raw-field` (name collides with `jira issue create --field`, which requires strict JSON) and `--paginate` (Jira Cloud has several pagination shapes).
+- New doc: `docs/10082026_raw_api_passthrough.md`. README raw-API block added.

@@ -74,6 +74,22 @@ enum JiraCommands {
     /// Audit log access
     #[command(subcommand)]
     Audit(AuditCommands),
+
+    /// Call any Jira REST endpoint using the configured auth profile
+    #[command(
+        long_about = "Call any Jira REST endpoint with the profile's credentials.\n\nExamples:\n  \
+        jira api /rest/api/3/myself\n  \
+        jira api /rest/api/3/search/jql --query 'jql=project = ABC' --query maxResults=5\n  \
+        jira api /rest/api/3/issue/ABC-1 -X PUT -d '{\"fields\":{\"summary\":\"New\"}}'\n  \
+        jira api /rest/api/3/issue/ABC-1 -X PUT -d @payload.json\n  \
+        jira api /rest/api/3/attachment/content/10001 --output shot.png\n\n\
+        Output is the raw response body, pretty-printed when it is JSON. --format yaml\n\
+        converts it; --format table/csv/markdown/quiet are ignored, because rendering a\n\
+        raw API dump as a table would drop nested fields. A non-2xx response still prints\n\
+        the body, then exits 1. DELETE requires --force. Paths must resolve to the\n\
+        profile's own site."
+    )]
+    Api(crate::commands::api::ApiArgs),
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -1358,5 +1374,6 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 .await
             }
         },
+        JiraCommands::Api(args) => crate::commands::api::run(&ctx.client, ctx.renderer, args).await,
     }
 }
