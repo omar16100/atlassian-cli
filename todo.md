@@ -1399,3 +1399,12 @@ Plan: `/Users/macmini/.claude/plans/https-github-com-omar16100-atlassian-cli-bin
 - Codex review of the passthrough found two blockers, both fixed: (1) `safe_join` compared scheme and host but **not port**, so any other port on the same host (e.g. another local service on a localhost profile) received the profile's credentials. This was pre-existing and affected every command; now a shared `same_origin` helper compares scheme + host + `port_or_known_default`. (2) `request_raw` used the default redirect policy, so a same-origin endpoint could bounce a credentialed, body-carrying request anywhere: 307/308 replay the body and custom `-H` headers are not stripped. `request_raw` now uses a separate client whose policy follows same-origin redirects only and returns the 3xx otherwise. The ordinary client still follows cross-host redirects, which attachment downloads depend on (guarded by a test).
 - Also: `--output` refuses to clobber without `--force` and uses `create_new` (no symlink follow); 429 retries respect `Retry-After`; binary detection now rejects control bytes, not just invalid UTF-8, so a response cannot drive the terminal.
 - Consequence: `jira api /rest/api/3/attachment/content/<id>` no longer resolves the media-host hop. Documented, with users pointed at `jira attachment download`.
+
+## 2026-08-10 — Release 0.5.0
+
+Minor bump (not patch): two new command groups plus a new public API on the shared `atlassian-cli-api` crate.
+
+- `jira attachment` group: list/get/download (single, `--output -`, bulk `--issue`/`--dir`)/upload/delete (#93, PR #94).
+- `jira api` raw authenticated passthrough (#93 alternative, PR #96).
+- `ApiClient::request_raw` / `RawRequest` / `RawResponse` / `resolve_url` added.
+- Security fixes shipped along the way, both pre-existing and affecting all commands: `init_tracing` logged to stdout, which could corrupt piped binary output; `safe_join` compared scheme and host but not port, so another port on the same host could receive the profile's credentials.
