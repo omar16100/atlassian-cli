@@ -473,3 +473,41 @@ async fn a_different_port_on_the_same_host_is_rejected() {
     assert!(!out.status.success());
     assert!(!String::from_utf8_lossy(&out.stdout).contains("secrets"));
 }
+
+/// `-X PUT` is how everyone writes it, but ValueEnum derives lowercase variant
+/// names, so the conventional spelling needs `ignore_case`. The README and the
+/// command's own help both show uppercase.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_method_flag_accepts_conventional_uppercase() {
+    let server = MockServer::start().await;
+    Mock::given(method("PUT"))
+        .and(path_matcher("/rest/api/3/issue/T-1"))
+        .respond_with(ResponseTemplate::new(204))
+        .expect(2)
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    for spelling in ["PUT", "put"] {
+        let out = run(
+            &config,
+            dir.path(),
+            &[
+                "jira",
+                "api",
+                "/rest/api/3/issue/T-1",
+                "-X",
+                spelling,
+                "-d",
+                "{}",
+            ],
+        );
+        assert!(
+            out.status.success(),
+            "-X {spelling} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
