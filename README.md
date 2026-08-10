@@ -128,6 +128,15 @@ crates/
    atlassian-cli jira attachment upload DEV-123 --file ./report.pdf
    atlassian-cli jira attachment delete 10001 --force
 
+   # Jira - Raw API access (any endpoint, using the configured profile)
+   atlassian-cli jira api /rest/api/3/myself
+   atlassian-cli jira api /rest/api/3/search/jql --query 'jql=project = DEV' --query maxResults=5
+   atlassian-cli jira api /rest/api/3/issue/DEV-123 -X PUT -d '{"fields":{"summary":"New"}}'
+   atlassian-cli jira api /rest/api/3/issue/DEV-123 -X PUT -d @payload.json
+   atlassian-cli jira api /rest/api/3/issue/DEV-123 -X DELETE --dry-run
+   # Note: `jira api` stops at cross-origin redirects by design. For attachment
+   # bytes, which redirect to Atlassian's media host, use `jira attachment download`.
+
    # Jira - Projects
    atlassian-cli jira project list
    atlassian-cli jira project get DEV
