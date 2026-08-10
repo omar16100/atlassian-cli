@@ -110,7 +110,7 @@ get_open_prs() {
         "$WORKSPACE" \
         "$REPO" \
         --state OPEN \
-        --output json
+        --format json
 }
 
 # Check if author is trusted
@@ -133,7 +133,7 @@ get_approval_count() {
         "$WORKSPACE" \
         "$REPO" \
         "$pr_id" \
-        --output json | \
+        --format json | \
         jq '[.participants[] | select(.approved == true)] | length'
 }
 

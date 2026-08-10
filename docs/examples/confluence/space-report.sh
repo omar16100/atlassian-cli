@@ -43,7 +43,7 @@ get_space_stats() {
     stats=$(atlassian-cli confluence analytics space-stats \
         --profile "$PROFILE" \
         "$SPACE_KEY" \
-        --output json)
+        --format json)
 
     echo "$stats" | jq -r '
         "Space: \(.space_key)",
@@ -62,7 +62,7 @@ get_all_pages() {
         --profile "$PROFILE" \
         --space "$SPACE_KEY" \
         --limit 1000 \
-        --output json)
+        --format json)
 
     echo "$pages"
 }
@@ -75,7 +75,7 @@ get_page_views() {
     atlassian-cli confluence analytics page-views \
         --profile "$PROFILE" \
         "$page_id" \
-        --output json 2>/dev/null | \
+        --format json 2>/dev/null | \
         jq -r '.view_count // 0' || echo "0"
 }
 
@@ -86,7 +86,7 @@ get_page_details() {
     atlassian-cli confluence page get \
         --profile "$PROFILE" \
         "$page_id" \
-        --output json
+        --format json
 }
 
 # Generate CSV report

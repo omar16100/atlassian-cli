@@ -50,7 +50,7 @@ export_metadata() {
     atlassian-cli confluence space get \
         --profile "$PROFILE" \
         "$SPACE_KEY" \
-        --output json > "$BACKUP_DIR/space_info.json"
+        --format json > "$BACKUP_DIR/space_info.json"
 }
 
 # Export all pages using bulk export
@@ -102,10 +102,13 @@ download_attachments() {
     for page_id in $page_ids; do
         # List attachments for this page
         local attachments
+        # --format, not --output: the latter is not an argument of this
+        # subcommand, and the `|| echo "[]"` below would silently turn the
+        # resulting parse error into an empty backup.
         attachments=$(atlassian-cli confluence attachment list \
             --profile "$PROFILE" \
             "$page_id" \
-            --output json 2>/dev/null || echo "[]")
+            --format json 2>/dev/null || echo "[]")
 
         # Process each attachment
         echo "$attachments" | jq -r '.[] | @json' | while IFS= read -r att_json; do

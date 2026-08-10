@@ -112,7 +112,7 @@ preview_pages() {
     local results
     results=$(atlassian-cli confluence search cql \
         --profile "$PROFILE" \
-        --output json \
+        --format json \
         "$cql" 2>/dev/null || echo "[]")
 
     local count
@@ -167,7 +167,7 @@ delete_pages_bulk() {
     local count
     count=$(atlassian-cli confluence search cql \
         --profile "$PROFILE" \
-        --output json \
+        --format json \
         "$cql" | jq '. | length')
 
     warn "This will permanently delete $count pages!"
