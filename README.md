@@ -118,6 +118,16 @@ crates/
    atlassian-cli jira assign DEV-123 --assignee user@example.com
    atlassian-cli jira delete DEV-123
 
+   # Jira - Attachments
+   atlassian-cli jira attachment list DEV-123
+   atlassian-cli jira attachment get 10001
+   atlassian-cli jira attachment download 10001                    # -> ./<server filename>
+   atlassian-cli jira attachment download 10001 --output ./logo.png
+   atlassian-cli jira attachment download 10001 --output - | file - # stream to stdout
+   atlassian-cli jira attachment download --issue DEV-123 --dir ./attachments
+   atlassian-cli jira attachment upload DEV-123 --file ./report.pdf
+   atlassian-cli jira attachment delete 10001 --force
+
    # Jira - Projects
    atlassian-cli jira project list
    atlassian-cli jira project get DEV
@@ -183,11 +193,11 @@ crates/
    atlassian-cli confluence blog delete --id 67890
 
    # Confluence - Attachments
-   atlassian-cli confluence attachment list --page-id 12345
-   atlassian-cli confluence attachment get --id 11111
-   atlassian-cli confluence attachment upload --page-id 12345 --file ./diagram.png
-   atlassian-cli confluence attachment download --id 11111 --output ./download.png
-   atlassian-cli confluence attachment delete --id 11111
+   atlassian-cli confluence attachment list 12345
+   atlassian-cli confluence attachment get 11111
+   atlassian-cli confluence attachment upload 12345 --file ./diagram.png
+   atlassian-cli confluence attachment download 11111 --output ./download.png
+   atlassian-cli confluence attachment delete 11111 --force
 
    # Confluence - Bulk Operations
    atlassian-cli confluence bulk delete --space OLD --dry-run
