@@ -82,12 +82,14 @@ enum JiraCommands {
         jira api /rest/api/3/search/jql --query 'jql=project = ABC' --query maxResults=5\n  \
         jira api /rest/api/3/issue/ABC-1 -X PUT -d '{\"fields\":{\"summary\":\"New\"}}'\n  \
         jira api /rest/api/3/issue/ABC-1 -X PUT -d @payload.json\n  \
-        jira api /rest/api/3/attachment/content/10001 --output shot.png\n\n\
+        jira api /rest/api/3/issue/ABC-1 -X DELETE --dry-run\n\n\
         Output is the raw response body, pretty-printed when it is JSON. --format yaml\n\
         converts it; --format table/csv/markdown/quiet are ignored, because rendering a\n\
         raw API dump as a table would drop nested fields. A non-2xx response still prints\n\
-        the body, then exits 1. DELETE requires --force. Paths must resolve to the\n\
-        profile's own site."
+        the body, then exits 1. DELETE requires --force, as does overwriting an\n\
+        existing --output file. Paths must resolve to the profile's own site, and\n\
+        cross-origin redirects are returned rather than followed: for attachment\n\
+        bytes use `jira attachment download`."
     )]
     Api(crate::commands::api::ApiArgs),
 }

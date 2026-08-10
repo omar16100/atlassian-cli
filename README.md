@@ -133,8 +133,9 @@ crates/
    atlassian-cli jira api /rest/api/3/search/jql --query 'jql=project = DEV' --query maxResults=5
    atlassian-cli jira api /rest/api/3/issue/DEV-123 -X PUT -d '{"fields":{"summary":"New"}}'
    atlassian-cli jira api /rest/api/3/issue/DEV-123 -X PUT -d @payload.json
-   atlassian-cli jira api /rest/api/3/attachment/content/10001 --output shot.png
    atlassian-cli jira api /rest/api/3/issue/DEV-123 -X DELETE --dry-run
+   # Note: `jira api` stops at cross-origin redirects by design. For attachment
+   # bytes, which redirect to Atlassian's media host, use `jira attachment download`.
 
    # Jira - Projects
    atlassian-cli jira project list

@@ -76,7 +76,7 @@ pub struct ApiArgs {
     #[arg(long)]
     pub dry_run: bool,
 
-    /// Required to send a DELETE
+    /// Required to send a DELETE, and to overwrite an existing --output file
     #[arg(long)]
     pub force: bool,
 
@@ -209,6 +209,14 @@ pub(crate) enum Rendered {
     Empty,
 }
 
+/// Valid UTF-8 is not the same as safe-to-print. A NUL or an escape byte in a
+/// response would let a payload drive the user's terminal.
+fn looks_binary(bytes: &[u8]) -> bool {
+    bytes
+        .iter()
+        .any(|b| *b == 0 || (*b < 0x20 && !matches!(b, b'\t' | b'\n' | b'\r')) || *b == 0x7f)
+}
+
 /// Decide how to present a body. JSON is pretty-printed; a top-level array stays
 /// JSON rather than becoming a table, which would drop nested fields.
 pub(crate) fn format_body(bytes: &[u8], format: OutputFormat) -> Result<Rendered> {
@@ -216,8 +224,8 @@ pub(crate) fn format_body(bytes: &[u8], format: OutputFormat) -> Result<Rendered
         return Ok(Rendered::Empty);
     }
     let text = match std::str::from_utf8(bytes) {
-        Ok(text) => text,
-        Err(_) => return Ok(Rendered::Binary),
+        Ok(text) if !looks_binary(bytes) => text,
+        _ => return Ok(Rendered::Binary),
     };
     match serde_json::from_str::<serde_json::Value>(text) {
         Ok(value) if format == OutputFormat::Yaml => Ok(Rendered::Text(
@@ -248,8 +256,27 @@ fn emit(renderer: &OutputRenderer, args: &ApiArgs, response: &RawResponse) -> Re
     }
 
     if let Some(path) = &args.output {
-        std::fs::write(path, &response.body)
-            .with_context(|| format!("Failed to write file: {}", path.display()))?;
+        // Matches `jira attachment download`: no silent clobber, and create_new
+        // refuses to follow a symlink planted at the target.
+        if args.force {
+            std::fs::write(path, &response.body)
+        } else {
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+            {
+                Ok(mut file) => file.write_all(&response.body),
+                Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                    bail!(
+                        "{} already exists. Use --force to overwrite.",
+                        path.display()
+                    );
+                }
+                Err(err) => Err(err),
+            }
+        }
+        .with_context(|| format!("Failed to write file: {}", path.display()))?;
         return Ok(());
     }
 
@@ -538,6 +565,28 @@ mod tests {
         assert_eq!(
             format_body(b"", OutputFormat::Json).unwrap(),
             Rendered::Empty
+        );
+    }
+
+    // Valid UTF-8 is not the same as safe to print: control bytes let a response
+    // drive the user's terminal.
+    #[test]
+    fn format_body_treats_control_bytes_as_binary() {
+        assert_eq!(
+            format_body(b"\x1b]0;pwned\x07", OutputFormat::Json).unwrap(),
+            Rendered::Binary
+        );
+        assert_eq!(
+            format_body(b"has\0nul", OutputFormat::Json).unwrap(),
+            Rendered::Binary
+        );
+    }
+
+    #[test]
+    fn format_body_allows_ordinary_whitespace() {
+        assert_eq!(
+            format_body(b"line one\nline\ttwo\r\n", OutputFormat::Json).unwrap(),
+            Rendered::Text("line one\nline\ttwo\r\n".to_string())
         );
     }
 }
