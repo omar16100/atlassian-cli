@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::adf::markdown_to_adf;
+use super::attachments::{attachments_markdown, JiraAttachment};
 use super::utils::JiraContext;
 use crate::commands::common::{render_success, MutationResult};
 use crate::query::JqlBuilder;
@@ -260,7 +261,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         issue_type: &'a str,
         #[serde(skip_serializing_if = "Option::is_none")]
         sprint: Option<String>,
-        attachments: &'a Vec<AttachmentField>,
+        attachments: &'a Vec<JiraAttachment>,
     }
 
     let view = IssueDetails {
@@ -892,65 +893,11 @@ struct IssueFields {
     #[serde(default)]
     issuetype: Option<IssueTypeField>,
     #[serde(default)]
-    attachment: Vec<AttachmentField>,
+    attachment: Vec<JiraAttachment>,
     // customfield_10020 is the standard Jira Cloud "Sprint" field (an array of
     // sprint objects). Optional so instances that omit/remap it never break the parse.
     #[serde(rename = "customfield_10020", default)]
     sprint: Option<Value>,
-}
-
-/// Jira returns attachment `id` as a number in some responses and a string in
-/// others; accept either and normalize to a string. All fields are optional so a
-/// single missing/null property never aborts the whole issue parse.
-#[derive(Deserialize, Serialize)]
-struct AttachmentField {
-    #[serde(
-        default,
-        deserialize_with = "de_id_to_string",
-        skip_serializing_if = "Option::is_none"
-    )]
-    id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    filename: Option<String>,
-    #[serde(rename = "mimeType", default, skip_serializing_if = "Option::is_none")]
-    mime_type: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    size: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    content: Option<String>,
-}
-
-/// Deserialize a value that may be a JSON string, number, or null into an
-/// `Option<String>` (used for Jira's number-or-string attachment `id`).
-fn de_id_to_string<'de, D>(deserializer: D) -> std::result::Result<Option<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let value = Option::<Value>::deserialize(deserializer)?;
-    Ok(value.and_then(|v| match v {
-        Value::String(s) => Some(s),
-        Value::Number(n) => Some(n.to_string()),
-        _ => None,
-    }))
-}
-
-/// Render an attachments section for markdown `issue get`. Empty string when the
-/// issue has no attachments.
-fn attachments_markdown(attachments: &[AttachmentField]) -> String {
-    if attachments.is_empty() {
-        return String::new();
-    }
-    let mut out = String::from(
-        "\n\n## Attachments\n\n| Filename | Size | ID | URL |\n| --- | --- | --- | --- |\n",
-    );
-    for a in attachments {
-        let filename = a.filename.as_deref().unwrap_or("");
-        let size = a.size.map(|s| s.to_string()).unwrap_or_default();
-        let id = a.id.as_deref().unwrap_or("");
-        let url = a.content.as_deref().unwrap_or("");
-        out.push_str(&format!("| {filename} | {size} | {id} | {url} |\n"));
-    }
-    out
 }
 
 #[derive(Deserialize)]

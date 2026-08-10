@@ -1372,3 +1372,16 @@ Driven by GA4 (`520368061`) + GSC (`sc-domain:atlassiancli.com`) review. Plan: `
 - Phase 4: deepen `runbooks/confluence-markdown-sync.html` (pos 40); above-the-fold TL;DR on `blog/bitbucket-cli-guide.html` (70% bounce).
 - Phase 5: site-wide `Atlassian CLI` → `atlassian-cli` rename (title/OG/JSON-LD/breadcrumb/H1); replace Atlassian-imitating product SVGs with generic glyphs; remove `<meta name="keywords">` (23 files); add `docs/about/index.html`, `docs/SECURITY.md`, `docs/.well-known/security.txt`, repo `SECURITY.md`; README + `docs/llms.txt` parity.
 - Decisions: full overhaul; keep `atlassiancli.com` domain, de-risk via naming/disclaimers (no migration).
+
+## 2026-08-10 — Jira attachments (issue #93, branch `feat/jira-attachments`)
+
+Plan: `/Users/macmini/.claude/plans/https-github-com-omar16100-atlassian-cli-binary-rossum.md`. Reviewed by kimi before implementation.
+
+- New `jira attachment` group: `list`, `get`, `download` (single, `--output -` to stdout, bulk via `--issue`/`--dir`), `upload` (multi-file), `delete`.
+- Fixed pre-existing bug: `init_tracing` had no `.with_writer`, so tracing-subscriber logged to stdout and could corrupt piped binary output. Now stderr.
+- Moved `AttachmentField` -> `JiraAttachment` + `de_id_to_string` + `attachments_markdown` from `issues.rs` (2046 lines) into new `jira/attachments.rs`; `issues.rs` now 1993.
+- `safe_filename` reduces server-supplied filenames to one path segment (traversal, control chars, Windows illegal/reserved, 255-byte truncation), with proptest.
+- Download refuses to clobber without `--force`, diverging from the Confluence command's silent truncate.
+- `clap`'s `requires = "issue"` alone silently ignored `--dir` in single mode, because the required `ArgGroup` already counted as satisfied. Needed an explicit `conflicts_with = "attachment_id"`.
+- `issue get --format json` gains `author` and `created` per attachment (additive).
+- New doc: `docs/10082026_jira_attachments.md`. README Jira section added; stale Confluence attachment flags in README fixed (they documented `--page-id`/`--id` for positional args).

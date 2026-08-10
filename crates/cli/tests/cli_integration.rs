@@ -334,3 +334,116 @@ fn test_jira_issue_create_help_mentions_custom_fields() {
         "expected fields-discovery hint in help, got: {stdout}"
     );
 }
+
+/// An invalid `ArgGroup` only panics when clap builds the command at runtime, so
+/// exercising the parser is the only way to catch it. This covers the
+/// `jira attachment download` group added for issue #93.
+#[test]
+fn test_jira_attachment_help_lists_subcommands() {
+    let output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "jira", "attachment", "--help"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for sub in ["list", "get", "download", "upload", "delete"] {
+        assert!(
+            stdout.contains(sub),
+            "attachment help should list `{sub}`, got:\n{stdout}"
+        );
+    }
+}
+
+#[test]
+fn test_jira_attachment_download_requires_a_source() {
+    let output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "jira", "attachment", "download"])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("required"),
+        "expected a required-argument error, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_jira_attachment_download_rejects_id_with_issue() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--quiet",
+            "--",
+            "jira",
+            "attachment",
+            "download",
+            "10001",
+            "--issue",
+            "TEST-1",
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("cannot be used with"),
+        "expected a conflict error, got: {stderr}"
+    );
+}
+
+/// `--dir` is bulk-mode only. Without an explicit conflict, clap treats the
+/// `requires = "issue"` as satisfied by the ArgGroup and silently ignores it.
+#[test]
+fn test_jira_attachment_download_rejects_dir_without_issue() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--quiet",
+            "--",
+            "jira",
+            "attachment",
+            "download",
+            "10001",
+            "--dir",
+            "./out",
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("cannot be used with"),
+        "expected a conflict error, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_jira_attachment_download_rejects_output_with_issue() {
+    let output = Command::new("cargo")
+        .args([
+            "run",
+            "--quiet",
+            "--",
+            "jira",
+            "attachment",
+            "download",
+            "--issue",
+            "TEST-1",
+            "--output",
+            "f.bin",
+        ])
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("cannot be used with"),
+        "expected a conflict error, got: {stderr}"
+    );
+}

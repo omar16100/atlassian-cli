@@ -1,10 +1,13 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use atlassian_cli_api::ApiClient;
 use atlassian_cli_output::OutputRenderer;
-use clap::{Args, Subcommand};
+use clap::{ArgGroup, Args, Subcommand};
 
 // Submodules
 mod adf;
+mod attachments;
 mod audit;
 mod automation;
 mod bulk;
@@ -27,6 +30,10 @@ enum JiraCommands {
     /// Issue operations (search, get, create, update, delete, etc.)
     #[command(subcommand)]
     Issue(IssueCommands),
+
+    /// Attachment operations (list, get, download, upload, delete)
+    #[command(subcommand)]
+    Attachment(AttachmentCommands),
 
     /// Manage projects
     #[command(subcommand)]
@@ -232,6 +239,88 @@ enum IssueCommands {
     /// Manage issue comments
     #[command(subcommand)]
     Comments(CommentCommands),
+}
+
+#[derive(Subcommand, Debug, Clone)]
+enum AttachmentCommands {
+    /// List attachments on an issue
+    #[command(long_about = "List attachments on an issue.\n\nExamples:\n  \
+        jira attachment list PROJ-123\n  \
+        jira attachment list PROJ-123 --format json")]
+    List {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+    },
+
+    /// Show attachment metadata
+    #[command(long_about = "Show attachment metadata.\n\nExamples:\n  \
+        jira attachment get 10001\n  \
+        jira attachment get 10001 --format yaml")]
+    Get {
+        /// Attachment ID
+        attachment_id: String,
+    },
+
+    /// Download attachment content
+    #[command(
+        long_about = "Download attachment content.\n\nExamples:\n  \
+            jira attachment download 10001                          # -> ./<server filename>\n  \
+            jira attachment download 10001 --output ./logo.png\n  \
+            jira attachment download 10001 --output - | file -      # stream to stdout\n  \
+            jira attachment download --issue PROJ-123 --dir ./attachments",
+        group = ArgGroup::new("source").required(true).args(["attachment_id", "issue"])
+    )]
+    Download {
+        /// Attachment ID (single-attachment mode)
+        attachment_id: Option<String>,
+
+        /// Download every attachment on this issue (bulk mode)
+        #[arg(long, conflicts_with = "output")]
+        issue: Option<String>,
+
+        /// Output file path; use `-` to stream to stdout. Defaults to the
+        /// server-supplied filename in the current directory
+        #[arg(long, short = 'o')]
+        output: Option<PathBuf>,
+
+        /// Destination directory for bulk mode (created if missing)
+        //
+        // `requires = "issue"` alone is not enough: with `issue` in a required
+        // ArgGroup that `attachment_id` already satisfies, clap treats the
+        // requirement as met and silently ignores --dir. The explicit conflict
+        // is what makes `download <ID> --dir x` an error.
+        #[arg(long, requires = "issue", conflicts_with = "attachment_id")]
+        dir: Option<PathBuf>,
+
+        /// Overwrite existing files
+        #[arg(long)]
+        force: bool,
+    },
+
+    /// Upload one or more files to an issue
+    #[command(long_about = "Upload one or more files to an issue.\n\nExamples:\n  \
+        jira attachment upload PROJ-123 --file ./report.pdf\n  \
+        jira attachment upload PROJ-123 --file ./a.png --file ./b.png")]
+    Upload {
+        /// Issue key (e.g. PROJ-123)
+        key: String,
+
+        /// File to upload (repeatable)
+        #[arg(long, required = true, num_args = 1)]
+        file: Vec<PathBuf>,
+    },
+
+    /// Delete an attachment
+    #[command(long_about = "Delete an attachment.\n\nExamples:\n  \
+        jira attachment delete 10001 --force")]
+    Delete {
+        /// Attachment ID
+        attachment_id: String,
+
+        /// Confirm deletion
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -918,6 +1007,37 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                     issues::delete_comment(&ctx, &comment_id).await
                 }
             },
+        },
+        JiraCommands::Attachment(cmd) => match cmd {
+            AttachmentCommands::List { key } => attachments::list_attachments(&ctx, &key).await,
+            AttachmentCommands::Get { attachment_id } => {
+                attachments::get_attachment(&ctx, &attachment_id).await
+            }
+            AttachmentCommands::Download {
+                attachment_id,
+                issue,
+                output,
+                dir,
+                force,
+            } => match (attachment_id, issue) {
+                (Some(id), None) => {
+                    attachments::download_attachment(&ctx, &id, output.as_deref(), force).await
+                }
+                (None, Some(key)) => {
+                    attachments::download_issue_attachments(&ctx, &key, dir.as_deref(), force).await
+                }
+                // Unreachable: the "source" ArgGroup is required and single-valued.
+                _ => Err(anyhow::anyhow!(
+                    "Specify exactly one of ATTACHMENT_ID or --issue <KEY>"
+                )),
+            },
+            AttachmentCommands::Upload { key, file } => {
+                attachments::upload_attachments(&ctx, &key, &file).await
+            }
+            AttachmentCommands::Delete {
+                attachment_id,
+                force,
+            } => attachments::delete_attachment(&ctx, &attachment_id, force).await,
         },
         JiraCommands::Project(cmd) => match cmd {
             ProjectCommands::List => projects::list_projects(&ctx).await,
