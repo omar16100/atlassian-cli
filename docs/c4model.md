@@ -179,6 +179,11 @@ Shows the internal structure of atlassian-cli as a Rust workspace with 6 crates.
 
 #### Command Modules
 
+**Shared (`commands/`):**
+- `api.rs` - Raw authenticated REST passthrough (`jira api`), product-agnostic;
+  built on `ApiClient::request_raw`, which returns status/headers/body with no
+  status-to-error mapping
+
 **Jira (`commands/jira/`):**
 - `issues.rs` - CRUD, search, transitions, assignments
 - `attachments.rs` - Attachment list/get/download/upload/delete, plus the shared

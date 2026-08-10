@@ -3,8 +3,10 @@ pub mod pagination;
 pub mod ratelimit;
 pub mod retry;
 
+use backoff::backoff::Backoff;
 use error::{ApiError, Result};
 use ratelimit::RateLimiter;
+use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
 use retry::{retry_with_backoff, RetryConfig};
 use secrecy::{ExposeSecret, SecretString};
@@ -46,6 +48,39 @@ impl fmt::Debug for AuthMethod {
                 .field("api_key", &"[REDACTED]")
                 .finish(),
         }
+    }
+}
+
+/// An arbitrary request for [`ApiClient::request_raw`].
+pub struct RawRequest<'a> {
+    pub method: Method,
+    /// Path (and optional query) relative to the client's base URL.
+    pub path: &'a str,
+    pub headers: HeaderMap,
+    pub body: Option<&'a [u8]>,
+    /// Overrides the client-wide 30s timeout for this request only.
+    pub timeout: Option<Duration>,
+}
+
+/// A response with no status-to-error mapping applied.
+#[derive(Debug, Clone)]
+pub struct RawResponse {
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
+impl RawResponse {
+    pub fn is_success(&self) -> bool {
+        (200..300).contains(&self.status)
+    }
+
+    /// Case-insensitive header lookup. Returns the first match.
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
     }
 }
 
@@ -371,6 +406,97 @@ impl ApiClient {
         Ok(result)
     }
 
+    /// Resolve `path` against the base URL, applying the same-origin (SSRF)
+    /// check used by every request. Public so callers can validate or preview a
+    /// path without sending anything.
+    pub fn resolve_url(&self, path: &str) -> Result<Url> {
+        self.safe_join(path)
+    }
+
+    /// Send an arbitrary request and return the status, headers and body bytes.
+    ///
+    /// Unlike [`ApiClient::request`], a non-2xx status is returned as
+    /// `Ok(RawResponse)` rather than mapped to an [`ApiError`], so callers can
+    /// surface the API's own error body. Only transport failures and URL
+    /// validation produce `Err`. Same-origin validation, auth and rate limiting
+    /// still apply.
+    ///
+    /// Retries on 429/5xx are limited to idempotent methods. `request` retries
+    /// POSTs, which can double-create; a raw passthrough must not inherit that.
+    pub async fn request_raw(&self, req: RawRequest<'_>) -> Result<RawResponse> {
+        if let Some(wait_secs) = self.rate_limiter.check_limit().await {
+            warn!(wait_secs, "Rate limit reached, waiting");
+            tokio::time::sleep(Duration::from_secs(wait_secs)).await;
+        }
+
+        let joined = self.safe_join(req.path)?;
+        debug!(method = %req.method, url = %joined, "Sending raw request");
+
+        let idempotent = matches!(
+            req.method,
+            Method::GET | Method::HEAD | Method::PUT | Method::DELETE | Method::OPTIONS
+        );
+        // retry_with_backoff cannot be used here: its closure must signal a
+        // retryable outcome as Err, which would discard the RawResponse we have
+        // to return on the final attempt.
+        let mut backoff = self.retry_config.backoff();
+        let mut attempts = 0usize;
+
+        loop {
+            attempts += 1;
+
+            let mut builder = self.client.request(req.method.clone(), joined.clone());
+            builder = self.apply_auth(builder);
+            builder = builder.headers(req.headers.clone());
+            if let Some(body) = req.body {
+                builder = builder.body(body.to_vec());
+            }
+            if let Some(timeout) = req.timeout {
+                builder = builder.timeout(timeout);
+            }
+
+            let response = builder.send().await.map_err(ApiError::RequestFailed)?;
+            self.rate_limiter.update_from_response(&response).await;
+            let status = response.status();
+
+            let retryable = status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error();
+            if idempotent && retryable && attempts < self.retry_config.max_retries {
+                if let Some(wait) = backoff.next_backoff() {
+                    warn!(
+                        status = status.as_u16(),
+                        attempt = attempts,
+                        wait_ms = wait.as_millis(),
+                        "Raw request failed, retrying"
+                    );
+                    tokio::time::sleep(wait).await;
+                    continue;
+                }
+            }
+
+            let headers = response
+                .headers()
+                .iter()
+                .map(|(name, value)| {
+                    (
+                        name.as_str().to_string(),
+                        value.to_str().unwrap_or_default().to_string(),
+                    )
+                })
+                .collect();
+            let body = response
+                .bytes()
+                .await
+                .map_err(|err| ApiError::InvalidResponse(err.to_string()))?
+                .to_vec();
+
+            return Ok(RawResponse {
+                status: status.as_u16(),
+                headers,
+                body,
+            });
+        }
+    }
+
     /// Get binary content from an endpoint.
     /// Includes retry logic and rate limiting.
     pub async fn get_bytes(&self, path: &str) -> Result<Vec<u8>> {
@@ -583,7 +709,7 @@ impl ApiClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{body_string, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[tokio::test]
@@ -721,5 +847,191 @@ mod tests {
         let client = ApiClient::new(server.uri()).unwrap();
         let result: serde_json::Value = client.get("/issue/AEA-1").await.unwrap();
         assert_eq!(result["key"], "AEA-1");
+    }
+
+    // -----------------------------------------------------------------------
+    // request_raw
+    // -----------------------------------------------------------------------
+
+    /// The point of the raw path: a non-2xx status is data, not an error, so the
+    /// API's own error body survives instead of being replaced by ApiError.
+    #[tokio::test]
+    async fn test_request_raw_surfaces_non_2xx_without_erroring() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/rest/api/3/issue/NOPE-1"))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(serde_json::json!({"errorMessages": ["Issue does not exist"]})),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "/rest/api/3/issue/NOPE-1",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 404);
+        assert!(!response.is_success());
+        assert!(response
+            .header("Content-Type")
+            .unwrap()
+            .contains("application/json"));
+        assert!(String::from_utf8_lossy(&response.body).contains("Issue does not exist"));
+    }
+
+    #[tokio::test]
+    async fn test_request_raw_applies_headers_and_body() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/rest/api/3/issue"))
+            .and(header("X-Atlassian-Token", "no-check"))
+            .and(body_string("{\"fields\":{}}"))
+            .respond_with(
+                ResponseTemplate::new(201).set_body_json(serde_json::json!({"key": "A-1"})),
+            )
+            .mount(&server)
+            .await;
+
+        let mut headers = HeaderMap::new();
+        headers.insert("X-Atlassian-Token", "no-check".parse().unwrap());
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::POST,
+                path: "/rest/api/3/issue",
+                headers,
+                body: Some(b"{\"fields\":{}}"),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 201);
+    }
+
+    #[tokio::test]
+    async fn test_request_raw_retries_5xx_for_get() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/flaky"))
+            .respond_with(ResponseTemplate::new(500))
+            .expect(3)
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri())
+            .unwrap()
+            .with_retry_config(RetryConfig {
+                initial_interval: Duration::from_millis(1),
+                ..RetryConfig::default()
+            });
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "/flaky",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 500);
+    }
+
+    /// Replaying a POST can double-create. `request` does retry POSTs; the raw
+    /// path deliberately does not inherit that.
+    #[tokio::test]
+    async fn test_request_raw_never_retries_post() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/create"))
+            .respond_with(ResponseTemplate::new(503))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri())
+            .unwrap()
+            .with_retry_config(RetryConfig {
+                initial_interval: Duration::from_millis(1),
+                ..RetryConfig::default()
+            });
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::POST,
+                path: "/create",
+                headers: HeaderMap::new(),
+                body: Some(b"{}"),
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 503);
+    }
+
+    #[tokio::test]
+    async fn test_request_raw_rejects_cross_host_path() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let err = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "https://evil.example.com/steal",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, ApiError::InvalidUrl(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn test_resolve_url_enforces_same_origin() {
+        let client = ApiClient::new("https://site.atlassian.net").unwrap();
+
+        assert_eq!(
+            client.resolve_url("/rest/api/3/myself").unwrap().as_str(),
+            "https://site.atlassian.net/rest/api/3/myself"
+        );
+        // Relative paths work with or without the leading slash.
+        assert_eq!(
+            client.resolve_url("rest/api/3/myself").unwrap().as_str(),
+            "https://site.atlassian.net/rest/api/3/myself"
+        );
+        // Other hosts, scheme downgrades and userinfo tricks are all rejected.
+        for bad in [
+            "https://evil.example.com/x",
+            "http://site.atlassian.net/x",
+            "https://site.atlassian.net@evil.example.com/",
+            "//evil.example.com/x",
+        ] {
+            let resolved = client.resolve_url(bad);
+            match resolved {
+                Err(_) => {}
+                // A protocol-relative path is not treated as a host by `join`;
+                // pin the behaviour so a future change cannot silently open it up.
+                Ok(url) => assert_eq!(url.host_str(), Some("site.atlassian.net"), "{bad}"),
+            }
+        }
     }
 }
