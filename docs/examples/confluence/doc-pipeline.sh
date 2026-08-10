@@ -75,7 +75,7 @@ get_or_create_page() {
     # Search for existing page
     local page_id
     page_id=$(atlassian-cli confluence search cql \
-        --output json \
+        --format json \
         "space = $space_key AND title = \"$title\"" 2>/dev/null | \
         jq -r '.results[0].content.id // empty')
 
@@ -104,7 +104,7 @@ get_or_create_page() {
         create_args+=("--parent" "$parent_id")
     fi
 
-    atlassian-cli "${create_args[@]}" --output json | jq -r '.id'
+    atlassian-cli "${create_args[@]}" --format json | jq -r '.id'
 }
 
 # Update page content

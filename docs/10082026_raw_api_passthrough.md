@@ -1,10 +1,10 @@
 # Raw API passthrough (`jira api`)
 
-Status: implemented on `feat/jira-api-passthrough`.
+Status: shipped in v0.5.0 (PR #96).
 
 The "Alternatives Considered" of issue #93, modelled on `glab api` and `gh api`:
 call any Jira REST endpoint with the credentials `atlassian-cli` already manages,
-instead of hand-rolling curl with a token. Ships separately from the
+instead of hand-rolling curl with a token. Shipped separately from the
 `jira attachment` group because it changes the shared `atlassian-cli-api` public
 surface and carries its own security decisions.
 
@@ -75,8 +75,16 @@ final attempt, so it drives `RetryConfig::backoff()` in a local loop.
 
 ## Safety
 
-- `safe_join` is the boundary and it holds: other hosts, scheme downgrades,
-  `https://site@evil.com/` and `\\evil.com/x` are all rejected.
+- `safe_join` is the boundary: other hosts, scheme downgrades,
+  `https://site@evil.com/`, `\\evil.com/x` and a different port on the same host
+  are all rejected. It compares full origin, scheme + host + port.
+- `safe_join` only ever sees the first URL, so `request_raw` additionally uses a
+  client that follows same-origin redirects only and hands back the 3xx
+  otherwise. Without that, a same-origin endpoint could bounce a credentialed,
+  body-carrying request anywhere: reqwest strips `Authorization` cross-host, but
+  307/308 replay the body and custom `-H` headers are not stripped. The
+  consequence is that `jira api` cannot resolve the media-host hop for
+  attachment bytes; use `jira attachment download`.
 - No `/rest/` prefix requirement. It would break `/secure/attachment/...`,
   `/download/...`, `/wiki/api/v2/...` and `/gateway/api/...`, and adds nothing
   over same-origin.
@@ -103,15 +111,20 @@ Bamboo.
 
 ## Tests
 
-- 26 unit tests in `commands/api.rs` covering `default_method`, `append_queries`
+- 28 unit tests in `commands/api.rs` covering `default_method`, `append_queries`
   (encoding, first-`=` split, separator choice), `parse_headers` (trimming,
   duplicates, `Authorization` refusal, CRLF), `read_body` (verbatim, `@file`,
   stdin) and `format_body`, including a regression guard that a JSON array stays
   JSON rather than becoming a table.
-- 5 wiremock tests in `crates/api/src/lib.rs` for `request_raw`: non-2xx returned
-  as data with headers, headers and body applied, 5xx retried for GET, POST never
-  retried, cross-host rejected, plus `resolve_url` origin pinning.
-- 11 end-to-end tests in `crates/cli/tests/jira_api_e2e.rs` driving the binary:
+- 10 wiremock tests in `crates/api/src/lib.rs`: non-2xx returned as data with
+  headers, headers and body applied, 5xx retried for GET, POST never retried,
+  cross-host rejected, an alternate port on the same host rejected, a
+  cross-origin redirect stopped, a same-origin redirect followed, `get_bytes`
+  still following the cross-host hop that attachment downloads need, plus
+  `resolve_url` and `same_origin` origin pinning.
+- 14 end-to-end tests in `crates/cli/tests/jira_api_e2e.rs` driving the binary:
   default GET, query encoding, verbatim body, custom headers, 404 body surfaced
-  with a non-zero exit, 204 silent, binary to `--output`, DELETE and `--dry-run`
-  both sending nothing, cross-host rejected, and `Authorization` refused.
+  with a non-zero exit, 204 silent, binary to `--output`, `--output` refusing to
+  clobber, DELETE and `--dry-run` both sending nothing, cross-host and
+  alternate-port paths rejected, a cross-origin redirect returned rather than
+  followed, and `Authorization` refused.

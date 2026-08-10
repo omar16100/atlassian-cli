@@ -1,6 +1,6 @@
 # Jira attachments (issue #93)
 
-Status: implemented on `feat/jira-attachments`.
+Status: shipped in v0.5.0 (PR #94).
 
 ## Problem
 

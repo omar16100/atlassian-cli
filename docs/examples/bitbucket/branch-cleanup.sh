@@ -111,7 +111,7 @@ get_repos() {
         atlassian-cli bitbucket repo list \
             --profile "$PROFILE" \
             "$WORKSPACE" \
-            --output json | jq -r '[.[].slug]'
+            --format json | jq -r '[.[].slug]'
     fi
 }
 
@@ -127,7 +127,7 @@ get_merged_branches() {
         --profile "$PROFILE" \
         "$WORKSPACE" \
         "$repo" \
-        --output json)
+        --format json)
 
     # Filter for merged branches (simplified - assumes default branch is main/master)
     echo "$branches" | jq -r '.[] | select(.merge_strategies != null) | .name'
