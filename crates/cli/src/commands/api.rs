@@ -49,7 +49,10 @@ pub struct ApiArgs {
     pub path: String,
 
     /// HTTP method. Defaults to GET, or POST when --data is given
-    #[arg(short = 'X', long, value_enum)]
+    //
+    // ignore_case: everyone writes `-X PUT`, but ValueEnum derives lowercase
+    // variant names, so without this the conventional spelling is rejected.
+    #[arg(short = 'X', long, value_enum, ignore_case = true)]
     pub method: Option<HttpMethod>,
 
     /// Request body: inline JSON, @file, or - to read stdin

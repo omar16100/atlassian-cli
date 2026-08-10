@@ -120,7 +120,7 @@ fetch_issues() {
     atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$jql" \
-        --output json
+        --format json
 }
 
 # Generate CSV report

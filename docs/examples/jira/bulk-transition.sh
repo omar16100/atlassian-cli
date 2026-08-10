@@ -98,7 +98,7 @@ preview_issues() {
     issues=$(atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$JQL" \
-        --output json 2>/dev/null || echo "[]")
+        --format json 2>/dev/null || echo "[]")
 
     local count
     count=$(echo "$issues" | jq '. | length')

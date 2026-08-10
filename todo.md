@@ -1408,3 +1408,17 @@ Minor bump (not patch): two new command groups plus a new public API on the shar
 - `jira api` raw authenticated passthrough (#93 alternative, PR #96).
 - `ApiClient::request_raw` / `RawRequest` / `RawResponse` / `resolve_url` added.
 - Security fixes shipped along the way, both pre-existing and affecting all commands: `init_tracing` logged to stdout, which could corrupt piped binary output; `safe_join` compared scheme and host but not port, so another port on the same host could receive the profile's credentials.
+
+## 2026-08-10 — Documentation freshness pass (branch `docs/index-and-0.5.0-freshness`)
+
+Audit after the 0.5.0 release, prompted by "is everything documented?".
+
+- Created `docs/index.md`, which never existed. It lists every doc, the `DDMMYYYY_topic.md` vs `topic.md` naming convention, required sections per category, and the rule that a dated feature doc carries a status line kept current.
+- Un-staled both 0.5.0 docs: they still said "implemented on <branch>" for branches deleted at merge.
+- Corrected the test counts in the passthrough doc (26/5/11 claimed vs 28/10/14 actual) and rewrote its Safety section, which predated the port and redirect fixes.
+- `docs/status.md` Jira row still claimed 11 wiremock tests and no attachments; now 21 wiremock plus 23 end-to-end.
+- Fixed 19 broken `--output json` invocations across all 9 example scripts. The flag is `--format`; `--output` is not an argument of any of those read commands. Verified each affected subcommand's help. In `backup-space.sh` the error was swallowed by `2>/dev/null || echo "[]"`, so that backup silently saved zero attachments.
+- Verified every `atlassian-cli <product> <group> <sub>` path used in the examples resolves against the built binary.
+- Extended the audit to the README after finding the example-script rot: **45 of its 128 command examples did not parse**. Causes: Jira issue commands never updated after the `issue` group was introduced (`jira get` -> `jira issue get`), `--id`/`--project`/`--space`/`--cql`/`--query` for arguments that are positional, `confluence bulk` documented as space-driven when it is CQL-driven, `space add-permission`/`page add-restriction` documented with flags that do not exist, pipelines taking `--repo` rather than a positional, and `jsm servicedesk` vs `jsm service-desk`. All fixed and verified.
+- Found and fixed a defect in the just-released 0.5.0: `jira api -X PUT` was rejected, because `ValueEnum` derives lowercase variant names and only `-X put` parsed. The README and the command's own help both showed uppercase. Now `ignore_case`.
+- New `crates/cli/tests/docs_examples.rs` parses every README command against the built binary (unroutable host, so nothing leaves the process; clap exit code 2 means malformed). Spawned concurrently: 7s instead of 100s. Verified it fails when a command line is broken.

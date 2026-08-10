@@ -125,7 +125,7 @@ preview_issues() {
     issues=$(atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$jql" \
-        --output json 2>/dev/null || echo "[]")
+        --format json 2>/dev/null || echo "[]")
 
     local count
     count=$(echo "$issues" | jq '. | length')
@@ -191,7 +191,7 @@ generate_report() {
     issues=$(atlassian-cli jira issue search \
         --profile "$PROFILE" \
         --jql "$jql" \
-        --output json)
+        --format json)
 
     local report_file="cleanup_report_$(date +%Y%m%d_%H%M%S).csv"
 

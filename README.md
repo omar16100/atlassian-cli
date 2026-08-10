@@ -106,17 +106,17 @@ crates/
 7. Try the Jira, Confluence, Bitbucket, and JSM commands (requires real data):
    ```bash
    # Jira - Issues
-   atlassian-cli jira search --jql "project = DEV order by created desc" --limit 5
-   atlassian-cli jira get DEV-123
-   atlassian-cli jira create --project DEV --issue-type Task --summary "Test task"
+   atlassian-cli jira issue search --jql "project = DEV order by created desc" --limit 5
+   atlassian-cli jira issue get DEV-123
+   atlassian-cli jira issue create --project DEV --issue-type Task --summary "Test task"
    # Custom fields — discover IDs via `jira fields list`:
-   atlassian-cli jira create --project DEV --issue-type Task --summary "cf test" \
+   atlassian-cli jira issue create --project DEV --issue-type Task --summary "cf test" \
      --field 'customfield_10010={"value":"Internal"}' \
      --field 'customfield_10020={"formula":"a=b"}'
-   atlassian-cli jira update DEV-123 --summary "Updated summary"
-   atlassian-cli jira transition DEV-123 --transition "In Progress"
-   atlassian-cli jira assign DEV-123 --assignee user@example.com
-   atlassian-cli jira delete DEV-123
+   atlassian-cli jira issue update DEV-123 --summary "Updated summary"
+   atlassian-cli jira issue transition DEV-123 --transition "In Progress"
+   atlassian-cli jira issue assign DEV-123 --assignee user@example.com
+   atlassian-cli jira issue delete DEV-123 --force
 
    # Jira - Attachments
    atlassian-cli jira attachment list DEV-123
@@ -140,20 +140,20 @@ crates/
    # Jira - Projects
    atlassian-cli jira project list
    atlassian-cli jira project get DEV
-   atlassian-cli jira components list --project DEV
-   atlassian-cli jira versions list --project DEV
+   atlassian-cli jira components list DEV
+   atlassian-cli jira versions list DEV
 
    # Jira - Roles
-   atlassian-cli jira roles list --project DEV
-   atlassian-cli jira roles get --project DEV --role-id 10002
-   atlassian-cli jira roles actors --project DEV --role-id 10002
-   atlassian-cli jira roles add-actor --project DEV --role-id 10002 --user user@example.com
-   atlassian-cli jira roles remove-actor --project DEV --role-id 10002 --user user@example.com
+   atlassian-cli jira roles list DEV
+   atlassian-cli jira roles get DEV 10002
+   atlassian-cli jira roles actors DEV 10002
+   atlassian-cli jira roles add-actor DEV 10002 --user user@example.com
+   atlassian-cli jira roles remove-actor DEV 10002 --user user@example.com
 
    # Jira - Custom Fields & Workflows
    atlassian-cli jira fields list
    atlassian-cli jira workflows list
-   atlassian-cli jira workflows export --name "Software Simplified Workflow"
+   atlassian-cli jira workflows export "Software Simplified Workflow"
 
    # Jira - Bulk Operations
    atlassian-cli jira bulk transition --jql "project = DEV AND status = Open" --transition "In Progress" --dry-run
@@ -166,9 +166,9 @@ crates/
    atlassian-cli jira audit list --from 2025-01-01 --limit 100
 
    # Confluence - Search
-   atlassian-cli confluence search cql --cql "space = DEV and type = page" --limit 5
-   atlassian-cli confluence search text --query "meeting notes" --limit 10
-   atlassian-cli confluence search in-space --space DEV --query "api docs"
+   atlassian-cli confluence search cql "space = DEV and type = page" --limit 5
+   atlassian-cli confluence search text "meeting notes" --limit 10
+   atlassian-cli confluence search in-space DEV "api docs"
 
    # Confluence - Spaces
    atlassian-cli confluence space list --limit 10
@@ -177,29 +177,29 @@ crates/
    atlassian-cli confluence space update DEV --name "Development Space"
    atlassian-cli confluence space delete OLD --force
    atlassian-cli confluence space permissions DEV
-   atlassian-cli confluence space add-permission DEV --principal user@example.com --operation read
+   atlassian-cli confluence space add-permission DEV --permission read --subject-type user --subject-id 5b10a2844c20165700ede21g
 
    # Confluence - Pages
    atlassian-cli confluence page list --space DEV --limit 25
-   atlassian-cli confluence page get --id 12345
+   atlassian-cli confluence page get 12345
    atlassian-cli confluence page create --space DEV --title "New Page" --body "<p>Content</p>"
-   atlassian-cli confluence page update --id 12345 --title "Updated Title"
-   atlassian-cli confluence page delete --id 12345
-   atlassian-cli confluence page versions --id 12345
-   atlassian-cli confluence page add-label --id 12345 --label documentation
-   atlassian-cli confluence page remove-label --id 12345 --label outdated
-   atlassian-cli confluence page comments --id 12345
-   atlassian-cli confluence page add-comment --id 12345 --body "Great work!"
-   atlassian-cli confluence page get-restrictions --id 12345
-   atlassian-cli confluence page add-restriction --id 12345 --operation update --user user@example.com
-   atlassian-cli confluence page remove-restriction --id 12345 --operation update --user user@example.com
+   atlassian-cli confluence page update 12345 --title "Updated Title"
+   atlassian-cli confluence page delete 12345
+   atlassian-cli confluence page versions 12345
+   atlassian-cli confluence page add-label 12345 documentation
+   atlassian-cli confluence page remove-label 12345 outdated
+   atlassian-cli confluence page comments 12345
+   atlassian-cli confluence page add-comment 12345 "Great work!"
+   atlassian-cli confluence page get-restrictions 12345
+   atlassian-cli confluence page add-restriction 12345 --operation update --subject-type user --subject-id 5b10a2844c20165700ede21g
+   atlassian-cli confluence page remove-restriction 12345 --operation update --subject-type user --subject-id 5b10a2844c20165700ede21g
 
    # Confluence - Blog Posts
    atlassian-cli confluence blog list --space DEV --limit 10
-   atlassian-cli confluence blog get --id 67890
+   atlassian-cli confluence blog get 67890
    atlassian-cli confluence blog create --space DEV --title "Sprint Recap" --body "<p>Summary</p>"
-   atlassian-cli confluence blog update --id 67890 --title "Updated Recap"
-   atlassian-cli confluence blog delete --id 67890
+   atlassian-cli confluence blog update 67890 --title "Updated Recap"
+   atlassian-cli confluence blog delete 67890
 
    # Confluence - Attachments
    atlassian-cli confluence attachment list 12345
@@ -209,13 +209,13 @@ crates/
    atlassian-cli confluence attachment delete 11111 --force
 
    # Confluence - Bulk Operations
-   atlassian-cli confluence bulk delete --space OLD --dry-run
+   atlassian-cli confluence bulk delete --cql "space = OLD AND type = page" --dry-run
    atlassian-cli confluence bulk add-labels --cql "space = DEV" --labels docs,reviewed --dry-run
-   atlassian-cli confluence bulk export --space DEV --output backup.json --format json
+   atlassian-cli confluence bulk export --cql "space = DEV" --output backup.json --format json
 
    # Confluence - Analytics
-   atlassian-cli confluence analytics page-views --id 12345 --from 2025-01-01
-   atlassian-cli confluence analytics space-stats --space DEV
+   atlassian-cli confluence analytics page-views 12345 --from 2025-01-01
+   atlassian-cli confluence analytics space-stats DEV
 
    # Bitbucket Commands
    # Note: You can use 'bb' as a shorthand alias for 'bitbucket' in all commands below
@@ -256,9 +256,9 @@ crates/
    atlassian-cli bitbucket --workspace myteam project delete PROJ --force
 
    # Bitbucket - Pipelines
-   atlassian-cli bitbucket --workspace myteam pipeline list api-service
-   atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main
-   atlassian-cli bitbucket --workspace myteam pipeline stop api-service {uuid}
+   atlassian-cli bitbucket --workspace myteam pipeline list --repo api-service
+   atlassian-cli bitbucket --workspace myteam pipeline trigger --repo api-service --ref-name main
+   atlassian-cli bitbucket --workspace myteam pipeline stop --repo api-service 42
 
    # Bitbucket - Webhooks & SSH Keys
    atlassian-cli bitbucket --workspace myteam webhook list api-service
@@ -278,7 +278,7 @@ crates/
    atlassian-cli bitbucket --workspace myteam bulk delete-branches api-service --exclude feature/keep --dry-run
 
    # JSM
-   atlassian-cli jsm servicedesk list --limit 10
+   atlassian-cli jsm service-desk list --limit 10
    atlassian-cli jsm request list --limit 10
    atlassian-cli jsm request get SD-123
    ```
