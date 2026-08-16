@@ -1,5 +1,10 @@
 # atlassian-cli TODO
 
+## Bitbucket PR Reviewer Status (2026-08-15)
+- [x] `bb pr reviewers <repo> <pr_id>` now lists current reviewers with approval status (Approved/Changes Requested/No Response) when `--add` is omitted
+- [x] Add `--all` flag to also include non-reviewer participants (commenters)
+- [x] Fixed latent bug where omitting `--add` silently no-op'd and printed a false "Reviewers added" success message
+
 ## Product Landing Pages — Jira & Confluence (2026-03-14)
 - [x] Create /docs/jira/index.html — Jira CLI product page (315 lines)
 - [x] Create /docs/confluence/index.html — Confluence CLI product page (326 lines)

@@ -247,6 +247,8 @@ crates/
    atlassian-cli bitbucket --workspace myteam pr merge api-service 123 --strategy merge_commit
    atlassian-cli bitbucket --workspace myteam pr comments api-service 123
    atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Looks good!"
+   atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123
+   atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123 --all
 
    # Bitbucket - Workspaces & Projects
    atlassian-cli bitbucket workspace list --limit 10

@@ -437,6 +437,73 @@ async fn test_bitbucket_approve_pull_request() {
 }
 
 #[tokio::test]
+async fn test_bitbucket_get_pull_request_with_reviewer_participants() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/2.0/repositories/myworkspace/myrepo/pullrequests/1"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": 1,
+            "title": "Add new feature",
+            "state": "OPEN",
+            "author": {"display_name": "John Doe"},
+            "source": {
+                "branch": {"name": "feature/new-feature"}
+            },
+            "destination": {
+                "branch": {"name": "main"}
+            },
+            "participants": [
+                {
+                    "user": {"display_name": "Jane Doe"},
+                    "role": "REVIEWER",
+                    "approved": true,
+                    "state": "approved",
+                    "participated_on": "2026-08-10T12:00:00Z"
+                },
+                {
+                    "user": {"display_name": "John Smith"},
+                    "role": "REVIEWER",
+                    "approved": false,
+                    "state": "changes_requested",
+                    "participated_on": "2026-08-11T09:30:00Z"
+                },
+                {
+                    "user": {"display_name": "Alex Lee"},
+                    "role": "PARTICIPANT",
+                    "approved": false,
+                    "state": null,
+                    "participated_on": null
+                }
+            ]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: Result<serde_json::Value, _> = client
+        .get("/2.0/repositories/myworkspace/myrepo/pullrequests/1")
+        .await;
+
+    assert!(response.is_ok());
+    let pr = response.unwrap();
+    let participants = pr["participants"].as_array().unwrap();
+    assert_eq!(participants.len(), 3);
+
+    assert_eq!(participants[0]["role"], "REVIEWER");
+    assert_eq!(participants[0]["state"], "approved");
+
+    assert_eq!(participants[1]["state"], "changes_requested");
+    assert_eq!(participants[1]["approved"], false);
+
+    assert_eq!(participants[2]["role"], "PARTICIPANT");
+    assert!(participants[2]["state"].is_null());
+}
+
+#[tokio::test]
 async fn test_bitbucket_branch_protection() {
     let mock_server = MockServer::start().await;
 
