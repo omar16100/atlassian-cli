@@ -363,15 +363,21 @@ enum PrCommands {
         #[arg(long)]
         text: String,
     },
-    /// Add reviewers to pull request.
+    /// List pull request reviewers with review status, or add new reviewers.
+    #[command(
+        long_about = "List pull request reviewers with review status, or add new reviewers.\n\nWith no flags, lists current reviewers (role=REVIEWER) and whether each has approved, requested changes, or not responded.\n\nExamples:\n  bb pr reviewers my-repo 123\n  bb pr reviewers my-repo 123 --all\n  bb pr reviewers my-repo 123 --add {uuid}"
+    )]
     Reviewers {
         /// Repository slug.
         repo: String,
         /// Pull request ID.
         pr_id: i64,
-        /// Reviewer UUIDs (comma-separated).
+        /// Reviewer UUIDs to add (comma-separated). If omitted, lists current reviewers instead.
         #[arg(long, value_delimiter = ',')]
         add: Vec<String>,
+        /// When listing, also include non-reviewer participants (commenters).
+        #[arg(long)]
+        all: bool,
     },
 }
 
@@ -1114,8 +1120,17 @@ pub async fn execute(
             PrCommands::Comment { repo, pr_id, text } => {
                 pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text).await
             }
-            PrCommands::Reviewers { repo, pr_id, add } => {
-                pullrequests::add_pr_reviewers(&ctx, &workspace, &repo, pr_id, add).await
+            PrCommands::Reviewers {
+                repo,
+                pr_id,
+                add,
+                all,
+            } => {
+                if add.is_empty() {
+                    pullrequests::list_pr_reviewers(&ctx, &workspace, &repo, pr_id, all).await
+                } else {
+                    pullrequests::add_pr_reviewers(&ctx, &workspace, &repo, pr_id, add).await
+                }
             }
         },
         BitbucketCommands::Workspace(cmd) => match cmd {
