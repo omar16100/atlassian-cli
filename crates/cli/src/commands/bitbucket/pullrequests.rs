@@ -79,13 +79,24 @@ struct RepositoryWorkspace {
 
 #[derive(Deserialize)]
 struct Participant {
-    #[allow(dead_code)]
     #[serde(default)]
     approved: bool,
-    #[allow(dead_code)]
     user: User,
-    #[allow(dead_code)]
     role: String,
+    #[serde(default)]
+    state: Option<String>,
+    #[serde(default)]
+    participated_on: Option<String>,
+}
+
+/// Derive a human-friendly review status label from a participant's `approved`/`state` fields.
+fn participant_status(approved: bool, state: Option<&str>) -> &'static str {
+    match state {
+        Some("approved") => "Approved",
+        Some("changes_requested") => "Changes Requested",
+        _ if approved => "Approved",
+        _ => "No Response",
+    }
 }
 
 #[derive(Deserialize)]
@@ -572,6 +583,48 @@ pub async fn add_pr_reviewers(
     )
 }
 
+/// List reviewers (or all participants) on a pull request along with their review status.
+pub async fn list_pr_reviewers(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pr_id: i64,
+    show_all: bool,
+) -> Result<()> {
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}");
+    let pr: PullRequest = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
+    })?;
+
+    #[derive(Serialize)]
+    struct Row<'a> {
+        name: &'a str,
+        role: &'a str,
+        status: &'a str,
+        participated_on: &'a str,
+    }
+
+    let participants = pr.participants.unwrap_or_default();
+    let rows: Vec<Row<'_>> = participants
+        .iter()
+        .filter(|p| show_all || p.role == "REVIEWER")
+        .map(|p| Row {
+            name: p.user.display_name.as_str(),
+            role: p.role.as_str(),
+            status: participant_status(p.approved, p.state.as_deref()),
+            participated_on: p.participated_on.as_deref().unwrap_or(""),
+        })
+        .collect();
+
+    if rows.is_empty() {
+        tracing::info!(pr_id, workspace, repo_slug, show_all, "No reviewers found");
+        println!("No reviewers found");
+        return Ok(());
+    }
+
+    ctx.renderer.render(&rows)
+}
+
 pub async fn get_pr_diff(
     _ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -634,4 +687,33 @@ pub async fn get_pr_info(
 /// Check if a PR is from a fork
 pub fn is_from_fork(pr_info: &PullRequestInfo, target_workspace: &str, target_repo: &str) -> bool {
     pr_info.source_workspace != target_workspace || pr_info.source_repo != target_repo
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_participant_status_approved_state() {
+        assert_eq!(participant_status(true, Some("approved")), "Approved");
+    }
+
+    #[test]
+    fn test_participant_status_changes_requested() {
+        assert_eq!(
+            participant_status(false, Some("changes_requested")),
+            "Changes Requested"
+        );
+    }
+
+    #[test]
+    fn test_participant_status_no_state_but_approved_fallback() {
+        // Older API responses may omit `state` but still set `approved`.
+        assert_eq!(participant_status(true, None), "Approved");
+    }
+
+    #[test]
+    fn test_participant_status_no_response() {
+        assert_eq!(participant_status(false, None), "No Response");
+    }
 }
