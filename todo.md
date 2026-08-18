@@ -122,7 +122,7 @@ Live GA4 (520368061) + GSC (sc-domain:atlassiancli.com): ~322 clicks / ~18k impr
 early-2026 baseline of 51 clicks/3mo), avg pos ~8.5, but 0 top-10 rankings and a near-zero backlink profile
 (1 referring domain per DataForSEO). DataForSEO + Reddit research drove a content + fix plan, codex-reviewed twice.
 
-### Research & planning (research/seo/, unpublished)
+### Research & planning (moved to the private repo 18 Aug 2026; was NOT unpublished before then)
 - DataForSEO: ranked keywords, Jira/Confluence/Bitbucket/JSM keyword universes, SERP competitors, backlinks, AI/LLM demand.
 - Reddit: 59 threads mined (top pain: "no gh-style Bitbucket CLI"; cross-product CLI; Confluence->markdown export).
 - CONTENT_AND_FIX_PLAN.md + BING_RECOVERY_AND_BACKLINKS.md. Codex reviews in /Users/macmini/projects/codex/.
