@@ -362,6 +362,9 @@ enum PrCommands {
         /// Comment text.
         #[arg(long)]
         text: String,
+        /// Parent comment ID for a threaded reply.
+        #[arg(long)]
+        parent: Option<i64>,
     },
     /// List pull request reviewers with review status, or add new reviewers.
     #[command(
@@ -1117,9 +1120,12 @@ pub async fn execute(
             PrCommands::Comments { repo, pr_id } => {
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Comment { repo, pr_id, text } => {
-                pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text).await
-            }
+            PrCommands::Comment {
+                repo,
+                pr_id,
+                text,
+                parent,
+            } => pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text, parent).await,
             PrCommands::Reviewers {
                 repo,
                 pr_id,

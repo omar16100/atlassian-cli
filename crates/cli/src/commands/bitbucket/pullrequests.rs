@@ -106,11 +106,49 @@ struct Comment {
     user: User,
     #[serde(default)]
     created_on: Option<String>,
+    #[serde(default)]
+    parent: Option<CommentParent>,
 }
 
 #[derive(Deserialize)]
 struct CommentContent {
     raw: String,
+}
+
+#[derive(Deserialize)]
+struct CommentParent {
+    id: i64,
+}
+
+#[derive(Serialize)]
+struct CommentRow<'a> {
+    id: i64,
+    author: &'a str,
+    content: &'a str,
+    created: &'a str,
+    parent: Option<i64>,
+}
+
+fn comment_row(comment: &Comment) -> CommentRow<'_> {
+    CommentRow {
+        id: comment.id,
+        author: comment.user.display_name.as_str(),
+        content: comment.content.raw.as_str(),
+        created: comment.created_on.as_deref().unwrap_or(""),
+        parent: comment.parent.as_ref().map(|parent| parent.id),
+    }
+}
+
+fn comment_payload(content: &str, parent: Option<i64>) -> serde_json::Value {
+    let mut payload = serde_json::json!({
+        "content": {
+            "raw": content
+        }
+    });
+    if let Some(parent) = parent {
+        payload["parent"] = serde_json::json!({"id": parent});
+    }
+    payload
 }
 
 pub async fn list_pull_requests(
@@ -496,24 +534,7 @@ pub async fn list_pr_comments(
         format!("Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}")
     })?;
 
-    #[derive(Serialize)]
-    struct Row<'a> {
-        id: i64,
-        author: &'a str,
-        content: &'a str,
-        created: &'a str,
-    }
-
-    let rows: Vec<Row<'_>> = response
-        .values
-        .iter()
-        .map(|comment| Row {
-            id: comment.id,
-            author: comment.user.display_name.as_str(),
-            content: comment.content.raw.lines().next().unwrap_or(""),
-            created: comment.created_on.as_deref().unwrap_or(""),
-        })
-        .collect();
+    let rows: Vec<CommentRow<'_>> = response.values.iter().map(comment_row).collect();
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, "No comments found");
@@ -530,12 +551,9 @@ pub async fn add_pr_comment(
     repo_slug: &str,
     pr_id: i64,
     content: &str,
+    parent: Option<i64>,
 ) -> Result<()> {
-    let payload = serde_json::json!({
-        "content": {
-            "raw": content
-        }
-    });
+    let payload = comment_payload(content, parent);
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
     let comment: Comment = ctx.client.post(&path, &payload).await.with_context(|| {
@@ -715,5 +733,39 @@ mod tests {
     #[test]
     fn test_participant_status_no_response() {
         assert_eq!(participant_status(false, None), "No Response");
+    }
+
+    #[test]
+    fn comment_payload_includes_parent_for_threaded_reply() {
+        assert_eq!(
+            comment_payload("Fixed", Some(843649259)),
+            serde_json::json!({
+                "content": {"raw": "Fixed"},
+                "parent": {"id": 843649259}
+            })
+        );
+        assert_eq!(
+            comment_payload("Top level", None),
+            serde_json::json!({"content": {"raw": "Top level"}})
+        );
+    }
+
+    #[test]
+    fn comment_row_preserves_full_content_and_parent() {
+        let mut comment: Comment = serde_json::from_value(serde_json::json!({
+            "id": 843649260,
+            "content": {"raw": "First line\nIdempotency marker"},
+            "user": {"display_name": "OCR"},
+            "created_on": "2026-08-18T06:01:54Z",
+            "parent": {"id": 843649259}
+        }))
+        .unwrap();
+
+        let row = serde_json::to_value(comment_row(&comment)).unwrap();
+        assert_eq!(row["content"], "First line\nIdempotency marker");
+        assert_eq!(row["parent"], 843649259);
+
+        comment.parent = None;
+        assert!(serde_json::to_value(comment_row(&comment)).unwrap()["parent"].is_null());
     }
 }
