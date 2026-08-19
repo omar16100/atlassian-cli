@@ -76,7 +76,7 @@ fn tokenize(s: &str) -> Vec<String> {
 /// and `name+=( ... )` array appends (stripping them from the text and
 /// recording/extending their tokenized contents in `arrays`), so later
 /// `"${name[@]}"` usages can be expanded inline.
-fn preprocess(text: &str) -> (String, HashMap<String, Vec<String>>) {
+fn preprocess(text: &str, source: &str) -> (String, HashMap<String, Vec<String>>) {
     let joined = text.replace("\\\n", " ");
 
     let mut arrays: HashMap<String, Vec<String>> = HashMap::new();
@@ -110,7 +110,7 @@ fn preprocess(text: &str) -> (String, HashMap<String, Vec<String>>) {
         let body_start = eq_paren + 2;
         let close = rest[body_start..]
             .find(')')
-            .unwrap_or_else(|| panic!("unterminated array assignment for {name}"));
+            .unwrap_or_else(|| panic!("unterminated array assignment for {name} in {source}"));
         let body = &rest[body_start..body_start + close];
         let tokens = tokenize(body);
         if is_append {
@@ -170,8 +170,8 @@ fn is_command_position(prefix: &str) -> bool {
 /// first unquoted `;`, `|`, `)` or (file-descriptor-prefixed) `>`, so
 /// statement separators, pipelines, redirects, and the closing paren of a
 /// `$(...)` command substitution don't get parsed as CLI arguments.
-fn extract_commands(text: &str) -> Vec<Vec<String>> {
-    let (joined, arrays) = preprocess(text);
+fn extract_commands(text: &str, source: &str) -> Vec<Vec<String>> {
+    let (joined, arrays) = preprocess(text, source);
     let mut commands = Vec::new();
 
     for line in joined.lines() {
@@ -220,9 +220,9 @@ fn extract_commands(text: &str) -> Vec<Vec<String>> {
         let mut expanded_tokens = Vec::new();
         for tok in raw_tokens {
             if let Some(name) = array_expansion_name(&tok) {
-                let expanded = arrays
-                    .get(name)
-                    .unwrap_or_else(|| panic!("no array recorded for {name} (line: {line})"));
+                let expanded = arrays.get(name).unwrap_or_else(|| {
+                    panic!("no array recorded for {name} in {source} (line: {line})")
+                });
                 expanded_tokens.extend(expanded.iter().cloned());
             } else {
                 expanded_tokens.push(tok);
@@ -290,7 +290,8 @@ fn every_example_script_command_parses() {
     let mut failures = Vec::new();
     for script in &scripts {
         let text = std::fs::read_to_string(script).unwrap();
-        for tokens in extract_commands(&text) {
+        let source = script.display().to_string();
+        for tokens in extract_commands(&text, &source) {
             // tokens[0] is always the literal "atlassian-cli" word.
             let output = Command::new(BIN)
                 .arg("--config")
@@ -303,6 +304,15 @@ fn every_example_script_command_parses() {
                 .output()
                 .expect("failed to run the CLI");
 
+            // Exit code 2 == clap rejected the argv. This is the only kind of
+            // regression we catch here: structure/spelling of flags and
+            // positionals. We do NOT validate semantic correctness — e.g.
+            // free-form `String` args (`--strategy`, `--state`, `--action`)
+            // accept any value, and `jq`/JSON-shape assumptions in the scripts
+            // are not exercised because the CLI never reaches the network.
+            // If you change a response shape or an accepted enum value, add
+            // an integration test that hits a mock server; this one won't
+            // notice.
             if output.status.code() == Some(2) {
                 let reason = String::from_utf8_lossy(&output.stderr)
                     .lines()
@@ -369,7 +379,7 @@ mod extraction_tests {
     #[test]
     fn extracts_simple_invocation_and_substitutes_variables() {
         let script = "atlassian-cli bitbucket pr approve \\\n    --workspace \"$WORKSPACE\" \\\n    \"$REPO\" \\\n    \"$pr_id\"\n";
-        let commands = extract_commands(script);
+        let commands = extract_commands(script, "<test>");
         assert_eq!(
             commands,
             vec![vec![
@@ -395,7 +405,7 @@ mod extraction_tests {
             ")\n",
             "atlassian-cli \"${args[@]}\"\n",
         );
-        let commands = extract_commands(script);
+        let commands = extract_commands(script, "<test>");
         assert_eq!(
             commands,
             vec![vec![
@@ -418,14 +428,17 @@ mod extraction_tests {
             "args+=(\"c\" \"$VAR\")\n",
             "atlassian-cli \"${args[@]}\"\n",
         );
-        let commands = extract_commands(script);
+        let commands = extract_commands(script, "<test>");
         assert_eq!(commands, vec![vec!["atlassian-cli", "a", "b", "c", "1"]]);
     }
 
     #[test]
     fn ignores_non_invocation_uses_of_the_word() {
         let script = "for cmd in atlassian-cli pandoc jq; do\n    true\ndone\n# atlassian-cli installed and configured\n";
-        assert_eq!(extract_commands(script), Vec::<Vec<String>>::new());
+        assert_eq!(
+            extract_commands(script, "<test>"),
+            Vec::<Vec<String>>::new()
+        );
     }
 
     #[test]
@@ -435,7 +448,7 @@ mod extraction_tests {
             "    --format json \\\n",
             "    \"$cql\" 2>/dev/null || echo \"[]\")\n",
         );
-        let commands = extract_commands(script);
+        let commands = extract_commands(script, "<test>");
         assert_eq!(
             commands,
             vec![vec![
@@ -451,7 +464,7 @@ mod extraction_tests {
 
         let script2 = "if atlassian-cli confluence attachment download --output \"$OUT\"; then\n";
         assert_eq!(
-            extract_commands(script2),
+            extract_commands(script2, "<test>"),
             vec![vec![
                 "atlassian-cli",
                 "confluence",
