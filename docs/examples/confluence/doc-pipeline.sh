@@ -94,8 +94,8 @@ get_or_create_page() {
     log "Creating new page: $title"
 
     local create_args=(
-        "confluence" "page" "create"
         "--profile" "$PROFILE"
+        "confluence" "page" "create"
         "--space" "$space_key"
         "--title" "$title"
     )
@@ -125,8 +125,7 @@ update_page() {
 
     log "Updating page $page_id: $title"
 
-    atlassian-cli confluence page update \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence page update \
         "$page_id" \
         --title "$title" \
         --body "$temp_file"
@@ -147,8 +146,7 @@ add_labels() {
 
     for label in "${labels[@]}"; do
         log "Adding label '$label' to page $page_id"
-        atlassian-cli confluence page add-label \
-            --profile "$PROFILE" \
+        atlassian-cli --profile "$PROFILE" confluence page add-label \
             "$page_id" \
             "$label" || warn "Failed to add label: $label"
     done
