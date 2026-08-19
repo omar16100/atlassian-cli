@@ -122,8 +122,7 @@ preview_issues() {
     log "JQL: $jql"
 
     local issues
-    issues=$(atlassian-cli jira issue search \
-        --profile "$PROFILE" \
+    issues=$(atlassian-cli --profile "$PROFILE" jira issue search \
         --jql "$jql" \
         --format json 2>/dev/null || echo "[]")
 
@@ -158,9 +157,9 @@ add_label() {
 
     log "Adding label '$label' to issues..."
 
-    atlassian-cli jira bulk label \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" jira bulk label \
         --jql "$jql" \
+        --action add \
         --labels "$label" \
         --concurrency "$CONCURRENCY"
 
@@ -188,8 +187,7 @@ generate_report() {
     log "Generating cleanup report..."
 
     local issues
-    issues=$(atlassian-cli jira issue search \
-        --profile "$PROFILE" \
+    issues=$(atlassian-cli --profile "$PROFILE" jira issue search \
         --jql "$jql" \
         --format json)
 
