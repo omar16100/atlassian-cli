@@ -363,6 +363,24 @@ enum PrCommands {
         #[arg(long)]
         text: String,
     },
+    /// Resolve a pull request diff comment thread.
+    ResolveComment {
+        /// Repository slug.
+        repo: String,
+        /// Pull request ID.
+        pr_id: i64,
+        /// Top-level comment ID.
+        comment_id: i64,
+    },
+    /// Reopen a resolved pull request comment thread.
+    ReopenComment {
+        /// Repository slug.
+        repo: String,
+        /// Pull request ID.
+        pr_id: i64,
+        /// Top-level comment ID.
+        comment_id: i64,
+    },
     /// List pull request reviewers with review status, or add new reviewers.
     #[command(
         long_about = "List pull request reviewers with review status, or add new reviewers.\n\nWith no flags, lists current reviewers (role=REVIEWER) and whether each has approved, requested changes, or not responded.\n\nExamples:\n  bb pr reviewers my-repo 123\n  bb pr reviewers my-repo 123 --all\n  bb pr reviewers my-repo 123 --add {uuid}"
@@ -1120,6 +1138,16 @@ pub async fn execute(
             PrCommands::Comment { repo, pr_id, text } => {
                 pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text).await
             }
+            PrCommands::ResolveComment {
+                repo,
+                pr_id,
+                comment_id,
+            } => pullrequests::resolve_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
+            PrCommands::ReopenComment {
+                repo,
+                pr_id,
+                comment_id,
+            } => pullrequests::reopen_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
             PrCommands::Reviewers {
                 repo,
                 pr_id,

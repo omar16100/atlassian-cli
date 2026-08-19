@@ -553,6 +553,67 @@ pub async fn add_pr_comment(
     )
 }
 
+pub async fn resolve_pr_comment(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pr_id: i64,
+    comment_id: i64,
+) -> Result<()> {
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments/{comment_id}/resolve"
+    );
+    let _: serde_json::Value = ctx
+        .client
+        .post(&path, &serde_json::json!({}))
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to resolve comment {comment_id} on pull request {pr_id} in {workspace}/{repo_slug}"
+            )
+        })?;
+
+    tracing::info!(comment_id, pr_id, "Comment thread resolved successfully");
+    render_success(
+        ctx.renderer,
+        &format!("✅ Comment {comment_id} resolved on pull request #{pr_id}"),
+        &MutationResult::with_id(
+            format!("Comment {comment_id} resolved on pull request #{pr_id}"),
+            comment_id.to_string(),
+        ),
+    )
+}
+
+pub async fn reopen_pr_comment(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pr_id: i64,
+    comment_id: i64,
+) -> Result<()> {
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments/{comment_id}/resolve"
+    );
+    ctx.client
+        .delete_no_content(&path)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to reopen comment {comment_id} on pull request {pr_id} in {workspace}/{repo_slug}"
+            )
+        })?;
+
+    tracing::info!(comment_id, pr_id, "Comment thread reopened successfully");
+    render_success(
+        ctx.renderer,
+        &format!("✅ Comment {comment_id} reopened on pull request #{pr_id}"),
+        &MutationResult::with_id(
+            format!("Comment {comment_id} reopened on pull request #{pr_id}"),
+            comment_id.to_string(),
+        ),
+    )
+}
+
 pub async fn add_pr_reviewers(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -692,6 +753,10 @@ pub fn is_from_fork(pr_info: &PullRequestInfo, target_workspace: &str, target_re
 #[cfg(test)]
 mod tests {
     use super::*;
+    use atlassian_cli_api::ApiClient;
+    use atlassian_cli_output::{OutputFormat, OutputRenderer};
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
     fn test_participant_status_approved_state() {
@@ -715,5 +780,38 @@ mod tests {
     #[test]
     fn test_participant_status_no_response() {
         assert_eq!(participant_status(false, None), "No Response");
+    }
+
+    #[tokio::test]
+    async fn comment_threads_can_be_resolved_and_reopened() {
+        let server = MockServer::start().await;
+        let endpoint = "/2.0/repositories/workspace/repo/pullrequests/42/comments/99/resolve";
+
+        Mock::given(method("POST"))
+            .and(path(endpoint))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "type": "pullrequest_comment_resolution"
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("DELETE"))
+            .and(path(endpoint))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = BitbucketContext {
+            client: ApiClient::new(server.uri()).unwrap(),
+            renderer: &renderer,
+            is_bearer: false,
+        };
+
+        resolve_pr_comment(&ctx, "workspace", "repo", 42, 99)
+            .await
+            .unwrap();
+        reopen_pr_comment(&ctx, "workspace", "repo", 42, 99)
+            .await
+            .unwrap();
     }
 }
