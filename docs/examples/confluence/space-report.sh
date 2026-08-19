@@ -40,8 +40,7 @@ get_space_stats() {
     log "Fetching space statistics for $SPACE_KEY"
 
     local stats
-    stats=$(atlassian-cli confluence analytics space-stats \
-        --profile "$PROFILE" \
+    stats=$(atlassian-cli --profile "$PROFILE" confluence analytics space-stats \
         "$SPACE_KEY" \
         --format json)
 
@@ -58,8 +57,7 @@ get_all_pages() {
     log "Fetching all pages from $SPACE_KEY"
 
     local pages
-    pages=$(atlassian-cli confluence page list \
-        --profile "$PROFILE" \
+    pages=$(atlassian-cli --profile "$PROFILE" confluence page list \
         --space "$SPACE_KEY" \
         --limit 1000 \
         --format json)
@@ -72,8 +70,7 @@ get_page_views() {
     local page_id="$1"
 
     # Try to get page views, return 0 if not available
-    atlassian-cli confluence analytics page-views \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence analytics page-views \
         "$page_id" \
         --format json 2>/dev/null | \
         jq -r '.view_count // 0' || echo "0"
@@ -83,8 +80,7 @@ get_page_views() {
 get_page_details() {
     local page_id="$1"
 
-    atlassian-cli confluence page get \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence page get \
         "$page_id" \
         --format json
 }
