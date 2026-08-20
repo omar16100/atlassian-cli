@@ -40,9 +40,8 @@ warn() {
 get_all_repos() {
     log "Fetching all repositories from workspace: $WORKSPACE"
 
-    atlassian-cli bitbucket repo list \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    atlassian-cli --profile "$PROFILE" bitbucket repo list \
+        --workspace "$WORKSPACE" \
         --format json
 }
 
@@ -50,9 +49,8 @@ get_all_repos() {
 get_repo_permissions() {
     local repo="$1"
 
-    atlassian-cli bitbucket permission list \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    atlassian-cli --profile "$PROFILE" bitbucket permission list \
+        --workspace "$WORKSPACE" \
         "$repo" \
         --format json 2>/dev/null || echo "[]"
 }

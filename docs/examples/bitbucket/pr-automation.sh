@@ -105,9 +105,8 @@ parse_args() {
 get_open_prs() {
     log "Fetching open pull requests..."
 
-    atlassian-cli bitbucket pr list \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    atlassian-cli --profile "$PROFILE" bitbucket pr list \
+        --workspace "$WORKSPACE" \
         "$REPO" \
         --state OPEN \
         --format json
@@ -128,13 +127,12 @@ is_trusted_author() {
 get_approval_count() {
     local pr_id="$1"
 
-    atlassian-cli bitbucket pr get \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    atlassian-cli --profile "$PROFILE" bitbucket pr reviewers \
+        --workspace "$WORKSPACE" \
         "$REPO" \
         "$pr_id" \
         --format json | \
-        jq '[.participants[] | select(.approved == true)] | length'
+        jq '[.[] | select(.status == "Approved")] | length'
 }
 
 # Auto-approve PR
@@ -149,9 +147,8 @@ approve_pr() {
 
     log "Approving PR #$pr_id: $title"
 
-    atlassian-cli bitbucket pr approve \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    atlassian-cli --profile "$PROFILE" bitbucket pr approve \
+        --workspace "$WORKSPACE" \
         "$REPO" \
         "$pr_id"
 }
@@ -168,12 +165,11 @@ merge_pr() {
 
     log "Merging PR #$pr_id: $title"
 
-    atlassian-cli bitbucket pr merge \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    atlassian-cli --profile "$PROFILE" bitbucket pr merge \
+        --workspace "$WORKSPACE" \
         "$REPO" \
         "$pr_id" \
-        --strategy merge
+        --strategy merge_commit
 }
 
 # Process PRs for auto-approval

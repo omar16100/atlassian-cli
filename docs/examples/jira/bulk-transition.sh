@@ -24,7 +24,6 @@ TRANSITION=""
 PROFILE="default"
 DRY_RUN=true
 CONCURRENCY=4
-COMMENT=""
 
 # Colors
 GREEN='\033[0;32m'
@@ -60,10 +59,6 @@ parse_args() {
                 PROFILE="$2"
                 shift 2
                 ;;
-            --comment)
-                COMMENT="$2"
-                shift 2
-                ;;
             --concurrency)
                 CONCURRENCY="$2"
                 shift 2
@@ -95,8 +90,7 @@ preview_issues() {
     log "Query: $JQL"
 
     local issues
-    issues=$(atlassian-cli jira issue search \
-        --profile "$PROFILE" \
+    issues=$(atlassian-cli --profile "$PROFILE" jira issue search \
         --jql "$JQL" \
         --format json 2>/dev/null || echo "[]")
 
@@ -129,16 +123,12 @@ execute_transition() {
     log "Executing bulk transition to: $TRANSITION"
 
     local args=(
-        "jira" "bulk" "transition"
         "--profile" "$PROFILE"
+        "jira" "bulk" "transition"
         "--jql" "$JQL"
         "--transition" "$TRANSITION"
         "--concurrency" "$CONCURRENCY"
     )
-
-    if [ -n "$COMMENT" ]; then
-        args+=("--comment" "$COMMENT")
-    fi
 
     atlassian-cli "${args[@]}"
 

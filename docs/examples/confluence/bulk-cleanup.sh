@@ -110,8 +110,7 @@ preview_pages() {
     log "CQL: $cql"
 
     local results
-    results=$(atlassian-cli confluence search cql \
-        --profile "$PROFILE" \
+    results=$(atlassian-cli --profile "$PROFILE" confluence search cql \
         --format json \
         "$cql" 2>/dev/null || echo "[]")
 
@@ -145,8 +144,7 @@ add_labels_bulk() {
 
     log "Adding '$LABEL_NAME' label to pages..."
 
-    atlassian-cli confluence bulk add-labels \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence bulk add-labels \
         --cql "$cql" \
         --labels "$LABEL_NAME" \
         --concurrency 4
@@ -165,8 +163,7 @@ delete_pages_bulk() {
 
     # Safety confirmation
     local count
-    count=$(atlassian-cli confluence search cql \
-        --profile "$PROFILE" \
+    count=$(atlassian-cli --profile "$PROFILE" confluence search cql \
         --format json \
         "$cql" | jq '. | length')
 
@@ -180,8 +177,7 @@ delete_pages_bulk() {
 
     log "Deleting pages..."
 
-    atlassian-cli confluence bulk delete \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence bulk delete \
         --cql "$cql" \
         --concurrency 2
 

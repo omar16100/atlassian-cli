@@ -1,6 +1,43 @@
 # Changes Made
 
-## 2026-08-20 - Fix RUSTSEC-2026-0258 (h2 unbounded empty DATA frames)
+## 2026-08-18 — Fixed docs/examples/**/*.sh CLI invocations (closes #105)
+
+### Context
+[Issue #105](https://github.com/omar16100/atlassian-cli/issues/105) reported that every
+`atlassian-cli` invocation in `docs/examples/bitbucket/pr-automation.sh` failed to parse.
+Auditing the fix turned up a much larger, pre-existing problem: all 10 scripts under
+`docs/examples/**/*.sh` placed `--profile "$PROFILE"` after the product subcommand (e.g.
+`bitbucket`, `jira`, `confluence`) instead of before it. `--profile` is a top-level `clap`
+field on the `Cli` struct without `global = true` (unlike `--format`/`--envelope`, which do
+have it), so it is only accepted before the subcommand word. In practice this meant literally
+none of the 10 example scripts worked as shipped, not just the one the issue named.
+
+### Additional bugs found during the audit
+Three of the Bitbucket scripts — `bitbucket/pr-automation.sh`, `bitbucket/repo-audit.sh`, and
+`bitbucket/branch-cleanup.sh` — also passed the Bitbucket workspace as a bare positional
+argument instead of via the `--workspace` flag, so they had two independent reasons to fail
+parsing. `jira/project-cleanup.sh` was separately missing the required `--action` flag on one
+of its `jira bulk label` calls. `jira/bulk-transition.sh` referenced a `--comment` flag on
+`jira bulk transition` that the CLI has never actually supported; that dead option was removed
+from the script rather than implemented, since nothing downstream depended on it.
+
+### `pr-automation.sh`'s `get_approval_count()`, the function issue #105 centered on
+The specific function the issue reported queried a `.participants[]` field on `pr get`'s JSON
+output that doesn't exist. It now calls `pr reviewers --format json` and filters on the real
+`status` field instead, which is the data Bitbucket actually returns for reviewer approval
+state. The same script's `merge_pr()` also passed `--strategy merge`, but the CLI (and the
+underlying Bitbucket API) only accept `merge_commit`, `squash`, or `fast_forward`; corrected to
+`merge_commit`.
+
+### Regression test
+`crates/cli/tests/docs_examples_scripts.rs` now statically extracts every `atlassian-cli`
+invocation out of `docs/examples/**/*.sh` — following backslash line continuations, bash array
+assignment/append/expansion, and variable substitution — and checks that each one parses via
+clap against the real binary. Before any of the fixes above it failed with 31 "unexpected
+argument '--profile'" errors; the full suite (`cargo test -p atlassian-cli`, including this new
+test and the existing `docs_examples::every_readme_command_parses`) is now green, and
+`cargo clippy -p atlassian-cli --tests --all-features -- -D warnings` reports no warnings. This
+closes #105 and should keep this whole class of bug from silently regressing again.## 2026-08-20 - Fix RUSTSEC-2026-0258 (h2 unbounded empty DATA frames)
 
 `cargo deny check advisories` started failing on `main` and on every PR opened after the
 advisory was published. h2 was pinned at 0.4.12; the advisory requires >= 0.4.16.
