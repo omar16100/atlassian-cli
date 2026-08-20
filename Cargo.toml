@@ -41,7 +41,7 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # Auth & Config
-base64 = "0.22"
+base64 = "0.23"
 
 # Logging
 tracing = "0.1"
