@@ -55,12 +55,11 @@ pub async fn list_heartbeats(ctx: &OpsgenieContext<'_>) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No heartbeats found");
-        println!("No heartbeats found");
-        return Ok(());
     }
 
     tracing::info!("Found {} heartbeats", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No heartbeats found")
 }
 
 /// Get heartbeat details.

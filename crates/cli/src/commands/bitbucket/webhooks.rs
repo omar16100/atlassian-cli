@@ -71,11 +71,10 @@ pub async fn list_webhooks(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No webhooks found");
-        println!("No webhooks found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No webhooks found")
 }
 
 pub async fn create_webhook(
@@ -197,11 +196,10 @@ pub async fn list_ssh_keys(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No SSH keys found");
-        println!("No SSH keys found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No SSH keys found")
 }
 
 pub async fn add_ssh_key(

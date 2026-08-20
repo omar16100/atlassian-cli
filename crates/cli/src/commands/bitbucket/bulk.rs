@@ -98,11 +98,6 @@ pub async fn archive_stale_repos(
         }
     }
 
-    if stale_repos.is_empty() {
-        println!("No stale repositories found (threshold: {days_threshold} days)");
-        return Ok(());
-    }
-
     if dry_run {
         println!(
             "DRY RUN - No changes made. Found {} stale repositories:",
@@ -110,7 +105,10 @@ pub async fn archive_stale_repos(
         );
     }
 
-    ctx.renderer.render(&stale_repos)
+    ctx.renderer.render_list_or_empty(
+        &stale_repos,
+        "No stale repositories found (threshold: {days_threshold} days)",
+    )
 }
 
 pub async fn delete_merged_branches(
@@ -177,11 +175,6 @@ pub async fn delete_merged_branches(
         }
     }
 
-    if merged_branches.is_empty() {
-        println!("No branches to delete (excluding protected patterns)");
-        return Ok(());
-    }
-
     if dry_run {
         println!(
             "DRY RUN - No changes made. Found {} branches to delete:",
@@ -189,5 +182,8 @@ pub async fn delete_merged_branches(
         );
     }
 
-    ctx.renderer.render(&merged_branches)
+    ctx.renderer.render_list_or_empty(
+        &merged_branches,
+        "No branches to delete (excluding protected patterns)",
+    )
 }

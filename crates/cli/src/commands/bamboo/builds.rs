@@ -48,12 +48,10 @@ pub async fn list_builds(ctx: &BambooContext<'_>, plan_key: &str, limit: usize) 
     if rows.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No builds found for plan {}", plan_key);
-        println!("No builds found");
-        return Ok(());
     }
 
     tracing::info!("Found {} builds for plan {}", rows.len(), plan_key);
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No builds found")
 }
 
 /// Get build details.

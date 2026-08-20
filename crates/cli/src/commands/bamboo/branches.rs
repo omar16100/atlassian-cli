@@ -47,12 +47,11 @@ pub async fn list_branches(ctx: &BambooContext<'_>, plan_key: &str, limit: usize
 
     if rows.is_empty() {
         tracing::info!("No branches found for plan {}", plan_key);
-        println!("No branches found");
-        return Ok(());
     }
 
     tracing::info!("Found {} branches for plan {}", rows.len(), plan_key);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No branches found")
 }
 
 /// Get branch details.

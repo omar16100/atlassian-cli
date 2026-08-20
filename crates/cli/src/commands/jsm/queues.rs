@@ -40,12 +40,10 @@ pub async fn list_queues(ctx: &JsmContext<'_>, servicedesk_id: i64) -> Result<()
 
     if rows.is_empty() {
         tracing::info!("No queues found for service desk {}", servicedesk_id);
-        println!("No queues found");
-        return Ok(());
     }
 
     tracing::info!("Found {} queues", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No queues found")
 }
 
 /// Get queue details.
@@ -183,10 +181,9 @@ pub async fn list_queue_issues(
             queue_id,
             servicedesk_id
         );
-        println!("No issues in queue");
-        return Ok(());
     }
 
     tracing::info!("Found {} issues in queue", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No issues in queue")
 }

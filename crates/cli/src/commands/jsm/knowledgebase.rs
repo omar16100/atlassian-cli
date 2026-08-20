@@ -68,10 +68,9 @@ pub async fn search_articles(
 
     if rows.is_empty() {
         tracing::info!("No articles found for query: {}", query);
-        println!("No articles found");
-        return Ok(());
     }
 
     tracing::info!("Found {} articles for query: {}", rows.len(), query);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No articles found")
 }

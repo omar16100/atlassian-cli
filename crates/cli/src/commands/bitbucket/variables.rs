@@ -216,8 +216,6 @@ pub async fn list_variables(
 
     if all_vars.is_empty() {
         tracing::info!(scope = scope.label(), "No variables found");
-        println!("No {} variables found", scope.label());
-        return Ok(());
     }
 
     let rows: Vec<VariableRow> = all_vars
@@ -231,7 +229,8 @@ pub async fn list_variables(
         "Listed pipeline variables"
     );
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, &format!("No {} variables found", scope.label()))
 }
 
 pub async fn get_variable(ctx: &BitbucketContext<'_>, scope: &VarScope, key: &str) -> Result<()> {
@@ -420,8 +419,6 @@ pub async fn list_environments(
 
     if all_envs.is_empty() {
         tracing::info!(workspace, repo_slug, "No deployment environments found");
-        println!("No deployment environments found");
-        return Ok(());
     }
 
     let rows: Vec<EnvironmentRow> = all_envs
@@ -445,7 +442,8 @@ pub async fn list_environments(
         "Listed deployment environments"
     );
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No deployment environments found")
 }
 
 // ---------------------------------------------------------------------------

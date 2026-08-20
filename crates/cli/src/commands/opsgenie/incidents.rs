@@ -50,12 +50,11 @@ pub async fn list_incidents(
 
     if rows.is_empty() {
         tracing::info!("No incidents found");
-        println!("No incidents found");
-        return Ok(());
     }
 
     tracing::info!("Found {} incidents", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No incidents found")
 }
 
 /// Get incident details by ID.
@@ -358,15 +357,11 @@ pub async fn list_timeline(
         .await
         .with_context(|| format!("Failed to list timeline for incident {}", identifier))?;
 
-    if response.data.entries.is_empty() {
-        println!("No timeline entries found");
-        return Ok(());
-    }
-
     tracing::info!(
         "Found {} timeline entries for incident {}",
         response.data.entries.len(),
         identifier
     );
-    ctx.renderer.render(&response.data.entries)
+    ctx.renderer
+        .render_list_or_empty(&response.data.entries, "No timeline entries found")
 }

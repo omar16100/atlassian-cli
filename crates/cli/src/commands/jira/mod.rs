@@ -149,6 +149,20 @@ enum IssueCommands {
         key: String,
     },
 
+    /// List the transitions currently available on an issue
+    #[command(
+        long_about = "List the transitions currently available on an issue.\n\n\
+        Which transitions exist depends on the workflow and the issue's current status, so\n\
+        this is the only reliable way to discover the name or id to pass to\n\
+        `jira issue transition`.\n\nExamples:\n  \
+        jira issue transitions DEV-123\n  \
+        jira issue transitions DEV-123 --format quiet   # ids only, for scripting"
+    )]
+    Transitions {
+        /// Issue key (e.g. DEV-123)
+        key: String,
+    },
+
     /// Create a new issue
     #[command(long_about = "Create a new issue.\n\nExamples:\n  \
         jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  \
@@ -397,7 +411,12 @@ enum CommentCommands {
         body: String,
     },
     /// Update a comment
+    //
+    // The issue key is required: Jira Cloud comments live under their issue, so
+    // there is no route that takes a comment id alone (#100).
     Update {
+        /// Issue key (e.g. DEV-123)
+        key: String,
         /// Comment ID
         comment_id: String,
         /// New comment body
@@ -406,6 +425,8 @@ enum CommentCommands {
     },
     /// Delete a comment
     Delete {
+        /// Issue key (e.g. DEV-123)
+        key: String,
         /// Comment ID
         comment_id: String,
     },
@@ -945,6 +966,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 .await
             }
             IssueCommands::Get { key } => issues::view_issue(&ctx, &key).await,
+            IssueCommands::Transitions { key } => issues::list_transitions(&ctx, &key).await,
             IssueCommands::Create {
                 project,
                 issue_type,
@@ -1018,11 +1040,13 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                     issues::list_comments(&ctx, &key, full).await
                 }
                 CommentCommands::Add { key, body } => issues::add_comment(&ctx, &key, &body).await,
-                CommentCommands::Update { comment_id, body } => {
-                    issues::update_comment(&ctx, &comment_id, &body).await
-                }
-                CommentCommands::Delete { comment_id } => {
-                    issues::delete_comment(&ctx, &comment_id).await
+                CommentCommands::Update {
+                    key,
+                    comment_id,
+                    body,
+                } => issues::update_comment(&ctx, &key, &comment_id, &body).await,
+                CommentCommands::Delete { key, comment_id } => {
+                    issues::delete_comment(&ctx, &key, &comment_id).await
                 }
             },
         },

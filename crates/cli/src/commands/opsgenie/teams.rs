@@ -33,12 +33,10 @@ pub async fn list_teams(ctx: &OpsgenieContext<'_>, limit: usize) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No teams found");
-        println!("No teams found");
-        return Ok(());
     }
 
     tracing::info!("Found {} teams", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No teams found")
 }
 
 /// Get team details.
@@ -166,12 +164,10 @@ pub async fn list_members(ctx: &OpsgenieContext<'_>, identifier: &str) -> Result
 
     if rows.is_empty() {
         tracing::info!("No members in team {}", identifier);
-        println!("No members found");
-        return Ok(());
     }
 
     tracing::info!("Found {} members in team {}", rows.len(), identifier);
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No members found")
 }
 
 /// Add member to team.
@@ -285,8 +281,6 @@ pub async fn get_on_call(
 
     if rows.is_empty() {
         tracing::info!("No one is on-call for team {}", identifier);
-        println!("No one is on-call");
-        return Ok(());
     }
 
     tracing::info!(
@@ -294,5 +288,6 @@ pub async fn get_on_call(
         rows.len(),
         identifier
     );
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No one is on-call")
 }

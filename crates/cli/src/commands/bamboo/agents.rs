@@ -38,12 +38,10 @@ pub async fn list_agents(ctx: &BambooContext<'_>) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No agents found");
-        println!("No agents found");
-        return Ok(());
     }
 
     tracing::info!("Found {} agents", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No agents found")
 }
 
 /// Get agent details.
@@ -151,12 +149,11 @@ pub async fn list_capabilities(ctx: &BambooContext<'_>, id: i64) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No capabilities found for agent {}", id);
-        println!("No capabilities found");
-        return Ok(());
     }
 
     tracing::info!("Found {} capabilities for agent {}", rows.len(), id);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No capabilities found")
 }
 
 /// Get server info.
@@ -248,10 +245,9 @@ pub async fn list_queue(ctx: &BambooContext<'_>) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("Build queue is empty");
-        println!("Build queue is empty");
-        return Ok(());
     }
 
     tracing::info!("Found {} builds in queue", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "Build queue is empty")
 }
