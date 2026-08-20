@@ -113,6 +113,58 @@ struct CommentContent {
     raw: String,
 }
 
+/// Which side of the diff a line-anchored inline comment attaches to.
+///
+/// - `New` (default): the destination revision. Comments an added or unchanged line.
+///   Serialised as Bitbucket's `inline.to` field.
+/// - `Old`: the source revision. Comments a removed line.
+///   Serialised as Bitbucket's `inline.from` field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+pub enum Side {
+    #[default]
+    #[value(name = "new")]
+    New,
+    #[value(name = "old")]
+    Old,
+}
+
+/// Build the JSON body for a Bitbucket PR-comment POST.
+///
+/// Pure function so its shape is unit-testable without a mock server.
+/// Matches the API contract from
+/// <https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/>.
+///
+/// - `content`: comment text (Bitbucket renders as Markdown).
+/// - `inline_path`: if `Some(_)`, comment is inline (attached to a file); if `None`, comment is global.
+/// - `inline_line`: only meaningful when `inline_path.is_some()`. If `Some(n)`, the comment
+///   is line-anchored; if `None`, it's a file-level inline comment.
+/// - `side`: only meaningful when both `inline_path` and `inline_line` are `Some(_)`.
+///   `New` → `inline.to = <n>`, `Old` → `inline.from = <n>`.
+#[allow(dead_code)] // Wired into `add_pr_comment` in Task 2 of the inline-comments plan.
+pub fn build_comment_payload(
+    content: &str,
+    inline_path: Option<&str>,
+    inline_line: Option<u32>,
+    side: Side,
+) -> serde_json::Value {
+    let mut payload = serde_json::json!({
+        "content": { "raw": content }
+    });
+
+    if let Some(path) = inline_path {
+        let mut inline = serde_json::json!({ "path": path });
+        if let Some(line) = inline_line {
+            match side {
+                Side::New => inline["to"] = serde_json::json!(line),
+                Side::Old => inline["from"] = serde_json::json!(line),
+            }
+        }
+        payload["inline"] = inline;
+    }
+
+    payload
+}
+
 pub async fn list_pull_requests(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -715,5 +767,73 @@ mod tests {
     #[test]
     fn test_participant_status_no_response() {
         assert_eq!(participant_status(false, None), "No Response");
+    }
+
+    #[test]
+    fn test_build_comment_payload_global() {
+        let payload = build_comment_payload("Looks good!", None, None, Side::New);
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Looks good!" }
+            })
+        );
+    }
+
+    #[test]
+    fn test_build_comment_payload_inline_new_side_line() {
+        let payload = build_comment_payload(
+            "Nit: rename this",
+            Some("src/main.rs"),
+            Some(42),
+            Side::New,
+        );
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Nit: rename this" },
+                "inline": { "path": "src/main.rs", "to": 42 }
+            })
+        );
+    }
+
+    #[test]
+    fn test_build_comment_payload_inline_old_side_line() {
+        let payload = build_comment_payload(
+            "Why remove this?",
+            Some("src/main.rs"),
+            Some(17),
+            Side::Old,
+        );
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Why remove this?" },
+                "inline": { "path": "src/main.rs", "from": 17 }
+            })
+        );
+    }
+
+    #[test]
+    fn test_build_comment_payload_file_level_inline_no_line() {
+        // path but no line -> file-level inline comment; side is irrelevant and must not leak into payload
+        let payload = build_comment_payload(
+            "Whole-file comment",
+            Some("README.md"),
+            None,
+            Side::New,
+        );
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Whole-file comment" },
+                "inline": { "path": "README.md" }
+            })
+        );
+    }
+
+    #[test]
+    fn test_side_default_is_new() {
+        assert_eq!(Side::default(), Side::New);
     }
 }
