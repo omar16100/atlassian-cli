@@ -976,4 +976,17 @@ mod tests {
         };
         assert_eq!(format_comment_location(Some(&inline)), "README.md");
     }
+
+    #[test]
+    fn test_format_comment_location_prefers_to_when_both_set() {
+        // Bitbucket's docs say only one of `to`/`from` should be set for a
+        // line-anchored inline comment, but if both ever come back, this pins
+        // the deterministic "prefer `to` (destination revision)" tie-break.
+        let inline = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(10),
+            from: Some(20),
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "src/main.rs:10");
+    }
 }
