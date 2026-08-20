@@ -1447,3 +1447,10 @@ Patch for a defect shipped in 0.5.0 plus the documentation repair.
 - `jira api -X PUT` was rejected; only lowercase `-X put` parsed, while the README and the command's own help showed uppercase.
 - `docs/index.md` added; 0.5.0 docs un-staled; `docs/status.md` refreshed.
 - 19 broken `--output json` invocations across all 9 example scripts and 45 broken README command examples fixed, with `tests/docs_examples.rs` added so they cannot rot silently again.
+
+## 2026-08-20 — CLI fixes found while auditing atlassiancli.com
+
+Validated all 1,924 command examples on the site against the real binary (checker lives at `atlassiancli-site/test/check_commands.py`). Two of the failures were the CLI's fault, not the docs':
+
+- `--profile` and `--config` were not global, while `--format` was. So `... issue list --profile prod`, which is what users and most published examples write, was rejected. Both are now `global = true`. This alone accounted for 36 broken site examples plus every shipped example script.
+- `auth login` run bare failed argument parsing, even though the CLI's own errors say "Run `atlassian-cli auth login` first" and the guides repeat it. Missing `--profile`/`--base-url`/`--email` are now prompted for, matching how `--token` already behaved. Without a terminal it stays a hard error rather than hanging on stdin, so CI keeps failing loudly.

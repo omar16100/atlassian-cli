@@ -1,3 +1,4 @@
+use std::io::{IsTerminal, Write};
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
@@ -139,14 +140,16 @@ pub struct StatusArgs {
     Note: App passwords are deprecated. Use Bitbucket API tokens (Basic auth) or access tokens (Bearer auth).\n  \
     Create API tokens at: https://id.atlassian.com/manage-profile/security/api-tokens -> Select 'Bitbucket'")]
 pub struct LoginArgs {
-    /// Profile name to create or update.
+    /// Profile name to create or update. Prompted for if omitted.
     #[arg(long)]
-    pub profile: String,
-    /// Atlassian site base URL (e.g. https://example.atlassian.net). Not required for --bitbucket.
-    #[arg(long, required_unless_present = "bitbucket")]
+    pub profile: Option<String>,
+    /// Atlassian site base URL (e.g. https://example.atlassian.net). Prompted for
+    /// if omitted. Not required for --bitbucket.
+    #[arg(long)]
     pub base_url: Option<String>,
-    /// Account email associated with the API token. Not required for --bearer.
-    #[arg(long, required_unless_present = "bearer")]
+    /// Account email associated with the API token. Prompted for if omitted.
+    /// Not required for --bearer.
+    #[arg(long)]
     pub email: Option<String>,
     /// API token to store securely (falls back to ATLASSIAN_API_TOKEN env or interactive prompt).
     #[arg(long, env = "ATLASSIAN_API_TOKEN")]
@@ -163,6 +166,13 @@ pub struct LoginArgs {
     /// Bitbucket workspace slug (optional, for --bitbucket mode).
     #[arg(long, requires = "bitbucket")]
     pub workspace: Option<String>,
+}
+
+impl LoginArgs {
+    /// Profile name, resolved by `login` before anything else runs.
+    fn profile_name(&self) -> &str {
+        self.profile.as_deref().unwrap_or_default()
+    }
 }
 
 #[derive(Args, Debug, Clone)]
@@ -194,7 +204,43 @@ pub async fn handle(
     }
 }
 
-fn login(args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -> Result<()> {
+/// Take a value from a flag, or ask for it interactively.
+///
+/// `auth login` used to reject the bare command, even though the CLI's own
+/// errors and the published guides both tell users to run exactly that. Only a
+/// terminal gets a prompt: without one this stays a hard error, so scripts and
+/// CI keep failing loudly rather than hanging on stdin.
+fn resolve_value(existing: Option<String>, label: &str, flag: &str) -> Result<String> {
+    if let Some(value) = existing {
+        if !value.trim().is_empty() {
+            return Ok(value.trim().to_string());
+        }
+    }
+
+    if !std::io::stdin().is_terminal() {
+        return Err(anyhow!(
+            "Missing --{flag}. Pass it on the command line (no terminal available to prompt for {label})."
+        ));
+    }
+
+    // Prompt on stderr so stdout stays clean for redirection.
+    eprint!("{label}: ");
+    std::io::stderr()
+        .flush()
+        .context("Failed to write prompt")?;
+    let mut line = String::new();
+    std::io::stdin()
+        .read_line(&mut line)
+        .with_context(|| format!("Failed to read {label}"))?;
+
+    let value = line.trim().to_string();
+    if value.is_empty() {
+        return Err(anyhow!("{label} cannot be empty"));
+    }
+    Ok(value)
+}
+
+fn login(mut args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -> Result<()> {
     // Migrate any existing plaintext credentials to encrypted storage
     if let Ok(count) = atlassian_cli_auth::migrate_plaintext_to_encrypted() {
         if count > 0 {
@@ -205,8 +251,28 @@ fn login(args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -> Re
         }
     }
 
-    if args.profile.trim().is_empty() {
+    // The CLI's own errors say "Run `atlassian-cli auth login`", and the
+    // published guides say the same, so the bare command has to work. Missing
+    // values are prompted for on a terminal and remain hard errors without one,
+    // so scripted use keeps failing loudly.
+    args.profile = Some(resolve_value(
+        args.profile.clone(),
+        "Profile name",
+        "profile",
+    )?);
+    if args.profile_name().trim().is_empty() {
         return Err(anyhow!("Profile name cannot be empty"));
+    }
+
+    if !args.bitbucket {
+        args.base_url = Some(resolve_value(
+            args.base_url.clone(),
+            "Atlassian site base URL (e.g. https://example.atlassian.net)",
+            "base-url",
+        )?);
+    }
+    if !args.bearer {
+        args.email = Some(resolve_value(args.email.clone(), "Account email", "email")?);
     }
 
     let token = match &args.token {
@@ -251,16 +317,19 @@ fn login_jira_confluence(
         .as_ref()
         .ok_or_else(|| anyhow!("--email is required for Jira/Confluence login"))?;
 
-    let profile_entry = config.profiles.entry(args.profile.clone()).or_default();
+    let profile_entry = config
+        .profiles
+        .entry(args.profile_name().to_string())
+        .or_default();
     profile_entry.base_url = Some(base_url.to_string());
     profile_entry.email = Some(email.clone());
     profile_entry.api_token = None;
 
     if args.default || config.default_profile.is_none() {
-        config.default_profile = Some(args.profile.clone());
+        config.default_profile = Some(args.profile_name().to_string());
     }
 
-    let secret_key = token_key(&args.profile);
+    let secret_key = token_key(args.profile_name());
     atlassian_cli_auth::set_secret_encrypted(&secret_key, token)
         .context("Failed to store token in encrypted credentials file")?;
 
@@ -269,7 +338,7 @@ fn login_jira_confluence(
         .context("Unable to persist configuration file")?;
 
     tracing::info!(
-        profile = %args.profile,
+        profile = %args.profile_name(),
         base_url = %base_url,
         "Profile saved and token stored securely"
     );
@@ -282,7 +351,10 @@ fn login_bitbucket(
     config: &mut Config,
     config_path: Option<&Path>,
 ) -> Result<()> {
-    let profile_entry = config.profiles.entry(args.profile.clone()).or_default();
+    let profile_entry = config
+        .profiles
+        .entry(args.profile_name().to_string())
+        .or_default();
 
     // Update workspace if provided
     if args.workspace.is_some() {
@@ -310,11 +382,11 @@ fn login_bitbucket(
     }
 
     if args.default || config.default_profile.is_none() {
-        config.default_profile = Some(args.profile.clone());
+        config.default_profile = Some(args.profile_name().to_string());
     }
 
     // Store Bitbucket token with _bitbucket suffix
-    let secret_key = bitbucket_token_key(&args.profile);
+    let secret_key = bitbucket_token_key(args.profile_name());
     atlassian_cli_auth::set_secret_encrypted(&secret_key, token)
         .context("Failed to store Bitbucket token in encrypted credentials file")?;
 
@@ -324,7 +396,7 @@ fn login_bitbucket(
 
     let auth_type = if args.bearer { "Bearer" } else { "Basic" };
     tracing::info!(
-        profile = %args.profile,
+        profile = %args.profile_name(),
         workspace = ?args.workspace,
         auth_type = auth_type,
         "Bitbucket credentials saved successfully"
