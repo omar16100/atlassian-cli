@@ -39,12 +39,13 @@ struct PullRequest {
     task_count: Option<i32>,
     #[serde(default)]
     participants: Option<Vec<Participant>>,
+    #[serde(default)]
+    reviewers: Option<Vec<User>>,
 }
 
 #[derive(Deserialize)]
 struct User {
     display_name: String,
-    #[allow(dead_code)]
     #[serde(default)]
     uuid: Option<String>,
 }
@@ -97,6 +98,29 @@ fn participant_status(approved: bool, state: Option<&str>) -> &'static str {
         _ if approved => "Approved",
         _ => "No Response",
     }
+}
+
+#[derive(Serialize)]
+struct ReviewerRow<'a> {
+    name: &'a str,
+    role: &'a str,
+    status: &'a str,
+    participated_on: &'a str,
+}
+
+/// Build the reviewer table rows. Only `role == REVIEWER` participants are kept unless
+/// `show_all` is set, in which case commenters and other participants are included too.
+fn reviewer_rows(participants: &[Participant], show_all: bool) -> Vec<ReviewerRow<'_>> {
+    participants
+        .iter()
+        .filter(|p| show_all || p.role == "REVIEWER")
+        .map(|p| ReviewerRow {
+            name: p.user.display_name.as_str(),
+            role: p.role.as_str(),
+            status: participant_status(p.approved, p.state.as_deref()),
+            participated_on: p.participated_on.as_deref().unwrap_or(""),
+        })
+        .collect()
 }
 
 #[derive(Deserialize)]
@@ -284,9 +308,9 @@ pub async fn create_pull_request(
     }
 
     if !reviewers.is_empty() {
-        let reviewer_objs: Vec<_> = reviewers
+        let reviewer_objs: Vec<_> = merge_reviewer_uuids(&[], &reviewers)
             .iter()
-            .map(|uuid| serde_json::json!({"uuid": uuid}))
+            .map(|uuid| serde_json::json!({ "uuid": uuid }))
             .collect();
         payload["reviewers"] = serde_json::json!(reviewer_objs);
     }
@@ -571,6 +595,36 @@ pub async fn add_pr_comment(
     )
 }
 
+/// Normalise a Bitbucket account UUID to the brace form the API expects (`{uuid}`),
+/// so `--add abc-123` and `--add '{abc-123}'` both work.
+fn normalize_uuid(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        trimmed.to_string()
+    } else {
+        format!("{{{trimmed}}}")
+    }
+}
+
+/// Merge the PR's existing reviewer UUIDs with the requested ones, preserving order and
+/// dropping duplicates and empties.
+fn merge_reviewer_uuids(existing: &[String], requested: &[String]) -> Vec<String> {
+    let mut merged: Vec<String> = Vec::new();
+    for uuid in existing.iter().chain(requested.iter()) {
+        let normalized = normalize_uuid(uuid);
+        if normalized == "{}" || merged.contains(&normalized) {
+            continue;
+        }
+        merged.push(normalized);
+    }
+    merged
+}
+
+/// Add reviewers to a pull request.
+///
+/// Bitbucket Cloud has no endpoint for adding a single reviewer to an existing PR: the
+/// reviewer list is replaced wholesale by a `PUT` on the pull request itself. So we read the
+/// current reviewers, union the requested UUIDs in, and PUT the result back.
 pub async fn add_pr_reviewers(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -578,18 +632,47 @@ pub async fn add_pr_reviewers(
     pr_id: i64,
     reviewers: Vec<String>,
 ) -> Result<()> {
-    for uuid in reviewers {
-        let path = format!(
-            "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/default-reviewers/{uuid}"
-        );
-        let _: serde_json::Value = ctx
-            .client
-            .put(&path, &serde_json::json!({}))
-            .await
-            .with_context(|| format!("Failed to add reviewer {uuid} to pull request {pr_id}"))?;
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}");
+    let pr: PullRequest = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
+    })?;
 
-        tracing::info!(uuid, pr_id, "Reviewer added successfully");
-    }
+    let existing: Vec<String> = pr
+        .reviewers
+        .as_ref()
+        .map(|list| {
+            list.iter()
+                .filter_map(|user| user.uuid.clone())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let merged = merge_reviewer_uuids(&existing, &reviewers);
+    tracing::info!(
+        pr_id,
+        workspace,
+        repo_slug,
+        existing = existing.len(),
+        requested = reviewers.len(),
+        total = merged.len(),
+        "Updating pull request reviewers"
+    );
+
+    let payload = serde_json::json!({
+        "title": pr.title,
+        "reviewers": merged
+            .iter()
+            .map(|uuid| serde_json::json!({ "uuid": uuid }))
+            .collect::<Vec<_>>(),
+    });
+
+    let _: serde_json::Value = ctx
+        .client
+        .put(&path, &payload)
+        .await
+        .with_context(|| format!("Failed to add reviewers to pull request {pr_id}"))?;
+
+    tracing::info!(pr_id, count = merged.len(), "Reviewers added successfully");
 
     render_success(
         ctx.renderer,
@@ -614,25 +697,8 @@ pub async fn list_pr_reviewers(
         format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
     })?;
 
-    #[derive(Serialize)]
-    struct Row<'a> {
-        name: &'a str,
-        role: &'a str,
-        status: &'a str,
-        participated_on: &'a str,
-    }
-
     let participants = pr.participants.unwrap_or_default();
-    let rows: Vec<Row<'_>> = participants
-        .iter()
-        .filter(|p| show_all || p.role == "REVIEWER")
-        .map(|p| Row {
-            name: p.user.display_name.as_str(),
-            role: p.role.as_str(),
-            status: participant_status(p.approved, p.state.as_deref()),
-            participated_on: p.participated_on.as_deref().unwrap_or(""),
-        })
-        .collect();
+    let rows = reviewer_rows(&participants, show_all);
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, show_all, "No reviewers found");
@@ -733,6 +799,131 @@ mod tests {
     #[test]
     fn test_participant_status_no_response() {
         assert_eq!(participant_status(false, None), "No Response");
+    }
+
+    fn participant(
+        name: &str,
+        role: &str,
+        approved: bool,
+        state: Option<&str>,
+        participated_on: Option<&str>,
+    ) -> Participant {
+        Participant {
+            approved,
+            user: User {
+                display_name: name.to_string(),
+                uuid: None,
+            },
+            role: role.to_string(),
+            state: state.map(str::to_string),
+            participated_on: participated_on.map(str::to_string),
+        }
+    }
+
+    fn sample_participants() -> Vec<Participant> {
+        vec![
+            participant(
+                "Jane Doe",
+                "REVIEWER",
+                true,
+                Some("approved"),
+                Some("2026-08-10T12:00:00Z"),
+            ),
+            participant(
+                "John Smith",
+                "REVIEWER",
+                false,
+                Some("changes_requested"),
+                Some("2026-08-11T09:30:00Z"),
+            ),
+            participant("Alex Lee", "REVIEWER", false, None, None),
+            participant(
+                "Sam Chen",
+                "PARTICIPANT",
+                false,
+                None,
+                Some("2026-08-12T08:00:00Z"),
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_reviewer_rows_default_excludes_participants() {
+        let participants = sample_participants();
+        let rows = reviewer_rows(&participants, false);
+
+        assert_eq!(rows.len(), 3);
+        assert!(rows.iter().all(|r| r.role == "REVIEWER"));
+        assert_eq!(rows[0].name, "Jane Doe");
+        assert_eq!(rows[0].status, "Approved");
+        assert_eq!(rows[0].participated_on, "2026-08-10T12:00:00Z");
+        assert_eq!(rows[1].status, "Changes Requested");
+        assert_eq!(rows[2].status, "No Response");
+        // Missing participated_on renders as an empty cell, not "null".
+        assert_eq!(rows[2].participated_on, "");
+    }
+
+    #[test]
+    fn test_reviewer_rows_all_includes_participants() {
+        let participants = sample_participants();
+        let rows = reviewer_rows(&participants, true);
+
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[3].name, "Sam Chen");
+        assert_eq!(rows[3].role, "PARTICIPANT");
+        assert_eq!(rows[3].status, "No Response");
+    }
+
+    #[test]
+    fn test_reviewer_rows_empty() {
+        assert!(reviewer_rows(&[], false).is_empty());
+        assert!(reviewer_rows(&[], true).is_empty());
+    }
+
+    #[test]
+    fn test_reviewer_rows_no_reviewers_only_participants() {
+        let participants = vec![participant("Sam Chen", "PARTICIPANT", false, None, None)];
+
+        assert!(reviewer_rows(&participants, false).is_empty());
+        assert_eq!(reviewer_rows(&participants, true).len(), 1);
+    }
+
+    #[test]
+    fn test_normalize_uuid_adds_braces() {
+        assert_eq!(normalize_uuid("abc-123"), "{abc-123}");
+        assert_eq!(normalize_uuid("{abc-123}"), "{abc-123}");
+        assert_eq!(normalize_uuid("  abc-123  "), "{abc-123}");
+    }
+
+    #[test]
+    fn test_merge_reviewer_uuids_unions_and_dedupes() {
+        let existing = vec!["{a}".to_string(), "b".to_string()];
+        let requested = vec!["b".to_string(), "{c}".to_string(), "a".to_string()];
+
+        assert_eq!(
+            merge_reviewer_uuids(&existing, &requested),
+            vec!["{a}".to_string(), "{b}".to_string(), "{c}".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_merge_reviewer_uuids_keeps_existing_when_nothing_requested() {
+        let existing = vec!["{a}".to_string()];
+
+        assert_eq!(
+            merge_reviewer_uuids(&existing, &[]),
+            vec!["{a}".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_merge_reviewer_uuids_skips_empty_entries() {
+        let requested = vec!["".to_string(), "  ".to_string(), "a".to_string()];
+
+        assert_eq!(
+            merge_reviewer_uuids(&[], &requested),
+            vec!["{a}".to_string()]
+        );
     }
 
     #[test]

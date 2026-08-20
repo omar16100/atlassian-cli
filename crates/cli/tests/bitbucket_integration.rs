@@ -1,5 +1,5 @@
 use atlassian_cli_api::ApiClient;
-use wiremock::matchers::{method, path, query_param, query_param_contains};
+use wiremock::matchers::{body_json, method, path, query_param, query_param_contains};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
@@ -501,6 +501,65 @@ async fn test_bitbucket_get_pull_request_with_reviewer_participants() {
 
     assert_eq!(participants[2]["role"], "PARTICIPANT");
     assert!(participants[2]["state"].is_null());
+}
+
+/// Pins the request contract `add_pr_reviewers` is written against: reviewers are set by
+/// PUTting the pull request itself with the full reviewer list, since Bitbucket Cloud has no
+/// per-reviewer endpoint on a PR.
+///
+/// Like the rest of this file, this drives `ApiClient` directly rather than the command, so
+/// it documents and exercises the wire format but would not catch the command regressing to
+/// a different URL. The command's own merge and normalisation logic is unit-tested in
+/// `crates/cli/src/commands/bitbucket/pullrequests.rs`.
+#[tokio::test]
+async fn test_bitbucket_add_pull_request_reviewers() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("PUT"))
+        .and(path("/2.0/repositories/myworkspace/myrepo/pullrequests/1"))
+        .and(body_json(serde_json::json!({
+            "title": "Add new feature",
+            "reviewers": [
+                {"uuid": "{existing-uuid}"},
+                {"uuid": "{new-uuid}"}
+            ]
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": 1,
+            "title": "Add new feature",
+            "state": "OPEN",
+            "author": {"display_name": "John Doe"},
+            "source": {"branch": {"name": "feature/new-feature"}},
+            "destination": {"branch": {"name": "main"}},
+            "reviewers": [
+                {"display_name": "Jane Doe", "uuid": "{existing-uuid}"},
+                {"display_name": "John Smith", "uuid": "{new-uuid}"}
+            ]
+        })))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: Result<serde_json::Value, _> = client
+        .put(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/1",
+            &serde_json::json!({
+                "title": "Add new feature",
+                "reviewers": [
+                    {"uuid": "{existing-uuid}"},
+                    {"uuid": "{new-uuid}"}
+                ]
+            }),
+        )
+        .await;
+
+    assert!(response.is_ok());
+    let pr = response.unwrap();
+    assert_eq!(pr["reviewers"].as_array().unwrap().len(), 2);
 }
 
 #[tokio::test]
