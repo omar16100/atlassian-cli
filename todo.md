@@ -1,5 +1,22 @@
 # Changes Made
 
+## 2026-08-20 - Fix RUSTSEC-2026-0258 (h2 unbounded empty DATA frames)
+
+`cargo deny check advisories` started failing on `main` and on every PR opened after the
+advisory was published. h2 was pinned at 0.4.12; the advisory requires >= 0.4.16.
+`cargo update -p h2` moves it to 0.4.17.
+
+This is not caused by any open PR. It surfaced on #109 and #113 only because their Security
+Audit happened to run after publication, while #104, #106 and #112 had run before it. Landing
+this unblocks them and stops contributors being blamed for a repo-wide advisory.
+
+Note the accompanying `windows-sys` movement in the lockfile is cargo's own re-resolution,
+not hand-editing: `cargo update -p h2` alone reproduces it, including the `quinn-udp` edge
+resolving to 0.52.0.
+
+`cargo deny check advisories` is clean after the bump.
+
+
 ## 2026-07-13 — Website separated into private repo; removed from public CLI repo
 
 ### Context
