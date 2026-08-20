@@ -1118,7 +1118,17 @@ pub async fn execute(
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Comment { repo, pr_id, text } => {
-                pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text).await
+                pullrequests::add_pr_comment(
+                    &ctx,
+                    &workspace,
+                    &repo,
+                    pr_id,
+                    &text,
+                    None,
+                    None,
+                    pullrequests::Side::default(),
+                )
+                .await
             }
             PrCommands::Reviewers {
                 repo,

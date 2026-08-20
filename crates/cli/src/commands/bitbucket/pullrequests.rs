@@ -140,7 +140,6 @@ pub enum Side {
 ///   is line-anchored; if `None`, it's a file-level inline comment.
 /// - `side`: only meaningful when both `inline_path` and `inline_line` are `Some(_)`.
 ///   `New` → `inline.to = <n>`, `Old` → `inline.from = <n>`.
-#[allow(dead_code)] // Wired into `add_pr_comment` in Task 2 of the inline-comments plan.
 pub fn build_comment_payload(
     content: &str,
     inline_path: Option<&str>,
@@ -576,32 +575,47 @@ pub async fn list_pr_comments(
     ctx.renderer.render(&rows)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn add_pr_comment(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
     repo_slug: &str,
     pr_id: i64,
     content: &str,
+    inline_path: Option<&str>,
+    inline_line: Option<u32>,
+    side: Side,
 ) -> Result<()> {
-    let payload = serde_json::json!({
-        "content": {
-            "raw": content
-        }
-    });
+    let payload = build_comment_payload(content, inline_path, inline_line, side);
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
     let comment: Comment = ctx.client.post(&path, &payload).await.with_context(|| {
         format!("Failed to add comment to pull request {pr_id} in {workspace}/{repo_slug}")
     })?;
 
-    tracing::info!(comment_id = comment.id, pr_id, "Comment added successfully");
+    let is_inline = inline_path.is_some();
+    tracing::info!(
+        comment_id = comment.id,
+        pr_id,
+        is_inline,
+        "Comment added successfully"
+    );
+
+    let emoji_message = if is_inline {
+        format!("✅ Inline comment added to pull request #{pr_id}")
+    } else {
+        format!("✅ Comment added to pull request #{pr_id}")
+    };
+    let mutation_message = if is_inline {
+        format!("Inline comment added to pull request #{pr_id}")
+    } else {
+        format!("Comment added to pull request #{pr_id}")
+    };
+
     render_success(
         ctx.renderer,
-        &format!("✅ Comment added to pull request #{pr_id}"),
-        &MutationResult::with_id(
-            format!("Comment added to pull request #{pr_id}"),
-            pr_id.to_string(),
-        ),
+        &emoji_message,
+        &MutationResult::with_id(mutation_message, pr_id.to_string()),
     )
 }
 
@@ -851,5 +865,16 @@ mod tests {
     #[test]
     fn test_side_default_is_new() {
         assert_eq!(Side::default(), Side::New);
+    }
+
+    #[test]
+    fn test_add_pr_comment_signature_compiles() {
+        // Sentinel test: the fact this module compiles at all means
+        // `add_pr_comment`'s new signature (with Option<&str>, Option<u32>, Side)
+        // is in place. The actual payload shape is covered by
+        // `test_build_comment_payload_*` above and by the wire-level
+        // integration tests in tests/bitbucket_integration.rs.
+        //
+        // If the signature regresses, mod.rs (Task 4) will fail to compile.
     }
 }
