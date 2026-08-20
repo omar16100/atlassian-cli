@@ -143,8 +143,6 @@ pub async fn search_issues(
     if response.issues.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No issues found");
-        println!("No issues found");
-        return Ok(());
     }
 
     #[derive(Serialize)]
@@ -183,7 +181,7 @@ pub async fn search_issues(
         })
         .collect();
 
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No issues found")
 }
 
 pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {

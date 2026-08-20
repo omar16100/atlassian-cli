@@ -1532,3 +1532,27 @@ Issue #102 and PR #103 from an outside contributor, plus the follow-up this repo
 - Breaking, but nothing that worked is broken: the old form could not succeed against Jira Cloud.
 - #101: added `jira issue transitions <KEY>`. `transition_issue` already fetched the list internally to resolve a name to an id; that fetch is now `fetch_transitions` and the listing renders `{id, name, to}`, so `--format quiet` gives ids for scripting. `to` is optional because older instances omit it.
 - Tests live in `crates/cli/tests/jira_issue_e2e.rs` and drive the real binary, because a wrong URL is invisible to a test that hands `ApiClient` the path itself. The mock for the non-existent route asserts `.expect(0)`. Verified by reverting the fix: the test fails.
+
+## 2026-08-20 — Empty list results stay machine-readable (closes #110)
+
+`println!("No X found")` on stdout in ~60 list commands, in every format, so `--format json`
+returned prose where a script expects an array and `| jq length` failed on exactly the case
+it most needs to handle.
+
+- New `OutputRenderer::render_list_or_empty(items, empty_message)`: Table and Markdown print
+  the message, everything else falls through to `render_list`.
+- `render_list` itself now prints nothing for an empty list in Quiet and CSV. That covers
+  list commands which never had a message at all and were emitting a literal `[]`, which
+  would feed a bogus item into `for id in $(...)`. CSV of an empty list has no rows and no
+  derivable header either.
+- 63 call sites converted. The empty guard is kept wherever it had side effects: several
+  commands call `ctx.verify_auth()` when the result set is empty, to tell "no matches" apart
+  from "bad credentials", and hoisting that out would have added an API call to every
+  successful list.
+- Not converted, and not part of this: `jira bulk`, `confluence bulk` and
+  `bitbucket pipeline logs`. Those are operations and log dumps rather than list renderers,
+  so returning early on an empty work set is the correct behaviour.
+- The reported command, `bitbucket pr reviewers`, cannot be pointed at a mock, because
+  Bitbucket builds its client from `BITBUCKET_API_URL` rather than the profile base URL. The
+  same renderer path is proved through Jira in `crates/cli/tests/empty_list_output_e2e.rs`,
+  which captures real stdout from the built binary.

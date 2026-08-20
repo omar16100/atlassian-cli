@@ -220,11 +220,10 @@ pub async fn list_pull_requests(
     if rows.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!(workspace, slug, "No pull requests found");
-        println!("No pull requests found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No pull requests found")
 }
 
 pub async fn get_pull_request(
@@ -562,11 +561,10 @@ pub async fn list_pr_comments(
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, "No comments found");
-        println!("No comments found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No comments found")
 }
 
 pub async fn add_pr_comment(
@@ -763,11 +761,10 @@ pub async fn list_pr_reviewers(
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, show_all, "No reviewers found");
-        println!("No reviewers found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No reviewers found")
 }
 
 pub async fn get_pr_diff(

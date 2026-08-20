@@ -40,12 +40,11 @@ pub async fn list_organizations(ctx: &JsmContext<'_>, limit: usize) -> Result<()
 
     if rows.is_empty() {
         tracing::info!("No organizations found");
-        println!("No organizations found");
-        return Ok(());
     }
 
     tracing::info!("Found {} organizations", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No organizations found")
 }
 
 /// Get organization details.
@@ -154,12 +153,10 @@ pub async fn list_organization_users(
 
     if rows.is_empty() {
         tracing::info!("No users in organization {}", org_id);
-        println!("No users found");
-        return Ok(());
     }
 
     tracing::info!("Found {} users in organization {}", rows.len(), org_id);
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No users found")
 }
 
 /// Add users to an organization.

@@ -73,11 +73,10 @@ pub async fn list_repos(ctx: &BitbucketContext<'_>, workspace: &str, limit: usiz
     if rows.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!(workspace, "No repositories found");
-        println!("No repositories found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No repositories found")
 }
 
 pub async fn get_repo(ctx: &BitbucketContext<'_>, workspace: &str, slug: &str) -> Result<()> {

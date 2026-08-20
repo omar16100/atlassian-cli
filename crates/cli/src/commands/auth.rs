@@ -899,12 +899,8 @@ async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRendere
     }
 
     println!("Profile: {}", profile_name);
-    if statuses.is_empty() {
-        println!("No services configured.");
-        return Ok(());
-    }
 
-    renderer.render(&statuses)
+    renderer.render_list_or_empty(&statuses, "No services configured.")
 }
 
 #[cfg(test)]

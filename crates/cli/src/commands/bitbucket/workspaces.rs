@@ -69,11 +69,10 @@ pub async fn list_workspaces(ctx: &BitbucketContext<'_>, limit: usize) -> Result
 
     if rows.is_empty() {
         tracing::info!("No workspaces found");
-        println!("No workspaces found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No workspaces found")
 }
 
 pub async fn get_workspace(ctx: &BitbucketContext<'_>, workspace: &str) -> Result<()> {
@@ -139,11 +138,10 @@ pub async fn list_projects(
 
     if rows.is_empty() {
         tracing::info!(workspace, "No projects found");
-        println!("No projects found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No projects found")
 }
 
 pub async fn get_project(

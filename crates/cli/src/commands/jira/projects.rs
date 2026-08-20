@@ -61,11 +61,10 @@ pub async fn list_projects(ctx: &JiraContext<'_>) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No projects found");
-        println!("No projects found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No projects found")
 }
 
 pub async fn get_project(ctx: &JiraContext<'_>, key: &str) -> Result<()> {

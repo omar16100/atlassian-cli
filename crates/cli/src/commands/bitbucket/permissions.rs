@@ -80,11 +80,10 @@ pub async fn list_repo_permissions(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No permissions found");
-        println!("No permissions found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No permissions found")
 }
 
 pub async fn grant_repo_permission(

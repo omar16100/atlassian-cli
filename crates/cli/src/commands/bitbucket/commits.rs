@@ -137,11 +137,9 @@ pub async fn list_commits(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No commits found");
-        println!("No commits found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No commits found")
 }
 
 pub async fn get_commit(
@@ -228,11 +226,9 @@ pub async fn get_commit_diff(
 
     if rows.is_empty() {
         tracing::info!(commit_hash, workspace, repo_slug, "No changes found");
-        println!("No changes found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No changes found")
 }
 
 pub async fn browse_source(
@@ -277,9 +273,7 @@ pub async fn browse_source(
             repo_slug,
             "No files found"
         );
-        println!("No files found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No files found")
 }
