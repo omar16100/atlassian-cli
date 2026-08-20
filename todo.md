@@ -1556,3 +1556,13 @@ it most needs to handle.
   Bitbucket builds its client from `BITBUCKET_API_URL` rather than the profile base URL. The
   same renderer path is proved through Jira in `crates/cli/tests/empty_list_output_e2e.rs`,
   which captures real stdout from the built binary.
+
+## 2026-08-20 — Release 0.6.0
+
+Minor, not patch: new commands, and two breaking-in-form changes.
+
+- `jira issue transitions` (#101), `bb pr comment --parent` (#109), `bb pr resolve-comment` / `reopen-comment` (#113).
+- `jira issue comments update|delete` take the issue key as a leading positional (#100). The old form could not work against Jira Cloud.
+- Every list command's empty result changed shape under machine formats (#110).
+- `bb pr reviewers --add` repaired (#104), flaky colours test serialised (#111), example scripts repaired with a regression test (#105 via #112).
+- Backlog cleared: 8 open PRs and 6 open issues resolved, leaving zero of each.
