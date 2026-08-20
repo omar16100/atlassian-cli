@@ -1525,3 +1525,10 @@ Issue #102 and PR #103 from an outside contributor, plus the follow-up this repo
 - Fixed `--add`, which had never worked: it PUT `/pullrequests/{id}/default-reviewers/{uuid}`, an endpoint Bitbucket Cloud does not have (repo default reviewers are at `/repositories/{ws}/{repo}/default-reviewers/{user}`, and a PR's reviewer list is replaced by a PUT on the PR). Same class of defect as #100. It now reads the PR's current reviewers, unions the requested UUIDs in, and PUTs `{title, reviewers}` back.
 - UUIDs are normalised to Bitbucket's brace form, so `--add abc-123` and `--add '{abc-123}'` both work. `pr create --reviewers` uses the same normalisation, where a bare UUID had the same problem.
 - Row filtering moved out of `list_pr_reviewers` into a pure `reviewer_rows()`; 12 unit tests now cover status derivation, REVIEWER-vs-`--all` filtering, empty results, UUID normalisation and the union/dedupe. The added wiremock test pins the PUT path and body.
+
+## 2026-08-20 — Jira comment endpoint and transition listing (closes #100, #101)
+
+- #100: `jira issue comments update` PUT to `/rest/api/3/comment/{id}` and `delete` DELETEd the same route. Jira Cloud has no top-level comment route, so both 404'd on every call. Comments live under their issue at `/rest/api/3/issue/{issueIdOrKey}/comment/{id}`, which needs the issue key neither command took. Both now take it as a leading positional, matching `add`.
+- Breaking, but nothing that worked is broken: the old form could not succeed against Jira Cloud.
+- #101: added `jira issue transitions <KEY>`. `transition_issue` already fetched the list internally to resolve a name to an id; that fetch is now `fetch_transitions` and the listing renders `{id, name, to}`, so `--format quiet` gives ids for scripting. `to` is optional because older instances omit it.
+- Tests live in `crates/cli/tests/jira_issue_e2e.rs` and drive the real binary, because a wrong URL is invisible to a test that hands `ApiClient` the path itself. The mock for the non-existent route asserts `.expect(0)`. Verified by reverting the fix: the test fails.

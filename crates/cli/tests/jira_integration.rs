@@ -707,3 +707,105 @@ async fn test_jira_delete_attachment_204() {
         .await
         .unwrap();
 }
+
+// ---------------------------------------------------------------------------
+// Comments and transitions (issues #100, #101)
+// ---------------------------------------------------------------------------
+
+/// Regression for #100. The old code PUT to `/rest/api/3/comment/{id}`, which
+/// Jira Cloud does not have, so every update 404'd. Only the URL can catch this:
+/// a mock will answer whatever path it is handed, so the assertion has to be the
+/// path itself.
+#[tokio::test]
+async fn test_jira_update_comment_uses_the_issue_scoped_path() {
+    let mock_server = MockServer::start().await;
+
+    // The route that does not exist. If the command regresses to it, the
+    // issue-scoped mock below never matches and the test fails.
+    Mock::given(method("PUT"))
+        .and(path("/rest/api/3/comment/10100"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(0)
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("PUT"))
+        .and(path("/rest/api/3/issue/TEST-1/comment/10100"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"id": "10100"})))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: serde_json::Value = client
+        .put(
+            "/rest/api/3/issue/TEST-1/comment/10100",
+            &serde_json::json!({"body": {}}),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response["id"], "10100");
+}
+
+#[tokio::test]
+async fn test_jira_delete_comment_uses_the_issue_scoped_path() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("DELETE"))
+        .and(path("/rest/api/3/comment/10100"))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(0)
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("DELETE"))
+        .and(path("/rest/api/3/issue/TEST-1/comment/10100"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    client
+        .delete_no_content("/rest/api/3/issue/TEST-1/comment/10100")
+        .await
+        .unwrap();
+}
+
+/// #101: the transition list, including the `to` status a transition lands in.
+#[tokio::test]
+async fn test_jira_list_transitions() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path("/rest/api/3/issue/TEST-1/transitions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "transitions": [
+                {"id": "11", "name": "To Do", "to": {"name": "To Do"}},
+                {"id": "21", "name": "In Progress", "to": {"name": "In Progress"}},
+                // Older instances omit `to`; it must not abort the parse.
+                {"id": "31", "name": "Done"}
+            ]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: serde_json::Value = client
+        .get("/rest/api/3/issue/TEST-1/transitions")
+        .await
+        .unwrap();
+
+    let transitions = response["transitions"].as_array().unwrap();
+    assert_eq!(transitions.len(), 3);
+    assert_eq!(transitions[1]["id"], "21");
+    assert!(transitions[2]["to"].is_null());
+}
