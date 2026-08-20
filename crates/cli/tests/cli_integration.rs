@@ -447,3 +447,71 @@ fn test_jira_attachment_download_rejects_output_with_issue() {
         "expected a conflict error, got: {stderr}"
     );
 }
+
+/// `--format` has always been global, so users and most of the published
+/// examples write `--profile` after the subcommand too. It used to be rejected,
+/// which broke a large share of the documented commands and every example
+/// script in `docs/examples/`.
+#[test]
+fn test_profile_and_config_are_accepted_after_the_subcommand() {
+    let temp_dir = tempdir().expect("Failed to create temp dir");
+    let config_path = temp_dir.path().join("config.yaml");
+    std::fs::write(
+        &config_path,
+        "default_profile: t\nprofiles:\n  t:\n    email: a@b.c\n    base_url: http://127.0.0.1:1\n",
+    )
+    .expect("Failed to write config");
+
+    // Deeply nested subcommands too, not just the first level.
+    for args in [
+        vec!["jira", "issue", "get", "T-1"],
+        vec!["confluence", "attachment", "list", "123"],
+        vec!["jira", "attachment", "download", "10001", "--output", "-"],
+    ] {
+        let output = Command::new("cargo")
+            .args(["run", "--quiet", "--"])
+            .args(&args)
+            .args(["--profile", "t", "--config", config_path.to_str().unwrap()])
+            .env("ATLASSIAN_CLI_TOKEN_T", "x")
+            .output()
+            .expect("Failed to execute command");
+
+        // Exit code 2 is a clap usage error. Anything else means the flags were
+        // accepted and the command failed at connect, which is the point.
+        assert_ne!(
+            output.status.code(),
+            Some(2),
+            "trailing --profile/--config rejected for {args:?}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+/// `auth login` used to be rejected by the argument parser when run bare, even
+/// though the CLI's own errors ("Run `atlassian-cli auth login` first") and the
+/// published guides both tell users to do exactly that. Missing values are now
+/// prompted for, and without a terminal it stays a hard error rather than
+/// hanging on stdin.
+#[test]
+fn test_auth_login_without_flags_is_not_a_parse_error() {
+    let output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "auth", "login"])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .expect("Failed to execute command");
+
+    assert_ne!(
+        output.status.code(),
+        Some(2),
+        "bare `auth login` should reach the command, not fail argument parsing"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--profile"),
+        "should name the flag to pass when it cannot prompt, got: {stderr}"
+    );
+    assert!(
+        !output.status.success(),
+        "it must still fail without a terminal rather than proceeding"
+    );
+}
