@@ -106,11 +106,42 @@ struct Comment {
     user: User,
     #[serde(default)]
     created_on: Option<String>,
+    #[serde(default)]
+    inline: Option<Inline>,
 }
 
 #[derive(Deserialize)]
 struct CommentContent {
     raw: String,
+}
+
+/// Inline anchor metadata returned by Bitbucket for a PR comment.
+///
+/// Present iff the comment is inline (attached to a file). `to` and `from`
+/// are line numbers in the destination and source revisions respectively;
+/// exactly one is set for a line-anchored comment, and both are `None` for
+/// a file-level inline comment. See
+/// <https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/>.
+#[derive(Deserialize, Debug, Clone)]
+struct Inline {
+    path: String,
+    #[serde(default)]
+    to: Option<u32>,
+    #[serde(default)]
+    from: Option<u32>,
+}
+
+/// Render an inline anchor as a compact `path:line` (or `path` alone for
+/// file-level comments, or `""` for global comments). Returned by
+/// `list_pr_comments`'s `location` column.
+fn format_comment_location(inline: Option<&Inline>) -> String {
+    match inline {
+        None => String::new(),
+        Some(i) => match i.to.or(i.from) {
+            Some(line) => format!("{}:{}", i.path, line),
+            None => i.path.clone(),
+        },
+    }
 }
 
 /// Which side of the diff a line-anchored inline comment attaches to.
@@ -552,6 +583,7 @@ pub async fn list_pr_comments(
         id: i64,
         author: &'a str,
         content: &'a str,
+        location: String,
         created: &'a str,
     }
 
@@ -562,6 +594,7 @@ pub async fn list_pr_comments(
             id: comment.id,
             author: comment.user.display_name.as_str(),
             content: comment.content.raw.lines().next().unwrap_or(""),
+            location: format_comment_location(comment.inline.as_ref()),
             created: comment.created_on.as_deref().unwrap_or(""),
         })
         .collect();
@@ -796,12 +829,8 @@ mod tests {
 
     #[test]
     fn test_build_comment_payload_inline_new_side_line() {
-        let payload = build_comment_payload(
-            "Nit: rename this",
-            Some("src/main.rs"),
-            Some(42),
-            Side::New,
-        );
+        let payload =
+            build_comment_payload("Nit: rename this", Some("src/main.rs"), Some(42), Side::New);
         assert_eq!(
             payload,
             serde_json::json!({
@@ -813,12 +842,8 @@ mod tests {
 
     #[test]
     fn test_build_comment_payload_inline_old_side_line() {
-        let payload = build_comment_payload(
-            "Why remove this?",
-            Some("src/main.rs"),
-            Some(17),
-            Side::Old,
-        );
+        let payload =
+            build_comment_payload("Why remove this?", Some("src/main.rs"), Some(17), Side::Old);
         assert_eq!(
             payload,
             serde_json::json!({
@@ -831,12 +856,8 @@ mod tests {
     #[test]
     fn test_build_comment_payload_file_level_inline_no_line() {
         // path but no line -> file-level inline comment; side is irrelevant and must not leak into payload
-        let payload = build_comment_payload(
-            "Whole-file comment",
-            Some("README.md"),
-            None,
-            Side::New,
-        );
+        let payload =
+            build_comment_payload("Whole-file comment", Some("README.md"), None, Side::New);
         assert_eq!(
             payload,
             serde_json::json!({
@@ -850,8 +871,10 @@ mod tests {
     fn test_build_comment_payload_file_level_inline_ignores_side_when_no_line() {
         // Regression guard: with no line, `side` must not leak into the payload
         // regardless of whether it's New or Old.
-        let new_side = build_comment_payload("Whole-file comment", Some("README.md"), None, Side::New);
-        let old_side = build_comment_payload("Whole-file comment", Some("README.md"), None, Side::Old);
+        let new_side =
+            build_comment_payload("Whole-file comment", Some("README.md"), None, Side::New);
+        let old_side =
+            build_comment_payload("Whole-file comment", Some("README.md"), None, Side::Old);
         assert_eq!(new_side, old_side);
         assert_eq!(
             old_side,
@@ -876,5 +899,81 @@ mod tests {
         // integration tests in tests/bitbucket_integration.rs.
         //
         // If the signature regresses, mod.rs (Task 4) will fail to compile.
+    }
+
+    #[test]
+    fn test_comment_deserializes_inline_line_new_side() {
+        let raw = serde_json::json!({
+            "id": 1,
+            "content": { "raw": "nit" },
+            "user": { "display_name": "Alice" },
+            "created_on": "2026-08-20T12:00:00Z",
+            "inline": { "path": "src/main.rs", "to": 42, "from": null }
+        });
+        let c: Comment = serde_json::from_value(raw).unwrap();
+        let inline = c.inline.expect("inline present");
+        assert_eq!(inline.path, "src/main.rs");
+        assert_eq!(inline.to, Some(42));
+        assert_eq!(inline.from, None);
+    }
+
+    #[test]
+    fn test_comment_deserializes_inline_line_old_side() {
+        let raw = serde_json::json!({
+            "id": 2,
+            "content": { "raw": "removed on purpose" },
+            "user": { "display_name": "Bob" },
+            "inline": { "path": "src/main.rs", "from": 17 }
+        });
+        let c: Comment = serde_json::from_value(raw).unwrap();
+        let inline = c.inline.expect("inline present");
+        assert_eq!(inline.from, Some(17));
+        assert_eq!(inline.to, None);
+    }
+
+    #[test]
+    fn test_comment_deserializes_global_comment_without_inline() {
+        let raw = serde_json::json!({
+            "id": 3,
+            "content": { "raw": "LGTM" },
+            "user": { "display_name": "Carol" }
+        });
+        let c: Comment = serde_json::from_value(raw).unwrap();
+        assert!(c.inline.is_none());
+    }
+
+    #[test]
+    fn test_format_comment_location_global_is_empty() {
+        assert_eq!(format_comment_location(None), String::new());
+    }
+
+    #[test]
+    fn test_format_comment_location_inline_new_side_line() {
+        let inline = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(42),
+            from: None,
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "src/main.rs:42");
+    }
+
+    #[test]
+    fn test_format_comment_location_inline_old_side_line() {
+        let inline = Inline {
+            path: "src/main.rs".to_string(),
+            to: None,
+            from: Some(17),
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "src/main.rs:17");
+    }
+
+    #[test]
+    fn test_format_comment_location_inline_file_level_no_line() {
+        let inline = Inline {
+            path: "README.md".to_string(),
+            to: None,
+            from: None,
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "README.md");
     }
 }
