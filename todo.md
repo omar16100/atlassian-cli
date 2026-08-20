@@ -15,6 +15,31 @@ not hand-editing: `cargo update -p h2` alone reproduces it, including the `quinn
 resolving to 0.52.0.
 
 `cargo deny check advisories` is clean after the bump.
+## 2026-08-20 - Fix flaky colors env-var race (closes #111)
+
+`crates/output/src/colors.rs`: four tests mutate process-global environment variables, and
+`EnvGuard` restores state per test but cannot stop a sibling thread mutating the same variable
+mid-assertion. Two vectors, both landing on `test_clicolor_force_enables_colors`, which needs
+`NO_COLOR` unset and `TERM` not `dumb`:
+
+- `test_no_color_env_disables_colors` and `test_no_color_takes_precedence_over_clicolor_force`
+  set `NO_COLOR=1`
+- `test_term_dumb_disables_colors` sets `TERM=dumb`, which `should_use_colors()` checks before
+  `CLICOLOR_FORCE`
+
+Serialised the four with a module-level `ENV_LOCK: Mutex<()>` rather than adding a `serial_test`
+dependency. The helper is poison-tolerant (`unwrap_or_else(|e| e.into_inner())`) so one genuine
+failure reports once instead of cascading into three misleading ones.
+
+Reproduced by narrowing the run to just those four, which forces them to run concurrently:
+
+```
+cargo test -p atlassian-cli-output --lib -- --test-threads=4 \
+  test_no_color_env_disables_colors test_term_dumb_disables_colors \
+  test_clicolor_force_enables_colors test_no_color_takes_precedence
+```
+
+**80/100 failures before, 0/100 after.** Full `cargo test --all` green.
 
 
 ## 2026-07-13 — Website separated into private repo; removed from public CLI repo

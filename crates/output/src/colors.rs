@@ -104,6 +104,25 @@ impl Default for StatusFormatter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // Environment variables are process-global, so the tests below cannot run
+    // concurrently: EnvGuard restores state when a test finishes, but it cannot stop a
+    // sibling test from mutating the same variable mid-assertion. Two vectors existed,
+    // both hitting test_clicolor_force_enables_colors, which needs NO_COLOR unset and
+    // TERM not "dumb":
+    //   - test_no_color_env_disables_colors and
+    //     test_no_color_takes_precedence_over_clicolor_force set NO_COLOR=1
+    //   - test_term_dumb_disables_colors sets TERM=dumb, which should_use_colors()
+    //     checks before CLICOLOR_FORCE
+    // Every test that touches the environment must take this lock first.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    // Poison-tolerant on purpose: if one env test fails while holding the lock, the
+    // other three should still report their own result rather than cascade.
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
 
     // Helper to save and restore environment variables
     struct EnvGuard {
@@ -141,6 +160,7 @@ mod tests {
 
     #[test]
     fn test_no_color_env_disables_colors() {
+        let _env = env_lock();
         let mut guard = EnvGuard::new();
         guard.set("NO_COLOR", "1");
         assert!(!should_use_colors());
@@ -148,6 +168,7 @@ mod tests {
 
     #[test]
     fn test_term_dumb_disables_colors() {
+        let _env = env_lock();
         let mut guard = EnvGuard::new();
         guard.remove("NO_COLOR");
         guard.remove("CLICOLOR_FORCE");
@@ -157,6 +178,7 @@ mod tests {
 
     #[test]
     fn test_clicolor_force_enables_colors() {
+        let _env = env_lock();
         let mut guard = EnvGuard::new();
         guard.remove("NO_COLOR");
         guard.set("CLICOLOR_FORCE", "1");
@@ -165,6 +187,7 @@ mod tests {
 
     #[test]
     fn test_no_color_takes_precedence_over_clicolor_force() {
+        let _env = env_lock();
         let mut guard = EnvGuard::new();
         guard.set("NO_COLOR", "1");
         guard.set("CLICOLOR_FORCE", "1");
