@@ -362,6 +362,9 @@ enum PrCommands {
         /// Comment text.
         #[arg(long)]
         text: String,
+        /// Parent comment ID for a threaded reply.
+        #[arg(long)]
+        parent: Option<i64>,
     },
     /// Resolve a pull request diff comment thread.
     ResolveComment {
@@ -394,7 +397,7 @@ enum PrCommands {
         #[arg(long, value_delimiter = ',')]
         add: Vec<String>,
         /// When listing, also include non-reviewer participants (commenters).
-        #[arg(long)]
+        #[arg(long, conflicts_with = "add")]
         all: bool,
     },
 }
@@ -1135,9 +1138,14 @@ pub async fn execute(
             PrCommands::Comments { repo, pr_id } => {
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Comment { repo, pr_id, text } => {
-                pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text).await
-            }
+            // main's threaded-comment signature (#109) plus this branch's
+            // resolve/reopen arms.
+            PrCommands::Comment {
+                repo,
+                pr_id,
+                text,
+                parent,
+            } => pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text, parent).await,
             PrCommands::ResolveComment {
                 repo,
                 pr_id,
