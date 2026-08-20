@@ -378,9 +378,10 @@ enum PrCommands {
         /// If omitted, posts a top-level PR comment (existing behaviour).
         #[arg(long)]
         path: Option<String>,
-        /// Line number to anchor the inline comment to. Requires --path.
+        /// Line number to anchor the inline comment to. Must be >= 1 (Bitbucket
+        /// line numbers are 1-indexed). Requires --path.
         /// If omitted (but --path is given), posts a file-level inline comment.
-        #[arg(long, requires = "path")]
+        #[arg(long, requires = "path", value_parser = clap::value_parser!(u32).range(1..))]
         line: Option<u32>,
         /// Which side of the diff --line refers to: `new` (default) = destination
         /// (added/unchanged lines), `old` = source (removed lines). Requires --line.
@@ -1855,6 +1856,29 @@ mod tests {
         ])
         .expect_err("only `new`/`old` are valid --side values");
         assert!(err.to_string().contains("side"));
+    }
+
+    #[test]
+    fn test_pr_comment_line_zero_is_rejected() {
+        // Bitbucket line numbers are 1-indexed; catch it at the CLI so users
+        // don't get a server-side 400.
+        let err = parse(&[
+            "pr",
+            "comment",
+            "my-repo",
+            "1",
+            "--text",
+            "nit",
+            "--path",
+            "src/main.rs",
+            "--line",
+            "0",
+        ])
+        .expect_err("`--line 0` must be rejected — line numbers are 1-indexed");
+        assert!(
+            err.to_string().contains("--line") || err.to_string().contains("line"),
+            "expected error to mention --line, got: {err}"
+        );
     }
 
     #[test]
