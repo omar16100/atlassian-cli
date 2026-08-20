@@ -245,15 +245,15 @@ crates/
    atlassian-cli bitbucket --workspace myteam pr update api-service 123 --title "Updated title"
    atlassian-cli bitbucket --workspace myteam pr approve api-service 123
    atlassian-cli bitbucket --workspace myteam pr merge api-service 123 --strategy merge_commit
-  atlassian-cli bitbucket --workspace myteam pr comments api-service 123
-  atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Looks good!"
-  # Inline comment anchored to a line on the new (destination) side of the diff
-  atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Nit: rename" --path src/main.rs --line 42
-  # Inline comment anchored to a removed line on the old (source) side
-  atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Why remove this?" --path src/main.rs --line 17 --side old
-  # Whole-file inline comment (no --line)
-  atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "See README" --path README.md
-  atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123
+   atlassian-cli bitbucket --workspace myteam pr comments api-service 123
+   atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Looks good!"
+   # Inline comment anchored to a line on the new (destination) side of the diff
+   atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Nit: rename" --path src/main.rs --line 42
+   # Inline comment anchored to a removed line on the old (source) side
+   atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Why remove this?" --path src/main.rs --line 17 --side old
+   # Whole-file inline comment (no --line)
+   atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "See README" --path README.md
+   atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123
    atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123 --all
 
    # Bitbucket - Workspaces & Projects

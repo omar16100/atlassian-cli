@@ -20,6 +20,19 @@ mod workspaces;
 
 use utils::BitbucketContext;
 
+/// `clap` value parser that trims and rejects empty strings.
+///
+/// Used for user-facing text fields where an empty value would only produce a
+/// server-side 400 (`--text ""`, `--path ""`). Bitbucket rejects both, and the
+/// error message is far more useful when raised by clap at parse time.
+fn non_empty_string(s: &str) -> std::result::Result<String, String> {
+    if s.trim().is_empty() {
+        Err("value must not be empty".to_string())
+    } else {
+        Ok(s.to_string())
+    }
+}
+
 /// Resolve pipeline ID from positional arg or --pipeline flag.
 fn resolve_pipeline_arg(
     positional: Option<String>,
@@ -372,11 +385,11 @@ enum PrCommands {
         /// Pull request ID.
         pr_id: i64,
         /// Comment text (Markdown).
-        #[arg(long)]
+        #[arg(long, value_parser = non_empty_string)]
         text: String,
         /// File path (relative to repo root) to anchor an inline comment to.
         /// If omitted, posts a top-level PR comment (existing behaviour).
-        #[arg(long)]
+        #[arg(long, value_parser = non_empty_string)]
         path: Option<String>,
         /// Line number to anchor the inline comment to. Must be >= 1 (Bitbucket
         /// line numbers are 1-indexed). Requires --path.
@@ -1878,6 +1891,32 @@ mod tests {
         assert!(
             err.to_string().contains("--line") || err.to_string().contains("line"),
             "expected error to mention --line, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_pr_comment_empty_text_is_rejected() {
+        // Bitbucket rejects an empty content.raw with a 400; catch it at the CLI.
+        let err = parse(&["pr", "comment", "my-repo", "1", "--text", ""])
+            .expect_err("empty --text must be rejected");
+        assert!(
+            err.to_string().contains("--text") || err.to_string().contains("empty"),
+            "expected error to mention --text or 'empty', got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_pr_comment_empty_path_is_rejected() {
+        // An empty --path would serialise as `{"inline": {"path": ""}}`, which
+        // Bitbucket rejects with a 400 and which would also render locally as
+        // ":42" if a line were given. Bounce it at parse time.
+        let err = parse(&[
+            "pr", "comment", "my-repo", "1", "--text", "nit", "--path", "",
+        ])
+        .expect_err("empty --path must be rejected");
+        assert!(
+            err.to_string().contains("--path") || err.to_string().contains("empty"),
+            "expected error to mention --path or 'empty', got: {err}"
         );
     }
 

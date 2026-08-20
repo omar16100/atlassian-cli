@@ -41,6 +41,9 @@ Flag validation is enforced by `clap`, not the API:
 - `--line` is `value_parser!(u32).range(1..)`, so `--line 0` is rejected
   client-side rather than making a round trip for a 400. Bitbucket line numbers
   are 1-indexed.
+- `--text` and `--path` reject empty strings via a shared `non_empty_string`
+  value parser. Bitbucket would otherwise return a 400 for either, and the
+  clap-time error is far more useful to the caller.
 - `--side` is a `clap::ValueEnum` with values `new` (default) and `old`, mapped
   to the API's `inline.to` and `inline.from` fields respectively.
 
@@ -71,16 +74,24 @@ docs but has no semantic value on the write path, and mirroring the user's
 ### Read path
 
 `bb pr comments` now surfaces a `LOCATION` column populated from the response's
-`inline` object:
+`inline` object. `LOCATION` is appended after `CREATED` so consumers that
+snapshot the JSON keys or read CSV positionally see a strictly additive change:
 
 - `None` → empty string (top-level comment)
-- `Some { path, to: Some(n) }` → `path:n`
-- `Some { path, from: Some(n) }` → `path:n`
+- `Some { path, to: Some(n) }` with `n >= 1` → `path:n`
+- `Some { path, from: Some(n) }` with `n >= 1` → `path:n`
 - `Some { path, to: None, from: None }` → `path` (whole-file inline)
+- `Some { path, to: Some(0) }` or `from: Some(0)` → `path` (defensive: 0 is
+  either a deleted-context sentinel or a serialisation glitch, and treating it
+  as a line would contradict the branch's own `--line >= 1` invariant)
 
-When both `to` and `from` are present in the response, `to` wins. That is
+When both `to` and `from` are non-zero in the response, `to` wins. That is
 pinned by `test_format_comment_location_prefers_to_when_both_set` so a future
 serde change or refactor cannot silently flip which side is displayed.
+
+`Inline.path` is `#[serde(default)]` so a stripped-down `inline` object without
+`path` still parses (rendering as `":42"` or `""`), rather than failing the
+entire `list_pr_comments` call for one malformed row.
 
 ## Files modified
 
@@ -115,7 +126,12 @@ serde change or refactor cannot silently flip which side is displayed.
   wiremock tests using `body_partial_json` to pin the exact POST shapes for
   new-side, old-side, and top-level; plus a GET test that parses a payload
   mixing global comments, `to`-anchored inline, `from`-anchored inline, and a
-  whole-file inline comment.
+  whole-file inline comment. The global-comment test also mounts a
+  higher-priority trap that returns 500 for any POST carrying an `inline`
+  object, and asserts on `mock_server.received_requests()` that the body sent
+  actually has no `inline` key — so a future regression that leaks `inline`
+  into a global-comment request fails immediately rather than passing
+  vacuously.
 
 ## Deliberately deferred
 

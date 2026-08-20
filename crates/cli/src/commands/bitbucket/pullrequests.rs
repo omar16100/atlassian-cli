@@ -124,6 +124,7 @@ struct CommentContent {
 /// <https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/>.
 #[derive(Deserialize, Debug, Clone)]
 struct Inline {
+    #[serde(default)]
     path: String,
     #[serde(default)]
     to: Option<u32>,
@@ -134,10 +135,15 @@ struct Inline {
 /// Render an inline anchor as a compact `path:line` (or `path` alone for
 /// file-level comments, or `""` for global comments). Returned by
 /// `list_pr_comments`'s `location` column.
+///
+/// `to`/`from` values of `0` are treated as "no line" to stay consistent with
+/// the client-side `--line >= 1` invariant: Bitbucket line numbers are
+/// 1-indexed, so a 0 in a response is either a deleted-context sentinel or a
+/// mis-serialised field, not a real anchor.
 fn format_comment_location(inline: Option<&Inline>) -> String {
     match inline {
         None => String::new(),
-        Some(i) => match i.to.or(i.from) {
+        Some(i) => match i.to.filter(|&n| n > 0).or(i.from.filter(|&n| n > 0)) {
             Some(line) => format!("{}:{}", i.path, line),
             None => i.path.clone(),
         },
@@ -592,8 +598,8 @@ pub async fn list_pr_comments(
         id: i64,
         author: &'a str,
         content: &'a str,
-        location: String,
         created: &'a str,
+        location: String,
     }
 
     let rows: Vec<Row<'_>> = response
@@ -603,8 +609,8 @@ pub async fn list_pr_comments(
             id: comment.id,
             author: comment.user.display_name.as_str(),
             content: comment.content.raw.lines().next().unwrap_or(""),
-            location: format_comment_location(comment.inline.as_ref()),
             created: comment.created_on.as_deref().unwrap_or(""),
+            location: format_comment_location(comment.inline.as_ref()),
         })
         .collect();
 
@@ -1003,5 +1009,57 @@ mod tests {
             from: Some(20),
         };
         assert_eq!(format_comment_location(Some(&inline)), "src/main.rs:10");
+    }
+
+    #[test]
+    fn test_format_comment_location_treats_zero_as_no_line() {
+        // Bitbucket lines are 1-indexed and we reject `--line 0` on the way
+        // out, so a 0 in the response is a sentinel or a serialisation glitch
+        // rather than an anchor. Degrade to file-level rather than rendering
+        // "src/main.rs:0".
+        let inline_to_zero = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(0),
+            from: None,
+        };
+        assert_eq!(
+            format_comment_location(Some(&inline_to_zero)),
+            "src/main.rs"
+        );
+
+        let inline_from_zero = Inline {
+            path: "src/main.rs".to_string(),
+            to: None,
+            from: Some(0),
+        };
+        assert_eq!(
+            format_comment_location(Some(&inline_from_zero)),
+            "src/main.rs"
+        );
+
+        // A real `from` still wins when `to` is 0.
+        let inline_to_zero_from_real = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(0),
+            from: Some(17),
+        };
+        assert_eq!(
+            format_comment_location(Some(&inline_to_zero_from_real)),
+            "src/main.rs:17"
+        );
+    }
+
+    #[test]
+    fn test_inline_deserialises_when_path_is_missing() {
+        // Defensive: if Bitbucket ever returns a stripped `inline` object
+        // without `path`, we should still parse the comment and degrade
+        // gracefully rather than fail the entire `list_pr_comments` call.
+        let json = serde_json::json!({ "to": 42 });
+        let inline: Inline = serde_json::from_value(json).expect("stripped inline must parse");
+        assert_eq!(inline.path, "");
+        assert_eq!(inline.to, Some(42));
+        // format renders as ":42" — ugly but survivable, and only surfaces if
+        // Bitbucket genuinely omits `path`, which is not documented behaviour.
+        assert_eq!(format_comment_location(Some(&inline)), ":42");
     }
 }

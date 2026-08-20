@@ -770,8 +770,24 @@ async fn test_bitbucket_add_pr_inline_comment_old_side_posts_from_field() {
 async fn test_bitbucket_add_pr_global_comment_still_has_no_inline_field() {
     let mock_server = MockServer::start().await;
 
-    // Two mocks: one matches the exact global-comment shape; one is a fallback
-    // that fails the test if any request with an `inline` field ever arrives.
+    // High-priority trap: any POST that ever carries an `inline` object to the
+    // comments endpoint returns 500 and fails the request. `body_partial_json`
+    // matches supersets, so pairing it with a distinct "leak" mock is the only
+    // way to distinguish "global comment" from "inline comment that also
+    // happens to contain content.raw". Priority ordering ensures the leak
+    // matcher is evaluated before the happy-path matcher below.
+    Mock::given(method("POST"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/3/comments",
+        ))
+        .and(body_partial_json(serde_json::json!({ "inline": {} })))
+        .respond_with(ResponseTemplate::new(500).set_body_string(
+            "test failure: global comment POST unexpectedly carried an `inline` object",
+        ))
+        .with_priority(1)
+        .mount(&mock_server)
+        .await;
+
     Mock::given(method("POST"))
         .and(path(
             "/2.0/repositories/myworkspace/myrepo/pullrequests/3/comments",
@@ -784,6 +800,7 @@ async fn test_bitbucket_add_pr_global_comment_still_has_no_inline_field() {
             "content": { "raw": "LGTM" },
             "user": { "display_name": "Test User" }
         })))
+        .with_priority(2)
         .mount(&mock_server)
         .await;
 
@@ -802,9 +819,20 @@ async fn test_bitbucket_add_pr_global_comment_still_has_no_inline_field() {
         )
         .await;
 
-    assert!(response.is_ok());
-    let created = response.unwrap();
-    assert!(created.get("inline").is_none_or(|v| v.is_null()));
+    assert!(
+        response.is_ok(),
+        "global comment POST should not carry `inline`; got: {response:?}"
+    );
+
+    // Belt and braces: inspect what actually left the wire and assert there
+    // is exactly one request and it has no top-level `inline` key.
+    let received = mock_server.received_requests().await.unwrap();
+    assert_eq!(received.len(), 1, "expected exactly one POST");
+    let body: serde_json::Value = serde_json::from_slice(&received[0].body).unwrap();
+    assert!(
+        body.get("inline").is_none(),
+        "global comment body must not contain `inline`, got: {body}"
+    );
 }
 
 #[tokio::test]
