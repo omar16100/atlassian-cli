@@ -376,7 +376,7 @@ enum PrCommands {
         #[arg(long, value_delimiter = ',')]
         add: Vec<String>,
         /// When listing, also include non-reviewer participants (commenters).
-        #[arg(long)]
+        #[arg(long, conflicts_with = "add")]
         all: bool,
     },
 }

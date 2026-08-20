@@ -249,6 +249,7 @@ crates/
    atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Looks good!"
    atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123
    atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123 --all
+   atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123 --add '{557058:1a2b3c}'
 
    # Bitbucket - Workspaces & Projects
    atlassian-cli bitbucket workspace list --limit 10

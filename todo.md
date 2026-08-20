@@ -1479,3 +1479,12 @@ Validated all 1,924 command examples on the site against the real binary (checke
 
 - `--profile` and `--config` were not global, while `--format` was. So `... issue list --profile prod`, which is what users and most published examples write, was rejected. Both are now `global = true`. This alone accounted for 36 broken site examples plus every shipped example script.
 - `auth login` run bare failed argument parsing, even though the CLI's own errors say "Run `atlassian-cli auth login` first" and the guides repeat it. Missing `--profile`/`--base-url`/`--email` are now prompted for, matching how `--token` already behaved. Without a terminal it stays a hard error rather than hanging on stdin, so CI keeps failing loudly.
+## 2026-08-16 — `bb pr reviewers` lists review status; `--add` endpoint fixed (branch `fix/bb-pr-reviewers-followup`)
+
+Issue #102 and PR #103 from an outside contributor, plus the follow-up this repo owed them.
+
+- PR #103 (merged): `bb pr reviewers <repo> <pr_id>` with no `--add` now lists participants with a derived `status` column (Approved / Changes Requested / No Response) instead of looping zero times and printing "✅ Reviewers added to pull request #N". `--all` includes `role == PARTICIPANT` rows. Participants come from the PR GET, which already embeds them, so there is no extra call.
+- `--all` combined with `--add` was silently ignored; now `conflicts_with = "add"`, so clap rejects it.
+- Fixed `--add`, which had never worked: it PUT `/pullrequests/{id}/default-reviewers/{uuid}`, an endpoint Bitbucket Cloud does not have (repo default reviewers are at `/repositories/{ws}/{repo}/default-reviewers/{user}`, and a PR's reviewer list is replaced by a PUT on the PR). Same class of defect as #100. It now reads the PR's current reviewers, unions the requested UUIDs in, and PUTs `{title, reviewers}` back.
+- UUIDs are normalised to Bitbucket's brace form, so `--add abc-123` and `--add '{abc-123}'` both work. `pr create --reviewers` uses the same normalisation, where a bare UUID had the same problem.
+- Row filtering moved out of `list_pr_reviewers` into a pure `reviewer_rows()`; 12 unit tests now cover status derivation, REVIEWER-vs-`--all` filtering, empty results, UUID normalisation and the union/dedupe. The added wiremock test pins the PUT path and body.
