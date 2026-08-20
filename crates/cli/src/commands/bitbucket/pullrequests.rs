@@ -159,6 +159,15 @@ pub enum Side {
     Old,
 }
 
+impl std::fmt::Display for Side {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Side::New => f.write_str("new"),
+            Side::Old => f.write_str("old"),
+        }
+    }
+}
+
 /// Build the JSON body for a Bitbucket PR-comment POST.
 ///
 /// Pure function so its shape is unit-testable without a mock server.
@@ -814,6 +823,12 @@ mod tests {
     #[test]
     fn test_participant_status_no_response() {
         assert_eq!(participant_status(false, None), "No Response");
+    }
+
+    #[test]
+    fn test_side_display() {
+        assert_eq!(Side::New.to_string(), "new");
+        assert_eq!(Side::Old.to_string(), "old");
     }
 
     #[test]

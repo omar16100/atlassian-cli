@@ -353,15 +353,39 @@ enum PrCommands {
         /// Pull request ID.
         pr_id: i64,
     },
-    /// Add comment to pull request.
+    /// Add a comment to a pull request. Supports both top-level PR comments (default)
+    /// and inline comments anchored to a file (and optionally a line).
+    #[command(long_about = "Add a comment to a pull request.\n\n\
+        By default, posts a top-level PR comment. Passing --path (with an optional --line and --side)\n\
+        posts an inline comment anchored to that file:\n\n\
+        Examples:\n  \
+        bb pr comment my-repo 123 --text \"LGTM\"\n  \
+        bb pr comment my-repo 123 --text \"Nit: rename\" --path src/main.rs --line 42\n  \
+        bb pr comment my-repo 123 --text \"Why remove?\" --path src/main.rs --line 17 --side old\n  \
+        bb pr comment my-repo 123 --text \"Whole-file comment\" --path README.md\n\n\
+        --side selects which side of the diff --line refers to:\n  \
+        new (default) = destination revision (added/unchanged lines)\n  \
+        old            = source revision (removed lines)")]
     Comment {
         /// Repository slug.
         repo: String,
         /// Pull request ID.
         pr_id: i64,
-        /// Comment text.
+        /// Comment text (Markdown).
         #[arg(long)]
         text: String,
+        /// File path (relative to repo root) to anchor an inline comment to.
+        /// If omitted, posts a top-level PR comment (existing behaviour).
+        #[arg(long)]
+        path: Option<String>,
+        /// Line number to anchor the inline comment to. Requires --path.
+        /// If omitted (but --path is given), posts a file-level inline comment.
+        #[arg(long, requires = "path")]
+        line: Option<u32>,
+        /// Which side of the diff --line refers to: `new` (default) = destination
+        /// (added/unchanged lines), `old` = source (removed lines). Requires --line.
+        #[arg(long, requires = "line", default_value_t = pullrequests::Side::New, value_enum)]
+        side: pullrequests::Side,
     },
     /// List pull request reviewers with review status, or add new reviewers.
     #[command(
@@ -1117,16 +1141,23 @@ pub async fn execute(
             PrCommands::Comments { repo, pr_id } => {
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Comment { repo, pr_id, text } => {
+            PrCommands::Comment {
+                repo,
+                pr_id,
+                text,
+                path,
+                line,
+                side,
+            } => {
                 pullrequests::add_pr_comment(
                     &ctx,
                     &workspace,
                     &repo,
                     pr_id,
                     &text,
-                    None,
-                    None,
-                    pullrequests::Side::default(),
+                    path.as_deref(),
+                    line,
+                    side,
                 )
                 .await
             }
@@ -1677,5 +1708,173 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Pipeline ID required"));
+    }
+
+    use clap::Parser;
+
+    /// Standalone parser used only in tests to feed clap the `pr comment ...`
+    /// subtree without dragging the whole top-level `Cli` derive into the file.
+    #[derive(clap::Parser, Debug)]
+    struct BbTestCli {
+        #[command(subcommand)]
+        cmd: BitbucketCommands,
+    }
+
+    fn parse(argv: &[&str]) -> Result<BbTestCli, clap::Error> {
+        // Prepend the binary name clap expects at argv[0].
+        let mut args = vec!["bb"];
+        args.extend_from_slice(argv);
+        BbTestCli::try_parse_from(args)
+    }
+
+    #[test]
+    fn test_pr_comment_global_still_parses_without_inline_flags() {
+        let parsed = parse(&["pr", "comment", "my-repo", "1", "--text", "LGTM"])
+            .expect("global comment should parse");
+        if let BitbucketCommands::Pr(PrCommands::Comment {
+            repo,
+            pr_id,
+            text,
+            path,
+            line,
+            side,
+        }) = parsed.cmd
+        {
+            assert_eq!(repo, "my-repo");
+            assert_eq!(pr_id, 1);
+            assert_eq!(text, "LGTM");
+            assert_eq!(path, None);
+            assert_eq!(line, None);
+            assert_eq!(side, pullrequests::Side::New);
+        } else {
+            panic!("expected PrCommands::Comment");
+        }
+    }
+
+    #[test]
+    fn test_pr_comment_inline_line_new_side_parses() {
+        let parsed = parse(&[
+            "pr",
+            "comment",
+            "my-repo",
+            "1",
+            "--text",
+            "nit: rename",
+            "--path",
+            "src/main.rs",
+            "--line",
+            "42",
+        ])
+        .expect("inline new-side comment should parse");
+        if let BitbucketCommands::Pr(PrCommands::Comment {
+            path, line, side, ..
+        }) = parsed.cmd
+        {
+            assert_eq!(path.as_deref(), Some("src/main.rs"));
+            assert_eq!(line, Some(42));
+            assert_eq!(side, pullrequests::Side::New);
+        } else {
+            panic!("expected PrCommands::Comment");
+        }
+    }
+
+    #[test]
+    fn test_pr_comment_inline_line_old_side_parses() {
+        let parsed = parse(&[
+            "pr",
+            "comment",
+            "my-repo",
+            "1",
+            "--text",
+            "why remove?",
+            "--path",
+            "src/main.rs",
+            "--line",
+            "17",
+            "--side",
+            "old",
+        ])
+        .expect("inline old-side comment should parse");
+        if let BitbucketCommands::Pr(PrCommands::Comment { side, .. }) = parsed.cmd {
+            assert_eq!(side, pullrequests::Side::Old);
+        } else {
+            panic!("expected PrCommands::Comment");
+        }
+    }
+
+    #[test]
+    fn test_pr_comment_line_without_path_is_rejected() {
+        let err = parse(&[
+            "pr", "comment", "my-repo", "1", "--text", "nit", "--line", "42",
+        ])
+        .expect_err("`--line` without `--path` must be rejected by clap");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("--path"),
+            "expected error to mention --path, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_pr_comment_side_without_line_is_rejected() {
+        let err = parse(&[
+            "pr",
+            "comment",
+            "my-repo",
+            "1",
+            "--text",
+            "nit",
+            "--path",
+            "src/main.rs",
+            "--side",
+            "old",
+        ])
+        .expect_err("`--side` without `--line` must be rejected by clap");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("--line"),
+            "expected error to mention --line, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_pr_comment_invalid_side_value_is_rejected() {
+        let err = parse(&[
+            "pr",
+            "comment",
+            "my-repo",
+            "1",
+            "--text",
+            "nit",
+            "--path",
+            "src/main.rs",
+            "--line",
+            "42",
+            "--side",
+            "left",
+        ])
+        .expect_err("only `new`/`old` are valid --side values");
+        assert!(err.to_string().contains("side"));
+    }
+
+    #[test]
+    fn test_pr_comment_file_level_inline_parses() {
+        let parsed = parse(&[
+            "pr",
+            "comment",
+            "my-repo",
+            "1",
+            "--text",
+            "whole file",
+            "--path",
+            "README.md",
+        ])
+        .expect("file-level inline (path, no line) should parse");
+        if let BitbucketCommands::Pr(PrCommands::Comment { path, line, .. }) = parsed.cmd {
+            assert_eq!(path.as_deref(), Some("README.md"));
+            assert_eq!(line, None);
+        } else {
+            panic!("expected PrCommands::Comment");
+        }
     }
 }
