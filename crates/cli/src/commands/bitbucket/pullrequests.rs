@@ -833,6 +833,22 @@ mod tests {
     }
 
     #[test]
+    fn test_build_comment_payload_file_level_inline_ignores_side_when_no_line() {
+        // Regression guard: with no line, `side` must not leak into the payload
+        // regardless of whether it's New or Old.
+        let new_side = build_comment_payload("Whole-file comment", Some("README.md"), None, Side::New);
+        let old_side = build_comment_payload("Whole-file comment", Some("README.md"), None, Side::Old);
+        assert_eq!(new_side, old_side);
+        assert_eq!(
+            old_side,
+            serde_json::json!({
+                "content": { "raw": "Whole-file comment" },
+                "inline": { "path": "README.md" }
+            })
+        );
+    }
+
+    #[test]
     fn test_side_default_is_new() {
         assert_eq!(Side::default(), Side::New);
     }
