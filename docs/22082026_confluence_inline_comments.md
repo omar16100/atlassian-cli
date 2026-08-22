@@ -1,6 +1,6 @@
 # Confluence inline comments and threads (issue #122)
 
-Status: shipped in 0.7.0 (PR pending).
+Status: shipped in 0.7.0 (PR #123).
 
 ## Problem
 
