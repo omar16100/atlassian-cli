@@ -76,6 +76,30 @@ fn test_auth_help() {
     assert!(stdout.contains("Authentication commands"));
 }
 
+/// Regression: `--token` carries a clap `env` annotation, and clap prints the
+/// variable's value in `--help` unless told not to. Anyone with the token
+/// exported leaked it by asking for help, CI logs included.
+#[test]
+fn test_auth_login_help_hides_the_token_env_value() {
+    let output = Command::new("cargo")
+        .args(["run", "--quiet", "--", "auth", "login", "--help"])
+        .env("ATLASSIAN_API_TOKEN", "super-secret-token-value")
+        .output()
+        .expect("Failed to execute command");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("super-secret-token-value"),
+        "auth login --help leaked the token value. Got: {stdout}"
+    );
+    // The variable is still advertised, just without its value.
+    assert!(
+        stdout.contains("ATLASSIAN_API_TOKEN"),
+        "auth login --help should still name the env var. Got: {stdout}"
+    );
+}
+
 #[test]
 fn test_output_format_flag() {
     let output = Command::new("cargo")

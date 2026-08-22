@@ -1605,7 +1605,13 @@ Minor: both changes add flags and columns.
 - `test_resolve_url_keeps_the_base_path` covers a path-bearing base with and without the trailing slash.
 - `confluence attachment upload` now trims the trailing slash before concatenating, as the Jira one already did.
 
-## 2026-08-22 — Release 0.7.1
+## 2026-08-22 — `auth login --help` printed the API token
+
+`--token` carries a clap `env` annotation, and clap prints the variable's value, so anyone with `ATLASSIAN_API_TOKEN` exported leaked it by asking for help — CI logs included, where log masking does not cover arbitrary command output.
+
+- `hide_env_values = true` on the arg. Help still names the variable, just not its value.
+- `test_auth_login_help_hides_the_token_env_value` runs `--help` with the variable set and asserts the value is absent; it fails without the fix.
+- Only `env` annotation in the workspace. `ATLASSIAN_CLI_TOKEN_{PROFILE}` is read via `std::env::var`, which never reaches help output.## 2026-08-22 — Release 0.7.1
 
 Patch: one user-facing fix, no new surface.
 
