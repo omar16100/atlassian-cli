@@ -1596,3 +1596,11 @@ Minor: both changes add flags and columns.
 - `bb pr comment --path/--line/--side` for inline PR comments, and a `location` column on `pr comments` (#121, @alcantaraleo, closes #120).
 - `confluence page comments` now covers inline comments as well as footer ones, follows cursor pagination, and gains `--replies`; `add-comment` gains `--parent`/`--kind` (#123, closes #122).
 - Doc status lines brought up to date, including #104's, which still named a merged branch.
+
+## 2026-08-22 — Base URLs with a path lost their last segment
+
+`Url::join` drops the base's last path segment unless the base ends with `/`, so `https://api.atlassian.com/ex/jira/<cloudId>` + `/rest/api/3/myself` ate the cloud id. This hits the API-gateway URL form, which scoped API tokens require.
+
+- New `normalize_base_url` appends the slash. Applied in `ApiClient::new` and in `auth login`, so old configs are fixed on load and new ones are stored right.
+- `test_resolve_url_keeps_the_base_path` covers a path-bearing base with and without the trailing slash.
+- `confluence attachment upload` now trims the trailing slash before concatenating, as the Jira one already did.

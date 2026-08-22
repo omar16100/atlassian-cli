@@ -94,7 +94,8 @@ pub async fn upload_attachment(
     };
 
     // Note: This uses the raw reqwest client for multipart upload
-    let base_url = ctx.client.base_url();
+    // base_url() keeps its trailing slash, so trim before joining.
+    let base_url = ctx.client.base_url().trim_end_matches('/');
 
     let mut request = ctx
         .client

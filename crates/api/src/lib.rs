@@ -62,6 +62,22 @@ fn same_origin(a: &Url, b: &Url) -> bool {
         && a.port_or_known_default() == b.port_or_known_default()
 }
 
+/// Make a base URL end with `/`.
+///
+/// `Url::join` drops the base's last path segment unless the base ends with
+/// `/`. Idempotent.
+pub fn normalize_base_url(mut url: Url) -> Url {
+    if url.cannot_be_a_base() {
+        return url;
+    }
+
+    let path = url.path();
+    if !path.ends_with('/') {
+        url.set_path(&format!("{path}/"));
+    }
+    url
+}
+
 /// The `Retry-After` delay in seconds, when the server sent one. The HTTP-date
 /// form is ignored; Atlassian sends seconds.
 fn retry_after(response: &reqwest::Response) -> Option<Duration> {
@@ -138,6 +154,8 @@ impl ApiClient {
                 ));
             }
         }
+
+        let url = normalize_base_url(url);
 
         let client = Client::builder()
             .user_agent(format!("atlassian-cli/{}", env!("CARGO_PKG_VERSION")))
@@ -1088,6 +1106,42 @@ mod tests {
                 Ok(url) => assert_eq!(url.host_str(), Some("site.atlassian.net"), "{bad}"),
             }
         }
+    }
+
+    /// Regression: a base URL carrying a path lost its last segment, so the
+    /// API-gateway form used by scoped API tokens dropped the cloud id.
+    #[test]
+    fn test_resolve_url_keeps_the_base_path() {
+        let client = ApiClient::new("https://api.atlassian.com/ex/jira/cloud-id").unwrap();
+
+        assert_eq!(
+            client.base_url(),
+            "https://api.atlassian.com/ex/jira/cloud-id/"
+        );
+        assert_eq!(
+            client.resolve_url("/rest/api/3/myself").unwrap().as_str(),
+            "https://api.atlassian.com/ex/jira/cloud-id/rest/api/3/myself"
+        );
+        assert_eq!(
+            client.resolve_url("rest/api/3/myself").unwrap().as_str(),
+            "https://api.atlassian.com/ex/jira/cloud-id/rest/api/3/myself"
+        );
+
+        // A base written with the trailing slash resolves the same way.
+        let client = ApiClient::new("https://api.atlassian.com/ex/jira/cloud-id/").unwrap();
+
+        assert_eq!(
+            client.base_url(),
+            "https://api.atlassian.com/ex/jira/cloud-id/"
+        );
+        assert_eq!(
+            client.resolve_url("/rest/api/3/myself").unwrap().as_str(),
+            "https://api.atlassian.com/ex/jira/cloud-id/rest/api/3/myself"
+        );
+        assert_eq!(
+            client.resolve_url("rest/api/3/myself").unwrap().as_str(),
+            "https://api.atlassian.com/ex/jira/cloud-id/rest/api/3/myself"
+        );
     }
 
     /// Regression: comparing scheme and host but not port let any other port on
