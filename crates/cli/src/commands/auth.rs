@@ -312,6 +312,8 @@ fn login_jira_confluence(
         ));
     }
 
+    let base_url = atlassian_cli_api::normalize_base_url(base_url);
+
     let email = args
         .email
         .as_ref()

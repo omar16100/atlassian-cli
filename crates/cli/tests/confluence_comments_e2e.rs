@@ -357,3 +357,44 @@ async fn comment_text_is_escaped_for_storage_format() {
         String::from_utf8_lossy(&out.stderr)
     );
 }
+
+/// The upload URL is built by hand from `base_url()`, which keeps its trailing
+/// slash, so it used to produce `host//wiki/...`. wiremock matches the path as
+/// sent, so a doubled slash simply fails to match and this test catches it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn attachment_upload_does_not_double_the_slash() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path_matcher(
+            "/wiki/rest/api/content/12345/child/attachment",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "results": [{"id": "att1", "title": "note.txt"}]
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let file = dir.path().join("note.txt");
+    std::fs::write(&file, b"hello").unwrap();
+
+    let out = run(
+        &config,
+        &[
+            "confluence",
+            "attachment",
+            "upload",
+            "12345",
+            "--file",
+            file.to_str().unwrap(),
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
