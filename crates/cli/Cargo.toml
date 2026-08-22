@@ -23,11 +23,11 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 
 # Internal crates
-atlassian-cli-api = { path = "../api", version = "0.7.0" }
-atlassian-cli-auth = { path = "../auth", version = "0.7.0" }
-atlassian-cli-config = { path = "../config", version = "0.7.0" }
-atlassian-cli-output = { path = "../output", version = "0.7.0" }
-atlassian-cli-bulk = { path = "../bulk", version = "0.7.0" }
+atlassian-cli-api = { path = "../api", version = "0.7.1" }
+atlassian-cli-auth = { path = "../auth", version = "0.7.1" }
+atlassian-cli-config = { path = "../config", version = "0.7.1" }
+atlassian-cli-output = { path = "../output", version = "0.7.1" }
+atlassian-cli-bulk = { path = "../bulk", version = "0.7.1" }
 
 # CLI helpers
 url.workspace = true
