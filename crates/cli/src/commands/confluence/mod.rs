@@ -166,6 +166,24 @@ enum FolderCommands {
     },
 }
 
+/// `--kind` for `page add-comment`. Mirrors `pages::CommentKind`, which is the
+/// API-facing type; keeping them separate stops clap derives leaking into the
+/// module that talks to Confluence.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, clap::ValueEnum)]
+enum CommentKindArg {
+    Footer,
+    Inline,
+}
+
+impl From<CommentKindArg> for pages::CommentKind {
+    fn from(value: CommentKindArg) -> Self {
+        match value {
+            CommentKindArg::Footer => pages::CommentKind::Footer,
+            CommentKindArg::Inline => pages::CommentKind::Inline,
+        }
+    }
+}
+
 #[derive(Subcommand, Debug, Clone)]
 enum PageCommands {
     /// List pages
@@ -259,19 +277,45 @@ enum PageCommands {
         label: String,
     },
     /// List page comments
+    #[command(long_about = "List a page's comments.\n\n\
+        Covers both footer comments and inline ones (the highlight-and-comment kind), which\n\
+        Confluence keeps in separate collections. The `kind` column says which a comment is,\n\
+        and is also what you pass to `add-comment --kind` when replying.\n\n\
+        Examples:\n  \
+        confluence page comments 12345\n  \
+        confluence page comments 12345 --full\n  \
+        confluence page comments 12345 --replies    # walk each thread")]
     Comments {
         /// Page ID
         page_id: String,
         /// Show full comment body instead of truncated preview
         #[arg(long)]
         full: bool,
+        /// Also fetch replies to each comment. One request per thread root
+        #[arg(long)]
+        replies: bool,
     },
-    /// Add comment to page
+    /// Add a comment to a page, or reply to an existing thread
+    #[command(
+        long_about = "Add a comment to a page, or reply to an existing thread.\n\n\
+        Examples:\n  \
+        confluence page add-comment 12345 \"Looks good\"\n  \
+        confluence page add-comment 12345 \"Agreed\" --parent 98765\n  \
+        confluence page add-comment 12345 \"Agreed\" --parent 98765 --kind inline\n\n\
+        --kind must match the thread you are replying to; Confluence will not accept a footer\n\
+        reply to an inline thread. `page comments` shows each comment's kind."
+    )]
     AddComment {
         /// Page ID
         page_id: String,
         /// Comment text
         comment: String,
+        /// Reply to this comment instead of starting a new thread
+        #[arg(long)]
+        parent: Option<String>,
+        /// Which collection the comment belongs to. Must match the parent when replying
+        #[arg(long, value_enum, default_value_t = CommentKindArg::Footer)]
+        kind: CommentKindArg,
     },
     /// Get page restrictions
     GetRestrictions {
@@ -645,11 +689,19 @@ pub async fn execute(
             PageCommands::RemoveLabel { page_id, label } => {
                 pages::remove_page_label(&ctx, &page_id, &label).await
             }
-            PageCommands::Comments { page_id, full } => {
-                pages::list_page_comments(&ctx, &page_id, full).await
-            }
-            PageCommands::AddComment { page_id, comment } => {
-                pages::add_page_comment(&ctx, &page_id, &comment).await
+            PageCommands::Comments {
+                page_id,
+                full,
+                replies,
+            } => pages::list_page_comments(&ctx, &page_id, full, replies).await,
+            PageCommands::AddComment {
+                page_id,
+                comment,
+                parent,
+                kind,
+            } => {
+                pages::add_page_comment(&ctx, &page_id, &comment, parent.as_deref(), kind.into())
+                    .await
             }
             PageCommands::GetRestrictions { page_id } => {
                 pages::get_page_restrictions(&ctx, &page_id).await
