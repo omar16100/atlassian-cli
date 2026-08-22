@@ -1588,3 +1588,11 @@ Minor, not patch: new commands, and two breaking-in-form changes.
 - Comment text is now escaped for storage format; it was interpolated raw into `<p>{}</p>`, so `<`, `>` or `&` produced invalid XHTML.
 - Not done: creating a new inline comment, which needs `inlineCommentProperties.textSelection` plus a match index and has no sensible command-line spelling. Replying to an existing inline thread is supported.
 - All mock-tested; no instance with inline comments available to verify the real v2 response shapes.
+
+## 2026-08-22 — Release 0.7.0
+
+Minor: both changes add flags and columns.
+
+- `bb pr comment --path/--line/--side` for inline PR comments, and a `location` column on `pr comments` (#121, @alcantaraleo, closes #120).
+- `confluence page comments` now covers inline comments as well as footer ones, follows cursor pagination, and gains `--replies`; `add-comment` gains `--parent`/`--kind` (#123, closes #122).
+- Doc status lines brought up to date, including #104's, which still named a merged branch.

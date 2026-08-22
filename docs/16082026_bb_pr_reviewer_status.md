@@ -1,6 +1,6 @@
 # Bitbucket PR reviewer status and reviewer updates
 
-Status: implemented on branch `fix/bb-pr-reviewers-followup`, on top of PR #103 (merged).
+Status: shipped in 0.6.0 (PR #104), on top of PR #103.
 
 ## Problem
 

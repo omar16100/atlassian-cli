@@ -1,5 +1,7 @@
 # Bitbucket PR Inline Comments
 
+Status: shipped in 0.7.0 (PR #121).
+
 ## Date: 2026-08-20
 
 ## Problem
