@@ -19,11 +19,15 @@ use tracing_subscriber::{fmt, EnvFilter};
 #[command(name = "atlassian-cli", version, about = "Unified Atlassian Cloud CLI", long_about = None)]
 struct Cli {
     /// Profile to use from config file
-    #[arg(short, long)]
+    //
+    // global: --format has always been accepted after the subcommand, so users
+    // and most of the documentation write `... issue list --profile prod` too.
+    // It was rejected, which made a large share of the published examples fail.
+    #[arg(short, long, global = true)]
     profile: Option<String>,
 
     /// Path to config file (defaults to ~/.atlassian-cli/config.yaml)
-    #[arg(long)]
+    #[arg(long, global = true)]
     config: Option<PathBuf>,
 
     /// Output format for command results (table, json, yaml, csv, quiet, markdown)

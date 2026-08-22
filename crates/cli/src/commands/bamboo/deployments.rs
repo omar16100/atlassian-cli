@@ -41,12 +41,11 @@ pub async fn list_projects(ctx: &BambooContext<'_>, limit: usize) -> Result<()> 
 
     if rows.is_empty() {
         tracing::info!("No deployment projects found");
-        println!("No deployment projects found");
-        return Ok(());
     }
 
     tracing::info!("Found {} deployment projects", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No deployment projects found")
 }
 
 /// Get deployment project details.
@@ -118,8 +117,6 @@ pub async fn list_environments(ctx: &BambooContext<'_>, project_id: i64) -> Resu
 
     if rows.is_empty() {
         tracing::info!("No environments found for project {}", project_id);
-        println!("No environments found");
-        return Ok(());
     }
 
     tracing::info!(
@@ -127,7 +124,8 @@ pub async fn list_environments(ctx: &BambooContext<'_>, project_id: i64) -> Resu
         rows.len(),
         project_id
     );
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No environments found")
 }
 
 /// Get environment details.
@@ -210,8 +208,6 @@ pub async fn list_results(ctx: &BambooContext<'_>, env_id: i64, limit: usize) ->
 
     if rows.is_empty() {
         tracing::info!("No deployment results found for environment {}", env_id);
-        println!("No deployment results found");
-        return Ok(());
     }
 
     tracing::info!(
@@ -219,7 +215,8 @@ pub async fn list_results(ctx: &BambooContext<'_>, env_id: i64, limit: usize) ->
         rows.len(),
         env_id
     );
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No deployment results found")
 }
 
 /// Trigger a deployment.
@@ -322,10 +319,9 @@ pub async fn list_versions(ctx: &BambooContext<'_>, project_id: i64, limit: usiz
 
     if rows.is_empty() {
         tracing::info!("No versions found for project {}", project_id);
-        println!("No versions found");
-        return Ok(());
     }
 
     tracing::info!("Found {} versions for project {}", rows.len(), project_id);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No versions found")
 }

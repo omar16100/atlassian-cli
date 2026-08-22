@@ -66,12 +66,10 @@ pub async fn list_slas(ctx: &JsmContext<'_>, key: &str) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No SLAs for request {}", key);
-        println!("No SLAs found");
-        return Ok(());
     }
 
     tracing::info!("Found {} SLAs for request {}", rows.len(), key);
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No SLAs found")
 }
 
 /// Get specific SLA details.

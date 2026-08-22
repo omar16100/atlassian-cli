@@ -108,9 +108,8 @@ get_repos() {
         echo "[\"$REPO\"]"
     else
         log "Fetching all repositories from workspace: $WORKSPACE"
-        atlassian-cli bitbucket repo list \
-            --profile "$PROFILE" \
-            "$WORKSPACE" \
+        atlassian-cli --profile "$PROFILE" bitbucket repo list \
+            --workspace "$WORKSPACE" \
             --format json | jq -r '[.[].slug]'
     fi
 }
@@ -123,9 +122,8 @@ get_merged_branches() {
 
     # Get all branches
     local branches
-    branches=$(atlassian-cli bitbucket branch list \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    branches=$(atlassian-cli --profile "$PROFILE" bitbucket branch list \
+        --workspace "$WORKSPACE" \
         "$repo" \
         --format json)
 
@@ -145,9 +143,8 @@ delete_branch() {
 
     log "Deleting branch: $repo/$branch"
 
-    atlassian-cli bitbucket branch delete \
-        --profile "$PROFILE" \
-        "$WORKSPACE" \
+    atlassian-cli --profile "$PROFILE" bitbucket branch delete \
+        --workspace "$WORKSPACE" \
         "$repo" \
         "$branch" || warn "Failed to delete: $branch"
 }

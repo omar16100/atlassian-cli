@@ -28,3 +28,8 @@ docs/todo.md
 
 # Scratch / screenshots
 tmp/
+
+# Agent planning artifacts. Useful while work is in progress, but they are
+# working notes rather than project documentation: docs/ is indexed by
+# docs/index.md and is meant to describe the shipped state.
+docs/superpowers/

@@ -43,12 +43,10 @@ pub async fn list_plans(ctx: &BambooContext<'_>, limit: usize) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No plans found");
-        println!("No plans found");
-        return Ok(());
     }
 
     tracing::info!("Found {} plans", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No plans found")
 }
 
 /// Get plan details.

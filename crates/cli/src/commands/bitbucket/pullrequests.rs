@@ -39,12 +39,13 @@ struct PullRequest {
     task_count: Option<i32>,
     #[serde(default)]
     participants: Option<Vec<Participant>>,
+    #[serde(default)]
+    reviewers: Option<Vec<User>>,
 }
 
 #[derive(Deserialize)]
 struct User {
     display_name: String,
-    #[allow(dead_code)]
     #[serde(default)]
     uuid: Option<String>,
 }
@@ -99,6 +100,29 @@ fn participant_status(approved: bool, state: Option<&str>) -> &'static str {
     }
 }
 
+#[derive(Serialize)]
+struct ReviewerRow<'a> {
+    name: &'a str,
+    role: &'a str,
+    status: &'a str,
+    participated_on: &'a str,
+}
+
+/// Build the reviewer table rows. Only `role == REVIEWER` participants are kept unless
+/// `show_all` is set, in which case commenters and other participants are included too.
+fn reviewer_rows(participants: &[Participant], show_all: bool) -> Vec<ReviewerRow<'_>> {
+    participants
+        .iter()
+        .filter(|p| show_all || p.role == "REVIEWER")
+        .map(|p| ReviewerRow {
+            name: p.user.display_name.as_str(),
+            role: p.role.as_str(),
+            status: participant_status(p.approved, p.state.as_deref()),
+            participated_on: p.participated_on.as_deref().unwrap_or(""),
+        })
+        .collect()
+}
+
 #[derive(Deserialize)]
 struct Comment {
     id: i64,
@@ -106,6 +130,8 @@ struct Comment {
     user: User,
     #[serde(default)]
     created_on: Option<String>,
+    #[serde(default)]
+    parent: Option<CommentParent>,
     #[serde(default)]
     inline: Option<Inline>,
 }
@@ -115,13 +141,17 @@ struct CommentContent {
     raw: String,
 }
 
+#[derive(Deserialize)]
+struct CommentParent {
+    id: i64,
+}
+
 /// Inline anchor metadata returned by Bitbucket for a PR comment.
 ///
 /// Present iff the comment is inline (attached to a file). `to` and `from`
 /// are line numbers in the destination and source revisions respectively;
 /// exactly one is set for a line-anchored comment, and both are `None` for
-/// a file-level inline comment. See
-/// <https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/>.
+/// a file-level inline comment.
 #[derive(Deserialize, Debug, Clone)]
 struct Inline {
     #[serde(default)]
@@ -132,14 +162,12 @@ struct Inline {
     from: Option<u32>,
 }
 
-/// Render an inline anchor as a compact `path:line` (or `path` alone for
-/// file-level comments, or `""` for global comments). Returned by
-/// `list_pr_comments`'s `location` column.
+/// Render an inline anchor as a compact `path:line`, or `path` alone for a
+/// file-level comment, or `""` for a top-level one.
 ///
-/// `to`/`from` values of `0` are treated as "no line" to stay consistent with
-/// the client-side `--line >= 1` invariant: Bitbucket line numbers are
-/// 1-indexed, so a 0 in a response is either a deleted-context sentinel or a
-/// mis-serialised field, not a real anchor.
+/// A `to`/`from` of `0` is treated as "no line", to stay consistent with the
+/// `--line >= 1` invariant: Bitbucket line numbers are 1-indexed, so a 0 in a
+/// response is a sentinel or a mis-serialised field, not a real anchor.
 fn format_comment_location(inline: Option<&Inline>) -> String {
     match inline {
         None => String::new(),
@@ -152,10 +180,9 @@ fn format_comment_location(inline: Option<&Inline>) -> String {
 
 /// Which side of the diff a line-anchored inline comment attaches to.
 ///
-/// - `New` (default): the destination revision. Comments an added or unchanged line.
-///   Serialised as Bitbucket's `inline.to` field.
-/// - `Old`: the source revision. Comments a removed line.
-///   Serialised as Bitbucket's `inline.from` field.
+/// - `New` (default): the destination revision, i.e. an added or unchanged
+///   line. Sent as Bitbucket's `inline.to`.
+/// - `Old`: the source revision, i.e. a removed line. Sent as `inline.from`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
 pub enum Side {
     #[default]
@@ -174,28 +201,55 @@ impl std::fmt::Display for Side {
     }
 }
 
-/// Build the JSON body for a Bitbucket PR-comment POST.
+#[derive(Serialize)]
+struct CommentRow<'a> {
+    id: i64,
+    author: &'a str,
+    content: &'a str,
+    created: &'a str,
+    parent: Option<i64>,
+    /// Appended rather than inserted: JSON key order, CSV columns and table
+    /// headers stay additive for anything already parsing this output.
+    location: String,
+}
+
+fn comment_row(comment: &Comment) -> CommentRow<'_> {
+    CommentRow {
+        id: comment.id,
+        author: comment.user.display_name.as_str(),
+        content: comment.content.raw.as_str(),
+        created: comment.created_on.as_deref().unwrap_or(""),
+        parent: comment.parent.as_ref().map(|parent| parent.id),
+        location: format_comment_location(comment.inline.as_ref()),
+    }
+}
+
+/// Build the JSON body for a PR-comment POST.
 ///
-/// Pure function so its shape is unit-testable without a mock server.
-/// Matches the API contract from
-/// <https://developer.atlassian.com/cloud/bitbucket/rest/api-group-pullrequests/>.
+/// Pure, so every shape is unit-testable without a mock server: top-level,
+/// threaded reply, whole-file inline, and line-anchored inline on either side.
 ///
-/// - `content`: comment text (Bitbucket renders as Markdown).
-/// - `inline_path`: if `Some(_)`, comment is inline (attached to a file); if `None`, comment is global.
-/// - `inline_line`: only meaningful when `inline_path.is_some()`. If `Some(n)`, the comment
-///   is line-anchored; if `None`, it's a file-level inline comment.
-/// - `side`: only meaningful when both `inline_path` and `inline_line` are `Some(_)`.
-///   `New` → `inline.to = <n>`, `Old` → `inline.from = <n>`.
-pub fn build_comment_payload(
+/// - `parent`: reply inside an existing thread.
+/// - `inline_path`: makes the comment inline, i.e. attached to a file.
+/// - `inline_line`: only meaningful with a path. Absent means a file-level
+///   inline comment.
+/// - `side`: only meaningful with a line. `New` sends `inline.to`, `Old` sends
+///   `inline.from`.
+fn comment_payload(
     content: &str,
+    parent: Option<i64>,
     inline_path: Option<&str>,
     inline_line: Option<u32>,
     side: Side,
 ) -> serde_json::Value {
     let mut payload = serde_json::json!({
-        "content": { "raw": content }
+        "content": {
+            "raw": content
+        }
     });
-
+    if let Some(parent) = parent {
+        payload["parent"] = serde_json::json!({"id": parent});
+    }
     if let Some(path) = inline_path {
         let mut inline = serde_json::json!({ "path": path });
         if let Some(line) = inline_line {
@@ -206,7 +260,6 @@ pub fn build_comment_payload(
         }
         payload["inline"] = inline;
     }
-
     payload
 }
 
@@ -255,11 +308,10 @@ pub async fn list_pull_requests(
     if rows.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!(workspace, slug, "No pull requests found");
-        println!("No pull requests found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No pull requests found")
 }
 
 pub async fn get_pull_request(
@@ -343,9 +395,9 @@ pub async fn create_pull_request(
     }
 
     if !reviewers.is_empty() {
-        let reviewer_objs: Vec<_> = reviewers
+        let reviewer_objs: Vec<_> = merge_reviewer_uuids(&[], &reviewers)
             .iter()
-            .map(|uuid| serde_json::json!({"uuid": uuid}))
+            .map(|uuid| serde_json::json!({ "uuid": uuid }))
             .collect();
         payload["reviewers"] = serde_json::json!(reviewer_objs);
     }
@@ -593,34 +645,14 @@ pub async fn list_pr_comments(
         format!("Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}")
     })?;
 
-    #[derive(Serialize)]
-    struct Row<'a> {
-        id: i64,
-        author: &'a str,
-        content: &'a str,
-        created: &'a str,
-        location: String,
-    }
-
-    let rows: Vec<Row<'_>> = response
-        .values
-        .iter()
-        .map(|comment| Row {
-            id: comment.id,
-            author: comment.user.display_name.as_str(),
-            content: comment.content.raw.lines().next().unwrap_or(""),
-            created: comment.created_on.as_deref().unwrap_or(""),
-            location: format_comment_location(comment.inline.as_ref()),
-        })
-        .collect();
+    let rows: Vec<CommentRow<'_>> = response.values.iter().map(comment_row).collect();
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, "No comments found");
-        println!("No comments found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No comments found")
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -630,11 +662,12 @@ pub async fn add_pr_comment(
     repo_slug: &str,
     pr_id: i64,
     content: &str,
+    parent: Option<i64>,
     inline_path: Option<&str>,
     inline_line: Option<u32>,
     side: Side,
 ) -> Result<()> {
-    let payload = build_comment_payload(content, inline_path, inline_line, side);
+    let payload = comment_payload(content, parent, inline_path, inline_line, side);
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
     let comment: Comment = ctx.client.post(&path, &payload).await.with_context(|| {
@@ -649,24 +682,110 @@ pub async fn add_pr_comment(
         "Comment added successfully"
     );
 
-    let emoji_message = if is_inline {
-        format!("✅ Inline comment added to pull request #{pr_id}")
+    let kind = if is_inline {
+        "Inline comment"
     } else {
-        format!("✅ Comment added to pull request #{pr_id}")
+        "Comment"
     };
-    let mutation_message = if is_inline {
-        format!("Inline comment added to pull request #{pr_id}")
-    } else {
-        format!("Comment added to pull request #{pr_id}")
-    };
-
+    let message = format!("{kind} added to pull request #{pr_id}");
     render_success(
         ctx.renderer,
-        &emoji_message,
-        &MutationResult::with_id(mutation_message, pr_id.to_string()),
+        &format!("✅ {message}"),
+        &MutationResult::with_id(message.clone(), pr_id.to_string()),
     )
 }
 
+pub async fn resolve_pr_comment(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pr_id: i64,
+    comment_id: i64,
+) -> Result<()> {
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments/{comment_id}/resolve"
+    );
+    let _: serde_json::Value = ctx
+        .client
+        .post(&path, &serde_json::json!({}))
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to resolve comment {comment_id} on pull request {pr_id} in {workspace}/{repo_slug}"
+            )
+        })?;
+
+    tracing::info!(comment_id, pr_id, "Comment thread resolved successfully");
+    render_success(
+        ctx.renderer,
+        &format!("✅ Comment {comment_id} resolved on pull request #{pr_id}"),
+        &MutationResult::with_id(
+            format!("Comment {comment_id} resolved on pull request #{pr_id}"),
+            comment_id.to_string(),
+        ),
+    )
+}
+
+pub async fn reopen_pr_comment(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+    pr_id: i64,
+    comment_id: i64,
+) -> Result<()> {
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments/{comment_id}/resolve"
+    );
+    ctx.client
+        .delete_no_content(&path)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to reopen comment {comment_id} on pull request {pr_id} in {workspace}/{repo_slug}"
+            )
+        })?;
+
+    tracing::info!(comment_id, pr_id, "Comment thread reopened successfully");
+    render_success(
+        ctx.renderer,
+        &format!("✅ Comment {comment_id} reopened on pull request #{pr_id}"),
+        &MutationResult::with_id(
+            format!("Comment {comment_id} reopened on pull request #{pr_id}"),
+            comment_id.to_string(),
+        ),
+    )
+}
+
+/// Normalise a Bitbucket account UUID to the brace form the API expects (`{uuid}`),
+/// so `--add abc-123` and `--add '{abc-123}'` both work.
+fn normalize_uuid(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.starts_with('{') && trimmed.ends_with('}') {
+        trimmed.to_string()
+    } else {
+        format!("{{{trimmed}}}")
+    }
+}
+
+/// Merge the PR's existing reviewer UUIDs with the requested ones, preserving order and
+/// dropping duplicates and empties.
+fn merge_reviewer_uuids(existing: &[String], requested: &[String]) -> Vec<String> {
+    let mut merged: Vec<String> = Vec::new();
+    for uuid in existing.iter().chain(requested.iter()) {
+        let normalized = normalize_uuid(uuid);
+        if normalized == "{}" || merged.contains(&normalized) {
+            continue;
+        }
+        merged.push(normalized);
+    }
+    merged
+}
+
+/// Add reviewers to a pull request.
+///
+/// Bitbucket Cloud has no endpoint for adding a single reviewer to an existing PR: the
+/// reviewer list is replaced wholesale by a `PUT` on the pull request itself. So we read the
+/// current reviewers, union the requested UUIDs in, and PUT the result back.
 pub async fn add_pr_reviewers(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -674,18 +793,47 @@ pub async fn add_pr_reviewers(
     pr_id: i64,
     reviewers: Vec<String>,
 ) -> Result<()> {
-    for uuid in reviewers {
-        let path = format!(
-            "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/default-reviewers/{uuid}"
-        );
-        let _: serde_json::Value = ctx
-            .client
-            .put(&path, &serde_json::json!({}))
-            .await
-            .with_context(|| format!("Failed to add reviewer {uuid} to pull request {pr_id}"))?;
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}");
+    let pr: PullRequest = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
+    })?;
 
-        tracing::info!(uuid, pr_id, "Reviewer added successfully");
-    }
+    let existing: Vec<String> = pr
+        .reviewers
+        .as_ref()
+        .map(|list| {
+            list.iter()
+                .filter_map(|user| user.uuid.clone())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+
+    let merged = merge_reviewer_uuids(&existing, &reviewers);
+    tracing::info!(
+        pr_id,
+        workspace,
+        repo_slug,
+        existing = existing.len(),
+        requested = reviewers.len(),
+        total = merged.len(),
+        "Updating pull request reviewers"
+    );
+
+    let payload = serde_json::json!({
+        "title": pr.title,
+        "reviewers": merged
+            .iter()
+            .map(|uuid| serde_json::json!({ "uuid": uuid }))
+            .collect::<Vec<_>>(),
+    });
+
+    let _: serde_json::Value = ctx
+        .client
+        .put(&path, &payload)
+        .await
+        .with_context(|| format!("Failed to add reviewers to pull request {pr_id}"))?;
+
+    tracing::info!(pr_id, count = merged.len(), "Reviewers added successfully");
 
     render_success(
         ctx.renderer,
@@ -710,33 +858,15 @@ pub async fn list_pr_reviewers(
         format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
     })?;
 
-    #[derive(Serialize)]
-    struct Row<'a> {
-        name: &'a str,
-        role: &'a str,
-        status: &'a str,
-        participated_on: &'a str,
-    }
-
     let participants = pr.participants.unwrap_or_default();
-    let rows: Vec<Row<'_>> = participants
-        .iter()
-        .filter(|p| show_all || p.role == "REVIEWER")
-        .map(|p| Row {
-            name: p.user.display_name.as_str(),
-            role: p.role.as_str(),
-            status: participant_status(p.approved, p.state.as_deref()),
-            participated_on: p.participated_on.as_deref().unwrap_or(""),
-        })
-        .collect();
+    let rows = reviewer_rows(&participants, show_all);
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, show_all, "No reviewers found");
-        println!("No reviewers found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No reviewers found")
 }
 
 pub async fn get_pr_diff(
@@ -806,6 +936,10 @@ pub fn is_from_fork(pr_info: &PullRequestInfo, target_workspace: &str, target_re
 #[cfg(test)]
 mod tests {
     use super::*;
+    use atlassian_cli_api::ApiClient;
+    use atlassian_cli_output::{OutputFormat, OutputRenderer};
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     #[test]
     fn test_participant_status_approved_state() {
@@ -831,6 +965,198 @@ mod tests {
         assert_eq!(participant_status(false, None), "No Response");
     }
 
+    fn participant(
+        name: &str,
+        role: &str,
+        approved: bool,
+        state: Option<&str>,
+        participated_on: Option<&str>,
+    ) -> Participant {
+        Participant {
+            approved,
+            user: User {
+                display_name: name.to_string(),
+                uuid: None,
+            },
+            role: role.to_string(),
+            state: state.map(str::to_string),
+            participated_on: participated_on.map(str::to_string),
+        }
+    }
+
+    fn sample_participants() -> Vec<Participant> {
+        vec![
+            participant(
+                "Jane Doe",
+                "REVIEWER",
+                true,
+                Some("approved"),
+                Some("2026-08-10T12:00:00Z"),
+            ),
+            participant(
+                "John Smith",
+                "REVIEWER",
+                false,
+                Some("changes_requested"),
+                Some("2026-08-11T09:30:00Z"),
+            ),
+            participant("Alex Lee", "REVIEWER", false, None, None),
+            participant(
+                "Sam Chen",
+                "PARTICIPANT",
+                false,
+                None,
+                Some("2026-08-12T08:00:00Z"),
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_reviewer_rows_default_excludes_participants() {
+        let participants = sample_participants();
+        let rows = reviewer_rows(&participants, false);
+
+        assert_eq!(rows.len(), 3);
+        assert!(rows.iter().all(|r| r.role == "REVIEWER"));
+        assert_eq!(rows[0].name, "Jane Doe");
+        assert_eq!(rows[0].status, "Approved");
+        assert_eq!(rows[0].participated_on, "2026-08-10T12:00:00Z");
+        assert_eq!(rows[1].status, "Changes Requested");
+        assert_eq!(rows[2].status, "No Response");
+        // Missing participated_on renders as an empty cell, not "null".
+        assert_eq!(rows[2].participated_on, "");
+    }
+
+    #[test]
+    fn test_reviewer_rows_all_includes_participants() {
+        let participants = sample_participants();
+        let rows = reviewer_rows(&participants, true);
+
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[3].name, "Sam Chen");
+        assert_eq!(rows[3].role, "PARTICIPANT");
+        assert_eq!(rows[3].status, "No Response");
+    }
+
+    #[test]
+    fn test_reviewer_rows_empty() {
+        assert!(reviewer_rows(&[], false).is_empty());
+        assert!(reviewer_rows(&[], true).is_empty());
+    }
+
+    #[test]
+    fn test_reviewer_rows_no_reviewers_only_participants() {
+        let participants = vec![participant("Sam Chen", "PARTICIPANT", false, None, None)];
+
+        assert!(reviewer_rows(&participants, false).is_empty());
+        assert_eq!(reviewer_rows(&participants, true).len(), 1);
+    }
+
+    #[test]
+    fn test_normalize_uuid_adds_braces() {
+        assert_eq!(normalize_uuid("abc-123"), "{abc-123}");
+        assert_eq!(normalize_uuid("{abc-123}"), "{abc-123}");
+        assert_eq!(normalize_uuid("  abc-123  "), "{abc-123}");
+    }
+
+    #[test]
+    fn test_merge_reviewer_uuids_unions_and_dedupes() {
+        let existing = vec!["{a}".to_string(), "b".to_string()];
+        let requested = vec!["b".to_string(), "{c}".to_string(), "a".to_string()];
+
+        assert_eq!(
+            merge_reviewer_uuids(&existing, &requested),
+            vec!["{a}".to_string(), "{b}".to_string(), "{c}".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_merge_reviewer_uuids_keeps_existing_when_nothing_requested() {
+        let existing = vec!["{a}".to_string()];
+
+        assert_eq!(
+            merge_reviewer_uuids(&existing, &[]),
+            vec!["{a}".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_merge_reviewer_uuids_skips_empty_entries() {
+        let requested = vec!["".to_string(), "  ".to_string(), "a".to_string()];
+
+        assert_eq!(
+            merge_reviewer_uuids(&[], &requested),
+            vec!["{a}".to_string()]
+        );
+    }
+
+    #[test]
+    fn comment_payload_includes_parent_for_threaded_reply() {
+        assert_eq!(
+            comment_payload("Fixed", Some(843649259), None, None, Side::New),
+            serde_json::json!({
+                "content": {"raw": "Fixed"},
+                "parent": {"id": 843649259}
+            })
+        );
+        assert_eq!(
+            comment_payload("Top level", None, None, None, Side::New),
+            serde_json::json!({"content": {"raw": "Top level"}})
+        );
+    }
+
+    #[test]
+    fn comment_row_preserves_full_content_and_parent() {
+        let mut comment: Comment = serde_json::from_value(serde_json::json!({
+            "id": 843649260,
+            "content": {"raw": "First line\nIdempotency marker"},
+            "user": {"display_name": "OCR"},
+            "created_on": "2026-08-18T06:01:54Z",
+            "parent": {"id": 843649259}
+        }))
+        .unwrap();
+
+        let row = serde_json::to_value(comment_row(&comment)).unwrap();
+        assert_eq!(row["content"], "First line\nIdempotency marker");
+        assert_eq!(row["parent"], 843649259);
+
+        comment.parent = None;
+        assert!(serde_json::to_value(comment_row(&comment)).unwrap()["parent"].is_null());
+    }
+
+    #[tokio::test]
+    async fn comment_threads_can_be_resolved_and_reopened() {
+        let server = MockServer::start().await;
+        let endpoint = "/2.0/repositories/workspace/repo/pullrequests/42/comments/99/resolve";
+
+        Mock::given(method("POST"))
+            .and(path(endpoint))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "type": "pullrequest_comment_resolution"
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("DELETE"))
+            .and(path(endpoint))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = BitbucketContext {
+            client: ApiClient::new(server.uri()).unwrap(),
+            renderer: &renderer,
+            is_bearer: false,
+        };
+
+        resolve_pr_comment(&ctx, "workspace", "repo", 42, 99)
+            .await
+            .unwrap();
+        reopen_pr_comment(&ctx, "workspace", "repo", 42, 99)
+            .await
+            .unwrap();
+    }
+
     #[test]
     fn test_side_display() {
         assert_eq!(Side::New.to_string(), "new");
@@ -839,7 +1165,7 @@ mod tests {
 
     #[test]
     fn test_build_comment_payload_global() {
-        let payload = build_comment_payload("Looks good!", None, None, Side::New);
+        let payload = comment_payload("Looks good!", None, None, None, Side::New);
         assert_eq!(
             payload,
             serde_json::json!({
@@ -850,8 +1176,13 @@ mod tests {
 
     #[test]
     fn test_build_comment_payload_inline_new_side_line() {
-        let payload =
-            build_comment_payload("Nit: rename this", Some("src/main.rs"), Some(42), Side::New);
+        let payload = comment_payload(
+            "Nit: rename this",
+            None,
+            Some("src/main.rs"),
+            Some(42),
+            Side::New,
+        );
         assert_eq!(
             payload,
             serde_json::json!({
@@ -863,8 +1194,13 @@ mod tests {
 
     #[test]
     fn test_build_comment_payload_inline_old_side_line() {
-        let payload =
-            build_comment_payload("Why remove this?", Some("src/main.rs"), Some(17), Side::Old);
+        let payload = comment_payload(
+            "Why remove this?",
+            None,
+            Some("src/main.rs"),
+            Some(17),
+            Side::Old,
+        );
         assert_eq!(
             payload,
             serde_json::json!({
@@ -877,8 +1213,13 @@ mod tests {
     #[test]
     fn test_build_comment_payload_file_level_inline_no_line() {
         // path but no line -> file-level inline comment; side is irrelevant and must not leak into payload
-        let payload =
-            build_comment_payload("Whole-file comment", Some("README.md"), None, Side::New);
+        let payload = comment_payload(
+            "Whole-file comment",
+            None,
+            Some("README.md"),
+            None,
+            Side::New,
+        );
         assert_eq!(
             payload,
             serde_json::json!({
@@ -892,10 +1233,20 @@ mod tests {
     fn test_build_comment_payload_file_level_inline_ignores_side_when_no_line() {
         // Regression guard: with no line, `side` must not leak into the payload
         // regardless of whether it's New or Old.
-        let new_side =
-            build_comment_payload("Whole-file comment", Some("README.md"), None, Side::New);
-        let old_side =
-            build_comment_payload("Whole-file comment", Some("README.md"), None, Side::Old);
+        let new_side = comment_payload(
+            "Whole-file comment",
+            None,
+            Some("README.md"),
+            None,
+            Side::New,
+        );
+        let old_side = comment_payload(
+            "Whole-file comment",
+            None,
+            Some("README.md"),
+            None,
+            Side::Old,
+        );
         assert_eq!(new_side, old_side);
         assert_eq!(
             old_side,
@@ -909,17 +1260,6 @@ mod tests {
     #[test]
     fn test_side_default_is_new() {
         assert_eq!(Side::default(), Side::New);
-    }
-
-    #[test]
-    fn test_add_pr_comment_signature_compiles() {
-        // Sentinel test: the fact this module compiles at all means
-        // `add_pr_comment`'s new signature (with Option<&str>, Option<u32>, Side)
-        // is in place. The actual payload shape is covered by
-        // `test_build_comment_payload_*` above and by the wire-level
-        // integration tests in tests/bitbucket_integration.rs.
-        //
-        // If the signature regresses, mod.rs (Task 4) will fail to compile.
     }
 
     #[test]

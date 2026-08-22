@@ -87,12 +87,11 @@ pub async fn list_requests(
     if rows.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No requests found");
-        println!("No requests found");
-        return Ok(());
     }
 
     tracing::info!("Found {} requests", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No requests found")
 }
 
 /// Get request details.
@@ -229,12 +228,11 @@ pub async fn list_transitions(ctx: &JsmContext<'_>, key: &str) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No transitions available for request {}", key);
-        println!("No transitions available");
-        return Ok(());
     }
 
     tracing::info!("Found {} transitions for request {}", rows.len(), key);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No transitions available")
 }
 
 /// Transition a request to a new status.
@@ -316,12 +314,11 @@ pub async fn get_status_history(ctx: &JsmContext<'_>, key: &str) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No status history for request {}", key);
-        println!("No status history");
-        return Ok(());
     }
 
     tracing::info!("Found {} status entries for request {}", rows.len(), key);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No status history")
 }
 
 /// List comments on a request.
@@ -370,12 +367,11 @@ pub async fn list_comments(ctx: &JsmContext<'_>, key: &str, limit: usize) -> Res
 
     if rows.is_empty() {
         tracing::info!("No comments for request {}", key);
-        println!("No comments found");
-        return Ok(());
     }
 
     tracing::info!("Found {} comments for request {}", rows.len(), key);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No comments found")
 }
 
 /// Add comment to a request.
@@ -441,12 +437,11 @@ pub async fn list_participants(ctx: &JsmContext<'_>, key: &str) -> Result<()> {
 
     if rows.is_empty() {
         tracing::info!("No participants for request {}", key);
-        println!("No participants found");
-        return Ok(());
     }
 
     tracing::info!("Found {} participants for request {}", rows.len(), key);
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No participants found")
 }
 
 /// Add participant to a request.

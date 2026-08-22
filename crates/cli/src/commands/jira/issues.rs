@@ -143,8 +143,6 @@ pub async fn search_issues(
     if response.issues.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No issues found");
-        println!("No issues found");
-        return Ok(());
     }
 
     #[derive(Serialize)]
@@ -183,7 +181,7 @@ pub async fn search_issues(
         })
         .collect();
 
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No issues found")
 }
 
 pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
@@ -537,29 +535,62 @@ pub async fn delete_issue(ctx: &JiraContext<'_>, key: &str, force: bool) -> Resu
     )
 }
 
-pub async fn transition_issue(ctx: &JiraContext<'_>, key: &str, transition: &str) -> Result<()> {
-    use serde_json::json;
+#[derive(Deserialize)]
+struct TransitionsResponse {
+    transitions: Vec<Transition>,
+}
 
-    // First, get available transitions
-    #[derive(Deserialize)]
-    struct TransitionsResponse {
-        transitions: Vec<Transition>,
-    }
+#[derive(Deserialize)]
+struct Transition {
+    id: String,
+    name: String,
+    /// The status the issue lands in. Absent on some older instances.
+    #[serde(default)]
+    to: Option<StatusField>,
+}
 
-    #[derive(Deserialize)]
-    struct Transition {
-        id: String,
-        name: String,
-    }
-
+async fn fetch_transitions(ctx: &JiraContext<'_>, key: &str) -> Result<Vec<Transition>> {
     let available: TransitionsResponse = ctx
         .client
         .get(&format!("/rest/api/3/issue/{key}/transitions"))
         .await
         .with_context(|| format!("Failed to get transitions for {key}"))?;
+    Ok(available.transitions)
+}
+
+/// List the transitions available on an issue right now.
+///
+/// Which transitions exist depends on the workflow and the issue's current
+/// status, so the only reliable source is the issue itself. Without this,
+/// `jira issue transition` had to be driven by guesswork (#101).
+pub async fn list_transitions(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
+    let transitions = fetch_transitions(ctx, key).await?;
+
+    #[derive(Serialize)]
+    struct Row<'a> {
+        id: &'a str,
+        name: &'a str,
+        to: &'a str,
+    }
+
+    let rows: Vec<Row<'_>> = transitions
+        .iter()
+        .map(|t| Row {
+            id: t.id.as_str(),
+            name: t.name.as_str(),
+            to: t.to.as_ref().map(|s| s.name.as_str()).unwrap_or(""),
+        })
+        .collect();
+
+    ctx.renderer.render_list(&rows)
+}
+
+pub async fn transition_issue(ctx: &JiraContext<'_>, key: &str, transition: &str) -> Result<()> {
+    use serde_json::json;
+
+    let available = fetch_transitions(ctx, key).await?;
 
     let target = available
-        .transitions
         .iter()
         .find(|t| t.name.eq_ignore_ascii_case(transition) || t.id == transition)
         .ok_or_else(|| anyhow::anyhow!("Transition '{}' not found", transition))?;
@@ -836,14 +867,28 @@ pub async fn add_comment(ctx: &JiraContext<'_>, key: &str, body: &str) -> Result
     )
 }
 
-pub async fn update_comment(ctx: &JiraContext<'_>, comment_id: &str, body: &str) -> Result<()> {
+/// Update a comment.
+///
+/// The issue key is required because Jira Cloud has no top-level comment route:
+/// comments live under their issue at
+/// `/rest/api/3/issue/{issueIdOrKey}/comment/{id}`. This previously PUT to
+/// `/rest/api/3/comment/{id}`, which 404s on every call (#100).
+pub async fn update_comment(
+    ctx: &JiraContext<'_>,
+    key: &str,
+    comment_id: &str,
+    body: &str,
+) -> Result<()> {
     use serde_json::json;
 
     let payload = json!({ "body": markdown_to_adf(body) });
 
     let _: Value = ctx
         .client
-        .put(&format!("/rest/api/3/comment/{comment_id}"), &payload)
+        .put(
+            &format!("/rest/api/3/issue/{key}/comment/{comment_id}"),
+            &payload,
+        )
         .await
         .with_context(|| format!("Failed to update comment {comment_id}"))?;
 
@@ -855,10 +900,11 @@ pub async fn update_comment(ctx: &JiraContext<'_>, comment_id: &str, body: &str)
     )
 }
 
-pub async fn delete_comment(ctx: &JiraContext<'_>, comment_id: &str) -> Result<()> {
+/// Delete a comment. Same routing fix as `update_comment` (#100).
+pub async fn delete_comment(ctx: &JiraContext<'_>, key: &str, comment_id: &str) -> Result<()> {
     let _: Value = ctx
         .client
-        .delete(&format!("/rest/api/3/comment/{comment_id}"))
+        .delete(&format!("/rest/api/3/issue/{key}/comment/{comment_id}"))
         .await
         .with_context(|| format!("Failed to delete comment {comment_id}"))?;
 

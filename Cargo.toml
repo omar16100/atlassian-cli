@@ -10,7 +10,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 authors = ["atlassian-cli contributors"]
 license = "MIT"
@@ -41,7 +41,7 @@ anyhow = "1.0"
 thiserror = "2.0"
 
 # Auth & Config
-base64 = "0.22"
+base64 = "0.23"
 
 # Logging
 tracing = "0.1"

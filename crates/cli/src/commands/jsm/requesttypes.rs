@@ -44,12 +44,11 @@ pub async fn list_all_request_types(ctx: &JsmContext<'_>, limit: usize) -> Resul
 
     if rows.is_empty() {
         tracing::info!("No request types found");
-        println!("No request types found");
-        return Ok(());
     }
 
     tracing::info!("Found {} request types", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No request types found")
 }
 
 /// List request types for a service desk.
@@ -95,12 +94,11 @@ pub async fn list_request_types(
 
     if rows.is_empty() {
         tracing::info!("No request types found for service desk {}", servicedesk_id);
-        println!("No request types found");
-        return Ok(());
     }
 
     tracing::info!("Found {} request types", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No request types found")
 }
 
 /// Get request type details.
@@ -202,12 +200,10 @@ pub async fn list_request_type_fields(
             type_id,
             servicedesk_id
         );
-        println!("No fields found");
-        return Ok(());
     }
 
     tracing::info!("Found {} fields for request type {}", rows.len(), type_id);
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No fields found")
 }
 
 /// List request type groups for a service desk.
@@ -253,10 +249,9 @@ pub async fn list_request_type_groups(ctx: &JsmContext<'_>, servicedesk_id: i64)
 
     if rows.is_empty() {
         tracing::info!("No request type groups for service desk {}", servicedesk_id);
-        println!("No request type groups found");
-        return Ok(());
     }
 
     tracing::info!("Found {} request type groups", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No request type groups found")
 }

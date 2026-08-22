@@ -39,12 +39,11 @@ pub async fn list_escalations(ctx: &OpsgenieContext<'_>, limit: usize) -> Result
 
     if rows.is_empty() {
         tracing::info!("No escalations found");
-        println!("No escalations found");
-        return Ok(());
     }
 
     tracing::info!("Found {} escalations", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No escalations found")
 }
 
 /// Get escalation policy details.

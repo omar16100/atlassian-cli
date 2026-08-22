@@ -35,12 +35,11 @@ pub async fn list_services(ctx: &OpsgenieContext<'_>, limit: usize) -> Result<()
 
     if rows.is_empty() {
         tracing::info!("No services found");
-        println!("No services found");
-        return Ok(());
     }
 
     tracing::info!("Found {} services", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No services found")
 }
 
 /// Get service details.

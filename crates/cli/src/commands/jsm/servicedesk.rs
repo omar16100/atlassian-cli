@@ -66,12 +66,11 @@ pub async fn list_service_desks(ctx: &JsmContext<'_>, limit: usize) -> Result<()
     if rows.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No service desks found");
-        println!("No service desks found");
-        return Ok(());
     }
 
     tracing::info!("Found {} service desks", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No service desks found")
 }
 
 /// Get service desk details.
@@ -153,12 +152,11 @@ pub async fn list_customers(ctx: &JsmContext<'_>, servicedesk_id: i64, limit: us
 
     if rows.is_empty() {
         tracing::info!("No customers found for service desk {}", servicedesk_id);
-        println!("No customers found");
-        return Ok(());
     }
 
     tracing::info!("Found {} customers", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No customers found")
 }
 
 /// Add customer to service desk.
@@ -287,12 +285,11 @@ pub async fn list_organizations(
 
     if rows.is_empty() {
         tracing::info!("No organizations found for service desk {}", servicedesk_id);
-        println!("No organizations found");
-        return Ok(());
     }
 
     tracing::info!("Found {} organizations", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No organizations found")
 }
 
 /// Add organization to service desk.

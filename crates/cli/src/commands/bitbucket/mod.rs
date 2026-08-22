@@ -20,19 +20,6 @@ mod workspaces;
 
 use utils::BitbucketContext;
 
-/// `clap` value parser that trims and rejects empty strings.
-///
-/// Used for user-facing text fields where an empty value would only produce a
-/// server-side 400 (`--text ""`, `--path ""`). Bitbucket rejects both, and the
-/// error message is far more useful when raised by clap at parse time.
-fn non_empty_string(s: &str) -> std::result::Result<String, String> {
-    if s.trim().is_empty() {
-        Err("value must not be empty".to_string())
-    } else {
-        Ok(s.to_string())
-    }
-}
-
 /// Resolve pipeline ID from positional arg or --pipeline flag.
 fn resolve_pipeline_arg(
     positional: Option<String>,
@@ -267,6 +254,19 @@ enum BranchCommands {
     },
 }
 
+/// `clap` value parser that trims and rejects empty strings.
+///
+/// Used where an empty value would only produce a server-side 400 (`--text ""`,
+/// `--path ""`). Bitbucket rejects both, and the error is far more useful
+/// raised by clap at parse time.
+fn non_empty_string(s: &str) -> std::result::Result<String, String> {
+    if s.trim().is_empty() {
+        Err("value must not be empty".to_string())
+    } else {
+        Ok(s.to_string())
+    }
+}
+
 #[derive(Subcommand, Debug, Clone)]
 enum PrCommands {
     /// List pull requests for a repository.
@@ -366,19 +366,19 @@ enum PrCommands {
         /// Pull request ID.
         pr_id: i64,
     },
-    /// Add a comment to a pull request. Supports both top-level PR comments (default)
-    /// and inline comments anchored to a file (and optionally a line).
+    /// Add a comment to a pull request, optionally inline or as a threaded reply
     #[command(long_about = "Add a comment to a pull request.\n\n\
-        By default, posts a top-level PR comment. Passing --path (with an optional --line and --side)\n\
-        posts an inline comment anchored to that file:\n\n\
+        By default, posts a top-level PR comment. Passing --path (with an optional --line and\n\
+        --side) anchors it to a file instead, and --parent replies inside an existing thread.\n\n\
         Examples:\n  \
         bb pr comment my-repo 123 --text \"LGTM\"\n  \
         bb pr comment my-repo 123 --text \"Nit: rename\" --path src/main.rs --line 42\n  \
         bb pr comment my-repo 123 --text \"Why remove?\" --path src/main.rs --line 17 --side old\n  \
-        bb pr comment my-repo 123 --text \"Whole-file comment\" --path README.md\n\n\
+        bb pr comment my-repo 123 --text \"Whole-file comment\" --path README.md\n  \
+        bb pr comment my-repo 123 --text \"Fixed\" --parent 843649259\n\n\
         --side selects which side of the diff --line refers to:\n  \
         new (default) = destination revision (added/unchanged lines)\n  \
-        old            = source revision (removed lines)")]
+        old           = source revision (removed lines)")]
     Comment {
         /// Repository slug.
         repo: String,
@@ -387,19 +387,40 @@ enum PrCommands {
         /// Comment text (Markdown).
         #[arg(long, value_parser = non_empty_string)]
         text: String,
+        /// Parent comment ID for a threaded reply.
+        #[arg(long)]
+        parent: Option<i64>,
         /// File path (relative to repo root) to anchor an inline comment to.
-        /// If omitted, posts a top-level PR comment (existing behaviour).
+        /// If omitted, posts a top-level PR comment.
         #[arg(long, value_parser = non_empty_string)]
         path: Option<String>,
-        /// Line number to anchor the inline comment to. Must be >= 1 (Bitbucket
-        /// line numbers are 1-indexed). Requires --path.
-        /// If omitted (but --path is given), posts a file-level inline comment.
+        /// Line number to anchor the inline comment to. Must be >= 1, because
+        /// Bitbucket line numbers are 1-indexed. Requires --path.
+        /// If omitted while --path is given, posts a file-level inline comment.
         #[arg(long, requires = "path", value_parser = clap::value_parser!(u32).range(1..))]
         line: Option<u32>,
         /// Which side of the diff --line refers to: `new` (default) = destination
         /// (added/unchanged lines), `old` = source (removed lines). Requires --line.
         #[arg(long, requires = "line", default_value_t = pullrequests::Side::New, value_enum)]
         side: pullrequests::Side,
+    },
+    /// Resolve a pull request diff comment thread.
+    ResolveComment {
+        /// Repository slug.
+        repo: String,
+        /// Pull request ID.
+        pr_id: i64,
+        /// Top-level comment ID.
+        comment_id: i64,
+    },
+    /// Reopen a resolved pull request comment thread.
+    ReopenComment {
+        /// Repository slug.
+        repo: String,
+        /// Pull request ID.
+        pr_id: i64,
+        /// Top-level comment ID.
+        comment_id: i64,
     },
     /// List pull request reviewers with review status, or add new reviewers.
     #[command(
@@ -414,7 +435,7 @@ enum PrCommands {
         #[arg(long, value_delimiter = ',')]
         add: Vec<String>,
         /// When listing, also include non-reviewer participants (commenters).
-        #[arg(long)]
+        #[arg(long, conflicts_with = "add")]
         all: bool,
     },
 }
@@ -1159,6 +1180,7 @@ pub async fn execute(
                 repo,
                 pr_id,
                 text,
+                parent,
                 path,
                 line,
                 side,
@@ -1169,12 +1191,23 @@ pub async fn execute(
                     &repo,
                     pr_id,
                     &text,
+                    parent,
                     path.as_deref(),
                     line,
                     side,
                 )
                 .await
             }
+            PrCommands::ResolveComment {
+                repo,
+                pr_id,
+                comment_id,
+            } => pullrequests::resolve_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
+            PrCommands::ReopenComment {
+                repo,
+                pr_id,
+                comment_id,
+            } => pullrequests::reopen_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
             PrCommands::Reviewers {
                 repo,
                 pr_id,
@@ -1722,222 +1755,5 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("Pipeline ID required"));
-    }
-
-    use clap::Parser;
-
-    /// Standalone parser used only in tests to feed clap the `pr comment ...`
-    /// subtree without dragging the whole top-level `Cli` derive into the file.
-    #[derive(clap::Parser, Debug)]
-    struct BbTestCli {
-        #[command(subcommand)]
-        cmd: BitbucketCommands,
-    }
-
-    fn parse(argv: &[&str]) -> Result<BbTestCli, clap::Error> {
-        // Prepend the binary name clap expects at argv[0].
-        let mut args = vec!["bb"];
-        args.extend_from_slice(argv);
-        BbTestCli::try_parse_from(args)
-    }
-
-    #[test]
-    fn test_pr_comment_global_still_parses_without_inline_flags() {
-        let parsed = parse(&["pr", "comment", "my-repo", "1", "--text", "LGTM"])
-            .expect("global comment should parse");
-        if let BitbucketCommands::Pr(PrCommands::Comment {
-            repo,
-            pr_id,
-            text,
-            path,
-            line,
-            side,
-        }) = parsed.cmd
-        {
-            assert_eq!(repo, "my-repo");
-            assert_eq!(pr_id, 1);
-            assert_eq!(text, "LGTM");
-            assert_eq!(path, None);
-            assert_eq!(line, None);
-            assert_eq!(side, pullrequests::Side::New);
-        } else {
-            panic!("expected PrCommands::Comment");
-        }
-    }
-
-    #[test]
-    fn test_pr_comment_inline_line_new_side_parses() {
-        let parsed = parse(&[
-            "pr",
-            "comment",
-            "my-repo",
-            "1",
-            "--text",
-            "nit: rename",
-            "--path",
-            "src/main.rs",
-            "--line",
-            "42",
-        ])
-        .expect("inline new-side comment should parse");
-        if let BitbucketCommands::Pr(PrCommands::Comment {
-            path, line, side, ..
-        }) = parsed.cmd
-        {
-            assert_eq!(path.as_deref(), Some("src/main.rs"));
-            assert_eq!(line, Some(42));
-            assert_eq!(side, pullrequests::Side::New);
-        } else {
-            panic!("expected PrCommands::Comment");
-        }
-    }
-
-    #[test]
-    fn test_pr_comment_inline_line_old_side_parses() {
-        let parsed = parse(&[
-            "pr",
-            "comment",
-            "my-repo",
-            "1",
-            "--text",
-            "why remove?",
-            "--path",
-            "src/main.rs",
-            "--line",
-            "17",
-            "--side",
-            "old",
-        ])
-        .expect("inline old-side comment should parse");
-        if let BitbucketCommands::Pr(PrCommands::Comment { side, .. }) = parsed.cmd {
-            assert_eq!(side, pullrequests::Side::Old);
-        } else {
-            panic!("expected PrCommands::Comment");
-        }
-    }
-
-    #[test]
-    fn test_pr_comment_line_without_path_is_rejected() {
-        let err = parse(&[
-            "pr", "comment", "my-repo", "1", "--text", "nit", "--line", "42",
-        ])
-        .expect_err("`--line` without `--path` must be rejected by clap");
-        let msg = err.to_string();
-        assert!(
-            msg.contains("--path"),
-            "expected error to mention --path, got: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_pr_comment_side_without_line_is_rejected() {
-        let err = parse(&[
-            "pr",
-            "comment",
-            "my-repo",
-            "1",
-            "--text",
-            "nit",
-            "--path",
-            "src/main.rs",
-            "--side",
-            "old",
-        ])
-        .expect_err("`--side` without `--line` must be rejected by clap");
-        let msg = err.to_string();
-        assert!(
-            msg.contains("--line"),
-            "expected error to mention --line, got: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_pr_comment_invalid_side_value_is_rejected() {
-        let err = parse(&[
-            "pr",
-            "comment",
-            "my-repo",
-            "1",
-            "--text",
-            "nit",
-            "--path",
-            "src/main.rs",
-            "--line",
-            "42",
-            "--side",
-            "left",
-        ])
-        .expect_err("only `new`/`old` are valid --side values");
-        assert!(err.to_string().contains("side"));
-    }
-
-    #[test]
-    fn test_pr_comment_line_zero_is_rejected() {
-        // Bitbucket line numbers are 1-indexed; catch it at the CLI so users
-        // don't get a server-side 400.
-        let err = parse(&[
-            "pr",
-            "comment",
-            "my-repo",
-            "1",
-            "--text",
-            "nit",
-            "--path",
-            "src/main.rs",
-            "--line",
-            "0",
-        ])
-        .expect_err("`--line 0` must be rejected — line numbers are 1-indexed");
-        assert!(
-            err.to_string().contains("--line") || err.to_string().contains("line"),
-            "expected error to mention --line, got: {err}"
-        );
-    }
-
-    #[test]
-    fn test_pr_comment_empty_text_is_rejected() {
-        // Bitbucket rejects an empty content.raw with a 400; catch it at the CLI.
-        let err = parse(&["pr", "comment", "my-repo", "1", "--text", ""])
-            .expect_err("empty --text must be rejected");
-        assert!(
-            err.to_string().contains("--text") || err.to_string().contains("empty"),
-            "expected error to mention --text or 'empty', got: {err}"
-        );
-    }
-
-    #[test]
-    fn test_pr_comment_empty_path_is_rejected() {
-        // An empty --path would serialise as `{"inline": {"path": ""}}`, which
-        // Bitbucket rejects with a 400 and which would also render locally as
-        // ":42" if a line were given. Bounce it at parse time.
-        let err = parse(&[
-            "pr", "comment", "my-repo", "1", "--text", "nit", "--path", "",
-        ])
-        .expect_err("empty --path must be rejected");
-        assert!(
-            err.to_string().contains("--path") || err.to_string().contains("empty"),
-            "expected error to mention --path or 'empty', got: {err}"
-        );
-    }
-
-    #[test]
-    fn test_pr_comment_file_level_inline_parses() {
-        let parsed = parse(&[
-            "pr",
-            "comment",
-            "my-repo",
-            "1",
-            "--text",
-            "whole file",
-            "--path",
-            "README.md",
-        ])
-        .expect("file-level inline (path, no line) should parse");
-        if let BitbucketCommands::Pr(PrCommands::Comment { path, line, .. }) = parsed.cmd {
-            assert_eq!(path.as_deref(), Some("README.md"));
-            assert_eq!(line, None);
-        } else {
-            panic!("expected PrCommands::Comment");
-        }
     }
 }

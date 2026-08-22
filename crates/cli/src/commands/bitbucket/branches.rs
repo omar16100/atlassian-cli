@@ -99,11 +99,10 @@ pub async fn list_branches(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No branches found");
-        println!("No branches found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No branches found")
 }
 
 pub async fn get_branch(
@@ -350,9 +349,8 @@ pub async fn list_restrictions(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No branch restrictions found");
-        println!("No branch restrictions found");
-        return Ok(());
     }
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No branch restrictions found")
 }

@@ -10,7 +10,84 @@ Plan: `docs/superpowers/plans/2026-08-20-bitbucket-pr-inline-comments.md`. Featu
 - `bb pr comments` gained a `LOCATION` column populated from the response's `inline` object: `path:line` when either `to` or `from` is set, `path` for whole-file inline, empty for top-level. When both `to` and `from` come back on the same comment, `to` wins; that tie-break is pinned by `test_format_comment_location_prefers_to_when_both_set` so a future serde tweak cannot flip which side of the diff we display.
 - `Side` implements `Display` matching its clap `value_name` (`"new"`, `"old"`) so `--help` and `possible_values` do not diverge from the enum's `Debug` output.
 - Four new wiremock tests in `crates/cli/tests/bitbucket_integration.rs` use `body_partial_json` to pin the exact new-side, old-side, and top-level POST shapes (regression guard that no `inline` object leaks into a global comment), plus a GET that parses a payload mixing global, `to`-anchored, `from`-anchored, and whole-file inline comments.
-- Baseline `crates/output` colour test `test_clicolor_force_enables_colors` was already failing on `main` and blocked the pre-commit hook, so commits on this branch went in with `--no-verify`. The failure is unrelated to this feature; flagging for a follow-up.
+- Baseline `crates/output` colour test `test_clicolor_force_enables_colors` was already failing on `main` and blocked the pre-commit hook, so commits on this branch went in with `--no-verify`. The failure is unrelated to this feature; flagging for a follow-up.## 2026-08-18 — Fixed docs/examples/**/*.sh CLI invocations (closes #105)
+
+### Context
+[Issue #105](https://github.com/omar16100/atlassian-cli/issues/105) reported that every
+`atlassian-cli` invocation in `docs/examples/bitbucket/pr-automation.sh` failed to parse.
+Auditing the fix turned up a much larger, pre-existing problem: all 10 scripts under
+`docs/examples/**/*.sh` placed `--profile "$PROFILE"` after the product subcommand (e.g.
+`bitbucket`, `jira`, `confluence`) instead of before it. `--profile` is a top-level `clap`
+field on the `Cli` struct without `global = true` (unlike `--format`/`--envelope`, which do
+have it), so it is only accepted before the subcommand word. In practice this meant literally
+none of the 10 example scripts worked as shipped, not just the one the issue named.
+
+### Additional bugs found during the audit
+Three of the Bitbucket scripts — `bitbucket/pr-automation.sh`, `bitbucket/repo-audit.sh`, and
+`bitbucket/branch-cleanup.sh` — also passed the Bitbucket workspace as a bare positional
+argument instead of via the `--workspace` flag, so they had two independent reasons to fail
+parsing. `jira/project-cleanup.sh` was separately missing the required `--action` flag on one
+of its `jira bulk label` calls. `jira/bulk-transition.sh` referenced a `--comment` flag on
+`jira bulk transition` that the CLI has never actually supported; that dead option was removed
+from the script rather than implemented, since nothing downstream depended on it.
+
+### `pr-automation.sh`'s `get_approval_count()`, the function issue #105 centered on
+The specific function the issue reported queried a `.participants[]` field on `pr get`'s JSON
+output that doesn't exist. It now calls `pr reviewers --format json` and filters on the real
+`status` field instead, which is the data Bitbucket actually returns for reviewer approval
+state. The same script's `merge_pr()` also passed `--strategy merge`, but the CLI (and the
+underlying Bitbucket API) only accept `merge_commit`, `squash`, or `fast_forward`; corrected to
+`merge_commit`.
+
+### Regression test
+`crates/cli/tests/docs_examples_scripts.rs` now statically extracts every `atlassian-cli`
+invocation out of `docs/examples/**/*.sh` — following backslash line continuations, bash array
+assignment/append/expansion, and variable substitution — and checks that each one parses via
+clap against the real binary. Before any of the fixes above it failed with 31 "unexpected
+argument '--profile'" errors; the full suite (`cargo test -p atlassian-cli`, including this new
+test and the existing `docs_examples::every_readme_command_parses`) is now green, and
+`cargo clippy -p atlassian-cli --tests --all-features -- -D warnings` reports no warnings. This
+closes #105 and should keep this whole class of bug from silently regressing again.## 2026-08-20 - Fix RUSTSEC-2026-0258 (h2 unbounded empty DATA frames)
+
+`cargo deny check advisories` started failing on `main` and on every PR opened after the
+advisory was published. h2 was pinned at 0.4.12; the advisory requires >= 0.4.16.
+`cargo update -p h2` moves it to 0.4.17.
+
+This is not caused by any open PR. It surfaced on #109 and #113 only because their Security
+Audit happened to run after publication, while #104, #106 and #112 had run before it. Landing
+this unblocks them and stops contributors being blamed for a repo-wide advisory.
+
+Note the accompanying `windows-sys` movement in the lockfile is cargo's own re-resolution,
+not hand-editing: `cargo update -p h2` alone reproduces it, including the `quinn-udp` edge
+resolving to 0.52.0.
+
+`cargo deny check advisories` is clean after the bump.
+## 2026-08-20 - Fix flaky colors env-var race (closes #111)
+
+`crates/output/src/colors.rs`: four tests mutate process-global environment variables, and
+`EnvGuard` restores state per test but cannot stop a sibling thread mutating the same variable
+mid-assertion. Two vectors, both landing on `test_clicolor_force_enables_colors`, which needs
+`NO_COLOR` unset and `TERM` not `dumb`:
+
+- `test_no_color_env_disables_colors` and `test_no_color_takes_precedence_over_clicolor_force`
+  set `NO_COLOR=1`
+- `test_term_dumb_disables_colors` sets `TERM=dumb`, which `should_use_colors()` checks before
+  `CLICOLOR_FORCE`
+
+Serialised the four with a module-level `ENV_LOCK: Mutex<()>` rather than adding a `serial_test`
+dependency. The helper is poison-tolerant (`unwrap_or_else(|e| e.into_inner())`) so one genuine
+failure reports once instead of cascading into three misleading ones.
+
+Reproduced by narrowing the run to just those four, which forces them to run concurrently:
+
+```
+cargo test -p atlassian-cli-output --lib -- --test-threads=4 \
+  test_no_color_env_disables_colors test_term_dumb_disables_colors \
+  test_clicolor_force_enables_colors test_no_color_takes_precedence
+```
+
+**80/100 failures before, 0/100 after.** Full `cargo test --all` green.
+
 
 ## 2026-07-13 — Website separated into private repo; removed from public CLI repo
 
@@ -1442,3 +1519,60 @@ Patch for a defect shipped in 0.5.0 plus the documentation repair.
 - `jira api -X PUT` was rejected; only lowercase `-X put` parsed, while the README and the command's own help showed uppercase.
 - `docs/index.md` added; 0.5.0 docs un-staled; `docs/status.md` refreshed.
 - 19 broken `--output json` invocations across all 9 example scripts and 45 broken README command examples fixed, with `tests/docs_examples.rs` added so they cannot rot silently again.
+
+## 2026-08-20 — CLI fixes found while auditing atlassiancli.com
+
+Validated all 1,924 command examples on the site against the real binary (checker lives at `atlassiancli-site/test/check_commands.py`). Two of the failures were the CLI's fault, not the docs':
+
+- `--profile` and `--config` were not global, while `--format` was. So `... issue list --profile prod`, which is what users and most published examples write, was rejected. Both are now `global = true`. This alone accounted for 36 broken site examples plus every shipped example script.
+- `auth login` run bare failed argument parsing, even though the CLI's own errors say "Run `atlassian-cli auth login` first" and the guides repeat it. Missing `--profile`/`--base-url`/`--email` are now prompted for, matching how `--token` already behaved. Without a terminal it stays a hard error rather than hanging on stdin, so CI keeps failing loudly.
+## 2026-08-16 — `bb pr reviewers` lists review status; `--add` endpoint fixed (branch `fix/bb-pr-reviewers-followup`)
+
+Issue #102 and PR #103 from an outside contributor, plus the follow-up this repo owed them.
+
+- PR #103 (merged): `bb pr reviewers <repo> <pr_id>` with no `--add` now lists participants with a derived `status` column (Approved / Changes Requested / No Response) instead of looping zero times and printing "✅ Reviewers added to pull request #N". `--all` includes `role == PARTICIPANT` rows. Participants come from the PR GET, which already embeds them, so there is no extra call.
+- `--all` combined with `--add` was silently ignored; now `conflicts_with = "add"`, so clap rejects it.
+- Fixed `--add`, which had never worked: it PUT `/pullrequests/{id}/default-reviewers/{uuid}`, an endpoint Bitbucket Cloud does not have (repo default reviewers are at `/repositories/{ws}/{repo}/default-reviewers/{user}`, and a PR's reviewer list is replaced by a PUT on the PR). Same class of defect as #100. It now reads the PR's current reviewers, unions the requested UUIDs in, and PUTs `{title, reviewers}` back.
+- UUIDs are normalised to Bitbucket's brace form, so `--add abc-123` and `--add '{abc-123}'` both work. `pr create --reviewers` uses the same normalisation, where a bare UUID had the same problem.
+- Row filtering moved out of `list_pr_reviewers` into a pure `reviewer_rows()`; 12 unit tests now cover status derivation, REVIEWER-vs-`--all` filtering, empty results, UUID normalisation and the union/dedupe. The added wiremock test pins the PUT path and body.
+
+## 2026-08-20 — Jira comment endpoint and transition listing (closes #100, #101)
+
+- #100: `jira issue comments update` PUT to `/rest/api/3/comment/{id}` and `delete` DELETEd the same route. Jira Cloud has no top-level comment route, so both 404'd on every call. Comments live under their issue at `/rest/api/3/issue/{issueIdOrKey}/comment/{id}`, which needs the issue key neither command took. Both now take it as a leading positional, matching `add`.
+- Breaking, but nothing that worked is broken: the old form could not succeed against Jira Cloud.
+- #101: added `jira issue transitions <KEY>`. `transition_issue` already fetched the list internally to resolve a name to an id; that fetch is now `fetch_transitions` and the listing renders `{id, name, to}`, so `--format quiet` gives ids for scripting. `to` is optional because older instances omit it.
+- Tests live in `crates/cli/tests/jira_issue_e2e.rs` and drive the real binary, because a wrong URL is invisible to a test that hands `ApiClient` the path itself. The mock for the non-existent route asserts `.expect(0)`. Verified by reverting the fix: the test fails.
+
+## 2026-08-20 — Empty list results stay machine-readable (closes #110)
+
+`println!("No X found")` on stdout in ~60 list commands, in every format, so `--format json`
+returned prose where a script expects an array and `| jq length` failed on exactly the case
+it most needs to handle.
+
+- New `OutputRenderer::render_list_or_empty(items, empty_message)`: Table and Markdown print
+  the message, everything else falls through to `render_list`.
+- `render_list` itself now prints nothing for an empty list in Quiet and CSV. That covers
+  list commands which never had a message at all and were emitting a literal `[]`, which
+  would feed a bogus item into `for id in $(...)`. CSV of an empty list has no rows and no
+  derivable header either.
+- 63 call sites converted. The empty guard is kept wherever it had side effects: several
+  commands call `ctx.verify_auth()` when the result set is empty, to tell "no matches" apart
+  from "bad credentials", and hoisting that out would have added an API call to every
+  successful list.
+- Not converted, and not part of this: `jira bulk`, `confluence bulk` and
+  `bitbucket pipeline logs`. Those are operations and log dumps rather than list renderers,
+  so returning early on an empty work set is the correct behaviour.
+- The reported command, `bitbucket pr reviewers`, cannot be pointed at a mock, because
+  Bitbucket builds its client from `BITBUCKET_API_URL` rather than the profile base URL. The
+  same renderer path is proved through Jira in `crates/cli/tests/empty_list_output_e2e.rs`,
+  which captures real stdout from the built binary.
+
+## 2026-08-20 — Release 0.6.0
+
+Minor, not patch: new commands, and two breaking-in-form changes.
+
+- `jira issue transitions` (#101), `bb pr comment --parent` (#109), `bb pr resolve-comment` / `reopen-comment` (#113).
+- `jira issue comments update|delete` take the issue key as a leading positional (#100). The old form could not work against Jira Cloud.
+- Every list command's empty result changed shape under machine formats (#110).
+- `bb pr reviewers --add` repaired (#104), flaky colours test serialised (#111), example scripts repaired with a regression test (#105 via #112).
+- Backlog cleared: 8 open PRs and 6 open issues resolved, leaving zero of each.

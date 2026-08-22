@@ -47,8 +47,7 @@ setup_backup_dir() {
 export_metadata() {
     log "Exporting space metadata"
 
-    atlassian-cli confluence space get \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence space get \
         "$SPACE_KEY" \
         --format json > "$BACKUP_DIR/space_info.json"
 }
@@ -59,8 +58,7 @@ export_pages() {
 
     local cql="space = $SPACE_KEY AND type = page"
 
-    atlassian-cli confluence bulk export \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence bulk export \
         --cql "$cql" \
         --output "$BACKUP_DIR/pages.json" \
         --format json
@@ -76,8 +74,7 @@ export_blogs() {
 
     local cql="space = $SPACE_KEY AND type = blogpost"
 
-    atlassian-cli confluence bulk export \
-        --profile "$PROFILE" \
+    atlassian-cli --profile "$PROFILE" confluence bulk export \
         --cql "$cql" \
         --output "$BACKUP_DIR/blogposts.json" \
         --format json
@@ -105,8 +102,7 @@ download_attachments() {
         # --format, not --output: the latter is not an argument of this
         # subcommand, and the `|| echo "[]"` below would silently turn the
         # resulting parse error into an empty backup.
-        attachments=$(atlassian-cli confluence attachment list \
-            --profile "$PROFILE" \
+        attachments=$(atlassian-cli --profile "$PROFILE" confluence attachment list \
             "$page_id" \
             --format json 2>/dev/null || echo "[]")
 
@@ -125,8 +121,7 @@ download_attachments() {
 
             log "Downloading: $att_title"
 
-            if atlassian-cli confluence attachment download \
-                --profile "$PROFILE" \
+            if atlassian-cli --profile "$PROFILE" confluence attachment download \
                 "$att_id" \
                 --output "$BACKUP_DIR/attachments/$safe_filename"; then
                 downloaded=$((downloaded + 1))

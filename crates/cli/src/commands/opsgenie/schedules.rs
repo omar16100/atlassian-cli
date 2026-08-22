@@ -43,12 +43,11 @@ pub async fn list_schedules(ctx: &OpsgenieContext<'_>, limit: usize) -> Result<(
 
     if rows.is_empty() {
         tracing::info!("No schedules found");
-        println!("No schedules found");
-        return Ok(());
     }
 
     tracing::info!("Found {} schedules", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No schedules found")
 }
 
 /// Get schedule details.
@@ -240,12 +239,11 @@ pub async fn get_on_call(
 
     if rows.is_empty() {
         tracing::info!("No one is on-call for schedule {}", identifier);
-        println!("No one is on-call");
-        return Ok(());
     }
 
     tracing::info!("Found {} on-call participants", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No one is on-call")
 }
 
 /// Get schedule timeline.
@@ -350,12 +348,11 @@ pub async fn get_timeline(
 
     if rows.is_empty() {
         tracing::info!("No timeline data for schedule {}", identifier);
-        println!("No timeline data found");
-        return Ok(());
     }
 
     tracing::info!("Found {} timeline periods", rows.len());
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No timeline data found")
 }
 
 /// Export schedule to iCal format.

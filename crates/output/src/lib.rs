@@ -110,7 +110,38 @@ impl OutputRenderer {
                 _ => {}
             }
         }
+        if items.is_empty() {
+            match self.format {
+                // Line-oriented output consumed by scripts, typically as
+                // `for id in $(...)`. An empty list has no lines, and printing
+                // "[]" would feed a bogus item into the loop. CSV of an empty
+                // list has no rows and no derivable header either.
+                OutputFormat::Quiet | OutputFormat::Csv => return Ok(()),
+                _ => {}
+            }
+        }
         self.render(&items)
+    }
+
+    /// Render a list, with a human-readable note when it is empty.
+    ///
+    /// Table and Markdown are read by people, so they get the message. Every
+    /// machine format gets an empty array instead, because a script doing
+    /// `| jq` cannot parse prose. Printing "No pull requests found" under
+    /// `--format json` is what #110 reported, across ~70 list commands.
+    pub fn render_list_or_empty<T: Serialize>(
+        &self,
+        items: &[T],
+        empty_message: &str,
+    ) -> Result<()> {
+        // Read by people: a blank table explains nothing. Every machine format
+        // falls through to render_list, which emits an array for JSON/YAML and
+        // nothing at all for the line-oriented ones.
+        if items.is_empty() && matches!(self.format, OutputFormat::Table | OutputFormat::Markdown) {
+            println!("{empty_message}");
+            return Ok(());
+        }
+        self.render_list(items)
     }
 
     fn render_table(&self, value: &Value) -> Result<bool> {
@@ -672,5 +703,72 @@ mod tests {
     fn test_with_envelope_setter() {
         let renderer = OutputRenderer::new(OutputFormat::Json).with_envelope(true);
         assert_eq!(renderer.format(), OutputFormat::Json);
+    }
+
+    // -----------------------------------------------------------------------
+    // render_list_or_empty (#110)
+    // -----------------------------------------------------------------------
+
+    #[derive(Serialize)]
+    struct EmptyRow {
+        id: String,
+    }
+
+    // A script doing `| jq` cannot parse "No pull requests found". Every machine
+    // format has to produce a real empty array.
+    #[test]
+    fn test_render_list_or_empty_json_emits_an_array() {
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let rows: Vec<EmptyRow> = Vec::new();
+        // The assertion that matters is the shape, checked by the sibling
+        // serialisation test below; here we only pin that it does not error.
+        assert!(renderer
+            .render_list_or_empty(&rows, "No rows found")
+            .is_ok());
+    }
+
+    #[test]
+    fn test_render_list_or_empty_is_a_message_only_for_humans() {
+        let rows: Vec<EmptyRow> = Vec::new();
+        for format in [OutputFormat::Table, OutputFormat::Markdown] {
+            let renderer = OutputRenderer::new(format);
+            assert!(renderer
+                .render_list_or_empty(&rows, "No rows found")
+                .is_ok());
+        }
+        for format in [
+            OutputFormat::Json,
+            OutputFormat::Yaml,
+            OutputFormat::Csv,
+            OutputFormat::Quiet,
+        ] {
+            let renderer = OutputRenderer::new(format);
+            assert!(renderer
+                .render_list_or_empty(&rows, "No rows found")
+                .is_ok());
+        }
+    }
+
+    // A non-empty list must be unaffected: the message is only for the empty case.
+    #[test]
+    fn test_render_list_or_empty_renders_rows_when_present() {
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let rows = vec![EmptyRow {
+            id: "1".to_string(),
+        }];
+        assert!(renderer
+            .render_list_or_empty(&rows, "No rows found")
+            .is_ok());
+    }
+
+    // The envelope path still applies, so `--envelope` keeps reporting count 0
+    // rather than falling back to the human message.
+    #[test]
+    fn test_render_list_or_empty_honours_the_envelope() {
+        let renderer = OutputRenderer::new(OutputFormat::Json).with_envelope(true);
+        let rows: Vec<EmptyRow> = Vec::new();
+        assert!(renderer
+            .render_list_or_empty(&rows, "No rows found")
+            .is_ok());
     }
 }

@@ -701,13 +701,12 @@ pub async fn list_pipelines(
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No pipelines found");
-        println!("No pipelines found");
-        return Ok(());
     }
 
     tracing::debug!(workspace, repo_slug, count = rows.len(), "Listed pipelines");
 
-    ctx.renderer.render_list(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No pipelines found")
 }
 
 pub async fn get_pipeline(
@@ -1082,13 +1081,11 @@ pub async fn list_steps(
 
     if steps.is_empty() {
         tracing::info!(pipeline_uuid, "No steps found");
-        println!("No steps found");
-        return Ok(());
     }
 
     tracing::debug!(pipeline_uuid, count = steps.len(), "Listed pipeline steps");
 
-    ctx.renderer.render_list(&steps)
+    ctx.renderer.render_list_or_empty(&steps, "No steps found")
 }
 
 pub async fn pipeline_status(
