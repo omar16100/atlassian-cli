@@ -1,5 +1,7 @@
 use atlassian_cli_api::ApiClient;
-use wiremock::matchers::{body_json, method, path, query_param, query_param_contains};
+use wiremock::matchers::{
+    body_json, body_partial_json, method, path, query_param, query_param_contains,
+};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 #[tokio::test]
@@ -732,4 +734,222 @@ async fn test_pipeline_list_pagination() {
     assert!(response.is_ok());
     let result = response.unwrap();
     assert!(result["next"].is_string()); // Verify pagination link exists
+}
+
+#[tokio::test]
+async fn test_bitbucket_add_pr_inline_comment_new_side_posts_inline_object() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/1/comments",
+        ))
+        .and(body_partial_json(serde_json::json!({
+            "content": { "raw": "Nit: rename this" },
+            "inline": { "path": "src/main.rs", "to": 42 }
+        })))
+        .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+            "id": 999,
+            "content": { "raw": "Nit: rename this", "markup": "markdown", "html": "<p>Nit: rename this</p>" },
+            "user": { "display_name": "Test User" },
+            "created_on": "2026-08-20T12:00:00Z",
+            "inline": { "path": "src/main.rs", "to": 42, "from": null }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let payload = serde_json::json!({
+        "content": { "raw": "Nit: rename this" },
+        "inline": { "path": "src/main.rs", "to": 42 }
+    });
+
+    let response: Result<serde_json::Value, _> = client
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/1/comments",
+            &payload,
+        )
+        .await;
+
+    assert!(response.is_ok(), "post should succeed: {response:?}");
+    let created = response.unwrap();
+    assert_eq!(created["id"], 999);
+    assert_eq!(created["inline"]["path"], "src/main.rs");
+    assert_eq!(created["inline"]["to"], 42);
+}
+
+#[tokio::test]
+async fn test_bitbucket_add_pr_inline_comment_old_side_posts_from_field() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/2/comments",
+        ))
+        .and(body_partial_json(serde_json::json!({
+            "content": { "raw": "Why remove this?" },
+            "inline": { "path": "src/main.rs", "from": 17 }
+        })))
+        .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+            "id": 1000,
+            "content": { "raw": "Why remove this?" },
+            "user": { "display_name": "Test User" },
+            "inline": { "path": "src/main.rs", "from": 17, "to": null }
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let payload = serde_json::json!({
+        "content": { "raw": "Why remove this?" },
+        "inline": { "path": "src/main.rs", "from": 17 }
+    });
+
+    let response: Result<serde_json::Value, _> = client
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/2/comments",
+            &payload,
+        )
+        .await;
+
+    assert!(response.is_ok());
+    let created = response.unwrap();
+    assert_eq!(created["inline"]["from"], 17);
+}
+
+#[tokio::test]
+async fn test_bitbucket_add_pr_global_comment_still_has_no_inline_field() {
+    let mock_server = MockServer::start().await;
+
+    // High-priority trap: any POST that ever carries an `inline` object to the
+    // comments endpoint returns 500 and fails the request. `body_partial_json`
+    // matches supersets, so pairing it with a distinct "leak" mock is the only
+    // way to distinguish "global comment" from "inline comment that also
+    // happens to contain content.raw". Priority ordering ensures the leak
+    // matcher is evaluated before the happy-path matcher below.
+    Mock::given(method("POST"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/3/comments",
+        ))
+        .and(body_partial_json(serde_json::json!({ "inline": {} })))
+        .respond_with(ResponseTemplate::new(500).set_body_string(
+            "test failure: global comment POST unexpectedly carried an `inline` object",
+        ))
+        .with_priority(1)
+        .mount(&mock_server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/3/comments",
+        ))
+        .and(body_partial_json(serde_json::json!({
+            "content": { "raw": "LGTM" }
+        })))
+        .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+            "id": 1001,
+            "content": { "raw": "LGTM" },
+            "user": { "display_name": "Test User" }
+        })))
+        .with_priority(2)
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let payload = serde_json::json!({
+        "content": { "raw": "LGTM" }
+    });
+
+    let response: Result<serde_json::Value, _> = client
+        .post(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/3/comments",
+            &payload,
+        )
+        .await;
+
+    assert!(
+        response.is_ok(),
+        "global comment POST should not carry `inline`; got: {response:?}"
+    );
+
+    // Belt and braces: inspect what actually left the wire and assert there
+    // is exactly one request and it has no top-level `inline` key.
+    let received = mock_server.received_requests().await.unwrap();
+    assert_eq!(received.len(), 1, "expected exactly one POST");
+    let body: serde_json::Value = serde_json::from_slice(&received[0].body).unwrap();
+    assert!(
+        body.get("inline").is_none(),
+        "global comment body must not contain `inline`, got: {body}"
+    );
+}
+
+#[tokio::test]
+async fn test_bitbucket_list_pr_comments_parses_mix_of_global_and_inline() {
+    let mock_server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path(
+            "/2.0/repositories/myworkspace/myrepo/pullrequests/4/comments",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "values": [
+                {
+                    "id": 100,
+                    "content": { "raw": "LGTM overall" },
+                    "user": { "display_name": "Alice" },
+                    "created_on": "2026-08-20T10:00:00Z"
+                },
+                {
+                    "id": 101,
+                    "content": { "raw": "nit: rename" },
+                    "user": { "display_name": "Bob" },
+                    "created_on": "2026-08-20T10:05:00Z",
+                    "inline": { "path": "src/main.rs", "to": 42, "from": null }
+                },
+                {
+                    "id": 102,
+                    "content": { "raw": "why remove?" },
+                    "user": { "display_name": "Carol" },
+                    "created_on": "2026-08-20T10:10:00Z",
+                    "inline": { "path": "src/main.rs", "from": 17, "to": null }
+                },
+                {
+                    "id": 103,
+                    "content": { "raw": "whole file comment" },
+                    "user": { "display_name": "Dave" },
+                    "created_on": "2026-08-20T10:15:00Z",
+                    "inline": { "path": "README.md", "to": null, "from": null }
+                }
+            ]
+        })))
+        .mount(&mock_server)
+        .await;
+
+    let client = ApiClient::new(mock_server.uri())
+        .unwrap()
+        .with_basic_auth("test@example.com", "fake-token");
+
+    let response: Result<serde_json::Value, _> = client
+        .get("/2.0/repositories/myworkspace/myrepo/pullrequests/4/comments")
+        .await;
+
+    assert!(response.is_ok());
+    let result = response.unwrap();
+    let values = result["values"].as_array().unwrap();
+    assert_eq!(values.len(), 4);
+
+    assert!(values[0].get("inline").is_none_or(|v| v.is_null()));
+    assert_eq!(values[1]["inline"]["to"], 42);
+    assert_eq!(values[2]["inline"]["from"], 17);
+    assert!(values[3]["inline"]["to"].is_null());
+    assert!(values[3]["inline"]["from"].is_null());
 }

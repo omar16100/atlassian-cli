@@ -132,6 +132,8 @@ struct Comment {
     created_on: Option<String>,
     #[serde(default)]
     parent: Option<CommentParent>,
+    #[serde(default)]
+    inline: Option<Inline>,
 }
 
 #[derive(Deserialize)]
@@ -144,6 +146,61 @@ struct CommentParent {
     id: i64,
 }
 
+/// Inline anchor metadata returned by Bitbucket for a PR comment.
+///
+/// Present iff the comment is inline (attached to a file). `to` and `from`
+/// are line numbers in the destination and source revisions respectively;
+/// exactly one is set for a line-anchored comment, and both are `None` for
+/// a file-level inline comment.
+#[derive(Deserialize, Debug, Clone)]
+struct Inline {
+    #[serde(default)]
+    path: String,
+    #[serde(default)]
+    to: Option<u32>,
+    #[serde(default)]
+    from: Option<u32>,
+}
+
+/// Render an inline anchor as a compact `path:line`, or `path` alone for a
+/// file-level comment, or `""` for a top-level one.
+///
+/// A `to`/`from` of `0` is treated as "no line", to stay consistent with the
+/// `--line >= 1` invariant: Bitbucket line numbers are 1-indexed, so a 0 in a
+/// response is a sentinel or a mis-serialised field, not a real anchor.
+fn format_comment_location(inline: Option<&Inline>) -> String {
+    match inline {
+        None => String::new(),
+        Some(i) => match i.to.filter(|&n| n > 0).or(i.from.filter(|&n| n > 0)) {
+            Some(line) => format!("{}:{}", i.path, line),
+            None => i.path.clone(),
+        },
+    }
+}
+
+/// Which side of the diff a line-anchored inline comment attaches to.
+///
+/// - `New` (default): the destination revision, i.e. an added or unchanged
+///   line. Sent as Bitbucket's `inline.to`.
+/// - `Old`: the source revision, i.e. a removed line. Sent as `inline.from`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
+pub enum Side {
+    #[default]
+    #[value(name = "new")]
+    New,
+    #[value(name = "old")]
+    Old,
+}
+
+impl std::fmt::Display for Side {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Side::New => f.write_str("new"),
+            Side::Old => f.write_str("old"),
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct CommentRow<'a> {
     id: i64,
@@ -151,6 +208,9 @@ struct CommentRow<'a> {
     content: &'a str,
     created: &'a str,
     parent: Option<i64>,
+    /// Appended rather than inserted: JSON key order, CSV columns and table
+    /// headers stay additive for anything already parsing this output.
+    location: String,
 }
 
 fn comment_row(comment: &Comment) -> CommentRow<'_> {
@@ -160,10 +220,28 @@ fn comment_row(comment: &Comment) -> CommentRow<'_> {
         content: comment.content.raw.as_str(),
         created: comment.created_on.as_deref().unwrap_or(""),
         parent: comment.parent.as_ref().map(|parent| parent.id),
+        location: format_comment_location(comment.inline.as_ref()),
     }
 }
 
-fn comment_payload(content: &str, parent: Option<i64>) -> serde_json::Value {
+/// Build the JSON body for a PR-comment POST.
+///
+/// Pure, so every shape is unit-testable without a mock server: top-level,
+/// threaded reply, whole-file inline, and line-anchored inline on either side.
+///
+/// - `parent`: reply inside an existing thread.
+/// - `inline_path`: makes the comment inline, i.e. attached to a file.
+/// - `inline_line`: only meaningful with a path. Absent means a file-level
+///   inline comment.
+/// - `side`: only meaningful with a line. `New` sends `inline.to`, `Old` sends
+///   `inline.from`.
+fn comment_payload(
+    content: &str,
+    parent: Option<i64>,
+    inline_path: Option<&str>,
+    inline_line: Option<u32>,
+    side: Side,
+) -> serde_json::Value {
     let mut payload = serde_json::json!({
         "content": {
             "raw": content
@@ -171,6 +249,16 @@ fn comment_payload(content: &str, parent: Option<i64>) -> serde_json::Value {
     });
     if let Some(parent) = parent {
         payload["parent"] = serde_json::json!({"id": parent});
+    }
+    if let Some(path) = inline_path {
+        let mut inline = serde_json::json!({ "path": path });
+        if let Some(line) = inline_line {
+            match side {
+                Side::New => inline["to"] = serde_json::json!(line),
+                Side::Old => inline["from"] = serde_json::json!(line),
+            }
+        }
+        payload["inline"] = inline;
     }
     payload
 }
@@ -567,6 +655,7 @@ pub async fn list_pr_comments(
         .render_list_or_empty(&rows, "No comments found")
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn add_pr_comment(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -574,22 +663,35 @@ pub async fn add_pr_comment(
     pr_id: i64,
     content: &str,
     parent: Option<i64>,
+    inline_path: Option<&str>,
+    inline_line: Option<u32>,
+    side: Side,
 ) -> Result<()> {
-    let payload = comment_payload(content, parent);
+    let payload = comment_payload(content, parent, inline_path, inline_line, side);
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
     let comment: Comment = ctx.client.post(&path, &payload).await.with_context(|| {
         format!("Failed to add comment to pull request {pr_id} in {workspace}/{repo_slug}")
     })?;
 
-    tracing::info!(comment_id = comment.id, pr_id, "Comment added successfully");
+    let is_inline = inline_path.is_some();
+    tracing::info!(
+        comment_id = comment.id,
+        pr_id,
+        is_inline,
+        "Comment added successfully"
+    );
+
+    let kind = if is_inline {
+        "Inline comment"
+    } else {
+        "Comment"
+    };
+    let message = format!("{kind} added to pull request #{pr_id}");
     render_success(
         ctx.renderer,
-        &format!("✅ Comment added to pull request #{pr_id}"),
-        &MutationResult::with_id(
-            format!("Comment added to pull request #{pr_id}"),
-            pr_id.to_string(),
-        ),
+        &format!("✅ {message}"),
+        &MutationResult::with_id(message.clone(), pr_id.to_string()),
     )
 }
 
@@ -991,14 +1093,14 @@ mod tests {
     #[test]
     fn comment_payload_includes_parent_for_threaded_reply() {
         assert_eq!(
-            comment_payload("Fixed", Some(843649259)),
+            comment_payload("Fixed", Some(843649259), None, None, Side::New),
             serde_json::json!({
                 "content": {"raw": "Fixed"},
                 "parent": {"id": 843649259}
             })
         );
         assert_eq!(
-            comment_payload("Top level", None),
+            comment_payload("Top level", None, None, None, Side::New),
             serde_json::json!({"content": {"raw": "Top level"}})
         );
     }
@@ -1053,5 +1155,251 @@ mod tests {
         reopen_pr_comment(&ctx, "workspace", "repo", 42, 99)
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn test_side_display() {
+        assert_eq!(Side::New.to_string(), "new");
+        assert_eq!(Side::Old.to_string(), "old");
+    }
+
+    #[test]
+    fn test_build_comment_payload_global() {
+        let payload = comment_payload("Looks good!", None, None, None, Side::New);
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Looks good!" }
+            })
+        );
+    }
+
+    #[test]
+    fn test_build_comment_payload_inline_new_side_line() {
+        let payload = comment_payload(
+            "Nit: rename this",
+            None,
+            Some("src/main.rs"),
+            Some(42),
+            Side::New,
+        );
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Nit: rename this" },
+                "inline": { "path": "src/main.rs", "to": 42 }
+            })
+        );
+    }
+
+    #[test]
+    fn test_build_comment_payload_inline_old_side_line() {
+        let payload = comment_payload(
+            "Why remove this?",
+            None,
+            Some("src/main.rs"),
+            Some(17),
+            Side::Old,
+        );
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Why remove this?" },
+                "inline": { "path": "src/main.rs", "from": 17 }
+            })
+        );
+    }
+
+    #[test]
+    fn test_build_comment_payload_file_level_inline_no_line() {
+        // path but no line -> file-level inline comment; side is irrelevant and must not leak into payload
+        let payload = comment_payload(
+            "Whole-file comment",
+            None,
+            Some("README.md"),
+            None,
+            Side::New,
+        );
+        assert_eq!(
+            payload,
+            serde_json::json!({
+                "content": { "raw": "Whole-file comment" },
+                "inline": { "path": "README.md" }
+            })
+        );
+    }
+
+    #[test]
+    fn test_build_comment_payload_file_level_inline_ignores_side_when_no_line() {
+        // Regression guard: with no line, `side` must not leak into the payload
+        // regardless of whether it's New or Old.
+        let new_side = comment_payload(
+            "Whole-file comment",
+            None,
+            Some("README.md"),
+            None,
+            Side::New,
+        );
+        let old_side = comment_payload(
+            "Whole-file comment",
+            None,
+            Some("README.md"),
+            None,
+            Side::Old,
+        );
+        assert_eq!(new_side, old_side);
+        assert_eq!(
+            old_side,
+            serde_json::json!({
+                "content": { "raw": "Whole-file comment" },
+                "inline": { "path": "README.md" }
+            })
+        );
+    }
+
+    #[test]
+    fn test_side_default_is_new() {
+        assert_eq!(Side::default(), Side::New);
+    }
+
+    #[test]
+    fn test_comment_deserializes_inline_line_new_side() {
+        let raw = serde_json::json!({
+            "id": 1,
+            "content": { "raw": "nit" },
+            "user": { "display_name": "Alice" },
+            "created_on": "2026-08-20T12:00:00Z",
+            "inline": { "path": "src/main.rs", "to": 42, "from": null }
+        });
+        let c: Comment = serde_json::from_value(raw).unwrap();
+        let inline = c.inline.expect("inline present");
+        assert_eq!(inline.path, "src/main.rs");
+        assert_eq!(inline.to, Some(42));
+        assert_eq!(inline.from, None);
+    }
+
+    #[test]
+    fn test_comment_deserializes_inline_line_old_side() {
+        let raw = serde_json::json!({
+            "id": 2,
+            "content": { "raw": "removed on purpose" },
+            "user": { "display_name": "Bob" },
+            "inline": { "path": "src/main.rs", "from": 17 }
+        });
+        let c: Comment = serde_json::from_value(raw).unwrap();
+        let inline = c.inline.expect("inline present");
+        assert_eq!(inline.from, Some(17));
+        assert_eq!(inline.to, None);
+    }
+
+    #[test]
+    fn test_comment_deserializes_global_comment_without_inline() {
+        let raw = serde_json::json!({
+            "id": 3,
+            "content": { "raw": "LGTM" },
+            "user": { "display_name": "Carol" }
+        });
+        let c: Comment = serde_json::from_value(raw).unwrap();
+        assert!(c.inline.is_none());
+    }
+
+    #[test]
+    fn test_format_comment_location_global_is_empty() {
+        assert_eq!(format_comment_location(None), String::new());
+    }
+
+    #[test]
+    fn test_format_comment_location_inline_new_side_line() {
+        let inline = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(42),
+            from: None,
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "src/main.rs:42");
+    }
+
+    #[test]
+    fn test_format_comment_location_inline_old_side_line() {
+        let inline = Inline {
+            path: "src/main.rs".to_string(),
+            to: None,
+            from: Some(17),
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "src/main.rs:17");
+    }
+
+    #[test]
+    fn test_format_comment_location_inline_file_level_no_line() {
+        let inline = Inline {
+            path: "README.md".to_string(),
+            to: None,
+            from: None,
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "README.md");
+    }
+
+    #[test]
+    fn test_format_comment_location_prefers_to_when_both_set() {
+        // Bitbucket's docs say only one of `to`/`from` should be set for a
+        // line-anchored inline comment, but if both ever come back, this pins
+        // the deterministic "prefer `to` (destination revision)" tie-break.
+        let inline = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(10),
+            from: Some(20),
+        };
+        assert_eq!(format_comment_location(Some(&inline)), "src/main.rs:10");
+    }
+
+    #[test]
+    fn test_format_comment_location_treats_zero_as_no_line() {
+        // Bitbucket lines are 1-indexed and we reject `--line 0` on the way
+        // out, so a 0 in the response is a sentinel or a serialisation glitch
+        // rather than an anchor. Degrade to file-level rather than rendering
+        // "src/main.rs:0".
+        let inline_to_zero = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(0),
+            from: None,
+        };
+        assert_eq!(
+            format_comment_location(Some(&inline_to_zero)),
+            "src/main.rs"
+        );
+
+        let inline_from_zero = Inline {
+            path: "src/main.rs".to_string(),
+            to: None,
+            from: Some(0),
+        };
+        assert_eq!(
+            format_comment_location(Some(&inline_from_zero)),
+            "src/main.rs"
+        );
+
+        // A real `from` still wins when `to` is 0.
+        let inline_to_zero_from_real = Inline {
+            path: "src/main.rs".to_string(),
+            to: Some(0),
+            from: Some(17),
+        };
+        assert_eq!(
+            format_comment_location(Some(&inline_to_zero_from_real)),
+            "src/main.rs:17"
+        );
+    }
+
+    #[test]
+    fn test_inline_deserialises_when_path_is_missing() {
+        // Defensive: if Bitbucket ever returns a stripped `inline` object
+        // without `path`, we should still parse the comment and degrade
+        // gracefully rather than fail the entire `list_pr_comments` call.
+        let json = serde_json::json!({ "to": 42 });
+        let inline: Inline = serde_json::from_value(json).expect("stripped inline must parse");
+        assert_eq!(inline.path, "");
+        assert_eq!(inline.to, Some(42));
+        // format renders as ":42" — ugly but survivable, and only surfaces if
+        // Bitbucket genuinely omits `path`, which is not documented behaviour.
+        assert_eq!(format_comment_location(Some(&inline)), ":42");
     }
 }

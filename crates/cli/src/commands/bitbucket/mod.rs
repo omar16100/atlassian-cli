@@ -254,6 +254,19 @@ enum BranchCommands {
     },
 }
 
+/// `clap` value parser that trims and rejects empty strings.
+///
+/// Used where an empty value would only produce a server-side 400 (`--text ""`,
+/// `--path ""`). Bitbucket rejects both, and the error is far more useful
+/// raised by clap at parse time.
+fn non_empty_string(s: &str) -> std::result::Result<String, String> {
+    if s.trim().is_empty() {
+        Err("value must not be empty".to_string())
+    } else {
+        Ok(s.to_string())
+    }
+}
+
 #[derive(Subcommand, Debug, Clone)]
 enum PrCommands {
     /// List pull requests for a repository.
@@ -353,18 +366,43 @@ enum PrCommands {
         /// Pull request ID.
         pr_id: i64,
     },
-    /// Add comment to pull request.
+    /// Add a comment to a pull request, optionally inline or as a threaded reply
+    #[command(long_about = "Add a comment to a pull request.\n\n\
+        By default, posts a top-level PR comment. Passing --path (with an optional --line and\n\
+        --side) anchors it to a file instead, and --parent replies inside an existing thread.\n\n\
+        Examples:\n  \
+        bb pr comment my-repo 123 --text \"LGTM\"\n  \
+        bb pr comment my-repo 123 --text \"Nit: rename\" --path src/main.rs --line 42\n  \
+        bb pr comment my-repo 123 --text \"Why remove?\" --path src/main.rs --line 17 --side old\n  \
+        bb pr comment my-repo 123 --text \"Whole-file comment\" --path README.md\n  \
+        bb pr comment my-repo 123 --text \"Fixed\" --parent 843649259\n\n\
+        --side selects which side of the diff --line refers to:\n  \
+        new (default) = destination revision (added/unchanged lines)\n  \
+        old           = source revision (removed lines)")]
     Comment {
         /// Repository slug.
         repo: String,
         /// Pull request ID.
         pr_id: i64,
-        /// Comment text.
-        #[arg(long)]
+        /// Comment text (Markdown).
+        #[arg(long, value_parser = non_empty_string)]
         text: String,
         /// Parent comment ID for a threaded reply.
         #[arg(long)]
         parent: Option<i64>,
+        /// File path (relative to repo root) to anchor an inline comment to.
+        /// If omitted, posts a top-level PR comment.
+        #[arg(long, value_parser = non_empty_string)]
+        path: Option<String>,
+        /// Line number to anchor the inline comment to. Must be >= 1, because
+        /// Bitbucket line numbers are 1-indexed. Requires --path.
+        /// If omitted while --path is given, posts a file-level inline comment.
+        #[arg(long, requires = "path", value_parser = clap::value_parser!(u32).range(1..))]
+        line: Option<u32>,
+        /// Which side of the diff --line refers to: `new` (default) = destination
+        /// (added/unchanged lines), `old` = source (removed lines). Requires --line.
+        #[arg(long, requires = "line", default_value_t = pullrequests::Side::New, value_enum)]
+        side: pullrequests::Side,
     },
     /// Resolve a pull request diff comment thread.
     ResolveComment {
@@ -1138,14 +1176,28 @@ pub async fn execute(
             PrCommands::Comments { repo, pr_id } => {
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
-            // main's threaded-comment signature (#109) plus this branch's
-            // resolve/reopen arms.
             PrCommands::Comment {
                 repo,
                 pr_id,
                 text,
                 parent,
-            } => pullrequests::add_pr_comment(&ctx, &workspace, &repo, pr_id, &text, parent).await,
+                path,
+                line,
+                side,
+            } => {
+                pullrequests::add_pr_comment(
+                    &ctx,
+                    &workspace,
+                    &repo,
+                    pr_id,
+                    &text,
+                    parent,
+                    path.as_deref(),
+                    line,
+                    side,
+                )
+                .await
+            }
             PrCommands::ResolveComment {
                 repo,
                 pr_id,

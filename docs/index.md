@@ -46,6 +46,7 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 | Document | Date | What it covers |
 | --- | --- | --- |
 | [16082026_bb_pr_reviewer_status.md](16082026_bb_pr_reviewer_status.md) | 2026-08-16 | `bb pr reviewers` listing with approval status, `--all`, and the `--add` endpoint fix |
+| [20082026_bitbucket_pr_inline_comments.md](20082026_bitbucket_pr_inline_comments.md) | 2026-08-20 | Inline pull request comments: `bb pr comment --path/--line/--side`, and the `location` column on `pr comments` |
 | [10082026_raw_api_passthrough.md](10082026_raw_api_passthrough.md) | 2026-08-10 | `jira api` raw authenticated REST passthrough, `ApiClient::request_raw`, origin and redirect safety |
 | [10082026_jira_attachments.md](10082026_jira_attachments.md) | 2026-08-10 | `jira attachment` group: list, get, download (single, stdout, bulk), upload, delete |
 | [02042026_jira_search_migration.md](02042026_jira_search_migration.md) | 2026-04-02 | Migration to `/rest/api/3/search/jql` after the old endpoint was removed |
