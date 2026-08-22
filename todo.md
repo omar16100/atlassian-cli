@@ -1604,3 +1604,10 @@ Minor: both changes add flags and columns.
 - New `normalize_base_url` appends the slash. Applied in `ApiClient::new` and in `auth login`, so old configs are fixed on load and new ones are stored right.
 - `test_resolve_url_keeps_the_base_path` covers a path-bearing base with and without the trailing slash.
 - `confluence attachment upload` now trims the trailing slash before concatenating, as the Jira one already did.
+
+## 2026-08-22 — Release 0.7.1
+
+Patch: one user-facing fix, no new surface.
+
+- Base URLs carrying a path lost their last segment, because `Url::join` replaces the base's final segment unless the base ends with `/` (#125, @shohi). This broke the API-gateway form that scoped API tokens require (`https://api.atlassian.com/ex/jira/<cloudId>`) and, by the same root cause, any self-hosted product behind a context path such as `https://example.com/bamboo`. Normalised once in `ApiClient::new`, so configs written before the fix are corrected on load rather than needing a hand-edit.
+- Verified no currently-working profile moves: Jira, Confluence, attachment download links, Bitbucket and Opsgenie all resolve byte-identically, and that is now a table test.
