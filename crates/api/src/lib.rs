@@ -1144,6 +1144,61 @@ mod tests {
         );
     }
 
+    /// The same fix covers a self-hosted product behind a context path, which is
+    /// the ordinary way Bamboo is deployed. Before this, `/rest/api/latest/plan`
+    /// against `https://example.com/bamboo` resolved to `https://example.com/rest/...`
+    /// and 404'd.
+    #[test]
+    fn test_resolve_url_keeps_a_context_path() {
+        let client = ApiClient::new("https://example.com/bamboo").unwrap();
+
+        assert_eq!(
+            client
+                .resolve_url("/rest/api/latest/plan")
+                .unwrap()
+                .as_str(),
+            "https://example.com/bamboo/rest/api/latest/plan"
+        );
+    }
+
+    /// Guard against the fix shifting any URL a working profile already resolves.
+    /// Every shape below is byte-identical before and after normalisation; only
+    /// the previously broken path-bearing bases move.
+    #[test]
+    fn test_normalisation_does_not_move_existing_product_urls() {
+        for (base, path, expected) in [
+            (
+                "https://x.atlassian.net",
+                "/rest/api/3/myself",
+                "https://x.atlassian.net/rest/api/3/myself",
+            ),
+            (
+                "https://x.atlassian.net",
+                "/wiki/download/attachments/1/f.png?version=1",
+                "https://x.atlassian.net/wiki/download/attachments/1/f.png?version=1",
+            ),
+            (
+                "https://api.bitbucket.org",
+                "/2.0/repositories/w/r",
+                "https://api.bitbucket.org/2.0/repositories/w/r",
+            ),
+            // Opsgenie's base already carries a path and already ends in a
+            // slash, and its request paths are relative, so it is untouched.
+            (
+                "https://api.opsgenie.com/v2/",
+                "alerts/123",
+                "https://api.opsgenie.com/v2/alerts/123",
+            ),
+        ] {
+            let client = ApiClient::new(base).unwrap();
+            assert_eq!(
+                client.resolve_url(path).unwrap().as_str(),
+                expected,
+                "{base} + {path}"
+            );
+        }
+    }
+
     /// Regression: comparing scheme and host but not port let any other port on
     /// the same host receive the profile's credentials.
     #[tokio::test]
