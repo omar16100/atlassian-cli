@@ -1576,3 +1576,15 @@ Minor, not patch: new commands, and two breaking-in-form changes.
 - Every list command's empty result changed shape under machine formats (#110).
 - `bb pr reviewers --add` repaired (#104), flaky colours test serialised (#111), example scripts repaired with a regression test (#105 via #112).
 - Backlog cleared: 8 open PRs and 6 open issues resolved, leaving zero of each.
+
+## 2026-08-22 — Confluence inline comments and threads (closes #122)
+
+`confluence page comments` only fetched `/wiki/api/v2/pages/{id}/footer-comments`, so pages using inline comments returned an empty list. Reporter had a page with 84 comments, none of them footer comments.
+
+- Both collections fetched and merged, with a `kind` column.
+- `_links.next` cursor pagination followed, with a 200-page cap. This was a second, hidden bug: every listing was capped at the default page size, so even a footer-only page would have shown 25 of 84.
+- `--replies` walks each thread via `/{collection}/{id}/children` and fills in `parent`. Opt-in, since it is one request per root.
+- `--parent` replies into a thread, POSTed to the parent's own collection; `--kind` selects it explicitly rather than the CLI guessing. Confluence rejects a footer reply to an inline thread.
+- Comment text is now escaped for storage format; it was interpolated raw into `<p>{}</p>`, so `<`, `>` or `&` produced invalid XHTML.
+- Not done: creating a new inline comment, which needs `inlineCommentProperties.textSelection` plus a match index and has no sensible command-line spelling. Replying to an existing inline thread is supported.
+- All mock-tested; no instance with inline comments available to verify the real v2 response shapes.

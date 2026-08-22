@@ -513,6 +513,80 @@ struct CommentBodyValue {
 struct CommentsResponse {
     #[serde(default)]
     results: Vec<Comment>,
+    /// Confluence v2 paginates with an opaque cursor in `_links.next`. Ignoring
+    /// it silently truncated every listing at the default page size, so a page
+    /// with 84 comments reported 25.
+    #[serde(rename = "_links", default)]
+    links: Option<CommentLinks>,
+}
+
+#[derive(Deserialize)]
+struct CommentLinks {
+    #[serde(default)]
+    next: Option<String>,
+}
+
+/// Where a comment lives on the page.
+///
+/// Confluence keeps these in separate collections with separate endpoints, and
+/// only footer comments were ever fetched, so pages that use inline comments
+/// (the highlight-and-comment kind) looked empty from the CLI.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum CommentKind {
+    Footer,
+    Inline,
+}
+
+impl CommentKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            CommentKind::Footer => "footer",
+            CommentKind::Inline => "inline",
+        }
+    }
+
+    /// The v2 collection this kind lives in, used for both listing replies and
+    /// creating them.
+    fn collection(self) -> &'static str {
+        match self {
+            CommentKind::Footer => "footer-comments",
+            CommentKind::Inline => "inline-comments",
+        }
+    }
+}
+
+/// Follow `_links.next` until the collection is exhausted.
+///
+/// The cap is a safety net against a server that keeps handing back a cursor;
+/// at the v2 default of 25 per page it allows 5,000 comments, far past anything
+/// a real page carries.
+async fn fetch_all_comments(ctx: &ConfluenceContext<'_>, first_path: &str) -> Result<Vec<Comment>> {
+    const MAX_PAGES: usize = 200;
+
+    let mut all = Vec::new();
+    let mut path = first_path.to_string();
+
+    for page in 0..MAX_PAGES {
+        let response: CommentsResponse = ctx
+            .client
+            .get(&path)
+            .await
+            .with_context(|| format!("Failed to fetch {path}"))?;
+        all.extend(response.results);
+
+        match response.links.and_then(|l| l.next) {
+            Some(next) if !next.is_empty() => path = next,
+            _ => return Ok(all),
+        }
+
+        if page + 1 == MAX_PAGES {
+            tracing::warn!(
+                fetched = all.len(),
+                "Stopped following comment pagination at the safety cap"
+            );
+        }
+    }
+    Ok(all)
 }
 
 /// The comment's creation timestamp, which the v2 API nests under `version`.
@@ -557,71 +631,162 @@ fn comment_body_preview(body: &str) -> String {
 /// Preview length, matching `jira issue comments`.
 const COMMENT_PREVIEW_CHARS: usize = 50;
 
-// List page comments
+/// A comment plus where it came from, so the two collections can be merged into
+/// one listing without losing which is which.
+struct LocatedComment {
+    comment: Comment,
+    kind: CommentKind,
+    /// The comment this one replies to. `None` for a thread root.
+    parent: Option<String>,
+}
+
+/// List page comments.
+///
+/// Fetches both collections, because Confluence keeps footer and inline
+/// comments apart and only footer comments were ever read: a page using inline
+/// comments looked empty from the CLI even with dozens of them in the browser.
+///
+/// `replies` walks each thread. That is one request per root comment, so it is
+/// opt-in rather than the default.
 pub async fn list_page_comments(
     ctx: &ConfluenceContext<'_>,
     page_id: &str,
     full: bool,
+    replies: bool,
 ) -> Result<()> {
-    // Request the storage-format body so callers actually get the comment text;
-    // previously only metadata was returned.
-    let response: CommentsResponse = ctx
-        .client
-        .get(&format!(
-            "/wiki/api/v2/pages/{}/footer-comments?body-format=storage",
-            page_id
-        ))
-        .await
-        .with_context(|| format!("Failed to list comments for page {}", page_id))?;
+    let mut located: Vec<LocatedComment> = Vec::new();
+
+    for kind in [CommentKind::Footer, CommentKind::Inline] {
+        // body-format=storage so callers get the text, not just metadata.
+        let path = format!(
+            "/wiki/api/v2/pages/{}/{}?body-format=storage",
+            page_id,
+            kind.collection()
+        );
+        let roots = fetch_all_comments(ctx, &path).await.with_context(|| {
+            format!("Failed to list {} for page {}", kind.collection(), page_id)
+        })?;
+
+        for root in roots {
+            let root_id = root.id.clone();
+            located.push(LocatedComment {
+                comment: root,
+                kind,
+                parent: None,
+            });
+
+            if replies {
+                let child_path = format!(
+                    "/wiki/api/v2/{}/{}/children?body-format=storage",
+                    kind.collection(),
+                    root_id
+                );
+                let children = fetch_all_comments(ctx, &child_path)
+                    .await
+                    .with_context(|| format!("Failed to list replies to comment {root_id}"))?;
+                for child in children {
+                    located.push(LocatedComment {
+                        comment: child,
+                        kind,
+                        parent: Some(root_id.clone()),
+                    });
+                }
+            }
+        }
+    }
 
     #[derive(Serialize)]
     struct Row<'a> {
         id: &'a str,
         title: &'a str,
         created_at: &'a str,
+        /// footer or inline. Also tells you which value to pass to
+        /// `add-comment --kind` when replying.
+        kind: &'static str,
+        /// The comment this replies to, absent for a thread root.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        parent: Option<&'a str>,
         #[serde(skip_serializing_if = "Option::is_none")]
         body_preview: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         body: Option<String>,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .results
+    let rows: Vec<Row<'_>> = located
         .iter()
-        .map(|c| {
-            let text = comment_body_markdown(c);
+        .map(|l| {
+            let text = comment_body_markdown(&l.comment);
             let (body_preview, body) = if full {
                 (None, Some(text))
             } else {
                 (Some(comment_body_preview(&text)), None)
             };
             Row {
-                id: c.id.as_str(),
-                title: c.title.as_str(),
-                created_at: comment_created_at(c),
+                id: l.comment.id.as_str(),
+                title: l.comment.title.as_str(),
+                created_at: comment_created_at(&l.comment),
+                kind: l.kind.as_str(),
+                parent: l.parent.as_deref(),
                 body_preview,
                 body,
             }
         })
         .collect();
 
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No comments found")
 }
 
-// Add page comment
-pub async fn add_page_comment(
-    ctx: &ConfluenceContext<'_>,
-    page_id: &str,
-    comment: &str,
-) -> Result<()> {
-    let payload = json!({
+/// Escape text for a storage-format (XHTML) body.
+///
+/// The comment was previously interpolated raw into `<p>{}</p>`, so a comment
+/// containing `<`, `>` or `&` produced invalid storage XHTML and Confluence
+/// either rejected it or mangled it.
+fn escape_storage_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+/// Build the body for creating a comment or a reply.
+///
+/// A reply carries `parentCommentId` and is POSTed to the collection its parent
+/// lives in: Confluence will not accept a footer reply to an inline thread.
+fn comment_payload(page_id: &str, comment: &str, parent: Option<&str>) -> serde_json::Value {
+    let mut payload = json!({
         "pageId": page_id,
         "status": "current",
         "body": {
             "representation": "storage",
-            "value": format!("<p>{}</p>", comment)
+            "value": format!("<p>{}</p>", escape_storage_text(comment))
         }
     });
+    if let Some(parent) = parent {
+        payload["parentCommentId"] = json!(parent);
+    }
+    payload
+}
+
+/// Add a comment to a page, or reply to an existing thread.
+///
+/// `kind` selects the collection. It matters for replies: an inline thread only
+/// accepts replies posted to `inline-comments`. The `kind` column on
+/// `page comments` tells you which to pass.
+pub async fn add_page_comment(
+    ctx: &ConfluenceContext<'_>,
+    page_id: &str,
+    comment: &str,
+    parent: Option<&str>,
+    kind: CommentKind,
+) -> Result<()> {
+    let payload = comment_payload(page_id, comment, parent);
 
     #[derive(Deserialize)]
     struct CreateResponse {
@@ -630,15 +795,28 @@ pub async fn add_page_comment(
 
     let response: CreateResponse = ctx
         .client
-        .post("/wiki/api/v2/footer-comments", &payload)
+        .post(&format!("/wiki/api/v2/{}", kind.collection()), &payload)
         .await
-        .with_context(|| format!("Failed to add comment to page {}", page_id))?;
+        .with_context(|| match parent {
+            Some(parent) => format!("Failed to reply to comment {parent}"),
+            None => format!("Failed to add comment to page {}", page_id),
+        })?;
 
-    tracing::info!(page_id = %page_id, comment_id = %response.id, "Comment added successfully");
+    tracing::info!(
+        page_id = %page_id,
+        comment_id = %response.id,
+        kind = kind.as_str(),
+        is_reply = parent.is_some(),
+        "Comment added successfully"
+    );
+    let message = match parent {
+        Some(parent) => format!("Replied to comment {parent} on page {page_id}"),
+        None => format!("Added comment to page {page_id}"),
+    };
     render_success(
         ctx.renderer,
-        &format!("✅ Added comment to page {page_id} (ID: {})", response.id),
-        &MutationResult::with_id(format!("Added comment to page {page_id}"), &response.id),
+        &format!("✅ {message} (ID: {})", response.id),
+        &MutationResult::with_id(message, &response.id),
     )
 }
 

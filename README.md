@@ -189,7 +189,9 @@ crates/
    atlassian-cli confluence page add-label 12345 documentation
    atlassian-cli confluence page remove-label 12345 outdated
    atlassian-cli confluence page comments 12345
+   atlassian-cli confluence page comments 12345 --replies   # walk each thread
    atlassian-cli confluence page add-comment 12345 "Great work!"
+   atlassian-cli confluence page add-comment 12345 "Agreed" --parent 98765 --kind inline
    atlassian-cli confluence page get-restrictions 12345
    atlassian-cli confluence page add-restriction 12345 --operation update --subject-type user --subject-id 5b10a2844c20165700ede21g
    atlassian-cli confluence page remove-restriction 12345 --operation update --subject-type user --subject-id 5b10a2844c20165700ede21g
