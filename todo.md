@@ -1617,3 +1617,9 @@ Patch: one user-facing fix, no new surface.
 
 - Base URLs carrying a path lost their last segment, because `Url::join` replaces the base's final segment unless the base ends with `/` (#125, @shohi). This broke the API-gateway form that scoped API tokens require (`https://api.atlassian.com/ex/jira/<cloudId>`) and, by the same root cause, any self-hosted product behind a context path such as `https://example.com/bamboo`. Normalised once in `ApiClient::new`, so configs written before the fix are corrected on load rather than needing a hand-edit.
 - Verified no currently-working profile moves: Jira, Confluence, attachment download links, Bitbucket and Opsgenie all resolve byte-identically, and that is now a table test.
+
+## 2026-08-22 — Release 0.7.2
+
+Patch. `auth login --help` printed the value of `ATLASSIAN_API_TOKEN` (#126, @shohi): clap renders an `env` annotation's *value* in help output unless told not to, so anyone with the variable exported disclosed their token by asking for help, including in CI logs, where masking covers registered secrets rather than arbitrary command output. Fixed with `hide_env_values`; the variable is still advertised, just not its value.
+
+Verified against the published 0.7.1 binary, not only a local build. `env = "` appears exactly once in the workspace, so this is the whole of the exposure; the per-profile and Bitbucket token fallbacks are read via `std::env::var` and never reach help output.
