@@ -152,7 +152,9 @@ pub struct LoginArgs {
     #[arg(long)]
     pub email: Option<String>,
     /// API token to store securely (falls back to ATLASSIAN_API_TOKEN env or interactive prompt).
-    #[arg(long, env = "ATLASSIAN_API_TOKEN")]
+    // `hide_env_values` keeps `--help` from printing the token itself; clap
+    // shows the variable's value by default.
+    #[arg(long, env = "ATLASSIAN_API_TOKEN", hide_env_values = true)]
     pub token: Option<String>,
     /// Mark this profile as the default one.
     #[arg(long)]
