@@ -6,7 +6,10 @@ endorsed by, sponsored by, or maintained by Atlassian.
 ## Scope
 
 `atlassian-cli` runs entirely on the user's own machine. API tokens are stored
-locally with AES-256-GCM encryption (`~/.config/atlassian-cli/credentials`). The
+locally with AES-256-GCM encryption, in `credentials.enc` inside the config
+directory (`~/.config/atlassian-cli` by default; see the README for how that is
+chosen). On Unix the directory is `0700` and the files `0600`. Windows has no
+equivalent mode, and relies on `%LOCALAPPDATA%` being user-only. The
 project and the `atlassiancli.com` website never receive, transmit, or process
 user Atlassian credentials.
 

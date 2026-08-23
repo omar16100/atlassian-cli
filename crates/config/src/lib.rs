@@ -1,76 +1,12 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
 
 use indexmap::IndexMap;
 
+pub mod paths;
+pub use paths::{ConfigDirSource, ConfigPaths, PathEnv};
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use tracing::info;
-
-const NEW_CONFIG_DIR: &str = ".atlassian-cli";
-const OLD_CONFIG_DIR: &str = ".atlcli";
-const CONFIG_FILENAME: &str = "config.yaml";
-
-/// Result of config directory migration attempt.
-#[derive(Debug)]
-pub enum MigrationResult {
-    /// No migration needed (new config exists or old doesn't)
-    NotNeeded,
-    /// Migration was performed successfully
-    Migrated { from: PathBuf, to: PathBuf },
-    /// Migration failed with an error
-    Failed(String),
-}
-
-/// Check and perform migration from old config directory (~/.atlcli/) to new one (~/.atlassian-cli/).
-/// Copies config file if old exists and new doesn't. Does not delete old config.
-pub fn migrate_config_if_needed() -> MigrationResult {
-    let home = match dirs::home_dir() {
-        Some(h) => h,
-        None => return MigrationResult::NotNeeded,
-    };
-
-    let old_config = home.join(OLD_CONFIG_DIR).join(CONFIG_FILENAME);
-    let new_config = home.join(NEW_CONFIG_DIR).join(CONFIG_FILENAME);
-
-    // Only migrate if old exists AND new doesn't
-    if !old_config.exists() || new_config.exists() {
-        return MigrationResult::NotNeeded;
-    }
-
-    // Create new directory
-    let new_dir = home.join(NEW_CONFIG_DIR);
-    if let Err(e) = fs::create_dir_all(&new_dir) {
-        return MigrationResult::Failed(format!(
-            "Failed to create directory {}: {}",
-            new_dir.display(),
-            e
-        ));
-    }
-
-    // Copy config file (not move - user can clean up old manually)
-    if let Err(e) = fs::copy(&old_config, &new_config) {
-        return MigrationResult::Failed(format!(
-            "Failed to copy config from {} to {}: {}",
-            old_config.display(),
-            new_config.display(),
-            e
-        ));
-    }
-
-    info!(
-        "Migrated config from {} to {}",
-        old_config.display(),
-        new_config.display()
-    );
-
-    MigrationResult::Migrated {
-        from: old_config,
-        to: new_config,
-    }
-}
 
 /// Represents the full CLI configuration stored on disk.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -82,40 +18,52 @@ pub struct Config {
 }
 
 impl Config {
-    /// Load configuration from the provided path or the default config file.
-    pub fn load<P: AsRef<Path>>(path: Option<P>) -> Result<Self> {
-        let path = path
-            .map(|p| p.as_ref().to_path_buf())
-            .unwrap_or_else(Config::default_path);
+    /// Load configuration from an explicit path.
+    pub fn load_from(path: &Path) -> Result<Self> {
+        Self::read(path)
+    }
 
+    /// Load configuration from the provided path or the resolved config file.
+    pub fn load<P: AsRef<Path>>(path: Option<P>) -> Result<Self> {
+        let path = match path {
+            Some(p) => p.as_ref().to_path_buf(),
+            None => ConfigPaths::resolve()?.config_file(),
+        };
+        Self::read(&path)
+    }
+
+    fn read(path: &Path) -> Result<Self> {
         if !path.exists() {
             return Ok(Config::default());
         }
 
-        let raw = fs::read_to_string(&path)
+        let raw = fs::read_to_string(path)
             .with_context(|| format!("Unable to read config file at {}", path.display()))?;
 
         serde_yaml::from_str(&raw)
             .with_context(|| format!("Malformed YAML in config file {}", path.display()))
     }
 
-    /// Persist the configuration to disk, creating parent directories if needed.
-    pub fn save<P: AsRef<Path>>(&self, path: Option<P>) -> Result<()> {
-        let path = path
-            .map(|p| p.as_ref().to_path_buf())
-            .unwrap_or_else(Config::default_path);
-
+    /// Persist the configuration to an explicit path.
+    ///
+    /// Written owner-only: a profile can carry a plaintext `api_token`, and this
+    /// used to land with whatever the umask allowed.
+    pub fn save_to(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).with_context(|| {
-                format!("Unable to create config directory {}", parent.display())
-            })?;
+            paths::create_private_dir(parent)?;
         }
 
         let serialized = serde_yaml::to_string(self)?;
-        fs::write(&path, serialized)
-            .with_context(|| format!("Unable to write config file {}", path.display()))?;
+        paths::write_private(path, serialized.as_bytes())
+    }
 
-        Ok(())
+    /// Persist the configuration to the provided path or the resolved config file.
+    pub fn save<P: AsRef<Path>>(&self, path: Option<P>) -> Result<()> {
+        let path = match path {
+            Some(p) => p.as_ref().to_path_buf(),
+            None => ConfigPaths::resolve()?.config_file(),
+        };
+        self.save_to(&path)
     }
 
     /// Convenience helper to retrieve a profile by name.
@@ -139,13 +87,6 @@ impl Config {
         } else {
             None
         }
-    }
-
-    fn default_path() -> PathBuf {
-        let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        path.push(".atlassian-cli");
-        path.push("config.yaml");
-        path
     }
 }
 

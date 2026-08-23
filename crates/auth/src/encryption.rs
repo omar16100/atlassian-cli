@@ -133,7 +133,7 @@ mod tests {
 
     /// Cross-version known-answer test. This nonce/ciphertext pair was produced by
     /// the aes-gcm 0.10 build (the version that wrote users' existing
-    /// `~/.atlassian-cli/credentials.enc` files). Decrypting it here proves the
+    /// `credentials.enc` files). Decrypting it here proves the
     /// aes-gcm 0.11 upgrade did not change the on-disk format and that stored
     /// credentials still open. Every other test in this module is a same-process
     /// round-trip and would pass even if the format silently changed.

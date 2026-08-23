@@ -46,6 +46,7 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 | Document | Date | What it covers |
 | --- | --- | --- |
 | [16082026_bb_pr_reviewer_status.md](16082026_bb_pr_reviewer_status.md) | 2026-08-16 | `bb pr reviewers` listing with approval status, `--all`, and the `--add` endpoint fix |
+| [23082026_xdg_config_paths.md](23082026_xdg_config_paths.md) | 2026-08-23 | XDG config directory resolution, `--config-dir`, legacy migration and 0600/0700 permissions |
 | [22082026_confluence_inline_comments.md](22082026_confluence_inline_comments.md) | 2026-08-22 | Confluence inline comments, thread replies, cursor pagination and storage-format escaping |
 | [20082026_bitbucket_pr_inline_comments.md](20082026_bitbucket_pr_inline_comments.md) | 2026-08-20 | Inline pull request comments: `bb pr comment --path/--line/--side`, and the `location` column on `pr comments` |
 | [10082026_raw_api_passthrough.md](10082026_raw_api_passthrough.md) | 2026-08-10 | `jira api` raw authenticated REST passthrough, `ApiClient::request_raw`, origin and redirect safety |

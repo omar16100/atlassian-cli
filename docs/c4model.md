@@ -94,7 +94,7 @@ Shows the internal structure of atlassian-cli as a Rust workspace with 6 crates.
                  ┌──────────────────┐                    ┌──────────────────┐
                  │ credentials.enc  │                    │   config.yaml    │
                  │                  │                    │                  │
-                 │ ~/.atlassian-cli/│                    │ ~/.atlassian-cli/│
+                 │ config directory │                    │ config directory │
                  │ (Encrypted)      │                    │ (YAML)           │
                  └──────────────────┘                    └──────────────────┘
                            │
@@ -114,7 +114,7 @@ Shows the internal structure of atlassian-cli as a Rust workspace with 6 crates.
 | `cli` | Binary | ~1100 | Command parsing, routing, orchestration |
 | `api` | Library | ~800 | HTTP client wrapper with resilience |
 | `auth` | Library | ~400 | Credential encryption & storage |
-| `config` | Library | ~300 | YAML configuration management |
+| `config` | Library | ~700 | YAML configuration, and resolving where the config directory lives |
 | `output` | Library | ~250 | Output format rendering |
 | `bulk` | Library | ~350 | Concurrent execution engine |
 
@@ -178,6 +178,24 @@ Shows the internal structure of atlassian-cli as a Rust workspace with 6 crates.
 ```
 
 #### Command Modules
+
+#### Configuration directory
+
+`config.yaml`, `credentials` and `credentials.enc` all live in one directory,
+resolved by `crates/config/src/paths.rs`:
+
+1. `$ATLASSIAN_CLI_CONFIG_DIR` or `--config-dir`
+2. `$XDG_CONFIG_HOME/atlassian-cli`
+3. `~/.config/atlassian-cli` (`%LOCALAPPDATA%\atlassian-cli` on Windows)
+4. a legacy `~/.atlassian-cli` or `~/.atlcli` that still holds those files
+
+`auth` does not resolve this itself: `CredentialStore` is constructed with the
+directory by `main`, which is what keeps the directory movable and keeps `auth`
+free of a dependency on `config`. `--config` overrides the config *file* only,
+so a shared or read-only config does not imply writing credentials beside it.
+
+A legacy directory is migrated on first use: files are staged and promoted with
+one atomic rename, then the original is renamed to `.migrated`.
 
 **Shared (`commands/`):**
 - `api.rs` - Raw authenticated REST passthrough (`jira api`), product-agnostic;
@@ -338,7 +356,7 @@ pub struct ApiClient {
 │  ┌───────────────────────────┐                                           │
 │  │    credentials.enc        │                                           │
 │  │                           │                                           │
-│  │  ~/.atlassian-cli/        │                                           │
+│  │  in the config directory  │                                           │
 │  │  (0600 permissions)       │                                           │
 │  └───────────────────────────┘                                           │
 │                                                                            │
@@ -383,7 +401,7 @@ pub struct ApiClient {
 │  ┌───────────────────────────┐                                            │
 │  │      config.yaml          │                                            │
 │  │                           │                                            │
-│  │  ~/.atlassian-cli/        │                                            │
+│  │  in the config directory  │                                            │
 │  └───────────────────────────┘                                            │
 │                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -392,7 +410,7 @@ pub struct ApiClient {
 #### Configuration Structure
 
 ```yaml
-# ~/.atlassian-cli/config.yaml
+# ~/.config/atlassian-cli/config.yaml
 default_profile: work
 profiles:
   work:

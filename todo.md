@@ -1623,3 +1623,62 @@ Patch: one user-facing fix, no new surface.
 Patch. `auth login --help` printed the value of `ATLASSIAN_API_TOKEN` (#126, @shohi): clap renders an `env` annotation's *value* in help output unless told not to, so anyone with the variable exported disclosed their token by asking for help, including in CI logs, where masking covers registered secrets rather than arbitrary command output. Fixed with `hide_env_values`; the variable is still advertised, just not its value.
 
 Verified against the published 0.7.1 binary, not only a local build. `env = "` appears exactly once in the workspace, so this is the whole of the exposure; the per-profile and Bitbucket token fallbacks are read via `std::env::var` and never reach help output.
+
+## 2026-08-23 — XDG config paths (issue #127, branch `feat/xdg-config-paths`)
+
+Plan: `/Users/macmini/.claude/plans/https-github-com-omar16100-atlassian-cli-binary-rossum.md`.
+
+### Step 1: hermetic tests
+
+Every test that spawns the CLI now goes through `crates/cli/tests/common/mod.rs`, which redirects `HOME` and `ATLASSIAN_CLI_CONFIG_DIR` at a scratch directory and clears the token variables. Without this, making the config directory movable would mean `cargo test` relocating a developer's real configuration.
+
+- `cli_integration.rs` converted from `cargo run --quiet --` to the compiled binary. Going through cargo forced a choice between leaving `HOME` alone (no isolation) and redirecting it (cargo then looks for `~/.cargo` in a temp dir and re-downloads everything). Side benefit: that file went from ~4s to 1.4s.
+- The seven e2e/docs harnesses already passed `--config`, which moves only the config file, so credential lookup still reached `$HOME`. Each now sets the scratch directory too.
+- Verified: `ls -la ~/.atlassian-cli` is byte-identical before and after a full `cargo test --all`.
+- Still outstanding at this point: the auth crate's own unit tests write to the real `~/.atlassian-cli/credentials.enc` (confirmed by watching mtime advance during `cargo test -p atlassian-cli-auth`). Fixed by `CredentialStore` in the next step.
+
+### Steps 2-5: resolver, CredentialStore, wiring
+
+- `crates/config/src/paths.rs`: `ConfigPaths` resolves `$ATLASSIAN_CLI_CONFIG_DIR` → `$XDG_CONFIG_HOME/atlassian-cli` → `~/.config/atlassian-cli` → a populated legacy dir. Resolution is a pure function over an injected `PathEnv` plus a `populated` probe, so its 17 tests need no `set_var` and no lock.
+- `~/.config` on macOS as well: `dirs::config_dir()` would give `~/Library/Application Support`. Windows uses `config_local_dir()` (`%LOCALAPPDATA%`), not the roaming one, because the encryption key derives from the machine id and a roamed `credentials.enc` cannot be decrypted elsewhere.
+- "Legacy" means *populated*, not merely present. A leftover empty `~/.atlassian-cli` must not pin someone on the old location nor trigger a migration that copies nothing.
+- A relative `$XDG_CONFIG_HOME` is ignored per the basedir spec; a relative `$ATLASSIAN_CLI_CONFIG_DIR` is honoured, since that one is ours and `./ci-config` is reasonable in CI. Asymmetry is deliberate.
+- `migrate_legacy_dir` stages into a temp directory and promotes with one atomic rename, then renames the original to `.migrated`. Staging matters: a half-copied target would make the next run choose the new directory and the user would appear logged out while their tokens sat in a directory the CLI no longer reads.
+- `CredentialStore` takes its directory instead of deriving one. That is what makes the directory movable, and it removed six `Cannot determine home directory` sites and the auth tests' dependence on a real home.
+- `write_private`: temp file at 0600 then rename. `OpenOptions::mode` only applies at creation, so an in-place write left an existing 0644 credentials file world-readable. `config.yaml` now gets the same treatment; it can hold a plaintext `api_token` and was written with whatever the umask allowed.
+- Verified by hand against scratch homes: all four resolution rules, 0700 dir and 0600 files, migration moving a real encrypted token that still decrypts afterwards (`has_jira_token: true`, which proves the key is not path-derived), a silent second run, and `--config` moving the config file while credentials stay in the resolved directory.
+
+### Steps 6-8: integration tests, docs, 0.8.0
+
+- `crates/cli/tests/config_paths.rs`: 12 end-to-end tests spawning the binary against a scratch `HOME`. The one that matters most asserts `has_jira_token: true` after a migration, which is the only way to prove the moved `credentials.enc` still decrypts (the key derives from machine id and username, not the path).
+- `docs_examples.rs` and `docs_examples_scripts.rs` now supply `--config` only when the documented command does not name one itself. Without that, a README example using `--config` failed as "cannot be used multiple times" — a harness limitation masquerading as a broken example.
+- README gains a Configuration Location section. `SECURITY.md` had been claiming `~/.config/atlassian-cli/credentials` all along, so it is now accurate rather than aspirational; it also states plainly that Windows has no 0600 equivalent.
+- `docs/c4model.md`: config-directory resolution recorded, ASCII diagrams re-aligned after the path substitution widened them.
+- 0.8.0, not a patch: `MigrationResult` and `migrate_config_if_needed` are gone from the config crate, and auth's free functions became `CredentialStore` methods. Both crates are published. The CLI's own behaviour stays backward compatible.
+
+### Self-review finding: do not re-permission a directory we did not create
+
+Both external reviewers were unavailable (codex out of credits, kimi membership error), so I reviewed this myself against the same checklist and found a real bug I had introduced.
+
+`create_private_dir` tightened whatever directory it wrote into. So `ATLASSIAN_CLI_CONFIG_DIR=$HOME` chmodded the home directory to 0700, and `--config /shared/team.yaml` chmodded `/shared`. Silently changing permissions on a directory the user chose is overreach, and hard to notice.
+
+Now only a directory we create gets a mode; an existing one is left exactly as found. Our own files are still written 0600 regardless of where they land, because the file holds the token. Regression tests at both the unit and end-to-end level.
+
+Also verified by hand: six concurrent migrations produce one migrated directory, one archive, no staging litter and a token that still decrypts; a legacy directory that is a symlink to the new location is left alone with no bogus archive; `$XDG_CONFIG_HOME` or the config dir pointing at a file degrades to a clear path-bearing error rather than a panic.
+
+### Fable review of PR #130: three MAJORs, all reproduced against the built binary before fixing
+
+Verdict was "not safe to merge yet". Each finding was reproduced by hand first, so none was taken on trust, and each fix has a test that was proved to fail without it.
+
+1. **A blank `ATLASSIAN_CLI_CONFIG_DIR` hard-failed every command.** `env ATLASSIAN_CLI_CONFIG_DIR="" atlassian-cli auth list` → `error: a value is required for '--config-dir <CONFIG_DIR>'`. The cause was clap's `env = ` on the flag, which rejects a set-but-empty variable before any of our code runs. The resolver's own `non_empty` handles blanks correctly, so its unit test was covering a path the binary bypassed. Dropped `env = ` and let `PathEnv::from_process` read the variable, which it already did; `--help` still names it.
+2. **The archived plaintext token was stranded.** After migrating a legacy directory holding a plaintext `credentials`, `~/.atlassian-cli.migrated/credentials` kept a second readable copy indefinitely, and the notice never mentioned it. Before this PR the next `auth login` shredded the only copy. Now the archived one is overwritten and removed after the promote succeeds, and the user is told. Nothing else in the archive is touched.
+3. **A target directory that existed but held none of our files could never be migrated into.** A single `.DS_Store` gave `Directory not empty (os error 66)`, a symlinked config directory gave `Not a directory (os error 20)`, and both printed the same warning on every command forever. The symlink case is the workaround people used while this feature did not exist, so it hit exactly the users who asked for it. Falls back to promoting each file with its own atomic rename, rolling back the ones already moved if any fails, so the all-or-nothing property staging exists for is kept. A symlinked target keeps its symlink.
+
+Also from the same review, smaller:
+
+- `write_private` used `create(true)` on a pid-derived temp name in both crates, so an attacker-planted symlink at that path would have been followed and the token written wherever it pointed. Now `create_new(true)`, and a leftover is cleared only after `symlink_metadata` confirms it is a regular file.
+- The test `Sandbox` named three token variables to strip. Tokens are also read per profile from `ATLASSIAN_CLI_TOKEN_<PROFILE>`, so a developer with `ATLASSIAN_CLI_TOKEN_WORK` exported would have made the migration test pass without a byte read from disk. It now strips every `ATLASSIAN_*`, `BITBUCKET_*`, `JIRA_*` and `CONFLUENCE_*` variable, which also covers whatever gets added next.
+
+Still not addressed, deliberately: the concurrent `set_encrypted` lost-update race, and no Windows CI while Windows binaries ship.
+
+Re-review of the follow-up commit came back safe to merge, with one minor worth fixing first: `scrub_file` used `fs::metadata`, which follows symlinks, so a `credentials` symlinked into a dotfiles repository had its *target* zeroed in place. Reproduced: 21 bytes of a git-managed file replaced with nulls. No token was lost (the copy is taken through the same link first) and shredding plaintext is the intent, but the file belongs to the user and is not in our directory. Now `symlink_metadata`: the link is removed, its target untouched, and nothing is reported as scrubbed since the plaintext still exists at the far end.

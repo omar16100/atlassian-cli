@@ -97,8 +97,24 @@ fn every_readme_command_parses() {
         .map(|line| {
             let args = split_args(line);
             let child = Command::new(BIN)
-                .arg("--config")
-                .arg(&config)
+                // Supply a config only when the example does not name one itself;
+                // otherwise clap rejects the flag as repeated and a
+                // perfectly good documented command looks broken.
+                .args(if args.iter().any(|a| a == "--config") {
+                    Vec::new()
+                } else {
+                    vec!["--config".to_string(), config.display().to_string()]
+                })
+                // Never resolve against the developer's real home.
+                .env("HOME", config.parent().unwrap_or_else(|| Path::new(".")))
+                .env(
+                    "ATLASSIAN_CLI_CONFIG_DIR",
+                    config.parent().unwrap_or_else(|| Path::new(".")),
+                )
+                .env_remove("XDG_CONFIG_HOME")
+                .env_remove("ATLASSIAN_API_TOKEN")
+                .env_remove("ATLASSIAN_BITBUCKET_TOKEN")
+                .env_remove("BITBUCKET_TOKEN")
                 .args(&args[1..])
                 .env("ATLASSIAN_CLI_TOKEN_T", "x")
                 .env("ATLASSIAN_CLI_BITBUCKET_TOKEN_T", "x")
