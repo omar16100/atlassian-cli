@@ -1647,3 +1647,11 @@ Every test that spawns the CLI now goes through `crates/cli/tests/common/mod.rs`
 - `CredentialStore` takes its directory instead of deriving one. That is what makes the directory movable, and it removed six `Cannot determine home directory` sites and the auth tests' dependence on a real home.
 - `write_private`: temp file at 0600 then rename. `OpenOptions::mode` only applies at creation, so an in-place write left an existing 0644 credentials file world-readable. `config.yaml` now gets the same treatment; it can hold a plaintext `api_token` and was written with whatever the umask allowed.
 - Verified by hand against scratch homes: all four resolution rules, 0700 dir and 0600 files, migration moving a real encrypted token that still decrypts afterwards (`has_jira_token: true`, which proves the key is not path-derived), a silent second run, and `--config` moving the config file while credentials stay in the resolved directory.
+
+### Steps 6-8: integration tests, docs, 0.8.0
+
+- `crates/cli/tests/config_paths.rs`: 12 end-to-end tests spawning the binary against a scratch `HOME`. The one that matters most asserts `has_jira_token: true` after a migration, which is the only way to prove the moved `credentials.enc` still decrypts (the key derives from machine id and username, not the path).
+- `docs_examples.rs` and `docs_examples_scripts.rs` now supply `--config` only when the documented command does not name one itself. Without that, a README example using `--config` failed as "cannot be used multiple times" — a harness limitation masquerading as a broken example.
+- README gains a Configuration Location section. `SECURITY.md` had been claiming `~/.config/atlassian-cli/credentials` all along, so it is now accurate rather than aspirational; it also states plainly that Windows has no 0600 equivalent.
+- `docs/c4model.md`: config-directory resolution recorded, ASCII diagrams re-aligned after the path substitution widened them.
+- 0.8.0, not a patch: `MigrationResult` and `migrate_config_if_needed` are gone from the config crate, and auth's free functions became `CredentialStore` methods. Both crates are published. The CLI's own behaviour stays backward compatible.

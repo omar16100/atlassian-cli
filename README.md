@@ -66,7 +66,7 @@ crates/
   cli/       # Clap-based binary entry point
   api/       # Thin HTTP client wrapper (reqwest)
   auth/      # Encrypted credential storage (AES-256-GCM)
-  config/    # YAML profile loader (~/.atlassian-cli/config.yaml)
+  config/    # YAML profile loader + config-directory resolution
   output/    # Output formatting helpers (table/json/yaml/csv/quiet)
   bulk/      # Concurrency + dry-run aware executor
 ```
@@ -98,11 +98,11 @@ crates/
      --token $ATLASSIAN_API_TOKEN \
      --default
    ```
-6. List configured profiles (reads `~/.atlassian-cli/config.yaml` if present):
+6. List configured profiles (reads `~/.config/atlassian-cli/config.yaml` if present):
    ```bash
    atlassian-cli auth list
    ```
-   *Tip:* Use `cp configs/config.example.yaml ~/.atlassian-cli/config.yaml` as a starting point before running the login command.
+   *Tip:* Use `cp configs/config.example.yaml ~/.config/atlassian-cli/config.yaml` as a starting point before running the login command.
 7. Try the Jira, Confluence, Bitbucket, and JSM commands (requires real data):
    ```bash
    # Jira - Issues
@@ -293,6 +293,46 @@ crates/
    atlassian-cli jsm request get SD-123
    ```
 
+## Configuration Location
+
+`config.yaml` and the encrypted credentials live in one directory, chosen in this
+order:
+
+1. `$ATLASSIAN_CLI_CONFIG_DIR`, or `--config-dir`
+2. `$XDG_CONFIG_HOME/atlassian-cli`
+3. `~/.config/atlassian-cli`
+4. `~/.atlassian-cli` (or the older `~/.atlcli`) if either still holds your files
+
+`~/.config` is used on macOS as well as Linux. On Windows the default is
+`%LOCALAPPDATA%\atlassian-cli`.
+
+```bash
+# Move everything, including credentials
+export ATLASSIAN_CLI_CONFIG_DIR=/tmp/ci-atlassian
+atlassian-cli --config-dir ./scratch auth list
+
+# Move just the config file; credentials stay in the config directory
+atlassian-cli --config ./team-config.yaml jira issue search --jql "project = DEV"
+```
+
+A relative `$XDG_CONFIG_HOME` is ignored, as the XDG base directory spec
+requires. A relative `$ATLASSIAN_CLI_CONFIG_DIR` is honoured, since that variable
+is this tool's own and `./ci-config` is a reasonable thing to write in a job with
+a fixed working directory.
+
+### Moving from `~/.atlassian-cli`
+
+An existing install is moved the first time you run any command: the files are
+copied to the new location and the old directory is renamed to
+`~/.atlassian-cli.migrated`. Nothing is deleted, and you are told where things
+went. The rename is deliberate — a lingering copy that is silently ignored is a
+trap, because anything you edit there later has no effect.
+
+Setting `$ATLASSIAN_CLI_CONFIG_DIR` skips the move entirely: an explicit choice
+is taken at face value.
+
+On Unix the directory is created `0700` and both files `0600`.
+
 ## Command Aliases
 
 For convenience, the following command aliases are available:
@@ -423,7 +463,7 @@ GitHub Actions workflow runs on every push/PR:
 
 **Phase 1 - Foundation** (100% complete)
 - ✅ Cargo workspace with modular crate structure
-- ✅ Config loader with profile support (~/.atlassian-cli/config.yaml)
+- ✅ Config loader with profile support (~/.config/atlassian-cli/config.yaml)
 - ✅ API token authentication (Basic auth with email+token)
 - ✅ HTTP client with retry, rate limiting, and pagination
 - ✅ Multi-format output (table/JSON/CSV/YAML/quiet)

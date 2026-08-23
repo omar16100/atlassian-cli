@@ -97,8 +97,14 @@ fn every_readme_command_parses() {
         .map(|line| {
             let args = split_args(line);
             let child = Command::new(BIN)
-                .arg("--config")
-                .arg(&config)
+                // Supply a config only when the example does not name one itself;
+                // otherwise clap rejects the flag as repeated and a
+                // perfectly good documented command looks broken.
+                .args(if args.iter().any(|a| a == "--config") {
+                    Vec::new()
+                } else {
+                    vec!["--config".to_string(), config.display().to_string()]
+                })
                 // Never resolve against the developer's real home.
                 .env("HOME", config.parent().unwrap_or_else(|| Path::new(".")))
                 .env(
