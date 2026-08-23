@@ -16,7 +16,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-dirs = "6"
+dirs.workspace = true
 # Security dependencies for credential encryption
 secrecy = "0.10"
 aes-gcm = "0.11"
@@ -25,6 +25,7 @@ machine-uid = "0.6"
 whoami = "2.1"
 
 [dev-dependencies]
+tempfile = "3.27"
 criterion.workspace = true
 
 [[bench]]

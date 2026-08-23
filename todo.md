@@ -1636,3 +1636,14 @@ Every test that spawns the CLI now goes through `crates/cli/tests/common/mod.rs`
 - The seven e2e/docs harnesses already passed `--config`, which moves only the config file, so credential lookup still reached `$HOME`. Each now sets the scratch directory too.
 - Verified: `ls -la ~/.atlassian-cli` is byte-identical before and after a full `cargo test --all`.
 - Still outstanding at this point: the auth crate's own unit tests write to the real `~/.atlassian-cli/credentials.enc` (confirmed by watching mtime advance during `cargo test -p atlassian-cli-auth`). Fixed by `CredentialStore` in the next step.
+
+### Steps 2-5: resolver, CredentialStore, wiring
+
+- `crates/config/src/paths.rs`: `ConfigPaths` resolves `$ATLASSIAN_CLI_CONFIG_DIR` → `$XDG_CONFIG_HOME/atlassian-cli` → `~/.config/atlassian-cli` → a populated legacy dir. Resolution is a pure function over an injected `PathEnv` plus a `populated` probe, so its 17 tests need no `set_var` and no lock.
+- `~/.config` on macOS as well: `dirs::config_dir()` would give `~/Library/Application Support`. Windows uses `config_local_dir()` (`%LOCALAPPDATA%`), not the roaming one, because the encryption key derives from the machine id and a roamed `credentials.enc` cannot be decrypted elsewhere.
+- "Legacy" means *populated*, not merely present. A leftover empty `~/.atlassian-cli` must not pin someone on the old location nor trigger a migration that copies nothing.
+- A relative `$XDG_CONFIG_HOME` is ignored per the basedir spec; a relative `$ATLASSIAN_CLI_CONFIG_DIR` is honoured, since that one is ours and `./ci-config` is reasonable in CI. Asymmetry is deliberate.
+- `migrate_legacy_dir` stages into a temp directory and promotes with one atomic rename, then renames the original to `.migrated`. Staging matters: a half-copied target would make the next run choose the new directory and the user would appear logged out while their tokens sat in a directory the CLI no longer reads.
+- `CredentialStore` takes its directory instead of deriving one. That is what makes the directory movable, and it removed six `Cannot determine home directory` sites and the auth tests' dependence on a real home.
+- `write_private`: temp file at 0600 then rename. `OpenOptions::mode` only applies at creation, so an in-place write left an existing 0644 credentials file world-readable. `config.yaml` now gets the same treatment; it can hold a plaintext `api_token` and was written with whatever the umask allowed.
+- Verified by hand against scratch homes: all four resolution rules, 0700 dir and 0600 files, migration moving a real encrypted token that still decrypts afterwards (`has_jira_token: true`, which proves the key is not path-derived), a silent second run, and `--config` moving the config file while credentials stay in the resolved directory.

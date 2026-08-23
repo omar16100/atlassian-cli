@@ -2,7 +2,7 @@ use std::io::{IsTerminal, Write};
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
-use atlassian_cli_auth::{bitbucket_token_key, token_key, BITBUCKET_API_URL};
+use atlassian_cli_auth::{bitbucket_token_key, token_key, CredentialStore, BITBUCKET_API_URL};
 use atlassian_cli_config::Config;
 use atlassian_cli_output::OutputRenderer;
 use clap::{Args, Subcommand};
@@ -21,7 +21,7 @@ pub fn is_bitbucket_bearer(config: &Config, profile_name: &str) -> bool {
 }
 
 /// Multi-tier token lookup: env var → encrypted credentials → plaintext credentials (migration fallback)
-pub fn get_token(profile_name: &str) -> Option<String> {
+pub fn get_token(store: &CredentialStore, profile_name: &str) -> Option<String> {
     // 1. Check profile-specific env var: ATLASSIAN_CLI_TOKEN_{PROFILE}
     let profile_env_var = format!("ATLASSIAN_CLI_TOKEN_{}", profile_name.to_uppercase());
     std::env::var(&profile_env_var)
@@ -36,19 +36,16 @@ pub fn get_token(profile_name: &str) -> Option<String> {
         .or_else(|| {
             // 3. Try encrypted credentials file
             let secret_key = token_key(profile_name);
-            atlassian_cli_auth::get_secret_encrypted(&secret_key)
-                .ok()
-                .flatten()
-                .or_else(|| {
-                    // 4. Fallback to plaintext credentials (for migration)
-                    atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
-                })
+            store.get_encrypted(&secret_key).ok().flatten().or_else(|| {
+                // 4. Fallback to plaintext credentials (for migration)
+                store.get(&secret_key).ok().flatten()
+            })
         })
 }
 
 /// Multi-tier Bitbucket token lookup: env var → credentials file
 /// Note: Does NOT fall back to general token. Caller should handle fallback if needed.
-pub fn get_bitbucket_token(profile_name: &str) -> Option<String> {
+pub fn get_bitbucket_token(store: &CredentialStore, profile_name: &str) -> Option<String> {
     // 1. Profile-specific Bitbucket env var
     let profile_env_var = format!(
         "ATLASSIAN_CLI_BITBUCKET_TOKEN_{}",
@@ -72,13 +69,10 @@ pub fn get_bitbucket_token(profile_name: &str) -> Option<String> {
         .or_else(|| {
             // 4. Try encrypted credentials file
             let secret_key = bitbucket_token_key(profile_name);
-            atlassian_cli_auth::get_secret_encrypted(&secret_key)
-                .ok()
-                .flatten()
-                .or_else(|| {
-                    // 5. Fallback to plaintext credentials (for migration)
-                    atlassian_cli_auth::get_secret(&secret_key).ok().flatten()
-                })
+            store.get_encrypted(&secret_key).ok().flatten().or_else(|| {
+                // 5. Fallback to plaintext credentials (for migration)
+                store.get(&secret_key).ok().flatten()
+            })
         })
 }
 
@@ -194,15 +188,16 @@ pub async fn handle(
     command: AuthCommand,
     config: &mut Config,
     config_path: Option<&Path>,
+    store: &CredentialStore,
     renderer: &OutputRenderer,
 ) -> Result<()> {
     match command {
-        AuthCommand::Login(args) => login(args, config, config_path),
-        AuthCommand::Logout(args) => logout(args, config, config_path),
-        AuthCommand::List(args) => list_profiles(args, config, renderer),
-        AuthCommand::Status(args) => auth_status(args, config, renderer).await,
-        AuthCommand::Whoami(args) => whoami(args, config).await,
-        AuthCommand::Test(args) => test_auth(args, config).await,
+        AuthCommand::Login(args) => login(args, config, config_path, store),
+        AuthCommand::Logout(args) => logout(args, config, config_path, store),
+        AuthCommand::List(args) => list_profiles(args, config, store, renderer),
+        AuthCommand::Status(args) => auth_status(args, config, store, renderer).await,
+        AuthCommand::Whoami(args) => whoami(args, config, store).await,
+        AuthCommand::Test(args) => test_auth(args, config, store).await,
     }
 }
 
@@ -242,9 +237,14 @@ fn resolve_value(existing: Option<String>, label: &str, flag: &str) -> Result<St
     Ok(value)
 }
 
-fn login(mut args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -> Result<()> {
+fn login(
+    mut args: LoginArgs,
+    config: &mut Config,
+    config_path: Option<&Path>,
+    store: &CredentialStore,
+) -> Result<()> {
     // Migrate any existing plaintext credentials to encrypted storage
-    if let Ok(count) = atlassian_cli_auth::migrate_plaintext_to_encrypted() {
+    if let Ok(count) = store.migrate_plaintext_to_encrypted() {
         if count > 0 {
             tracing::info!(
                 credentials_migrated = count,
@@ -286,9 +286,9 @@ fn login(mut args: LoginArgs, config: &mut Config, config_path: Option<&Path>) -
     }
 
     if args.bitbucket {
-        login_bitbucket(&args, &token, config, config_path)
+        login_bitbucket(&args, &token, config, config_path, store)
     } else {
-        login_jira_confluence(&args, &token, config, config_path)
+        login_jira_confluence(&args, &token, config, config_path, store)
     }
 }
 
@@ -297,6 +297,7 @@ fn login_jira_confluence(
     token: &str,
     config: &mut Config,
     config_path: Option<&Path>,
+    store: &CredentialStore,
 ) -> Result<()> {
     let base_url_str = args
         .base_url
@@ -334,7 +335,8 @@ fn login_jira_confluence(
     }
 
     let secret_key = token_key(args.profile_name());
-    atlassian_cli_auth::set_secret_encrypted(&secret_key, token)
+    store
+        .set_encrypted(&secret_key, token)
         .context("Failed to store token in encrypted credentials file")?;
 
     config
@@ -354,6 +356,7 @@ fn login_bitbucket(
     token: &str,
     config: &mut Config,
     config_path: Option<&Path>,
+    store: &CredentialStore,
 ) -> Result<()> {
     let profile_entry = config
         .profiles
@@ -391,7 +394,8 @@ fn login_bitbucket(
 
     // Store Bitbucket token with _bitbucket suffix
     let secret_key = bitbucket_token_key(args.profile_name());
-    atlassian_cli_auth::set_secret_encrypted(&secret_key, token)
+    store
+        .set_encrypted(&secret_key, token)
         .context("Failed to store Bitbucket token in encrypted credentials file")?;
 
     config
@@ -408,7 +412,12 @@ fn login_bitbucket(
     Ok(())
 }
 
-fn logout(args: LogoutArgs, config: &mut Config, config_path: Option<&Path>) -> Result<()> {
+fn logout(
+    args: LogoutArgs,
+    config: &mut Config,
+    config_path: Option<&Path>,
+    store: &CredentialStore,
+) -> Result<()> {
     let _profile = config
         .profiles
         .get(&args.profile)
@@ -418,9 +427,9 @@ fn logout(args: LogoutArgs, config: &mut Config, config_path: Option<&Path>) -> 
         // Only remove Bitbucket token
         let secret_key = bitbucket_token_key(&args.profile);
         // Try encrypted first, then plaintext (for migration cleanup)
-        if let Err(e) = atlassian_cli_auth::delete_secret_encrypted(&secret_key) {
+        if let Err(e) = store.delete_encrypted(&secret_key) {
             debug!("No encrypted Bitbucket token to delete: {e}");
-            if let Err(e) = atlassian_cli_auth::delete_secret(&secret_key) {
+            if let Err(e) = store.delete(&secret_key) {
                 debug!("No plaintext Bitbucket token to delete: {e}");
             }
         }
@@ -429,18 +438,18 @@ fn logout(args: LogoutArgs, config: &mut Config, config_path: Option<&Path>) -> 
         // Remove both Jira and Bitbucket tokens
         let secret_key = token_key(&args.profile);
         // Try encrypted first, then plaintext (for migration cleanup)
-        if let Err(e) = atlassian_cli_auth::delete_secret_encrypted(&secret_key) {
+        if let Err(e) = store.delete_encrypted(&secret_key) {
             debug!("No encrypted Jira token to delete: {e}");
-            if let Err(e) = atlassian_cli_auth::delete_secret(&secret_key) {
+            if let Err(e) = store.delete(&secret_key) {
                 debug!("No plaintext Jira token to delete: {e}");
             }
         }
 
         let bb_secret_key = bitbucket_token_key(&args.profile);
         // Try encrypted first, then plaintext (for migration cleanup)
-        if let Err(e) = atlassian_cli_auth::delete_secret_encrypted(&bb_secret_key) {
+        if let Err(e) = store.delete_encrypted(&bb_secret_key) {
             debug!("No encrypted Bitbucket token to delete: {e}");
-            if let Err(e) = atlassian_cli_auth::delete_secret(&bb_secret_key) {
+            if let Err(e) = store.delete(&bb_secret_key) {
                 debug!("No plaintext Bitbucket token to delete: {e}");
             }
         }
@@ -465,7 +474,12 @@ fn logout(args: LogoutArgs, config: &mut Config, config_path: Option<&Path>) -> 
     Ok(())
 }
 
-fn list_profiles(args: ListArgs, config: &Config, renderer: &OutputRenderer) -> Result<()> {
+fn list_profiles(
+    args: ListArgs,
+    config: &Config,
+    store: &CredentialStore,
+    renderer: &OutputRenderer,
+) -> Result<()> {
     #[derive(Serialize)]
     struct Row<'a> {
         name: &'a str,
@@ -486,8 +500,8 @@ fn list_profiles(args: ListArgs, config: &Config, renderer: &OutputRenderer) -> 
 
     for name in profile_names {
         let profile = &config.profiles[name];
-        let has_jira_token = get_token(name).is_some();
-        let has_bitbucket_token = get_bitbucket_token(name).is_some();
+        let has_jira_token = get_token(store, name).is_some();
+        let has_bitbucket_token = get_bitbucket_token(store, name).is_some();
 
         // Only show profiles with at least one active token, unless --all is specified
         if !args.all && !has_jira_token && !has_bitbucket_token {
@@ -553,7 +567,7 @@ fn read_token_from_stdin(args: &LoginArgs) -> Result<String> {
     Ok(token.trim().to_owned())
 }
 
-async fn whoami(args: WhoamiArgs, config: &Config) -> Result<()> {
+async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
@@ -564,7 +578,7 @@ async fn whoami(args: WhoamiArgs, config: &Config) -> Result<()> {
         .context("Profile missing base_url")?;
     let email = profile.email.as_deref().context("Profile missing email")?;
 
-    let token = get_token(profile_name).ok_or_else(|| {
+    let token = get_token(store, profile_name).ok_or_else(|| {
         anyhow!(
             "No token found for profile '{profile_name}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login`",
             profile_name.to_uppercase()
@@ -596,7 +610,7 @@ async fn whoami(args: WhoamiArgs, config: &Config) -> Result<()> {
     Ok(())
 }
 
-async fn test_auth(args: TestArgs, config: &Config) -> Result<()> {
+async fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
@@ -604,19 +618,24 @@ async fn test_auth(args: TestArgs, config: &Config) -> Result<()> {
     if args.bitbucket {
         let is_bearer = is_bitbucket_bearer(config, profile_name);
         let email = profile.email.as_deref().unwrap_or("");
-        test_bitbucket_auth(profile_name, email, is_bearer).await
+        test_bitbucket_auth(store, profile_name, email, is_bearer).await
     } else {
         let email = profile.email.as_deref().context("Profile missing email")?;
         let base_url = profile
             .base_url
             .as_deref()
             .context("Profile missing base_url. For Bitbucket, use --bitbucket flag.")?;
-        test_jira_auth(profile_name, email, base_url).await
+        test_jira_auth(store, profile_name, email, base_url).await
     }
 }
 
-async fn test_jira_auth(profile_name: &str, email: &str, base_url: &str) -> Result<()> {
-    let token = get_token(profile_name).ok_or_else(|| {
+async fn test_jira_auth(
+    store: &CredentialStore,
+    profile_name: &str,
+    email: &str,
+    base_url: &str,
+) -> Result<()> {
+    let token = get_token(store, profile_name).ok_or_else(|| {
         anyhow!("No Jira token found for profile '{profile_name}'. Run `atlassian-cli auth login`")
     })?;
 
@@ -647,8 +666,13 @@ async fn test_jira_auth(profile_name: &str, email: &str, base_url: &str) -> Resu
     }
 }
 
-async fn test_bitbucket_auth(profile_name: &str, email: &str, is_bearer: bool) -> Result<()> {
-    let token = get_bitbucket_token(profile_name).ok_or_else(|| {
+async fn test_bitbucket_auth(
+    store: &CredentialStore,
+    profile_name: &str,
+    email: &str,
+    is_bearer: bool,
+) -> Result<()> {
+    let token = get_bitbucket_token(store, profile_name).ok_or_else(|| {
         anyhow!(
             "No Bitbucket token found for profile '{profile_name}'. \
             Set BITBUCKET_TOKEN or ATLASSIAN_CLI_BITBUCKET_TOKEN_{} env var, \
@@ -732,7 +756,12 @@ async fn test_bitbucket_auth(profile_name: &str, email: &str, is_bearer: bool) -
     }
 }
 
-async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRenderer) -> Result<()> {
+async fn auth_status(
+    args: StatusArgs,
+    config: &Config,
+    store: &CredentialStore,
+    renderer: &OutputRenderer,
+) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
@@ -750,7 +779,7 @@ async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRendere
 
     // Check Jira/Confluence
     let jira_status = if let Some(base_url) = profile.base_url.as_deref() {
-        if let Some(token) = get_token(profile_name) {
+        if let Some(token) = get_token(store, profile_name) {
             let client = atlassian_cli_api::ApiClient::new(base_url)
                 .ok()
                 .map(|c| c.with_basic_auth(email, &token));
@@ -795,7 +824,7 @@ async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRendere
 
     // Check Bitbucket
     let bb_is_bearer = is_bitbucket_bearer(config, profile_name);
-    let bb_status = if let Some(token) = get_bitbucket_token(profile_name) {
+    let bb_status = if let Some(token) = get_bitbucket_token(store, profile_name) {
         let client = if bb_is_bearer {
             atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)
                 .ok()
@@ -873,7 +902,7 @@ async fn auth_status(args: StatusArgs, config: &Config, renderer: &OutputRendere
 
     // Check Bamboo
     let bamboo_status = if profile.bamboo_base_url.is_some() || profile.base_url.is_some() {
-        if get_token(profile_name).is_some() {
+        if get_token(store, profile_name).is_some() {
             let base_url = profile
                 .bamboo_base_url
                 .as_deref()

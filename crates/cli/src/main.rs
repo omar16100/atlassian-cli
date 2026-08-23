@@ -7,8 +7,10 @@ use std::path::PathBuf;
 use anyhow::{anyhow, Result};
 use atlassian_cli_api::error::ApiError;
 use atlassian_cli_api::ApiClient;
+use atlassian_cli_auth::CredentialStore;
 use atlassian_cli_auth::BITBUCKET_API_URL;
-use atlassian_cli_config::{migrate_config_if_needed, Config, MigrationResult};
+use atlassian_cli_config::paths::{migrate_legacy_dir, DirMigration};
+use atlassian_cli_config::{Config, ConfigPaths};
 use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Parser, Subcommand};
 use commands::auth::{self, AuthCommand};
@@ -26,9 +28,20 @@ struct Cli {
     #[arg(short, long, global = true)]
     profile: Option<String>,
 
-    /// Path to config file (defaults to ~/.atlassian-cli/config.yaml)
+    /// Path to the config file. Moves config.yaml only; credentials stay in the
+    /// config directory. Use --config-dir to move everything
     #[arg(long, global = true)]
     config: Option<PathBuf>,
+
+    /// Directory holding config.yaml and credentials
+    /// (default: $XDG_CONFIG_HOME/atlassian-cli, else ~/.config/atlassian-cli)
+    #[arg(
+        long,
+        global = true,
+        env = "ATLASSIAN_CLI_CONFIG_DIR",
+        hide_env_values = true
+    )]
+    config_dir: Option<PathBuf>,
 
     /// Output format for command results (table, json, yaml, csv, quiet, markdown)
     #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Table, global = true)]
@@ -97,13 +110,18 @@ async fn run() -> Result<()> {
     };
     init_tracing(cli.debug)?;
 
-    // Perform config directory migration if needed (only when no custom path specified)
-    if cli.config.is_none() {
-        handle_migration();
-    }
+    // Resolve where our files live, then move a legacy directory if that is what
+    // we landed on. Unlike the old config-file migration this runs even with
+    // --config, because that flag moves only the config file and the credentials
+    // still come from the resolved directory.
+    let paths = ConfigPaths::resolve_from(cli.config_dir.clone())?;
+    let (paths, migration) = migrate_legacy_dir(paths);
+    report_migration(&migration);
+    let paths = paths.with_config_file_override(cli.config.clone());
+    let store = CredentialStore::new(paths.dir());
 
-    let config_path = cli.config.clone();
-    let mut config = Config::load(config_path.as_ref())?;
+    let config_path = Some(paths.config_file());
+    let mut config = Config::load_from(&paths.config_file())?;
     let renderer = OutputRenderer::new(cli.format).with_envelope(cli.envelope);
 
     // Validate profile selection for destructive commands
@@ -112,17 +130,17 @@ async fn run() -> Result<()> {
 
     match cli.command {
         AtlassianCommand::Jira(args) => {
-            let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
+            let profile = resolve_profile_for_product(&config, cli.profile.as_deref(), &store)?;
             let client = build_product_client(&profile)?;
             commands::jira::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Confluence(args) => {
-            let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
+            let profile = resolve_profile_for_product(&config, cli.profile.as_deref(), &store)?;
             let client = build_product_client(&profile)?;
             commands::confluence::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Bitbucket(args) => {
-            let profile = resolve_profile_for_bitbucket(&config, cli.profile.as_deref())?;
+            let profile = resolve_profile_for_bitbucket(&config, cli.profile.as_deref(), &store)?;
             let client = build_bitbucket_client(&profile)?;
             commands::bitbucket::execute(
                 args,
@@ -135,7 +153,7 @@ async fn run() -> Result<()> {
             .await?
         }
         AtlassianCommand::Jsm(args) => {
-            let profile = resolve_profile_for_product(&config, cli.profile.as_deref())?;
+            let profile = resolve_profile_for_product(&config, cli.profile.as_deref(), &store)?;
             let client = build_product_client(&profile)?;
             commands::jsm::execute(args, client, &renderer).await?
         }
@@ -145,12 +163,19 @@ async fn run() -> Result<()> {
             commands::opsgenie::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Bamboo(args) => {
-            let profile = resolve_profile_for_bamboo(&config, cli.profile.as_deref())?;
+            let profile = resolve_profile_for_bamboo(&config, cli.profile.as_deref(), &store)?;
             let client = build_bamboo_client(&profile)?;
             commands::bamboo::execute(args, client, &renderer).await?
         }
         AtlassianCommand::Auth(command) => {
-            auth::handle(command, &mut config, config_path.as_deref(), &renderer).await?
+            auth::handle(
+                command,
+                &mut config,
+                config_path.as_deref(),
+                &store,
+                &renderer,
+            )
+            .await?
         }
     }
 
@@ -201,19 +226,45 @@ struct BitbucketProfile {
     bitbucket_remote: Option<String>,
 }
 
-fn handle_migration() {
-    match migrate_config_if_needed() {
-        MigrationResult::Migrated { from, to } => {
+/// Tell the user their files moved. On stderr, so structured output on stdout
+/// stays parseable.
+fn report_migration(migration: &DirMigration) {
+    match migration {
+        DirMigration::Migrated {
+            to,
+            files,
+            archived,
+            from,
+        } => {
             eprintln!(
-                "Config migrated from {} to {}\nThe old directory can be safely removed.",
+                "Moved your configuration to {} ({}).",
+                to.display(),
+                files.join(", ")
+            );
+            match archived {
+                Some(archived) => eprintln!(
+                    "The old directory was renamed to {} - delete it when you are happy.",
+                    archived.display()
+                ),
+                None => eprintln!(
+                    "Warning: could not rename {}. Remove it yourself so it does not \
+                     drift out of sync.",
+                    from.display()
+                ),
+            }
+        }
+        DirMigration::Failed { from, to, error } => {
+            eprintln!(
+                "Warning: could not move {} to {}: {error}",
                 from.display(),
                 to.display()
             );
+            eprintln!(
+                "Still using {}. Set ATLASSIAN_CLI_CONFIG_DIR to choose a location.",
+                from.display()
+            );
         }
-        MigrationResult::Failed(e) => {
-            eprintln!("Warning: Config migration failed: {}", e);
-        }
-        MigrationResult::NotNeeded => {}
+        DirMigration::NotNeeded => {}
     }
 }
 
@@ -268,7 +319,11 @@ fn resolve_base_profile<'a>(
 
 /// Resolve profile for Jira/Confluence/JSM commands.
 /// Requires base_url and Jira/Confluence token.
-fn resolve_profile_for_product(config: &Config, requested: Option<&str>) -> Result<ProductProfile> {
+fn resolve_profile_for_product(
+    config: &Config,
+    requested: Option<&str>,
+    store: &CredentialStore,
+) -> Result<ProductProfile> {
     let (base, profile) = resolve_base_profile(config, requested)?;
 
     let base_url = profile.base_url.clone().ok_or_else(|| {
@@ -278,7 +333,7 @@ fn resolve_profile_for_product(config: &Config, requested: Option<&str>) -> Resu
         )
     })?;
 
-    let token = auth::get_token(&base.name).ok_or_else(|| {
+    let token = auth::get_token(store, &base.name).ok_or_else(|| {
         anyhow!(
             "No token found for profile '{}'. Set ATLASSIAN_CLI_TOKEN_{} env var or run `atlassian-cli auth login --profile {}`",
             base.name,
@@ -300,6 +355,7 @@ fn resolve_profile_for_product(config: &Config, requested: Option<&str>) -> Resu
 fn resolve_profile_for_bitbucket(
     config: &Config,
     requested: Option<&str>,
+    store: &CredentialStore,
 ) -> Result<BitbucketProfile> {
     let (name, profile) = config
         .resolve_profile(requested)
@@ -319,10 +375,10 @@ fn resolve_profile_for_bitbucket(
     };
 
     // Try Bitbucket-specific token first, then fall back to general token
-    let token = auth::get_bitbucket_token(&base.name)
-        .or_else(|| auth::get_token(&base.name))
+    let token = auth::get_bitbucket_token(store, &base.name)
+        .or_else(|| auth::get_token(store, &base.name))
         .ok_or_else(|| {
-            let has_jira_token = auth::get_token(&base.name).is_some();
+            let has_jira_token = auth::get_token(store, &base.name).is_some();
             if has_jira_token {
                 anyhow!(
                     "Profile '{}' has no Bitbucket token.\n\n\
@@ -443,7 +499,11 @@ struct BambooProfile {
 
 /// Resolve profile for Bamboo commands.
 /// Uses bamboo_base_url if set, otherwise falls back to base_url.
-fn resolve_profile_for_bamboo(config: &Config, requested: Option<&str>) -> Result<BambooProfile> {
+fn resolve_profile_for_bamboo(
+    config: &Config,
+    requested: Option<&str>,
+    store: &CredentialStore,
+) -> Result<BambooProfile> {
     let (base, profile) = resolve_base_profile(config, requested)?;
 
     // Use bamboo_base_url if set, otherwise fall back to base_url
@@ -458,7 +518,7 @@ fn resolve_profile_for_bamboo(config: &Config, requested: Option<&str>) -> Resul
             )
         })?;
 
-    let token = auth::get_token(&base.name).ok_or_else(|| {
+    let token = auth::get_token(store, &base.name).ok_or_else(|| {
         anyhow!(
             "No token found for profile '{}'. Run `atlassian-cli auth login --profile {}`",
             base.name,
