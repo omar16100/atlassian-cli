@@ -1655,3 +1655,13 @@ Every test that spawns the CLI now goes through `crates/cli/tests/common/mod.rs`
 - README gains a Configuration Location section. `SECURITY.md` had been claiming `~/.config/atlassian-cli/credentials` all along, so it is now accurate rather than aspirational; it also states plainly that Windows has no 0600 equivalent.
 - `docs/c4model.md`: config-directory resolution recorded, ASCII diagrams re-aligned after the path substitution widened them.
 - 0.8.0, not a patch: `MigrationResult` and `migrate_config_if_needed` are gone from the config crate, and auth's free functions became `CredentialStore` methods. Both crates are published. The CLI's own behaviour stays backward compatible.
+
+### Self-review finding: do not re-permission a directory we did not create
+
+Both external reviewers were unavailable (codex out of credits, kimi membership error), so I reviewed this myself against the same checklist and found a real bug I had introduced.
+
+`create_private_dir` tightened whatever directory it wrote into. So `ATLASSIAN_CLI_CONFIG_DIR=$HOME` chmodded the home directory to 0700, and `--config /shared/team.yaml` chmodded `/shared`. Silently changing permissions on a directory the user chose is overreach, and hard to notice.
+
+Now only a directory we create gets a mode; an existing one is left exactly as found. Our own files are still written 0600 regardless of where they land, because the file holds the token. Regression tests at both the unit and end-to-end level.
+
+Also verified by hand: six concurrent migrations produce one migrated directory, one archive, no staging litter and a token that still decrypts; a legacy directory that is a symlink to the new location is left alone with no bogus archive; `$XDG_CONFIG_HOME` or the config dir pointing at a file degrades to a clear path-bearing error rather than a panic.

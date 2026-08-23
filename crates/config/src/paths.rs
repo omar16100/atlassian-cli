@@ -450,21 +450,21 @@ pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
 
 /// Create a directory only its owner can enter.
 pub fn create_private_dir(dir: &Path) -> Result<()> {
+    // Only a directory we create is ours to set a mode on. Tightening one that
+    // already exists would mean `--config /shared/team.yaml` silently chmodding
+    // /shared, or `ATLASSIAN_CLI_CONFIG_DIR=$HOME` chmodding the home directory.
+    if dir.is_dir() {
+        return Ok(());
+    }
+
     std::fs::create_dir_all(dir)
         .map_err(|e| anyhow!("Unable to create directory {}: {}", dir.display(), e))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mode = std::fs::metadata(dir)
-            .map_err(|e| anyhow!("Unable to inspect {}: {}", dir.display(), e))?
-            .permissions()
-            .mode();
-        // Only tighten, and only when it is currently open to others.
-        if mode & 0o077 != 0 {
-            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
-                .map_err(|e| anyhow!("Unable to restrict {}: {}", dir.display(), e))?;
-        }
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| anyhow!("Unable to restrict {}: {}", dir.display(), e))?;
     }
 
     Ok(())
@@ -883,6 +883,63 @@ mod tests {
         assert!(!to.exists(), "no partial target");
 
         std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+
+    /// A directory we did not create is not ours to re-permission. Tightening it
+    /// would mean `--config /shared/team.yaml` silently chmodding /shared, or
+    /// `ATLASSIAN_CLI_CONFIG_DIR=$HOME` chmodding the home directory.
+    #[cfg(unix)]
+    #[test]
+    fn an_existing_directory_keeps_its_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let parent = TempDir::new().unwrap();
+        let dir = parent.path().join("theirs");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        create_private_dir(&dir).unwrap();
+
+        let mode = std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o755,
+            "we must not re-permission a directory we found"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_directory_we_create_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let parent = TempDir::new().unwrap();
+        let dir = parent.path().join("nested").join("ours");
+
+        create_private_dir(&dir).unwrap();
+
+        let mode = std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700);
+    }
+
+    /// The file is ours whatever the directory, because it holds the token.
+    #[cfg(unix)]
+    #[test]
+    fn a_file_written_into_someone_elses_directory_is_still_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let parent = TempDir::new().unwrap();
+        let dir = parent.path().join("theirs");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        write_private(&dir.join("config.yaml"), b"profiles: {}").unwrap();
+
+        let mode = std::fs::metadata(dir.join("config.yaml"))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777;
+        assert_eq!(mode, 0o600);
     }
 
     #[test]

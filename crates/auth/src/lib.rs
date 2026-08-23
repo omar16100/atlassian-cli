@@ -53,18 +53,20 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
 
 /// Create a directory only its owner can enter.
 fn create_private_dir(dir: &Path) -> Result<()> {
+    // Only a directory we create is ours to set a mode on; see the matching
+    // helper in atlassian-cli-config for why tightening an existing one is wrong.
+    if dir.is_dir() {
+        return Ok(());
+    }
+
     fs::create_dir_all(dir)
         .with_context(|| format!("Unable to create directory {}", dir.display()))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mode = fs::metadata(dir)?.permissions().mode();
-        // Only tighten, never loosen, and only when it is currently open.
-        if mode & 0o077 != 0 {
-            fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
-                .with_context(|| format!("Unable to restrict permissions on {}", dir.display()))?;
-        }
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))
+            .with_context(|| format!("Unable to restrict permissions on {}", dir.display()))?;
     }
 
     Ok(())

@@ -341,3 +341,31 @@ fn the_oldest_legacy_directory_migrates_in_one_step() {
     let profiles: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(profiles[0]["name"], "old");
 }
+
+/// Regression: an earlier version of this change tightened any directory it
+/// wrote into, so `--config /shared/team.yaml` chmodded `/shared` and
+/// `ATLASSIAN_CLI_CONFIG_DIR=$HOME` chmodded the home directory. Only a
+/// directory we create is ours to set a mode on.
+#[cfg(unix)]
+#[test]
+fn a_directory_the_user_already_had_keeps_its_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let sandbox = Sandbox::new();
+    let theirs = sandbox.path("theirs");
+    std::fs::create_dir_all(&theirs).unwrap();
+    std::fs::set_permissions(&theirs, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let out = login(sandbox.bare_cli().env("ATLASSIAN_CLI_CONFIG_DIR", &theirs));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode(&theirs), 0o755, "their directory must be left alone");
+    // Our own files are still ours to protect.
+    assert_eq!(mode(&theirs.join("credentials.enc")), 0o600);
+    assert_eq!(mode(&theirs.join("config.yaml")), 0o600);
+}
