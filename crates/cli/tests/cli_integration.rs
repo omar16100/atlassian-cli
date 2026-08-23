@@ -1,10 +1,13 @@
-use std::process::Command;
+mod common;
+
+use common::Sandbox;
 use tempfile::tempdir;
 
 #[test]
 fn test_cli_version() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "--version"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["--version"])
         .output()
         .expect("Failed to execute command");
 
@@ -23,8 +26,9 @@ fn test_cli_version() {
 
 #[test]
 fn test_cli_help() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -40,8 +44,9 @@ fn test_cli_help() {
 
 #[test]
 fn test_jira_help() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "jira", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["jira", "--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -54,8 +59,9 @@ fn test_jira_help() {
 
 #[test]
 fn test_confluence_help() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "confluence", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["confluence", "--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -66,8 +72,9 @@ fn test_confluence_help() {
 
 #[test]
 fn test_auth_help() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "auth", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["auth", "--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -81,8 +88,9 @@ fn test_auth_help() {
 /// exported leaked it by asking for help, CI logs included.
 #[test]
 fn test_auth_login_help_hides_the_token_env_value() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "auth", "login", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["auth", "login", "--help"])
         .env("ATLASSIAN_API_TOKEN", "super-secret-token-value")
         .output()
         .expect("Failed to execute command");
@@ -102,8 +110,9 @@ fn test_auth_login_help_hides_the_token_env_value() {
 
 #[test]
 fn test_output_format_flag() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "--format", "json", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["--format", "json", "--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -112,8 +121,9 @@ fn test_output_format_flag() {
 
 #[test]
 fn test_invalid_command() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "nonexistent"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["nonexistent"])
         .output()
         .expect("Failed to execute command");
 
@@ -125,13 +135,15 @@ fn test_invalid_command() {
 #[test]
 fn test_bb_alias_works() {
     // Test that 'bb' alias executes the same as 'bitbucket'
-    let bb_output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "bb", "--help"])
+    let bb_output = Sandbox::new()
+        .cli()
+        .args(["bb", "--help"])
         .output()
         .expect("Failed to execute bb alias");
 
-    let bitbucket_output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "bitbucket", "--help"])
+    let bitbucket_output = Sandbox::new()
+        .cli()
+        .args(["bitbucket", "--help"])
         .output()
         .expect("Failed to execute bitbucket command");
 
@@ -152,14 +164,16 @@ fn test_bb_alias_works() {
 #[test]
 fn test_bitbucket_alias_backwards_compatible() {
     // Ensure 'bitbucket' and 'bb' behave identically (backward compatibility)
-    let bitbucket_output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "bitbucket", "whoami"])
+    let bitbucket_output = Sandbox::new()
+        .cli()
+        .args(["bitbucket", "whoami"])
         .env("ATLASSIAN_CLI_PROFILE", "nonexistent")
         .output()
         .expect("Failed to execute bitbucket whoami");
 
-    let bb_output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "bb", "whoami"])
+    let bb_output = Sandbox::new()
+        .cli()
+        .args(["bb", "whoami"])
         .env("ATLASSIAN_CLI_PROFILE", "nonexistent")
         .output()
         .expect("Failed to execute bb whoami");
@@ -202,11 +216,9 @@ profiles:
     // Run a bitbucket command with the custom config and a fake token via env var
     // The command will fail at the API call (no real credentials), but should NOT fail
     // at profile resolution with "missing base_url" error
-    let output = Command::new("cargo")
+    let output = Sandbox::new()
+        .cli()
         .args([
-            "run",
-            "--quiet",
-            "--",
             "--config",
             config_path.to_str().unwrap(),
             "bitbucket",
@@ -232,8 +244,9 @@ profiles:
 /// Test that auth login help shows bearer flag and deprecation notice.
 #[test]
 fn test_auth_login_help_shows_bearer_flag() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "auth", "login", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["auth", "login", "--help"])
         .output()
         .expect("Failed to execute auth login help");
 
@@ -274,11 +287,9 @@ profiles:
 
     std::fs::write(&config_path, config_content).expect("Failed to write config");
 
-    let output = Command::new("cargo")
+    let output = Sandbox::new()
+        .cli()
         .args([
-            "run",
-            "--quiet",
-            "--",
             "--config",
             config_path.to_str().unwrap(),
             "bitbucket",
@@ -316,11 +327,9 @@ profiles:
 
     std::fs::write(&config_path, config_content).expect("Failed to write config");
 
-    let output = Command::new("cargo")
+    let output = Sandbox::new()
+        .cli()
         .args([
-            "run",
-            "--quiet",
-            "--",
             "--config",
             config_path.to_str().unwrap(),
             "jira",
@@ -342,8 +351,9 @@ profiles:
 
 #[test]
 fn test_jira_issue_create_help_mentions_custom_fields() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "jira", "issue", "create", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["jira", "issue", "create", "--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -364,8 +374,9 @@ fn test_jira_issue_create_help_mentions_custom_fields() {
 /// `jira attachment download` group added for issue #93.
 #[test]
 fn test_jira_attachment_help_lists_subcommands() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "jira", "attachment", "--help"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["jira", "attachment", "--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -381,8 +392,9 @@ fn test_jira_attachment_help_lists_subcommands() {
 
 #[test]
 fn test_jira_attachment_download_requires_a_source() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "jira", "attachment", "download"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["jira", "attachment", "download"])
         .output()
         .expect("Failed to execute command");
 
@@ -396,11 +408,9 @@ fn test_jira_attachment_download_requires_a_source() {
 
 #[test]
 fn test_jira_attachment_download_rejects_id_with_issue() {
-    let output = Command::new("cargo")
+    let output = Sandbox::new()
+        .cli()
         .args([
-            "run",
-            "--quiet",
-            "--",
             "jira",
             "attachment",
             "download",
@@ -423,18 +433,9 @@ fn test_jira_attachment_download_rejects_id_with_issue() {
 /// `requires = "issue"` as satisfied by the ArgGroup and silently ignores it.
 #[test]
 fn test_jira_attachment_download_rejects_dir_without_issue() {
-    let output = Command::new("cargo")
-        .args([
-            "run",
-            "--quiet",
-            "--",
-            "jira",
-            "attachment",
-            "download",
-            "10001",
-            "--dir",
-            "./out",
-        ])
+    let output = Sandbox::new()
+        .cli()
+        .args(["jira", "attachment", "download", "10001", "--dir", "./out"])
         .output()
         .expect("Failed to execute command");
 
@@ -448,11 +449,9 @@ fn test_jira_attachment_download_rejects_dir_without_issue() {
 
 #[test]
 fn test_jira_attachment_download_rejects_output_with_issue() {
-    let output = Command::new("cargo")
+    let output = Sandbox::new()
+        .cli()
         .args([
-            "run",
-            "--quiet",
-            "--",
             "jira",
             "attachment",
             "download",
@@ -492,8 +491,8 @@ fn test_profile_and_config_are_accepted_after_the_subcommand() {
         vec!["confluence", "attachment", "list", "123"],
         vec!["jira", "attachment", "download", "10001", "--output", "-"],
     ] {
-        let output = Command::new("cargo")
-            .args(["run", "--quiet", "--"])
+        let output = Sandbox::new()
+            .cli()
             .args(&args)
             .args(["--profile", "t", "--config", config_path.to_str().unwrap()])
             .env("ATLASSIAN_CLI_TOKEN_T", "x")
@@ -518,8 +517,9 @@ fn test_profile_and_config_are_accepted_after_the_subcommand() {
 /// hanging on stdin.
 #[test]
 fn test_auth_login_without_flags_is_not_a_parse_error() {
-    let output = Command::new("cargo")
-        .args(["run", "--quiet", "--", "auth", "login"])
+    let output = Sandbox::new()
+        .cli()
+        .args(["auth", "login"])
         .stdin(std::process::Stdio::null())
         .output()
         .expect("Failed to execute command");

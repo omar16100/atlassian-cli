@@ -1623,3 +1623,16 @@ Patch: one user-facing fix, no new surface.
 Patch. `auth login --help` printed the value of `ATLASSIAN_API_TOKEN` (#126, @shohi): clap renders an `env` annotation's *value* in help output unless told not to, so anyone with the variable exported disclosed their token by asking for help, including in CI logs, where masking covers registered secrets rather than arbitrary command output. Fixed with `hide_env_values`; the variable is still advertised, just not its value.
 
 Verified against the published 0.7.1 binary, not only a local build. `env = "` appears exactly once in the workspace, so this is the whole of the exposure; the per-profile and Bitbucket token fallbacks are read via `std::env::var` and never reach help output.
+
+## 2026-08-23 — XDG config paths (issue #127, branch `feat/xdg-config-paths`)
+
+Plan: `/Users/macmini/.claude/plans/https-github-com-omar16100-atlassian-cli-binary-rossum.md`.
+
+### Step 1: hermetic tests
+
+Every test that spawns the CLI now goes through `crates/cli/tests/common/mod.rs`, which redirects `HOME` and `ATLASSIAN_CLI_CONFIG_DIR` at a scratch directory and clears the token variables. Without this, making the config directory movable would mean `cargo test` relocating a developer's real configuration.
+
+- `cli_integration.rs` converted from `cargo run --quiet --` to the compiled binary. Going through cargo forced a choice between leaving `HOME` alone (no isolation) and redirecting it (cargo then looks for `~/.cargo` in a temp dir and re-downloads everything). Side benefit: that file went from ~4s to 1.4s.
+- The seven e2e/docs harnesses already passed `--config`, which moves only the config file, so credential lookup still reached `$HOME`. Each now sets the scratch directory too.
+- Verified: `ls -la ~/.atlassian-cli` is byte-identical before and after a full `cargo test --all`.
+- Still outstanding at this point: the auth crate's own unit tests write to the real `~/.atlassian-cli/credentials.enc` (confirmed by watching mtime advance during `cargo test -p atlassian-cli-auth`). Fixed by `CredentialStore` in the next step.

@@ -34,6 +34,18 @@ fn run(config: &Path, cwd: &Path, args: &[&str]) -> std::process::Output {
     Command::new(BIN)
         .arg("--config")
         .arg(config)
+        // Keep the CLI away from the developer's real configuration: `--config`
+        // moves only the config file, so without this the credential lookup
+        // still reaches $HOME.
+        .env("HOME", config.parent().unwrap_or_else(|| Path::new(".")))
+        .env(
+            "ATLASSIAN_CLI_CONFIG_DIR",
+            config.parent().unwrap_or_else(|| Path::new(".")),
+        )
+        .env_remove("XDG_CONFIG_HOME")
+        .env_remove("ATLASSIAN_API_TOKEN")
+        .env_remove("ATLASSIAN_BITBUCKET_TOKEN")
+        .env_remove("BITBUCKET_TOKEN")
         .args(args)
         .current_dir(cwd)
         .env("ATLASSIAN_CLI_TOKEN_LOCAL", "fake-token")
