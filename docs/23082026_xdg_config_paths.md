@@ -107,6 +107,12 @@ and removed, and the user is told so. It is the one thing migration deletes, and
 only after its contents are confirmed present at the new location. The archived
 `config.yaml` is untouched.
 
+A symlinked `credentials` is not written through. Pointing it at a dotfiles
+repository is one of the workarounds this feature replaces, so the file at the
+far end is the user's, usually git-managed, and zeroing it because they upgraded
+is not ours to do. The link is removed, its target left alone, and nothing is
+reported as scrubbed, because the plaintext still exists.
+
 ## Permissions
 
 The directory is created `0700` and every file written `0600`, via a temporary

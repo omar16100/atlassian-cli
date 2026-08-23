@@ -460,10 +460,22 @@ fn promote_each_file(staging: &Path, to: &Path, files: &[&'static str]) -> Resul
 /// The same one-pass overwrite the auth crate uses: it defeats an undelete on
 /// the filesystems people actually run, and claims nothing more than that. On a
 /// copy-on-write filesystem the old blocks may survive regardless.
+///
+/// `symlink_metadata`, so a symlinked `credentials` is not written through. That
+/// happens: pointing it at a dotfiles repository is one of the workarounds this
+/// feature replaces, and zeroing 21 bytes inside someone's git working tree
+/// because they migrated is not ours to do. The link itself is removed, and the
+/// caller reports nothing scrubbed, because the plaintext still exists at the
+/// far end of it.
 fn scrub_file(path: &Path) -> bool {
-    let Ok(metadata) = std::fs::metadata(path) else {
+    let Ok(metadata) = std::fs::symlink_metadata(path) else {
         return false;
     };
+
+    if metadata.is_symlink() {
+        let _ = std::fs::remove_file(path);
+        return false;
+    }
     if !metadata.is_file() {
         return false;
     }
@@ -875,6 +887,58 @@ mod tests {
             std::fs::read_to_string(to.join("credentials")).unwrap(),
             "w=secret",
             "the surviving copy must be the one at the new location"
+        );
+    }
+
+    /// A symlinked `credentials` is not written through.
+    ///
+    /// Pointing it at a dotfiles repository is one of the workarounds this
+    /// feature exists to replace, so the file at the far end is git-managed and
+    /// belongs to the user. The link goes; its target is left exactly as it was,
+    /// and nothing is reported as scrubbed, since the plaintext still exists.
+    #[cfg(unix)]
+    #[test]
+    fn migration_does_not_scrub_through_a_symlinked_credentials_file() {
+        let home = TempDir::new().unwrap();
+        let from = home.path().join(".atlassian-cli");
+        let to = home.path().join(".config").join(APP_DIR);
+        let real = home.path().join("dotfiles").join("credentials");
+        seed(&from, &[("config.yaml", "profiles: {}")]);
+        std::fs::create_dir_all(real.parent().unwrap()).unwrap();
+        std::fs::write(&real, "w=secret").unwrap();
+        std::os::unix::fs::symlink(&real, from.join("credentials")).unwrap();
+
+        let (_, outcome) = migrate_legacy_dir(ConfigPaths::for_legacy(&from, &to));
+
+        let (archived, scrubbed) = match outcome {
+            DirMigration::Migrated {
+                archived,
+                scrubbed_plaintext,
+                ..
+            } => (
+                archived.expect("the original should be renamed"),
+                scrubbed_plaintext,
+            ),
+            other => panic!("expected a migration, got {other:?}"),
+        };
+
+        assert_eq!(
+            std::fs::read_to_string(&real).unwrap(),
+            "w=secret",
+            "the user's own file must not be zeroed"
+        );
+        assert!(
+            !scrubbed,
+            "nothing was destroyed, so the notice must not say so"
+        );
+        assert!(
+            !archived.join("credentials").exists(),
+            "the dangling link should not be left in the archive"
+        );
+        assert_eq!(
+            std::fs::read_to_string(to.join("credentials")).unwrap(),
+            "w=secret",
+            "the copy is taken through the link, as before"
         );
     }
 
