@@ -1665,3 +1665,18 @@ Both external reviewers were unavailable (codex out of credits, kimi membership 
 Now only a directory we create gets a mode; an existing one is left exactly as found. Our own files are still written 0600 regardless of where they land, because the file holds the token. Regression tests at both the unit and end-to-end level.
 
 Also verified by hand: six concurrent migrations produce one migrated directory, one archive, no staging litter and a token that still decrypts; a legacy directory that is a symlink to the new location is left alone with no bogus archive; `$XDG_CONFIG_HOME` or the config dir pointing at a file degrades to a clear path-bearing error rather than a panic.
+
+### Fable review of PR #130: three MAJORs, all reproduced against the built binary before fixing
+
+Verdict was "not safe to merge yet". Each finding was reproduced by hand first, so none was taken on trust, and each fix has a test that was proved to fail without it.
+
+1. **A blank `ATLASSIAN_CLI_CONFIG_DIR` hard-failed every command.** `env ATLASSIAN_CLI_CONFIG_DIR="" atlassian-cli auth list` → `error: a value is required for '--config-dir <CONFIG_DIR>'`. The cause was clap's `env = ` on the flag, which rejects a set-but-empty variable before any of our code runs. The resolver's own `non_empty` handles blanks correctly, so its unit test was covering a path the binary bypassed. Dropped `env = ` and let `PathEnv::from_process` read the variable, which it already did; `--help` still names it.
+2. **The archived plaintext token was stranded.** After migrating a legacy directory holding a plaintext `credentials`, `~/.atlassian-cli.migrated/credentials` kept a second readable copy indefinitely, and the notice never mentioned it. Before this PR the next `auth login` shredded the only copy. Now the archived one is overwritten and removed after the promote succeeds, and the user is told. Nothing else in the archive is touched.
+3. **A target directory that existed but held none of our files could never be migrated into.** A single `.DS_Store` gave `Directory not empty (os error 66)`, a symlinked config directory gave `Not a directory (os error 20)`, and both printed the same warning on every command forever. The symlink case is the workaround people used while this feature did not exist, so it hit exactly the users who asked for it. Falls back to promoting each file with its own atomic rename, rolling back the ones already moved if any fails, so the all-or-nothing property staging exists for is kept. A symlinked target keeps its symlink.
+
+Also from the same review, smaller:
+
+- `write_private` used `create(true)` on a pid-derived temp name in both crates, so an attacker-planted symlink at that path would have been followed and the token written wherever it pointed. Now `create_new(true)`, and a leftover is cleared only after `symlink_metadata` confirms it is a regular file.
+- The test `Sandbox` named three token variables to strip. Tokens are also read per profile from `ATLASSIAN_CLI_TOKEN_<PROFILE>`, so a developer with `ATLASSIAN_CLI_TOKEN_WORK` exported would have made the migration test pass without a byte read from disk. It now strips every `ATLASSIAN_*`, `BITBUCKET_*`, `JIRA_*` and `CONFLUENCE_*` variable, which also covers whatever gets added next.
+
+Still not addressed, deliberately: the concurrent `set_encrypted` lost-update race, and no Windows CI while Windows binaries ship.

@@ -122,6 +122,41 @@ fn the_flag_matches_the_environment_variable() {
     assert_holds_both(&explicit);
 }
 
+/// `export ATLASSIAN_CLI_CONFIG_DIR=` must behave as if it were unset.
+///
+/// An empty export is ordinary: a shell rc that sets it conditionally,
+/// `docker run -e ATLASSIAN_CLI_CONFIG_DIR`, a CI matrix with a blank entry.
+/// Wiring the variable into clap's `env` made all three a hard failure on every
+/// command ("a value is required for '--config-dir'"), before the resolver -
+/// which does treat a blank value as unset - ever ran.
+#[test]
+fn a_blank_environment_variable_falls_back_to_the_default() {
+    let sandbox = Sandbox::new();
+    let out = login(sandbox.bare_cli().env("ATLASSIAN_CLI_CONFIG_DIR", ""));
+    assert!(
+        out.status.success(),
+        "a blank value should be ignored, not rejected: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert_holds_both(&sandbox.path(".config/atlassian-cli"));
+}
+
+/// The same for whitespace, which is what a here-doc or a trimmed CI value
+/// leaves behind.
+#[test]
+fn a_whitespace_environment_variable_falls_back_to_the_default() {
+    let sandbox = Sandbox::new();
+    let out = login(sandbox.bare_cli().env("ATLASSIAN_CLI_CONFIG_DIR", "   "));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert_holds_both(&sandbox.path(".config/atlassian-cli"));
+}
+
 /// The config directory holds credentials, so it should not be readable by
 /// other users, and neither should the config: a profile can carry a plaintext
 /// api_token.

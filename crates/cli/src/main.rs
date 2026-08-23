@@ -33,14 +33,15 @@ struct Cli {
     #[arg(long, global = true)]
     config: Option<PathBuf>,
 
-    /// Directory holding config.yaml and credentials
-    /// (default: $XDG_CONFIG_HOME/atlassian-cli, else ~/.config/atlassian-cli)
-    #[arg(
-        long,
-        global = true,
-        env = "ATLASSIAN_CLI_CONFIG_DIR",
-        hide_env_values = true
-    )]
+    /// Directory holding config.yaml and credentials. Also settable with
+    /// $ATLASSIAN_CLI_CONFIG_DIR (default: $XDG_CONFIG_HOME/atlassian-cli,
+    /// else ~/.config/atlassian-cli)
+    //
+    // The variable is read by ConfigPaths, not by clap's `env`. clap rejects a
+    // set-but-empty variable with "a value is required", and an empty export is
+    // ordinary in shells, `docker -e VAR` and CI matrices, so `env` here made
+    // every command hard-fail. The resolver treats an empty value as unset.
+    #[arg(long, global = true)]
     config_dir: Option<PathBuf>,
 
     /// Output format for command results (table, json, yaml, csv, quiet, markdown)
@@ -235,6 +236,7 @@ fn report_migration(migration: &DirMigration) {
             files,
             archived,
             from,
+            scrubbed_plaintext,
         } => {
             eprintln!(
                 "Moved your configuration to {} ({}).",
@@ -251,6 +253,14 @@ fn report_migration(migration: &DirMigration) {
                      drift out of sync.",
                     from.display()
                 ),
+            }
+            if *scrubbed_plaintext {
+                eprintln!(
+                    "The plaintext credentials file was removed from the old copy; \
+                     the one at {} is now the only copy. Run `atlassian-cli auth login` \
+                     to store it encrypted.",
+                    to.join("credentials").display()
+                );
             }
         }
         DirMigration::Failed { from, to, error } => {

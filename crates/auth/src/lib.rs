@@ -30,14 +30,39 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
     ));
 
     {
+        // `create_new`, not `create`: the temp name is derived from the pid, so
+        // it is guessable, and opening an existing path would follow a symlink
+        // planted there and write the token wherever it points. Failing is the
+        // right answer - a leftover means a crash, and the retry below clears it
+        // only after confirming it is a plain file we own.
         let mut options = OpenOptions::new();
-        options.write(true).create(true).truncate(true);
+        options.write(true).create_new(true);
         #[cfg(unix)]
         options.mode(0o600);
 
-        let mut file = options
-            .open(&tmp)
-            .with_context(|| format!("Unable to write {}", tmp.display()))?;
+        let mut file = match options.open(&tmp) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let stale = fs::symlink_metadata(&tmp)
+                    .map(|m| m.is_file())
+                    .unwrap_or(false);
+                if !stale {
+                    return Err(anyhow::anyhow!(
+                        "Refusing to write {}: it exists and is not a regular file",
+                        tmp.display()
+                    ));
+                }
+                fs::remove_file(&tmp)
+                    .with_context(|| format!("Unable to clear stale {}", tmp.display()))?;
+                options
+                    .open(&tmp)
+                    .with_context(|| format!("Unable to write {}", tmp.display()))?
+            }
+            Err(e) => {
+                return Err(anyhow::Error::new(e))
+                    .with_context(|| format!("Unable to write {}", tmp.display()))
+            }
+        };
         file.write_all(bytes)
             .with_context(|| format!("Unable to write {}", tmp.display()))?;
         file.sync_all().ok();

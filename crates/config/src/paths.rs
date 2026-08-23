@@ -275,6 +275,10 @@ pub enum DirMigration {
         /// Where the old directory was renamed to. `None` if the rename failed,
         /// which is untidy but not a correctness problem.
         archived: Option<PathBuf>,
+        /// A plaintext `credentials` file was scrubbed from the archive after
+        /// its contents were copied to the new location. Worth telling the user
+        /// about: it is the one thing migration removes.
+        scrubbed_plaintext: bool,
     },
     /// Nothing was copied, and the returned paths still point at `from`.
     Failed {
@@ -322,6 +326,19 @@ pub fn migrate_legacy_dir(paths: ConfigPaths) -> (ConfigPaths, DirMigration) {
     match stage_and_promote(&from, &to) {
         Ok(files) => {
             let archived = archive_legacy_dir(&from);
+            // The copy in the new location is now the only one that should
+            // exist. Leaving the archived plaintext token behind would be a
+            // regression against the pre-migration behaviour, where the next
+            // `auth login` shredded it: the file would sit in
+            // `~/.atlassian-cli.migrated/credentials` indefinitely, readable,
+            // while the user believed encryption had taken over.
+            let scrubbed_plaintext = files.contains(&CREDENTIALS_FILENAME)
+                && scrub_file(
+                    &archived
+                        .clone()
+                        .unwrap_or_else(|| from.clone())
+                        .join(CREDENTIALS_FILENAME),
+                );
             let migrated = ConfigPaths {
                 dir: to.clone(),
                 preferred: to.clone(),
@@ -335,6 +352,7 @@ pub fn migrate_legacy_dir(paths: ConfigPaths) -> (ConfigPaths, DirMigration) {
                     to,
                     files,
                     archived,
+                    scrubbed_plaintext,
                 },
             )
         }
@@ -379,14 +397,79 @@ fn stage_and_promote(from: &Path, to: &Path) -> Result<Vec<&'static str>> {
     // One atomic step. If a concurrent invocation won the race, the target is
     // no longer empty and there is nothing left to do.
     if let Err(e) = std::fs::rename(&staging, to) {
-        let _ = std::fs::remove_dir_all(&staging);
         if is_populated(to) {
+            let _ = std::fs::remove_dir_all(&staging);
             return Ok(copied);
         }
-        return Err(anyhow!("Unable to move {} into place: {}", to.display(), e));
+        // `to` holds none of our files but is not a name we can rename onto:
+        // an existing directory with a `.DS_Store`, a `.keep`, or an unrelated
+        // file in it (ENOTEMPTY), or a symlink to a directory, which is exactly
+        // the shape a stow/chezmoi dotfile setup has - and dotfile users are
+        // who asked for this feature. Renaming a directory onto either fails
+        // forever, so without this fallback the migration would never complete
+        // and every single command would print the same warning.
+        let result = promote_each_file(&staging, to, &copied);
+        let _ = std::fs::remove_dir_all(&staging);
+        return match result {
+            Ok(()) => Ok(copied),
+            Err(fallback) => Err(anyhow!(
+                "Unable to move {} into place: {} (and moving the files \
+                 individually failed: {})",
+                to.display(),
+                e,
+                fallback
+            )),
+        };
     }
 
     Ok(copied)
+}
+
+/// Move each staged file into an existing target directory, one atomic rename
+/// apiece, undoing them all if any fails.
+///
+/// The all-or-nothing part is the point. A target holding `config.yaml` but not
+/// `credentials.enc` is worse than an unmigrated one: the resolver would pick it
+/// on the next run and the user would look logged out while their token sat in a
+/// directory the CLI had stopped reading.
+fn promote_each_file(staging: &Path, to: &Path, files: &[&'static str]) -> Result<()> {
+    create_private_dir(to)?;
+
+    let mut moved: Vec<&'static str> = Vec::new();
+    for name in files {
+        match std::fs::rename(staging.join(name), to.join(name)) {
+            Ok(()) => moved.push(name),
+            Err(e) => {
+                for done in &moved {
+                    let _ = std::fs::rename(to.join(done), staging.join(done));
+                }
+                return Err(anyhow!(
+                    "Unable to write {}: {}",
+                    to.join(name).display(),
+                    e
+                ));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Overwrite a file's bytes before removing it, and report whether it went.
+///
+/// The same one-pass overwrite the auth crate uses: it defeats an undelete on
+/// the filesystems people actually run, and claims nothing more than that. On a
+/// copy-on-write filesystem the old blocks may survive regardless.
+fn scrub_file(path: &Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !metadata.is_file() {
+        return false;
+    }
+
+    let _ = std::fs::write(path, vec![0u8; metadata.len() as usize]);
+    std::fs::remove_file(path).is_ok()
 }
 
 /// Rename the legacy directory aside so it cannot be edited by mistake.
@@ -424,17 +507,38 @@ pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
     ));
 
     {
+        // `create_new`, not `create`: the temp name is derived from the pid, so
+        // it is guessable, and opening an existing path would follow a symlink
+        // planted there and write a token wherever it points. A leftover file
+        // means a crash, and is cleared only once confirmed to be a plain file.
         let mut options = std::fs::OpenOptions::new();
-        options.write(true).create(true).truncate(true);
+        options.write(true).create_new(true);
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
             options.mode(0o600);
         }
 
-        let mut file = options
-            .open(&tmp)
-            .map_err(|e| anyhow!("Unable to write {}: {}", tmp.display(), e))?;
+        let mut file = match options.open(&tmp) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let stale = std::fs::symlink_metadata(&tmp)
+                    .map(|m| m.is_file())
+                    .unwrap_or(false);
+                if !stale {
+                    return Err(anyhow!(
+                        "Refusing to write {}: it exists and is not a regular file",
+                        tmp.display()
+                    ));
+                }
+                std::fs::remove_file(&tmp)
+                    .map_err(|e| anyhow!("Unable to clear stale {}: {}", tmp.display(), e))?;
+                options
+                    .open(&tmp)
+                    .map_err(|e| anyhow!("Unable to write {}: {}", tmp.display(), e))?
+            }
+            Err(e) => return Err(anyhow!("Unable to write {}: {}", tmp.display(), e)),
+        };
         file.write_all(bytes)
             .map_err(|e| anyhow!("Unable to write {}: {}", tmp.display(), e))?;
         file.sync_all().ok();
@@ -726,6 +830,146 @@ mod tests {
             "profiles: {}"
         );
         assert!(!from.exists(), "the original path should no longer resolve");
+    }
+
+    /// The archive must not keep a second readable copy of a plaintext token.
+    ///
+    /// Before the directory moved, `auth login` shredded the one plaintext
+    /// `credentials` file it found. Copying it aside and leaving it there would
+    /// quietly undo that: the user encrypts their token and a cleartext copy
+    /// lives on in `~/.atlassian-cli.migrated` for as long as they never look.
+    #[test]
+    fn migration_does_not_strand_a_plaintext_token_in_the_archive() {
+        let home = TempDir::new().unwrap();
+        let from = home.path().join(".atlassian-cli");
+        let to = home.path().join(".config").join(APP_DIR);
+        seed(
+            &from,
+            &[("config.yaml", "profiles: {}"), ("credentials", "w=secret")],
+        );
+
+        let (_, outcome) = migrate_legacy_dir(ConfigPaths::for_legacy(&from, &to));
+
+        let (archived, scrubbed) = match outcome {
+            DirMigration::Migrated {
+                archived,
+                scrubbed_plaintext,
+                ..
+            } => (
+                archived.expect("the original should be renamed"),
+                scrubbed_plaintext,
+            ),
+            other => panic!("expected a migration, got {other:?}"),
+        };
+
+        assert!(scrubbed, "the user must be told the copy was removed");
+        assert!(
+            !archived.join("credentials").exists(),
+            "the archived plaintext token should be gone"
+        );
+        assert!(
+            archived.join("config.yaml").exists(),
+            "only the secret is removed; the rest of the archive stays"
+        );
+        assert_eq!(
+            std::fs::read_to_string(to.join("credentials")).unwrap(),
+            "w=secret",
+            "the surviving copy must be the one at the new location"
+        );
+    }
+
+    /// An encrypted-only install has no plaintext file, so nothing is removed
+    /// and the notice must not claim otherwise.
+    #[test]
+    fn migration_reports_no_scrub_when_there_was_no_plaintext_file() {
+        let home = TempDir::new().unwrap();
+        let from = home.path().join(".atlassian-cli");
+        let to = home.path().join(".config").join(APP_DIR);
+        seed(&from, &[("credentials.enc", "{}")]);
+
+        let (_, outcome) = migrate_legacy_dir(ConfigPaths::for_legacy(&from, &to));
+
+        match outcome {
+            DirMigration::Migrated {
+                scrubbed_plaintext, ..
+            } => assert!(!scrubbed_plaintext),
+            other => panic!("expected a migration, got {other:?}"),
+        }
+    }
+
+    /// A target directory that exists but holds none of our files.
+    ///
+    /// `.DS_Store`, a `.keep`, or anything else a dotfile manager drops there
+    /// makes `rename(staging, to)` fail with ENOTEMPTY every single run. The
+    /// files must be promoted individually instead of the migration warning
+    /// forever.
+    #[test]
+    fn migration_into_a_non_empty_but_unowned_target() {
+        let home = TempDir::new().unwrap();
+        let from = home.path().join(".atlassian-cli");
+        let to = home.path().join(".config").join(APP_DIR);
+        seed(
+            &from,
+            &[("config.yaml", "profiles: {}"), ("credentials.enc", "{}")],
+        );
+        seed(&to, &[(".DS_Store", "junk")]);
+
+        let (paths, outcome) = migrate_legacy_dir(ConfigPaths::for_legacy(&from, &to));
+
+        assert!(
+            matches!(outcome, DirMigration::Migrated { .. }),
+            "expected a migration, got {outcome:?}"
+        );
+        assert_eq!(paths.dir(), to);
+        assert_eq!(
+            std::fs::read_to_string(to.join("config.yaml")).unwrap(),
+            "profiles: {}"
+        );
+        assert!(to.join("credentials.enc").exists());
+        assert!(
+            to.join(".DS_Store").exists(),
+            "the unrelated file must survive"
+        );
+        assert!(!from.exists());
+        assert!(
+            std::fs::read_dir(to.parent().unwrap())
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .all(|e| !e.file_name().to_string_lossy().contains(".migrating.")),
+            "the staging directory must not be left behind"
+        );
+    }
+
+    /// A symlinked config directory, which is how the people who asked for this
+    /// feature already work around its absence.
+    #[cfg(unix)]
+    #[test]
+    fn migration_into_a_symlinked_target_keeps_the_symlink() {
+        let home = TempDir::new().unwrap();
+        let from = home.path().join(".atlassian-cli");
+        let real = home.path().join("dotfiles").join("atlassian-cli");
+        let to = home.path().join(".config").join(APP_DIR);
+        seed(&from, &[("config.yaml", "profiles: {}")]);
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::create_dir_all(to.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(&real, &to).unwrap();
+
+        let (paths, outcome) = migrate_legacy_dir(ConfigPaths::for_legacy(&from, &to));
+
+        assert!(
+            matches!(outcome, DirMigration::Migrated { .. }),
+            "expected a migration, got {outcome:?}"
+        );
+        assert_eq!(paths.dir(), to);
+        assert!(
+            std::fs::symlink_metadata(&to).unwrap().is_symlink(),
+            "the symlink must not be replaced by a real directory"
+        );
+        assert_eq!(
+            std::fs::read_to_string(real.join("config.yaml")).unwrap(),
+            "profiles: {}",
+            "the file should land in the directory the symlink points at"
+        );
     }
 
     /// Only what is there. An install with no credentials must not create empty ones.

@@ -79,6 +79,34 @@ install moves once and prints one message.
 Setting `$ATLASSIAN_CLI_CONFIG_DIR` skips migration: an explicit choice is taken
 at face value.
 
+### When the target exists but is not ours
+
+`rename(staging, to)` fails outright if `to` is a directory holding anything at
+all, or a symlink to one. Both are common: a `.DS_Store` from a Finder visit, a
+`.keep` from a dotfile repo, and above all a symlink, which is precisely the
+workaround people adopted while this feature did not exist. Left as an error the
+migration could never complete, so the warning would print on every command
+forever.
+
+So when the target holds none of our files but cannot be renamed onto, each file
+is promoted individually, one atomic rename apiece, and any already moved are
+put back if a later one fails. The all-or-nothing property that staging exists to
+provide is preserved; only the mechanism changes. A symlinked target keeps its
+symlink, and the files land in the directory it points at.
+
+### The archived plaintext token
+
+The archive is a copy of the old directory, so a plaintext `credentials` file
+would exist twice afterwards. That is a regression on its own terms: before this
+change, the next `auth login` shredded the single plaintext file it found, and
+leaving a second copy in `~/.atlassian-cli.migrated` would mean a readable token
+outliving the encryption the user believed had replaced it.
+
+After a successful promote, the plaintext file inside the archive is overwritten
+and removed, and the user is told so. It is the one thing migration deletes, and
+only after its contents are confirmed present at the new location. The archived
+`config.yaml` is untouched.
+
 ## Permissions
 
 The directory is created `0700` and every file written `0600`, via a temporary
@@ -97,16 +125,36 @@ read-modify-write of the whole file. Writing through a temp file and renaming
 makes each write atomic, so nobody reads a truncated file, which the previous
 truncate-then-write allowed. Full locking is a separate piece of work.
 
+## `--config-dir` is a plain flag
+
+The variable is read by the resolver, not by clap's `env = `. Wiring it into
+clap looked free (documented in `--help`, no global read) but rejects a
+set-but-empty value with "a value is required for '--config-dir'" before any of
+our code runs. `export ATLASSIAN_CLI_CONFIG_DIR=` is an ordinary thing to have in
+a shell rc, a `docker run -e VAR`, or a CI matrix with a blank entry, and it made
+every command fail. The resolver treats blank and whitespace as unset, which is
+what the fallback chain is for. `--help` names the variable in the flag's own
+description instead.
+
 ## Tests
 
 - 17 pure unit tests for resolution, over an injected environment and a
   `populated` probe, so they need no `set_var` and no lock and run in parallel.
-- 10 migration tests over temporary directories, including that a forced failure
-  leaves no partial target and keeps working from the old location.
+- 13 migration tests over temporary directories, including that a forced failure
+  leaves no partial target and keeps working from the old location, that no
+  plaintext token is stranded in the archive, and that a target containing an
+  unrelated file, or a symlinked target, still migrates.
 - Auth tests moved onto temporary directories, plus new coverage that a file
   overwritten from `0644` ends up `0600`.
-- 12 end-to-end tests in `crates/cli/tests/config_paths.rs` spawning the binary
-  against a scratch `HOME`: each resolution rule, permissions on disk, migration
-  including that the moved token still decrypts, a silent second run, an empty
-  legacy directory left alone, an explicit directory never migrated, and
-  `--config` moving only the config file.
+- 15 end-to-end tests in `crates/cli/tests/config_paths.rs` spawning the binary
+  against a scratch `HOME`: each resolution rule, a blank and a whitespace value
+  for the variable, permissions on disk, migration including that the moved token
+  still decrypts, a silent second run, an empty legacy directory left alone, an
+  explicit directory never migrated, and `--config` moving only the config file.
+
+The shared `Sandbox` strips every `ATLASSIAN_*`, `BITBUCKET_*`, `JIRA_*` and
+`CONFLUENCE_*` variable from the child rather than naming a few. Tokens are also
+read per profile from `ATLASSIAN_CLI_TOKEN_<PROFILE>`, so a developer with
+`ATLASSIAN_CLI_TOKEN_WORK` exported would have satisfied the migration test
+without a byte being read from disk, and it would have passed while proving
+nothing.

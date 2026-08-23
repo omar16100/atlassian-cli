@@ -53,26 +53,37 @@ impl Sandbox {
     /// A command pointed at this sandbox, with any real credentials in the
     /// environment removed so a test can neither read nor be influenced by them.
     pub fn cli(&self) -> Command {
-        let mut cmd = Command::new(BIN);
-        cmd.env("HOME", self.home.path())
-            .env("ATLASSIAN_CLI_CONFIG_DIR", self.config_dir())
-            .env_remove("XDG_CONFIG_HOME")
-            .env_remove("ATLASSIAN_API_TOKEN")
-            .env_remove("ATLASSIAN_BITBUCKET_TOKEN")
-            .env_remove("BITBUCKET_TOKEN");
+        let mut cmd = self.clean_command();
+        cmd.env("ATLASSIAN_CLI_CONFIG_DIR", self.config_dir());
         cmd
     }
 
     /// A command with `HOME` pointed here but nothing else set, for tests that
     /// exercise path resolution itself and need to choose their own variables.
     pub fn bare_cli(&self) -> Command {
+        self.clean_command()
+    }
+
+    /// The binary with `HOME` here and every credential-bearing variable gone.
+    ///
+    /// Naming the variables individually was not enough: tokens are also read
+    /// per profile from `ATLASSIAN_CLI_TOKEN_<PROFILE>`, so a developer with
+    /// `ATLASSIAN_CLI_TOKEN_WORK` exported could satisfy a migration test
+    /// without a single byte being read from disk, and the test would pass
+    /// while proving nothing. Sweeping the prefixes catches those, and catches
+    /// any variable added later without anyone remembering this file.
+    fn clean_command(&self) -> Command {
+        const PREFIXES: [&str; 4] = ["ATLASSIAN_", "BITBUCKET_", "JIRA_", "CONFLUENCE_"];
+
         let mut cmd = Command::new(BIN);
+        for (key, _) in std::env::vars_os() {
+            let name = key.to_string_lossy().to_uppercase();
+            if PREFIXES.iter().any(|p| name.starts_with(p)) {
+                cmd.env_remove(&key);
+            }
+        }
         cmd.env("HOME", self.home.path())
-            .env_remove("ATLASSIAN_CLI_CONFIG_DIR")
-            .env_remove("XDG_CONFIG_HOME")
-            .env_remove("ATLASSIAN_API_TOKEN")
-            .env_remove("ATLASSIAN_BITBUCKET_TOKEN")
-            .env_remove("BITBUCKET_TOKEN");
+            .env_remove("XDG_CONFIG_HOME");
         cmd
     }
 }
