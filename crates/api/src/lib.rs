@@ -78,6 +78,90 @@ pub fn normalize_base_url(mut url: Url) -> Url {
     url
 }
 
+/// What a 401 says when the server offered no explanation of its own.
+const UNAUTHORIZED_FALLBACK: &str = "Invalid or expired credentials";
+
+/// Keep a quoted server message short enough to stay readable on one screen.
+const MAX_DETAIL_LEN: usize = 200;
+
+/// Build the error for a 401, keeping whatever reason the server gave.
+///
+/// Atlassian's gateway explains *why* it rejected the call — for example
+/// `{"code":401,"message":"Unauthorized; scope does not match"}`. Reporting
+/// every 401 as "Invalid or expired credentials" hid that, so a token missing
+/// one scope looked identical to an expired one and sent people re-issuing
+/// credentials that were fine all along.
+async fn unauthorized_error(response: reqwest::Response) -> ApiError {
+    let body = response.text().await.unwrap_or_default();
+    ApiError::AuthenticationFailed {
+        message: unauthorized_message(&body),
+    }
+}
+
+/// Combine the generic 401 wording with the server's own message, if any.
+fn unauthorized_message(body: &str) -> String {
+    match unauthorized_detail(body) {
+        Some(detail) => format!("{UNAUTHORIZED_FALLBACK} ({detail})"),
+        None => UNAUTHORIZED_FALLBACK.to_string(),
+    }
+}
+
+/// Pull the human-readable reason out of a 401 body.
+///
+/// Returns `None` when the body is empty or is an HTML error page, since a
+/// login page's markup tells the user nothing.
+fn unauthorized_detail(body: &str) -> Option<String> {
+    let trimmed = body.trim();
+    if trimmed.is_empty() || trimmed.starts_with('<') {
+        return None;
+    }
+
+    let detail = serde_json::from_str::<serde_json::Value>(trimmed)
+        .ok()
+        .and_then(|value| json_error_detail(&value))
+        .unwrap_or_else(|| trimmed.to_string());
+
+    let detail = detail.trim();
+    if detail.is_empty() {
+        return None;
+    }
+    Some(truncate_detail(detail))
+}
+
+/// Find the message field, across the several shapes Atlassian returns.
+fn json_error_detail(value: &serde_json::Value) -> Option<String> {
+    let direct = ["message", "error_description", "error"]
+        .iter()
+        .find_map(|key| value.get(*key).and_then(|v| v.as_str()))
+        .map(str::to_string);
+
+    // Jira classic instead returns `{"errorMessages": [...]}`.
+    direct
+        .or_else(|| {
+            value
+                .get("errorMessages")
+                .and_then(|v| v.as_array())
+                .map(|messages| {
+                    messages
+                        .iter()
+                        .filter_map(|m| m.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                })
+        })
+        .map(|detail| detail.trim().to_string())
+        .filter(|detail| !detail.is_empty())
+}
+
+/// Shorten on a char boundary, so multi-byte text cannot panic the slice.
+fn truncate_detail(detail: &str) -> String {
+    if detail.chars().count() <= MAX_DETAIL_LEN {
+        return detail.to_string();
+    }
+    let short: String = detail.chars().take(MAX_DETAIL_LEN).collect();
+    format!("{short}...")
+}
+
 /// The `Retry-After` delay in seconds, when the server sent one. The HTTP-date
 /// form is ignored; Atlassian sends seconds.
 fn retry_after(response: &reqwest::Response) -> Option<Duration> {
@@ -310,9 +394,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -398,9 +480,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -593,9 +673,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -676,9 +754,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -818,9 +894,93 @@ mod tests {
         let result: error::Result<serde_json::Value> = client.get("/test").await;
 
         match result {
-            Err(ApiError::AuthenticationFailed { .. }) => {}
+            Err(ApiError::AuthenticationFailed { message }) => {
+                // No body, so the generic wording is all we can say.
+                assert_eq!(message, UNAUTHORIZED_FALLBACK);
+            }
             other => panic!("Expected AuthenticationFailed, got: {:?}", other),
         }
+    }
+
+    /// The scope-mismatch case that cost a full debugging session: the gateway
+    /// explained itself and the CLI threw the explanation away.
+    #[tokio::test]
+    async fn test_401_surfaces_gateway_scope_message() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("test"))
+            .respond_with(
+                ResponseTemplate::new(401).set_body_string(
+                    r#"{"code":401,"message":"Unauthorized; scope does not match"}"#,
+                ),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result: error::Result<serde_json::Value> = client.get("/test").await;
+
+        match result {
+            Err(ApiError::AuthenticationFailed { message }) => {
+                assert!(
+                    message.contains("scope does not match"),
+                    "gateway reason was dropped: {message}"
+                );
+            }
+            other => panic!("Expected AuthenticationFailed, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn unauthorized_message_falls_back_when_body_is_empty() {
+        assert_eq!(unauthorized_message(""), UNAUTHORIZED_FALLBACK);
+        assert_eq!(unauthorized_message("   "), UNAUTHORIZED_FALLBACK);
+    }
+
+    #[test]
+    fn unauthorized_message_keeps_gateway_reason() {
+        let body = r#"{"code":401,"message":"Unauthorized; scope does not match"}"#;
+        let message = unauthorized_message(body);
+        assert!(message.starts_with(UNAUTHORIZED_FALLBACK));
+        assert!(message.contains("Unauthorized; scope does not match"));
+    }
+
+    #[test]
+    fn unauthorized_message_reads_jira_error_messages() {
+        let body = r#"{"errorMessages":["Client must be authenticated"],"errors":{}}"#;
+        assert!(unauthorized_message(body).contains("Client must be authenticated"));
+    }
+
+    #[test]
+    fn unauthorized_message_reads_oauth_error_description() {
+        let body = r#"{"error":"invalid_token","error_description":"The token expired"}"#;
+        assert!(unauthorized_message(body).contains("The token expired"));
+    }
+
+    #[test]
+    fn unauthorized_message_keeps_plain_text_body() {
+        assert!(unauthorized_message("Basic auth is not allowed").contains("Basic auth"));
+    }
+
+    #[test]
+    fn unauthorized_message_ignores_html_login_page() {
+        let body = "<!DOCTYPE html><html><body>Sign in</body></html>";
+        assert_eq!(unauthorized_message(body), UNAUTHORIZED_FALLBACK);
+    }
+
+    #[test]
+    fn unauthorized_message_truncates_long_bodies() {
+        let body = format!(r#"{{"message":"{}"}}"#, "x".repeat(500));
+        let message = unauthorized_message(&body);
+        assert!(message.contains("..."));
+        assert!(message.len() < 300, "message was not truncated: {message}");
+    }
+
+    /// Multi-byte text must not panic the truncation slice.
+    #[test]
+    fn unauthorized_message_truncates_on_char_boundary() {
+        let body = format!(r#"{{"message":"{}"}}"#, "é".repeat(500));
+        assert!(unauthorized_message(&body).contains("..."));
     }
 
     #[tokio::test]

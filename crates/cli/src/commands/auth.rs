@@ -10,6 +10,47 @@ use serde::Serialize;
 use tracing::debug;
 use url::Url;
 
+/// The Jira user endpoint. Also serves Jira Service Management.
+const JIRA_MYSELF_PATH: &str = "/rest/api/3/myself";
+
+/// The Confluence user endpoint, **v1** on purpose.
+///
+/// The v2 form (`/wiki/api/v2/users/current`) requires `read:user:confluence`,
+/// which a normal read-only scope set omits, so it 401s on tokens that work
+/// everywhere else. v1 needs no extra scope and returns the same fields.
+const CONFLUENCE_CURRENT_USER_PATH: &str = "/wiki/rest/api/user/current";
+
+/// Pick the user-info endpoint that matches the profile's product.
+///
+/// Both Jira and Confluence expose accountId / displayName / email, so callers
+/// read the same fields either way. Confluence sites are recognised by the
+/// OAuth gateway form (`/ex/confluence/<cloudId>`) or by a `/wiki` base path;
+/// anything else is treated as Jira, which keeps existing profiles working.
+///
+/// Hardcoding the Jira path made every Confluence profile 401 with a Jira
+/// error, and no token or scope could fix it.
+fn user_info_path(base_url: &str) -> &'static str {
+    let lower = base_url.to_lowercase();
+    let is_confluence = lower.contains("/ex/confluence/")
+        || lower.contains("/wiki/")
+        || lower.trim_end_matches('/').ends_with("/wiki");
+
+    if is_confluence {
+        CONFLUENCE_CURRENT_USER_PATH
+    } else {
+        JIRA_MYSELF_PATH
+    }
+}
+
+/// Product label for the profile's base URL, for messages only.
+fn product_label(base_url: &str) -> &'static str {
+    if user_info_path(base_url) == CONFLUENCE_CURRENT_USER_PATH {
+        "Confluence"
+    } else {
+        "Jira"
+    }
+}
+
 /// Check if a profile uses Bearer auth for Bitbucket.
 pub fn is_bitbucket_bearer(config: &Config, profile_name: &str) -> bool {
     config
@@ -587,27 +628,53 @@ async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> R
 
     let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 
+    let path = user_info_path(base_url);
+    let product = product_label(base_url);
+
     let user_data: serde_json::Value = client
-        .get("/rest/api/3/myself")
+        .get(path)
         .await
-        .context("Failed to fetch user information from Jira API")?;
+        .with_context(|| format!("Failed to fetch user information from {product} API"))?;
 
     println!("Profile: {}", profile_name);
+    println!("Product: {}", product);
     println!(
         "Display Name: {}",
-        user_data["displayName"].as_str().unwrap_or("Unknown")
+        display_name(&user_data).unwrap_or("Unknown")
     );
-    println!(
-        "Email: {}",
-        user_data["emailAddress"].as_str().unwrap_or("Unknown")
-    );
+    println!("Email: {}", email_address(&user_data).unwrap_or("Unknown"));
     println!(
         "Account ID: {}",
         user_data["accountId"].as_str().unwrap_or("Unknown")
     );
-    println!("Active: {}", user_data["active"].as_bool().unwrap_or(false));
+    // Only Jira reports `active`. Printing a default for Confluence would claim
+    // the account is disabled when the API simply never said either way.
+    if let Some(active) = user_data["active"].as_bool() {
+        println!("Active: {}", active);
+    }
 
     Ok(())
+}
+
+/// Display name, across both products.
+///
+/// Confluence can withhold `displayName` for privacy and send `publicName`.
+fn display_name(user: &serde_json::Value) -> Option<&str> {
+    user["displayName"]
+        .as_str()
+        .or_else(|| user["publicName"].as_str())
+        .filter(|value| !value.is_empty())
+}
+
+/// Email address, across both products.
+///
+/// Jira calls it `emailAddress`, Confluence calls it `email`. Either can be
+/// absent when the account hides its email.
+fn email_address(user: &serde_json::Value) -> Option<&str> {
+    user["emailAddress"]
+        .as_str()
+        .or_else(|| user["email"].as_str())
+        .filter(|value| !value.is_empty())
 }
 
 async fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> Result<()> {
@@ -625,42 +692,47 @@ async fn test_auth(args: TestArgs, config: &Config, store: &CredentialStore) -> 
             .base_url
             .as_deref()
             .context("Profile missing base_url. For Bitbucket, use --bitbucket flag.")?;
-        test_jira_auth(store, profile_name, email, base_url).await
+        test_site_auth(store, profile_name, email, base_url).await
     }
 }
 
-async fn test_jira_auth(
+/// Test a Jira or Confluence profile against its own product's user endpoint.
+async fn test_site_auth(
     store: &CredentialStore,
     profile_name: &str,
     email: &str,
     base_url: &str,
 ) -> Result<()> {
+    let product = product_label(base_url);
+
     let token = get_token(store, profile_name).ok_or_else(|| {
-        anyhow!("No Jira token found for profile '{profile_name}'. Run `atlassian-cli auth login`")
+        anyhow!(
+            "No {product} token found for profile '{profile_name}'. Run `atlassian-cli auth login`"
+        )
     })?;
 
-    println!(
-        "Testing Jira authentication for profile '{}'...",
-        profile_name
-    );
+    println!("Testing {product} authentication for profile '{profile_name}'...");
 
     let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
 
     let result: Result<serde_json::Value> = client
-        .get("/rest/api/3/myself")
+        .get(user_info_path(base_url))
         .await
-        .context("Jira authentication test failed");
+        .with_context(|| format!("{product} authentication test failed"));
 
     match result {
         Ok(_) => {
             println!("Authentication successful!");
             println!("   Profile: {}", profile_name);
+            println!("   Product: {}", product);
             println!("   Email: {}", email);
             println!("   Base URL: {}", base_url);
             Ok(())
         }
         Err(e) => {
-            println!("Authentication failed: {}", e);
+            // `{:#}` keeps the source chain. `{}` printed only the outermost
+            // context and hid the reason the request actually failed.
+            println!("Authentication failed: {:#}", e);
             Err(e)
         }
     }
@@ -717,7 +789,7 @@ async fn test_bitbucket_auth(
                 Ok(())
             }
             Err(e) => {
-                println!("Bitbucket Bearer authentication failed: {}", e);
+                println!("Bitbucket Bearer authentication failed: {:#}", e);
                 Err(e)
             }
         }
@@ -742,7 +814,7 @@ async fn test_bitbucket_auth(
                 Ok(())
             }
             Err(e) => {
-                println!("Bitbucket authentication failed: {}", e);
+                println!("Bitbucket authentication failed: {:#}", e);
                 println!();
                 println!("Hint: App passwords are deprecated (disabled Jun 2026).");
                 println!("Use Bitbucket API tokens: https://id.atlassian.com/manage-profile/security/api-tokens");
@@ -777,36 +849,43 @@ async fn auth_status(
 
     let mut statuses = Vec::new();
 
-    // Check Jira/Confluence
-    let jira_status = if let Some(base_url) = profile.base_url.as_deref() {
+    // Check the site product (Jira or Confluence, per the profile's base URL).
+    let site_status = if let Some(base_url) = profile.base_url.as_deref() {
+        // Name the product the profile actually points at, so a failure here
+        // is not reported against the other one.
+        let service = product_label(base_url).to_string();
+
         if let Some(token) = get_token(store, profile_name) {
             let client = atlassian_cli_api::ApiClient::new(base_url)
                 .ok()
                 .map(|c| c.with_basic_auth(email, &token));
 
             if let Some(client) = client {
-                match client.get::<serde_json::Value>("/rest/api/3/myself").await {
+                match client
+                    .get::<serde_json::Value>(user_info_path(base_url))
+                    .await
+                {
                     Ok(_) => ServiceStatus {
-                        service: "Jira/Confluence".to_string(),
+                        service,
                         status: "OK".to_string(),
                         details: base_url.to_string(),
                     },
                     Err(e) => ServiceStatus {
-                        service: "Jira/Confluence".to_string(),
+                        service,
                         status: "FAILED".to_string(),
-                        details: format!("{}", e),
+                        details: format!("{:#}", e),
                     },
                 }
             } else {
                 ServiceStatus {
-                    service: "Jira/Confluence".to_string(),
+                    service,
                     status: "FAILED".to_string(),
                     details: "Invalid base URL".to_string(),
                 }
             }
         } else {
             ServiceStatus {
-                service: "Jira/Confluence".to_string(),
+                service,
                 status: "N/A".to_string(),
                 details: "No token configured".to_string(),
             }
@@ -818,8 +897,8 @@ async fn auth_status(
             details: "No base_url configured".to_string(),
         }
     };
-    if !args.configured_only || jira_status.status != "N/A" {
-        statuses.push(jira_status);
+    if !args.configured_only || site_status.status != "N/A" {
+        statuses.push(site_status);
     }
 
     // Check Bitbucket
@@ -980,5 +1059,87 @@ mod tests {
     fn test_is_bitbucket_bearer_nonexistent_profile() {
         let config = Config::default();
         assert!(!is_bitbucket_bearer(&config, "nonexistent"));
+    }
+
+    #[test]
+    fn plain_site_url_uses_jira_endpoint() {
+        assert_eq!(
+            user_info_path("https://example.atlassian.net/"),
+            JIRA_MYSELF_PATH
+        );
+        assert_eq!(product_label("https://example.atlassian.net/"), "Jira");
+    }
+
+    #[test]
+    fn oauth_gateway_jira_url_uses_jira_endpoint() {
+        let url = "https://api.atlassian.com/ex/jira/11111111-2222-3333-4444-555555555555/";
+        assert_eq!(user_info_path(url), JIRA_MYSELF_PATH);
+    }
+
+    /// The reported bug: a Confluence gateway profile built
+    /// `/ex/confluence/<cloudId>/rest/api/3/myself` and always 401'd.
+    #[test]
+    fn oauth_gateway_confluence_url_uses_confluence_endpoint() {
+        let url = "https://api.atlassian.com/ex/confluence/11111111-2222-3333-4444-555555555555/";
+        assert_eq!(user_info_path(url), CONFLUENCE_CURRENT_USER_PATH);
+        assert_eq!(product_label(url), "Confluence");
+    }
+
+    #[test]
+    fn wiki_base_path_uses_confluence_endpoint() {
+        assert_eq!(
+            user_info_path("https://example.atlassian.net/wiki"),
+            CONFLUENCE_CURRENT_USER_PATH
+        );
+        assert_eq!(
+            user_info_path("https://example.atlassian.net/wiki/"),
+            CONFLUENCE_CURRENT_USER_PATH
+        );
+    }
+
+    #[test]
+    fn product_detection_ignores_case() {
+        assert_eq!(
+            user_info_path("https://api.atlassian.com/EX/CONFLUENCE/abc/"),
+            CONFLUENCE_CURRENT_USER_PATH
+        );
+    }
+
+    /// v1, not v2: `/wiki/api/v2/users/current` needs `read:user:confluence`,
+    /// which a read-only scope set omits.
+    #[test]
+    fn confluence_endpoint_is_the_v1_path() {
+        assert_eq!(CONFLUENCE_CURRENT_USER_PATH, "/wiki/rest/api/user/current");
+    }
+
+    #[test]
+    fn whoami_fields_read_jira_payload() {
+        let user = serde_json::json!({
+            "displayName": "Ada Lovelace",
+            "emailAddress": "ada@example.com",
+            "accountId": "abc123",
+            "active": true,
+        });
+        assert_eq!(display_name(&user), Some("Ada Lovelace"));
+        assert_eq!(email_address(&user), Some("ada@example.com"));
+    }
+
+    #[test]
+    fn whoami_fields_read_confluence_payload() {
+        // Confluence v1 names the field `email`, not `emailAddress`.
+        let user = serde_json::json!({
+            "displayName": "Ada Lovelace",
+            "email": "ada@example.com",
+            "accountId": "abc123",
+        });
+        assert_eq!(display_name(&user), Some("Ada Lovelace"));
+        assert_eq!(email_address(&user), Some("ada@example.com"));
+    }
+
+    #[test]
+    fn whoami_falls_back_to_public_name() {
+        let user = serde_json::json!({ "publicName": "ada", "accountId": "abc123" });
+        assert_eq!(display_name(&user), Some("ada"));
+        assert_eq!(email_address(&user), None);
     }
 }

@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
 
-use super::utils::ConfluenceContext;
+use super::utils::{resolve_space_id, ConfluenceContext};
 use crate::commands::common::{render_success, MutationResult};
 use crate::query::UrlParamsBuilder;
 
@@ -34,6 +34,16 @@ pub async fn list_pages(
         status: Option<String>,
     }
 
+    // `/wiki/api/v2/pages` filters on the numeric `space-id`. It has no
+    // `space-key` parameter and silently ignores unknown ones, so the old
+    // `space-key` filter returned the whole site: two different keys gave
+    // byte-identical results. Resolve the key first, which also turns a bad
+    // key into an error instead of a plausible-looking wrong listing.
+    let space_id = match space_key {
+        Some(key) => Some(resolve_space_id(ctx, key).await?),
+        None => None,
+    };
+
     let query_string = {
         let mut builder = UrlParamsBuilder::new();
 
@@ -41,7 +51,7 @@ pub async fn list_pages(
             builder = builder.add("limit", &l.to_string());
         }
 
-        builder = builder.add_optional("space-key", space_key);
+        builder = builder.add_optional("space-id", space_id.as_deref());
 
         let params = builder.finish();
         if params.is_empty() {
