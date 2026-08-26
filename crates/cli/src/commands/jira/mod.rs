@@ -11,6 +11,7 @@ mod attachments;
 mod audit;
 mod automation;
 mod bulk;
+mod field_selection;
 mod fields_workflows;
 mod issues;
 mod projects;
@@ -98,7 +99,15 @@ enum JiraCommands {
 enum IssueCommands {
     /// Search issues using JQL or filter parameters
     #[command(
-        long_about = "Search issues using JQL or filter parameters.\n\nExamples:\n  jira issue search --project PROJ --status Open\n  jira issue search --assignee @me --priority High\n  jira issue search --jql 'project = PROJ AND status = Open ORDER BY created DESC'\n  jira issue search --status Open --status \"In Progress\" --limit 50"
+        long_about = "Search issues using JQL or filter parameters.\n\nExamples:\n  \
+        jira issue search --project PROJ --status Open\n  \
+        jira issue search --assignee @me --priority High\n  \
+        jira issue search --jql 'project = PROJ AND status = Open ORDER BY created DESC'\n  \
+        jira issue search --status Open --status \"In Progress\" --limit 50\n  \
+        jira issue search --project PROJ --fields status,\"Story Points\" --format csv\n\n\
+        --fields replaces the default columns rather than adding to them, and accepts field\n\
+        ids, the display names shown by `jira fields list`, or `all`. Columns come back in\n\
+        the order you ask for them, with key always first."
     )]
     Search {
         /// Raw JQL query (conflicts with filter flags)
@@ -141,12 +150,32 @@ enum IssueCommands {
         /// Maximum number of issues to return
         #[arg(long, default_value_t = 25)]
         limit: usize,
+
+        /// Fields to return: ids or names from `jira fields list`, or `all`
+        #[arg(long, value_delimiter = ',', value_name = "FIELD")]
+        fields: Vec<String>,
     },
 
     /// Fetch a single issue
+    #[command(long_about = "Fetch a single issue.\n\nExamples:\n  \
+        jira issue get DEV-123\n  \
+        jira issue get DEV-123 --fields summary,status\n  \
+        jira issue get DEV-123 --fields \"Story Points\" --format json\n  \
+        jira issue get DEV-123 --fields all --format json\n\n\
+        --fields accepts field ids (summary, customfield_10016) and the display names shown\n\
+        by `jira fields list`, matched without regard to case. Columns come back in the\n\
+        order you ask for them. `all` returns every field Jira will give.\n\n\
+        Without --fields the curated view is unchanged. With it you get exactly the fields\n\
+        you asked for, so the description and attachment sections are not added back.\n\
+        JSON and YAML return Jira's values untouched; the table, CSV and markdown formats\n\
+        flatten wrapper objects to their label.")]
     Get {
         /// Issue key (e.g. DEV-123)
         key: String,
+
+        /// Fields to return: ids or names from `jira fields list`, or `all`
+        #[arg(long, value_delimiter = ',', value_name = "FIELD")]
+        fields: Vec<String>,
     },
 
     /// List the transitions currently available on an issue
@@ -949,6 +978,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 text,
                 show_query,
                 limit,
+                fields,
             } => {
                 issues::search_issues(
                     &ctx,
@@ -962,10 +992,17 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                     text.as_deref(),
                     show_query,
                     limit,
+                    &fields,
                 )
                 .await
             }
-            IssueCommands::Get { key } => issues::view_issue(&ctx, &key).await,
+            IssueCommands::Get { key, fields } => {
+                if fields.is_empty() {
+                    issues::view_issue(&ctx, &key).await
+                } else {
+                    field_selection::view_issue_fields(&ctx, &key, &fields).await
+                }
+            }
             IssueCommands::Transitions { key } => issues::list_transitions(&ctx, &key).await,
             IssueCommands::Create {
                 project,

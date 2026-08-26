@@ -69,6 +69,7 @@ pub async fn search_issues(
     text: Option<&str>,
     show_query: bool,
     limit: usize,
+    fields: &[String],
 ) -> Result<()> {
     // Build JQL from filters or use raw JQL
     let final_jql = if let Some(raw_jql) = jql {
@@ -114,6 +115,12 @@ pub async fn search_issues(
         if jql.is_none() {
             println!();
         }
+    }
+
+    // A chosen field list replaces the fixed five columns, and takes its own
+    // path over raw JSON. The default below is left exactly as it was.
+    if !fields.is_empty() {
+        return super::field_selection::search_rows(ctx, &final_jql, limit, fields).await;
     }
 
     #[derive(Deserialize)]
@@ -968,7 +975,7 @@ const ADF_MAX_DEPTH: usize = 64;
 
 /// Recursively extract plain text from an ADF (Atlassian Document Format) JSON value.
 /// Handles paragraphs, headings, lists, code blocks, hard breaks, inline nodes, and nested content.
-fn extract_adf_text(value: &Value) -> String {
+pub(super) fn extract_adf_text(value: &Value) -> String {
     extract_adf_inner(value, 0)
 }
 
