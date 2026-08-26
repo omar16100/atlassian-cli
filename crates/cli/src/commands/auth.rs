@@ -20,6 +20,14 @@ const JIRA_MYSELF_PATH: &str = "/rest/api/3/myself";
 /// everywhere else. v1 needs no extra scope and returns the same fields.
 const CONFLUENCE_CURRENT_USER_PATH: &str = "/wiki/rest/api/user/current";
 
+/// The same endpoint, for a base URL that already ends in `/wiki`.
+///
+/// `ApiClient` appends to the base rather than replacing its path
+/// (`normalize_base_url` gives the base a trailing slash, `safe_join` strips
+/// the leading slash off the path), so prepending `/wiki` to a base that
+/// carries it already asks for `/wiki/wiki/rest/api/user/current`.
+const CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED: &str = "/rest/api/user/current";
+
 /// Pick the user-info endpoint that matches the profile's product.
 ///
 /// Both Jira and Confluence expose accountId / displayName / email, so callers
@@ -31,23 +39,28 @@ const CONFLUENCE_CURRENT_USER_PATH: &str = "/wiki/rest/api/user/current";
 /// error, and no token or scope could fix it.
 fn user_info_path(base_url: &str) -> &'static str {
     let lower = base_url.to_lowercase();
-    let is_confluence = lower.contains("/ex/confluence/")
-        || lower.contains("/wiki/")
-        || lower.trim_end_matches('/').ends_with("/wiki");
+    let trimmed = lower.trim_end_matches('/');
 
-    if is_confluence {
-        CONFLUENCE_CURRENT_USER_PATH
-    } else {
-        JIRA_MYSELF_PATH
+    // Checked first, and separately from the gateway form: a gateway base can
+    // itself end in `/wiki` (`/ex/confluence/<cloudId>/wiki`), and that spelling
+    // needs the unprefixed path just as much as a plain site does.
+    if trimmed.ends_with("/wiki") {
+        return CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED;
     }
+
+    if lower.contains("/ex/confluence/") || lower.contains("/wiki/") {
+        return CONFLUENCE_CURRENT_USER_PATH;
+    }
+
+    JIRA_MYSELF_PATH
 }
 
 /// Product label for the profile's base URL, for messages only.
 fn product_label(base_url: &str) -> &'static str {
-    if user_info_path(base_url) == CONFLUENCE_CURRENT_USER_PATH {
-        "Confluence"
-    } else {
+    if user_info_path(base_url) == JIRA_MYSELF_PATH {
         "Jira"
+    } else {
+        "Confluence"
     }
 }
 
@@ -1085,15 +1098,22 @@ mod tests {
         assert_eq!(product_label(url), "Confluence");
     }
 
+    /// A `/wiki` base is Confluence, but takes the unprefixed path, since the
+    /// base already carries the segment. `wiki_base_url_does_not_double_the_wiki_segment`
+    /// pins what that resolves to.
     #[test]
     fn wiki_base_path_uses_confluence_endpoint() {
         assert_eq!(
             user_info_path("https://example.atlassian.net/wiki"),
-            CONFLUENCE_CURRENT_USER_PATH
+            CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED
         );
         assert_eq!(
             user_info_path("https://example.atlassian.net/wiki/"),
-            CONFLUENCE_CURRENT_USER_PATH
+            CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED
+        );
+        assert_eq!(
+            product_label("https://example.atlassian.net/wiki"),
+            "Confluence"
         );
     }
 
@@ -1141,5 +1161,65 @@ mod tests {
         let user = serde_json::json!({ "publicName": "ada", "accountId": "abc123" });
         assert_eq!(display_name(&user), Some("ada"));
         assert_eq!(email_address(&user), None);
+    }
+
+    /// What the client will actually request, which is the only thing that
+    /// matters. Asserting that `user_info_path` returns a given constant says
+    /// nothing: the path is joined onto the profile's base URL, and
+    /// `normalize_base_url` gives that base a trailing slash while `safe_join`
+    /// strips the path's leading one, so the two concatenate. A base that
+    /// already ends in `/wiki` therefore produced `/wiki/wiki/...`.
+    fn resolved(base_url: &str) -> String {
+        atlassian_cli_api::ApiClient::new(base_url)
+            .expect("base URL should parse")
+            .resolve_url(user_info_path(base_url))
+            .expect("path should join")
+            .to_string()
+    }
+
+    #[test]
+    fn plain_site_resolves_to_the_jira_endpoint() {
+        assert_eq!(
+            resolved("https://example.atlassian.net"),
+            "https://example.atlassian.net/rest/api/3/myself"
+        );
+    }
+
+    #[test]
+    fn confluence_gateway_resolves_under_its_cloud_id() {
+        assert_eq!(
+            resolved("https://api.atlassian.com/ex/confluence/cloud-id"),
+            "https://api.atlassian.com/ex/confluence/cloud-id/wiki/rest/api/user/current"
+        );
+    }
+
+    /// The gateway form written with the `/wiki` segment already on it, which
+    /// is how the Confluence REST docs spell the full URL.
+    #[test]
+    fn confluence_gateway_with_wiki_already_present_is_not_doubled() {
+        assert_eq!(
+            resolved("https://api.atlassian.com/ex/confluence/cloud-id/wiki"),
+            "https://api.atlassian.com/ex/confluence/cloud-id/wiki/rest/api/user/current"
+        );
+    }
+
+    /// A base URL ending in `/wiki` is a shape people really write, and it must
+    /// not gain a second one.
+    #[test]
+    fn wiki_base_url_does_not_double_the_wiki_segment() {
+        for base in [
+            "https://example.atlassian.net/wiki",
+            "https://example.atlassian.net/wiki/",
+        ] {
+            let url = resolved(base);
+            assert!(
+                !url.contains("/wiki/wiki/"),
+                "the /wiki segment was doubled: {url}"
+            );
+            assert_eq!(
+                url,
+                "https://example.atlassian.net/wiki/rest/api/user/current"
+            );
+        }
     }
 }
