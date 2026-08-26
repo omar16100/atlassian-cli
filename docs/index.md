@@ -45,6 +45,7 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 
 | Document | Date | What it covers |
 | --- | --- | --- |
+| [26082026_auth_product_dispatch.md](26082026_auth_product_dispatch.md) | 2026-08-26 | `auth whoami`/`test`/`status` dispatch on the profile's product, the `--space` filter fix, and 401s that keep the server's reason |
 | [16082026_bb_pr_reviewer_status.md](16082026_bb_pr_reviewer_status.md) | 2026-08-16 | `bb pr reviewers` listing with approval status, `--all`, and the `--add` endpoint fix |
 | [23082026_xdg_config_paths.md](23082026_xdg_config_paths.md) | 2026-08-23 | XDG config directory resolution, `--config-dir`, legacy migration and 0600/0700 permissions |
 | [22082026_confluence_inline_comments.md](22082026_confluence_inline_comments.md) | 2026-08-22 | Confluence inline comments, thread replies, cursor pagination and storage-format escaping |

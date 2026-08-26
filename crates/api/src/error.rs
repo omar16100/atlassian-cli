@@ -52,8 +52,17 @@ impl ApiError {
 
     pub fn suggestion(&self) -> Option<String> {
         match self {
-            ApiError::AuthenticationFailed { .. } => {
-                Some("Verify tokens with: atlassian-cli auth list\nTest auth with: atlassian-cli auth test [--bitbucket]".to_string())
+            ApiError::AuthenticationFailed { message } => {
+                let base = "Verify tokens with: atlassian-cli auth list\nTest auth with: atlassian-cli auth test [--bitbucket]".to_string();
+                // A scope mismatch is not a bad token: re-issuing the same
+                // token changes nothing, so point at the scopes instead.
+                if message.to_lowercase().contains("scope") {
+                    Some(format!(
+                        "{base}\nThis looks like a missing scope, not a bad token. Re-create the token with the scopes the command needs at:\nhttps://id.atlassian.com/manage-profile/security/api-tokens"
+                    ))
+                } else {
+                    Some(base)
+                }
             }
             ApiError::Forbidden { message } => {
                 let base = "Verify tokens with: atlassian-cli auth list\nTest auth with: atlassian-cli auth test [--bitbucket]".to_string();
@@ -145,6 +154,27 @@ mod tests {
         };
         let hint = err.suggestion().unwrap();
         assert!(hint.contains("app-passwords"));
+    }
+
+    #[test]
+    fn authentication_failed_with_scope_message_points_at_scopes() {
+        let err = ApiError::AuthenticationFailed {
+            message: "Invalid or expired credentials (Unauthorized; scope does not match)"
+                .to_string(),
+        };
+        let hint = err.suggestion().unwrap();
+        assert!(hint.contains("missing scope"));
+        assert!(hint.contains("api-tokens"));
+    }
+
+    #[test]
+    fn authentication_failed_without_scope_message_omits_scope_hint() {
+        let err = ApiError::AuthenticationFailed {
+            message: "Invalid or expired credentials".to_string(),
+        };
+        let hint = err.suggestion().unwrap();
+        assert!(hint.contains("auth test"));
+        assert!(!hint.contains("missing scope"));
     }
 
     #[test]

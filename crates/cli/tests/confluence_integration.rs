@@ -120,7 +120,9 @@ async fn test_list_pages() {
 
     Mock::given(method("GET"))
         .and(path("/wiki/api/v2/pages"))
-        .and(query_param("space-key", "DOCS"))
+        // v2 filters on the numeric space id; it has no `space-key` parameter
+        // and ignores unknown ones, which would list the whole site.
+        .and(query_param("space-id", "786433"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "results": [
                 {
@@ -145,7 +147,7 @@ async fn test_list_pages() {
         .with_basic_auth("test@example.com", "fake-token");
 
     let response: Result<serde_json::Value, _> =
-        client.get("/wiki/api/v2/pages?space-key=DOCS").await;
+        client.get("/wiki/api/v2/pages?space-id=786433").await;
 
     assert!(response.is_ok());
     let data = response.unwrap();

@@ -78,6 +78,182 @@ pub fn normalize_base_url(mut url: Url) -> Url {
     url
 }
 
+/// What a 401 says when the server offered no explanation of its own.
+const UNAUTHORIZED_FALLBACK: &str = "Invalid or expired credentials";
+
+/// Keep a quoted server message short enough to stay readable on one screen.
+const MAX_DETAIL_LEN: usize = 200;
+
+/// Build the error for a 401, keeping whatever reason the server gave.
+///
+/// Atlassian's gateway explains *why* it rejected the call, for example
+/// `{"code":401,"message":"Unauthorized; scope does not match"}`. Reporting
+/// every 401 as "Invalid or expired credentials" hid that, so a token missing
+/// one scope looked identical to an expired one and sent people re-issuing
+/// credentials that were fine all along.
+async fn unauthorized_error(response: reqwest::Response) -> ApiError {
+    let body = response.text().await.unwrap_or_default();
+    ApiError::AuthenticationFailed {
+        message: unauthorized_message(&body),
+    }
+}
+
+/// Combine the generic 401 wording with the server's own message, if any.
+fn unauthorized_message(body: &str) -> String {
+    match unauthorized_detail(body) {
+        Some(detail) => format!("{UNAUTHORIZED_FALLBACK} ({detail})"),
+        None => UNAUTHORIZED_FALLBACK.to_string(),
+    }
+}
+
+/// Pull the human-readable reason out of a 401 body.
+///
+/// Returns `None` when the body is empty or is an HTML error page, since a
+/// login page's markup tells the user nothing.
+fn unauthorized_detail(body: &str) -> Option<String> {
+    let trimmed = body.trim();
+    if trimmed.is_empty() || trimmed.starts_with('<') {
+        return None;
+    }
+
+    let detail = serde_json::from_str::<serde_json::Value>(trimmed)
+        .ok()
+        .and_then(|value| json_error_detail(&value))
+        .unwrap_or_else(|| trimmed.to_string());
+
+    let detail = detail.trim();
+    if detail.is_empty() {
+        return None;
+    }
+    Some(truncate_detail(&scrub_credentials(detail)))
+}
+
+/// Find the message field, across the several shapes Atlassian returns.
+fn json_error_detail(value: &serde_json::Value) -> Option<String> {
+    let direct = ["message", "error_description", "error"]
+        .iter()
+        .find_map(|key| value.get(*key).and_then(|v| v.as_str()))
+        .map(str::to_string);
+
+    direct
+        // `{"error": {"message": "..."}}`, which some Atlassian services and
+        // most proxies in front of them return. Without this the whole JSON
+        // document ends up quoted at the user as though it were prose.
+        .or_else(|| {
+            value
+                .get("error")
+                .and_then(|e| e.get("message").or_else(|| e.get("description")))
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+        })
+        // Jira classic instead returns `{"errorMessages": [...]}`.
+        .or_else(|| {
+            value
+                .get("errorMessages")
+                .and_then(|v| v.as_array())
+                .map(|messages| {
+                    messages
+                        .iter()
+                        .filter_map(|m| m.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                })
+        })
+        .map(|detail| detail.trim().to_string())
+        .filter(|detail| !detail.is_empty())
+}
+
+/// Replace credential-shaped substrings with a placeholder.
+///
+/// When a body has no field we recognise we quote it whole, and a gateway or
+/// proxy that echoes the request back would then put an `Authorization` value
+/// on the user's terminal, into their shell history and into any CI log
+/// scraping stderr. Tokens are `SecretString` everywhere else precisely so they
+/// cannot leak by accident; this closes the one path that bypasses that.
+///
+/// It looks for the two auth schemes this client sends and drops what follows,
+/// but only when that looks like a credential rather than a word: "Basic auth
+/// is not allowed" is a sentence a server really sends, and mangling it into
+/// "Basic <redacted> is not allowed" would destroy the message to protect
+/// nothing. See `is_credential_shaped`.
+fn scrub_credentials(detail: &str) -> String {
+    const SCHEMES: [&str; 2] = ["bearer ", "basic "];
+
+    // ASCII-lowercase, so byte offsets stay valid in the original. A full
+    // `to_lowercase` can change a string's length and desync the indices.
+    let haystack = detail.to_ascii_lowercase();
+
+    let mut out = String::with_capacity(detail.len());
+    let mut cursor = 0;
+
+    while cursor < detail.len() {
+        let found = SCHEMES
+            .iter()
+            .filter_map(|scheme| {
+                haystack[cursor..]
+                    .find(scheme)
+                    .map(|at| (cursor + at, *scheme))
+            })
+            .min_by_key(|(at, _)| *at);
+
+        let Some((at, scheme)) = found else {
+            out.push_str(&detail[cursor..]);
+            break;
+        };
+
+        let value_start = at + scheme.len();
+        out.push_str(&detail[cursor..value_start]);
+
+        let value_end = detail[value_start..]
+            .find(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | ',' | '}' | ']' | ')'))
+            .map(|offset| value_start + offset)
+            .unwrap_or(detail.len());
+
+        if is_credential_shaped(&detail[value_start..value_end]) {
+            out.push_str("<redacted>");
+            cursor = value_end;
+        } else {
+            // Not a credential. Leave it, but step past the scheme word so the
+            // scan cannot match it again and loop.
+            cursor = value_start;
+        }
+    }
+
+    out
+}
+
+/// Whether the token after an auth scheme is a credential rather than a word.
+///
+/// Credentials here are base64 or a JWT, so: only characters from that
+/// alphabet, and either long enough that no English word reaches it, or
+/// carrying one of the punctuation marks base64 and JWTs use and prose does
+/// not. "auth" and "authentication" fail both tests; `Zm9vOmJhcg==` and
+/// `eyJhbGci....sig` pass on punctuation alone, whatever their length.
+fn is_credential_shaped(token: &str) -> bool {
+    const MIN_OPAQUE_LEN: usize = 16;
+
+    if token.len() < 4 {
+        return false;
+    }
+    if !token
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '/' | '=' | '.' | '_' | '-'))
+    {
+        return false;
+    }
+
+    token.len() >= MIN_OPAQUE_LEN || token.contains(['+', '/', '=', '.'])
+}
+
+/// Shorten on a char boundary, so multi-byte text cannot panic the slice.
+fn truncate_detail(detail: &str) -> String {
+    if detail.chars().count() <= MAX_DETAIL_LEN {
+        return detail.to_string();
+    }
+    let short: String = detail.chars().take(MAX_DETAIL_LEN).collect();
+    format!("{short}...")
+}
+
 /// The `Retry-After` delay in seconds, when the server sent one. The HTTP-date
 /// form is ignored; Atlassian sends seconds.
 fn retry_after(response: &reqwest::Response) -> Option<Duration> {
@@ -310,9 +486,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -398,9 +572,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -593,9 +765,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -676,9 +846,7 @@ impl ApiClient {
             let status = response.status();
 
             match status {
-                StatusCode::UNAUTHORIZED => Err(ApiError::AuthenticationFailed {
-                    message: "Invalid or expired credentials".to_string(),
-                }),
+                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
                 StatusCode::FORBIDDEN => {
                     let message = response
                         .text()
@@ -818,9 +986,173 @@ mod tests {
         let result: error::Result<serde_json::Value> = client.get("/test").await;
 
         match result {
-            Err(ApiError::AuthenticationFailed { .. }) => {}
+            Err(ApiError::AuthenticationFailed { message }) => {
+                // No body, so the generic wording is all we can say.
+                assert_eq!(message, UNAUTHORIZED_FALLBACK);
+            }
             other => panic!("Expected AuthenticationFailed, got: {:?}", other),
         }
+    }
+
+    /// The scope-mismatch case that cost a full debugging session: the gateway
+    /// explained itself and the CLI threw the explanation away.
+    #[tokio::test]
+    async fn test_401_surfaces_gateway_scope_message() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("test"))
+            .respond_with(
+                ResponseTemplate::new(401).set_body_string(
+                    r#"{"code":401,"message":"Unauthorized; scope does not match"}"#,
+                ),
+            )
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri()).unwrap();
+        let result: error::Result<serde_json::Value> = client.get("/test").await;
+
+        match result {
+            Err(ApiError::AuthenticationFailed { message }) => {
+                assert!(
+                    message.contains("scope does not match"),
+                    "gateway reason was dropped: {message}"
+                );
+            }
+            other => panic!("Expected AuthenticationFailed, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn unauthorized_message_falls_back_when_body_is_empty() {
+        assert_eq!(unauthorized_message(""), UNAUTHORIZED_FALLBACK);
+        assert_eq!(unauthorized_message("   "), UNAUTHORIZED_FALLBACK);
+    }
+
+    #[test]
+    fn unauthorized_message_keeps_gateway_reason() {
+        let body = r#"{"code":401,"message":"Unauthorized; scope does not match"}"#;
+        let message = unauthorized_message(body);
+        assert!(message.starts_with(UNAUTHORIZED_FALLBACK));
+        assert!(message.contains("Unauthorized; scope does not match"));
+    }
+
+    #[test]
+    fn unauthorized_message_reads_jira_error_messages() {
+        let body = r#"{"errorMessages":["Client must be authenticated"],"errors":{}}"#;
+        assert!(unauthorized_message(body).contains("Client must be authenticated"));
+    }
+
+    #[test]
+    fn unauthorized_message_reads_oauth_error_description() {
+        let body = r#"{"error":"invalid_token","error_description":"The token expired"}"#;
+        assert!(unauthorized_message(body).contains("The token expired"));
+    }
+
+    #[test]
+    fn unauthorized_message_reads_a_nested_error_object() {
+        let body = r#"{"error":{"message":"Token does not have the required scope"}}"#;
+        let message = unauthorized_message(body);
+        assert!(message.contains("required scope"));
+        // The whole document must not be quoted back as though it were prose.
+        assert!(
+            !message.contains("{\"error\""),
+            "raw JSON leaked: {message}"
+        );
+    }
+
+    /// A body we cannot parse is quoted whole, so a proxy echoing the request
+    /// back would otherwise print the token we just sent it.
+    #[test]
+    fn unauthorized_message_redacts_an_echoed_authorization_header() {
+        let body =
+            "rejected request: Authorization: Basic Zm9vOmJhcnNlY3JldA== to /rest/api/3/myself";
+        let message = unauthorized_message(body);
+        assert!(
+            !message.contains("Zm9vOmJhcnNlY3JldA=="),
+            "the credential survived: {message}"
+        );
+        assert!(message.contains("Basic <redacted>"));
+        assert!(
+            message.contains("/rest/api/3/myself"),
+            "the useful part of the body was lost: {message}"
+        );
+    }
+
+    #[test]
+    fn unauthorized_message_redacts_a_bearer_token_inside_json() {
+        let body = r#"{"message":"bad header \"Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig\""}"#;
+        let message = unauthorized_message(body);
+        assert!(!message.contains("eyJhbGciOiJIUzI1NiJ9"), "{message}");
+        assert!(message.contains("Bearer <redacted>"));
+    }
+
+    #[test]
+    fn unauthorized_message_redacts_every_occurrence() {
+        let body = "Bearer aGVsbG8gd29ybGQgdG9rZW4= and basic dXNlcjpwYXNzd29yZA==";
+        let message = unauthorized_message(body);
+        for secret in ["aGVsbG8gd29ybGQgdG9rZW4=", "dXNlcjpwYXNzd29yZA=="] {
+            assert!(!message.contains(secret), "{secret} survived: {message}");
+        }
+        assert_eq!(message.matches("<redacted>").count(), 2);
+    }
+
+    /// "Basic auth is not allowed" is a sentence servers really send. Redacting
+    /// the word after the scheme would destroy the message to protect nothing.
+    #[test]
+    fn scrub_leaves_ordinary_prose_alone() {
+        for prose in [
+            "basic authentication is not permitted here",
+            "Basic auth is not allowed",
+            "use Bearer tokens instead",
+            "no credentials at all",
+        ] {
+            assert_eq!(scrub_credentials(prose), prose, "prose was mangled");
+        }
+    }
+
+    #[test]
+    fn credential_shape_separates_words_from_secrets() {
+        for word in ["auth", "authentication", "tokens", "a", ""] {
+            assert!(
+                !is_credential_shaped(word),
+                "{word} is a word, not a secret"
+            );
+        }
+        for secret in [
+            "Zm9vOmJhcg==",
+            "eyJhbGciOiJIUzI1NiJ9.payload.sig",
+            "abcdefghijklmnop",
+            "ATATT3xFfGF0abc_def-123",
+        ] {
+            assert!(is_credential_shaped(secret), "{secret} should be redacted");
+        }
+    }
+
+    #[test]
+    fn unauthorized_message_keeps_plain_text_body() {
+        assert!(unauthorized_message("Basic auth is not allowed").contains("Basic auth"));
+    }
+
+    #[test]
+    fn unauthorized_message_ignores_html_login_page() {
+        let body = "<!DOCTYPE html><html><body>Sign in</body></html>";
+        assert_eq!(unauthorized_message(body), UNAUTHORIZED_FALLBACK);
+    }
+
+    #[test]
+    fn unauthorized_message_truncates_long_bodies() {
+        let body = format!(r#"{{"message":"{}"}}"#, "x".repeat(500));
+        let message = unauthorized_message(&body);
+        assert!(message.contains("..."));
+        assert!(message.len() < 300, "message was not truncated: {message}");
+    }
+
+    /// Multi-byte text must not panic the truncation slice.
+    #[test]
+    fn unauthorized_message_truncates_on_char_boundary() {
+        let body = format!(r#"{{"message":"{}"}}"#, "é".repeat(500));
+        assert!(unauthorized_message(&body).contains("..."));
     }
 
     #[tokio::test]

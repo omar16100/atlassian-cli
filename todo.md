@@ -1,5 +1,69 @@
 # Changes Made
 
+## 2026-08-24 — Product-aware auth endpoint (branch `fix/auth-confluence-product-dispatch`)
+
+### The bug
+`auth whoami` and `auth test` hardcoded Jira's `/rest/api/3/myself` for every profile. On a
+Confluence profile that produced
+`https://api.atlassian.com/ex/confluence/<cloudId>/rest/api/3/myself`, which always 401s — no
+token and no scope could fix it, because the path simply does not exist on the Confluence
+gateway. It was worst when a Confluence profile was the default: the first command a new user
+ran failed with a *Jira* error for no visible reason, pointing the investigation at the one
+thing that was not broken.
+
+`crates/cli/src/commands/auth.rs` now derives the endpoint from the profile's `base_url` via
+`user_info_path()`: a base URL containing `/ex/confluence/` or a `/wiki` path selects
+`/wiki/rest/api/user/current`, anything else keeps the Jira path. `auth status` shares the same
+dispatch, so it covers Confluence for the first time and labels the row with the product it
+actually tested instead of the ambiguous `Jira/Confluence`.
+
+The Confluence path is **v1 on purpose**. The v2 form (`/wiki/api/v2/users/current`) requires
+`read:user:confluence`, which a normal read-only scope set omits, so v2 would 401 on tokens
+that work everywhere else — reintroducing the original symptom by a different route. A test
+pins the constant to the v1 string so this cannot be quietly "modernised" later.
+
+### Payload-shape differences the dispatch exposed
+Both products return accountId / displayName / email, so the output shape is unchanged, but the
+spellings differ: Confluence sends `email` where Jira sends `emailAddress`, and it omits
+`active` entirely. Lookup now accepts either spelling (falling back to `publicName`, which
+Confluence substitutes when a user hides their display name), and `Active:` prints only when
+the API actually reports it. The previous `unwrap_or(false)` would have declared every
+Confluence account disabled.
+
+### Three adjacent fixes, batched because they surfaced in the same debugging session
+- **401s no longer discard the server's explanation.** All four `StatusCode::UNAUTHORIZED` arms
+  in `crates/api/src/lib.rs` hardcoded `"Invalid or expired credentials"`, so an
+  insufficient-scope failure was indistinguishable from an expired token. The gateway's real
+  body says `{"code":401,"message":"Unauthorized; scope does not match"}`. They now route
+  through a shared `unauthorized_error()` that parses `message`, `errorMessages` and
+  `error_description`, keeps plain text, skips HTML login pages (a sign-in page's markup
+  explains nothing), and truncates on a char boundary so multi-byte text cannot panic the
+  slice. `ApiError::AuthenticationFailed`'s suggestion additionally detects "scope" and says so
+  outright, because re-issuing the same token — the obvious next move under the old wording —
+  changes nothing. This one masked message cost a full debugging session.
+- **`confluence page list --space` was silently ignored.** `/wiki/api/v2/pages` has no
+  `space-key` parameter and drops unknown ones, so `--space TEAM` and `--space DOCS` returned
+  byte-identical, site-wide page ids: it looked like a space listing and was not.
+  `list_pages` now resolves the key through the existing `utils::resolve_space_id` and sends
+  `space-id`, which also turns an unknown key into an error instead of a plausible-looking
+  wrong answer. The `--space` help text already said "Filter by space key"; it is now true.
+- **`auth test` hid the error source**, printing failures with `{}` instead of `{:#}` and so
+  showing only the outermost context. Fixed in the site path and both Bitbucket paths.
+
+### Testing
+22 new tests; full suite 723 passing, `cargo fmt` and `cargo clippy --workspace --all-targets`
+clean. Coverage spans both dispatch branches (plain site, `/ex/jira/`, `/ex/confluence/`,
+`/wiki`, mixed case), the v1-path guard, both payload shapes, and the 401 parser (empty body,
+gateway scope body, Jira `errorMessages`, OAuth `error_description`, plain text, HTML,
+truncation including multi-byte). The scope-mismatch case is also covered end-to-end through
+the existing `wiremock` harness.
+
+`test_list_pages` in `crates/cli/tests/confluence_integration.rs` was updated to assert
+`space-id`. Note it exercises the raw `ApiClient` against a hand-written URL, so it was
+self-consistent and passed both before and after — it did **not** catch this bug, it merely
+documented the broken parameter for anyone copying it. Genuine coverage of `list_pages` needs
+`ConfluenceContext` to be constructible against a mock server; flagging for a follow-up.
+
 ## 2026-08-20 — Bitbucket PR inline comments (branch `bitbucket-pr-inline-comments`)
 
 Plan: `docs/superpowers/plans/2026-08-20-bitbucket-pr-inline-comments.md`. Feature doc: `docs/20082026_bitbucket_pr_inline_comments.md`.
@@ -1682,3 +1746,15 @@ Also from the same review, smaller:
 Still not addressed, deliberately: the concurrent `set_encrypted` lost-update race, and no Windows CI while Windows binaries ship.
 
 Re-review of the follow-up commit came back safe to merge, with one minor worth fixing first: `scrub_file` used `fs::metadata`, which follows symlinks, so a `credentials` symlinked into a dotfiles repository had its *target* zeroed in place. Reproduced: 21 bytes of a git-managed file replaced with nulls. No token was lost (the copy is taken through the same link first) and shredding plaintext is the intent, but the file belongs to the user and is not in our directory. Now `symlink_metadata`: the link is removed, its target untouched, and nothing is reported as scrubbed since the plaintext still exists at the far end.
+
+### Review of PR #131: three fixes before merge
+
+Each was reproduced first, and each fix has a test proved to fail without it.
+
+- **A `/wiki` base URL asked for `/wiki/wiki/rest/api/user/current`.** `user_info_path` returned a constant beginning with `/wiki`, but `ApiClient` appends to the base rather than replacing its path: `normalize_base_url` gives the base a trailing slash and `safe_join` strips the leading one off the path, so the two concatenate. The unit tests asserted only which constant came back, so they never saw it. A base already ending in `/wiki` now takes the unprefixed path, and the tests assert on the **resolved URL** instead, which is the only thing that matters. Verified live against a logging HTTP server: the plain site, `/wiki` and `/ex/confluence/<cloudId>` shapes request `/rest/api/3/myself`, `/wiki/rest/api/user/current` and `/ex/confluence/cloud-id/wiki/rest/api/user/current` respectively.
+- **The `--space` fix had no test that ran the command.** `test_list_pages` drives `ApiClient` against a URL the test wrote itself, so it passed both before and after and merely documented the broken parameter. New `crates/cli/tests/confluence_page_list_e2e.rs` spawns the binary: the key is resolved, the pages request carries `space-id` and no `space-key`, two keys return their own pages, an unknown key errors without listing anything, and a listing with no `--space` makes no lookup. Three of the four fail against the pre-fix code.
+- **401 bodies are now quoted, so credential-shaped substrings are redacted.** A body with no field we recognise is quoted whole, and a proxy echoing the request back would have put an `Authorization` value on the terminal and into CI logs. `Bearer`/`Basic` followed by a base64 or JWT shaped token becomes `Bearer <redacted>`. The shape test earns its keep: my first attempt redacted the word after the scheme and turned the real server message "Basic auth is not allowed" into "Basic <redacted> is not allowed", breaking the PR's own test. A token now counts only if it uses the base64 alphabet and is either 16 characters or carries punctuation prose does not use. Nested `{"error":{"message":...}}` is also parsed rather than dumped whole.
+
+Documented in `docs/26082026_auth_product_dispatch.md`, including the limitation the heuristic cannot fix: a Confluence-only profile whose `base_url` is the plain site is indistinguishable from a Jira one.
+
+Worth its own issue: a `base_url` ending in `/wiki` still breaks every other Confluence command, which build `/wiki/api/v2/...` themselves and hit the same doubling. `auth login` should normalise the suffix off at save time.
