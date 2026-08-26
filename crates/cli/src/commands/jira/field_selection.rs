@@ -129,7 +129,21 @@ pub(crate) fn match_fields(tokens: &[String], defs: &[FieldDef]) -> Result<Vec<R
             continue;
         }
 
-        resolved.push(resolve_one(trimmed, defs)?);
+        let candidate = resolve_one(trimmed, defs)?;
+
+        // Two spellings of one field, `--fields customfield_10016,"Story Points"`
+        // or `summary,Summary`, are still one field. Without this the id went
+        // to Jira twice and the same value printed in two columns.
+        if resolved.iter().any(|r| r.id == candidate.id) {
+            tracing::debug!(
+                token = %candidate.token,
+                id = %candidate.id,
+                "field already requested under another name, skipping"
+            );
+            continue;
+        }
+
+        resolved.push(candidate);
     }
 
     if resolved.is_empty() {
@@ -188,7 +202,24 @@ pub(crate) async fn resolve_field_ids(
     ctx: &JiraContext<'_>,
     tokens: &[String],
 ) -> Result<FieldSelection> {
+    // `--fields ""` and `--fields ,` reach here as blank tokens. Checked before
+    // anything else so the user is told immediately, rather than after paying
+    // for a field-list request that cannot help.
+    if tokens.iter().all(|t| t.trim().is_empty()) {
+        bail!("--fields was given no field names");
+    }
+
     if let Some(wildcard) = tokens.iter().find(|t| is_wildcard(t)) {
+        if tokens.len() > 1 {
+            // Jira reads `*all,summary` as everything, so the named fields do
+            // not narrow anything. Say so rather than quietly returning far
+            // more than was asked for.
+            tracing::warn!(
+                "a wildcard in --fields returns every field, so the other names \
+                 do not narrow the result"
+            );
+        }
+
         // One wildcard makes the whole selection a wildcard: mixing `all` with
         // named fields cannot narrow anything, and Jira reads the parameter as
         // one list anyway, so we hand it over whole.
@@ -435,6 +466,14 @@ pub(crate) async fn search_rows(
     if response.issues.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No issues found");
+        // Hand an empty result to the shared helper rather than falling through
+        // to the ordered renderer, which would print "[]" under table, CSV,
+        // markdown and quiet. Every other list command prints the message for
+        // the formats people read and nothing at all for the line-oriented
+        // ones; #110 was this exact inconsistency, across ~70 commands.
+        return ctx
+            .renderer
+            .render_list_or_empty(&Vec::<Value>::new(), "No issues found");
     }
 
     let mut columns: Vec<String> = vec![KEY_COLUMN.to_string()];
@@ -585,6 +624,20 @@ mod tests {
         let resolved = match_fields(&tokens(&["status", "summary", "status"]), &defs()).unwrap();
         let ids: Vec<&str> = resolved.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(ids, vec!["status", "summary"]);
+    }
+
+    /// Two spellings of one field are one field. Otherwise the id went to Jira
+    /// twice and the value printed in two identical columns.
+    #[test]
+    fn two_names_for_the_same_field_collapse_to_one_column() {
+        let resolved = match_fields(&tokens(&["summary", "Summary"]), &defs()).unwrap();
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].token, "summary", "the first spelling wins");
+
+        let resolved =
+            match_fields(&tokens(&["customfield_10016", "Story Points"]), &defs()).unwrap();
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].id, "customfield_10016");
     }
 
     #[test]

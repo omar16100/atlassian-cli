@@ -1777,3 +1777,11 @@ Verified live against a local mock Jira: only the resolved ids reach the wire (`
 Both load-bearing behaviours were verified by reverting them: ignoring the explicit columns turns the CSV header into `Story Points,key,status`, and replacing the ambiguity check with `.find()` makes the site answer silently with one of two different fields.
 
 775 tests pass. Documented in `docs/26082026_jira_field_selection.md`, with `docs/index.md`, `docs/c4model.md` and README updated.
+
+Self-review of the above, by running the binary against a mock Jira and reading what it actually sent, found three defects the tests had not:
+
+- `--fields ""` and `--fields ,` fetched the field list before erroring, since an empty token is not a custom field id. Now rejected before any request.
+- `--fields summary,Summary` sent `fields=summary,summary` and printed two identical columns: duplicates were detected on the token, not the resolved id.
+- An empty search result printed `[]` under table, CSV, markdown and quiet, where every other list command prints "No issues found" or nothing. That is #110 reintroduced on a new path; the empty case now goes through `render_list_or_empty`.
+
+Each has a test verified to fail against the pre-fix code. A wildcard mixed with named fields now warns, since Jira reads `*all,summary` as everything. 779 tests pass.

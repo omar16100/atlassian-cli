@@ -174,6 +174,28 @@ selection happens to include those fields would make the output shape depend on
 the selection in a way nobody can predict. `--fields` means "these and nothing
 else"; users who want the curated view omit the flag.
 
+### Found in self-review, after the first pass
+
+Three defects surfaced by running the built binary against a mock Jira and
+reading what it actually sent, rather than by reading the code:
+
+- **A blank selection cost a request.** `--fields ""` and `--fields ,` reach the
+  resolver as empty tokens, which are not custom field ids, so the field list
+  was fetched before the "no field names" error. Now checked first.
+- **Two spellings of one field became two columns.** `--fields summary,Summary`
+  and `--fields customfield_10016,"Story Points"` sent the id to Jira twice and
+  printed the same value twice, because duplicates were detected on the token
+  rather than on the resolved id.
+- **An empty result printed `[]`.** Under table, CSV, markdown and quiet, a
+  search returning nothing printed `[]`, where every other list command prints
+  "No issues found" for the formats people read and nothing at all for the
+  line-oriented ones. That is exactly the inconsistency #110 fixed across ~70
+  commands, reintroduced on a new path. The empty case now goes through the same
+  `render_list_or_empty` helper.
+
+A wildcard mixed with named fields (`--fields all,summary`) now warns: Jira reads
+it as everything, so the named fields do not narrow anything.
+
 ## Limitations
 
 - **`--fields all` returns Jira's raw ids as keys** (`customfield_10016`, not

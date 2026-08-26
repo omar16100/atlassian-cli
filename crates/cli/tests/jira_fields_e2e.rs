@@ -357,6 +357,81 @@ async fn an_ambiguous_field_name_lists_the_candidate_ids() {
     assert!(stderr.contains("customfield_10100"), "{stderr}");
 }
 
+/// `--fields ""` and `--fields ,` are a mistake, and the user should be told
+/// before paying for a field-list request that cannot help.
+#[tokio::test]
+async fn a_blank_field_list_fails_without_calling_jira_at_all() {
+    for argument in ["", ",", "  "] {
+        let server = MockServer::start().await;
+        mock_field_list(&server, 0).await;
+
+        Mock::given(method("GET"))
+            .and(path_matcher("/rest/api/3/issue/DEV-1"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(issue_body(serde_json::json!({}))),
+            )
+            .expect(0)
+            .mount(&server)
+            .await;
+
+        let dir = TempDir::new().unwrap();
+        let config = write_config(dir.path(), &server.uri());
+
+        let out = run(
+            &config,
+            &["jira", "issue", "get", "DEV-1", "--fields", argument],
+        );
+
+        assert!(!out.status.success(), "'{argument}' should fail");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains("no field names"),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+/// An id and its display name are the same field, and must reach Jira once.
+#[tokio::test]
+async fn the_same_field_twice_is_requested_once() {
+    let server = MockServer::start().await;
+    mock_field_list(&server, 1).await;
+
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/DEV-1"))
+        .and(query_param("fields", "customfield_10016"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(issue_body(serde_json::json!({ "customfield_10016": 5 }))),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "get",
+            "DEV-1",
+            "--fields",
+            "customfield_10016,Story Points",
+        ],
+    );
+
+    assert_ok(&out);
+    let text = stdout(&out);
+    assert_eq!(
+        text.matches('5').count(),
+        1,
+        "the value should appear in one column only: {text}"
+    );
+}
+
 fn search_response() -> serde_json::Value {
     serde_json::json!({
         "issues": [
@@ -460,6 +535,67 @@ async fn search_with_fields_replaces_the_columns_and_keeps_their_order() {
     assert_eq!(lines[1], "DEV-1,Open,5");
     // DEV-2 has no story points: an empty cell, not a missing column.
     assert_eq!(lines[2], "DEV-2,Done,");
+}
+
+/// An empty result must look the same with `--fields` as without it. #110 was
+/// this exact inconsistency across ~70 list commands: prose for the formats
+/// people read, nothing for the line-oriented ones, `[]` only for JSON and YAML.
+#[tokio::test]
+async fn an_empty_result_matches_the_other_list_commands() {
+    let server = MockServer::start().await;
+    // One per format below: the lookup is not cached across processes.
+    mock_field_list(&server, 5).await;
+
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/search/jql"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "issues": [], "isLast": true
+        })))
+        .mount(&server)
+        .await;
+
+    // `search_issues` verifies auth when a result is empty, to tell an empty
+    // project from a broken token.
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/myself"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({"accountId": "abc"})),
+        )
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    for (format, expected) in [
+        ("table", "No issues found"),
+        ("markdown", "No issues found"),
+        ("csv", ""),
+        ("quiet", ""),
+        ("json", "[]"),
+    ] {
+        let out = run(
+            &config,
+            &[
+                "jira",
+                "issue",
+                "search",
+                "--jql",
+                "project = DEV",
+                "--fields",
+                "status",
+                "--format",
+                format,
+            ],
+        );
+
+        assert_ok(&out);
+        assert_eq!(
+            stdout(&out).trim(),
+            expected,
+            "--format {format} should print {expected:?}"
+        );
+    }
 }
 
 #[tokio::test]
