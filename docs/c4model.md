@@ -208,6 +208,9 @@ one atomic rename, then the original is renamed to `.migrated`.
   `JiraAttachment` model used by `issues.rs` for `issue get`
 - `projects.rs` - Project management, roles
 - `fields_workflows.rs` - Custom fields, workflow transitions
+- `field_selection.rs` - `--fields` on `issue get`/`issue search`: display name to
+  id resolution via `/rest/api/3/field`, ordered projection, and value flattening
+  for the tabular formats only
 - `automation.rs` - Automation rules management
 - `webhooks.rs` - Webhook CRUD
 - `audit.rs` - Audit log retrieval

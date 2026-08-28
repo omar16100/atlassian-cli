@@ -144,8 +144,48 @@ impl OutputRenderer {
         self.render_list(items)
     }
 
+    /// Render rows with the columns given, in the order given.
+    ///
+    /// `render` derives columns as the sorted union of the rows' keys, which is
+    /// right when the caller has no opinion about them. A caller who let the
+    /// user choose does have one: `jira issue search --fields status,summary`
+    /// should read back in that order, and alphabetical sorting would silently
+    /// reverse it.
+    ///
+    /// Only the tabular formats take the order. JSON and YAML go through the
+    /// untouched path, because `serde_json::Map` is a `BTreeMap` and their key
+    /// order is alphabetical no matter what we do here.
+    pub fn render_rows_ordered(&self, rows: &[Value], columns: &[String]) -> Result<()> {
+        let value = Value::Array(rows.to_vec());
+
+        match self.format {
+            OutputFormat::Table => {
+                if !self.render_table_with(&value, Some(columns))? {
+                    println!("{}", serde_json::to_string_pretty(&value)?);
+                }
+            }
+            OutputFormat::Csv => {
+                if !self.render_csv_with(&value, Some(columns))? {
+                    println!("{}", serde_json::to_string_pretty(&value)?);
+                }
+            }
+            OutputFormat::Markdown => {
+                if !self.render_markdown_table_with(&value, Some(columns))? {
+                    self.render_markdown_single(&value)?;
+                }
+            }
+            _ => self.render(&value)?,
+        }
+
+        Ok(())
+    }
+
     fn render_table(&self, value: &Value) -> Result<bool> {
-        let (headers, rows) = match Self::coerce_rows(value) {
+        self.render_table_with(value, None)
+    }
+
+    fn render_table_with(&self, value: &Value, columns: Option<&[String]>) -> Result<bool> {
+        let (headers, rows) = match Self::coerce_rows_with(value, columns) {
             Some(data) => data,
             None => return Ok(false),
         };
@@ -162,7 +202,11 @@ impl OutputRenderer {
     }
 
     fn render_csv(&self, value: &Value) -> Result<bool> {
-        let (headers, rows) = match Self::coerce_rows(value) {
+        self.render_csv_with(value, None)
+    }
+
+    fn render_csv_with(&self, value: &Value, columns: Option<&[String]>) -> Result<bool> {
+        let (headers, rows) = match Self::coerce_rows_with(value, columns) {
             Some(data) => data,
             None => return Ok(false),
         };
@@ -242,7 +286,15 @@ impl OutputRenderer {
     }
 
     fn render_markdown_table(&self, value: &Value) -> Result<bool> {
-        let (headers, rows) = match Self::coerce_rows(value) {
+        self.render_markdown_table_with(value, None)
+    }
+
+    fn render_markdown_table_with(
+        &self,
+        value: &Value,
+        columns: Option<&[String]>,
+    ) -> Result<bool> {
+        let (headers, rows) = match Self::coerce_rows_with(value, columns) {
             Some(data) => data,
             None => return Ok(false),
         };
@@ -300,24 +352,45 @@ impl OutputRenderer {
         }
     }
 
+    /// Headers as the sorted union of every row's keys. The shape all ~70 list
+    /// commands use; only field selection passes explicit columns.
+    #[cfg(test)]
     fn coerce_rows(value: &Value) -> Option<(Vec<String>, Vec<Vec<String>>)> {
+        Self::coerce_rows_with(value, None)
+    }
+
+    /// Flatten an array of objects into headers and string cells.
+    ///
+    /// With `columns`, those are the headers verbatim: keys not listed are
+    /// dropped and listed keys missing from a row render empty, the same as any
+    /// other absent key. Without them, headers are the sorted union of every
+    /// row's keys, which is what all ~70 existing list commands rely on.
+    fn coerce_rows_with(
+        value: &Value,
+        columns: Option<&[String]>,
+    ) -> Option<(Vec<String>, Vec<Vec<String>>)> {
         let rows = match value {
             Value::Array(rows) if !rows.is_empty() => rows,
             _ => return None,
         };
 
-        let mut headers = BTreeSet::new();
-        for row in rows {
-            if let Value::Object(obj) = row {
-                headers.extend(obj.keys().cloned());
+        let headers_vec: Vec<String> = match columns {
+            Some(columns) => columns.to_vec(),
+            None => {
+                let mut headers = BTreeSet::new();
+                for row in rows {
+                    if let Value::Object(obj) = row {
+                        headers.extend(obj.keys().cloned());
+                    }
+                }
+                headers.into_iter().collect()
             }
-        }
+        };
 
-        if headers.is_empty() {
+        if headers_vec.is_empty() {
             return None;
         }
 
-        let headers_vec: Vec<String> = headers.into_iter().collect();
         let mut data = Vec::with_capacity(rows.len());
         for row in rows {
             let mut record = Vec::with_capacity(headers_vec.len());
@@ -414,6 +487,56 @@ mod tests {
     fn test_coerce_rows_not_array() {
         let value = json!({"id": "1", "name": "Alice"});
         assert!(OutputRenderer::coerce_rows(&value).is_none());
+    }
+
+    /// The default contract, pinned so field selection cannot change it for the
+    /// ~70 commands that derive their own columns.
+    #[test]
+    fn coerce_rows_without_columns_sorts_headers_alphabetically() {
+        let value = json!([{"zebra": "1", "apple": "2"}]);
+        let (headers, _) = OutputRenderer::coerce_rows(&value).unwrap();
+        assert_eq!(headers, vec!["apple".to_string(), "zebra".to_string()]);
+    }
+
+    /// The whole point of the explicit form: the user typed an order.
+    #[test]
+    fn coerce_rows_with_columns_preserves_the_given_order() {
+        let value = json!([{"apple": "2", "zebra": "1"}]);
+        let columns = vec!["zebra".to_string(), "apple".to_string()];
+
+        let (headers, rows) = OutputRenderer::coerce_rows_with(&value, Some(&columns)).unwrap();
+
+        assert_eq!(headers, columns);
+        assert_eq!(rows[0], vec!["1".to_string(), "2".to_string()]);
+    }
+
+    #[test]
+    fn coerce_rows_with_columns_drops_keys_not_listed() {
+        let value = json!([{"wanted": "yes", "unwanted": "no"}]);
+        let columns = vec!["wanted".to_string()];
+
+        let (headers, rows) = OutputRenderer::coerce_rows_with(&value, Some(&columns)).unwrap();
+
+        assert_eq!(headers, columns);
+        assert_eq!(rows[0], vec!["yes".to_string()]);
+    }
+
+    /// A field the site does not have, or that the API omitted, is an empty
+    /// cell rather than a missing column or an error.
+    #[test]
+    fn coerce_rows_with_columns_fills_absent_keys_with_empty() {
+        let value = json!([{"present": "here"}]);
+        let columns = vec!["present".to_string(), "absent".to_string()];
+
+        let (_, rows) = OutputRenderer::coerce_rows_with(&value, Some(&columns)).unwrap();
+
+        assert_eq!(rows[0], vec!["here".to_string(), String::new()]);
+    }
+
+    #[test]
+    fn coerce_rows_with_empty_columns_renders_nothing() {
+        let value = json!([{"id": "1"}]);
+        assert!(OutputRenderer::coerce_rows_with(&value, Some(&[])).is_none());
     }
 
     #[test]

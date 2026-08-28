@@ -1758,3 +1758,30 @@ Each was reproduced first, and each fix has a test proved to fail without it.
 Documented in `docs/26082026_auth_product_dispatch.md`, including the limitation the heuristic cannot fix: a Confluence-only profile whose `base_url` is the plain site is indistinguishable from a Jira one.
 
 Worth its own issue: a `base_url` ending in `/wiki` still breaks every other Confluence command, which build `/wiki/api/v2/...` themselves and hit the same doubling. `auth login` should normalise the suffix off at save time.
+
+### Issue #132: `--fields` on `jira issue get` and `jira issue search`
+
+`jira issue get` sent no `fields` parameter, so Jira returned every navigable field and serde discarded all but eight of them. `jira issue search` asked for a hardcoded five. Custom fields, where most teams keep the data they care about, were unreachable without dropping to `jira api`.
+
+- One flag, `--fields`, comma-separated and repeatable, on both commands. Accepts field ids, the display names from `jira fields list`, and `all`. Not `--field`: that already means *set* `KEY=JSON_VALUE` on create and update, and reusing the singular for select would be a footgun.
+- `all` rather than `*all` as the documented spelling, because a bare `*all` is a glob and zsh refuses the command line before the CLI starts. Tokens already starting with `*` or `-` pass through, so `'*navigable'` and `'*all,-comment'` work for free.
+- **Rejected `#[serde(flatten)]` on `IssueFields`** twice over: the default `get` receives the whole issue, comments and worklogs included, so flatten would retain all of it for output that discards it; and it collides with the existing `customfield_10020` rename, whose key would be consumed by `sprint` and therefore missing from the map, so `--fields customfield_10020` would silently return nothing. `--fields` takes its own path over raw JSON instead, which leaves the default output unchanged by construction rather than by review.
+- **An ambiguous display name is an error listing every candidate id.** Several fields named "Story Points" is the normal state of a mature Jira site, and they hold different numbers, so picking one would be wrong in a way the output cannot show. Unknown and ambiguous names both fail before the issue is fetched.
+- The field list is fetched only when a token could be a name, meaning unless every token is `customfield_<digits>`. That is the only shape that is unambiguously an id: a site can have a custom field named "Status".
+- **Column order needed the shared renderer.** `coerce_rows` unions keys into an alphabetical `BTreeSet`, so `--fields status,summary` would print `summary` first. Enabling `serde_json/preserve_order` was rejected: it would change key order for all ~70 commands and break `--format csv` consumers as a side effect of a Jira feature, and would not even fix this since `coerce_rows` re-sorts anyway. Added `render_rows_ordered` and `coerce_rows_with(value, Option<&[String]>)`; the no-columns path is byte-identical, pinned by a test.
+- **Flattening is a rendering decision only.** Wrapper objects (`{"value":"Internal"}`, `{"displayName":"Ada"}`) become their label in table, CSV and markdown. JSON and YAML are byte for byte what Jira sent: the format people pipe into `jq` must not be the lossy one. `value_to_string` in `crates/output` was left alone; it serves Bitbucket and Confluence, where `{"value":...}` means nothing in particular.
+- `jira issue get --fields` renders as a two-column vertical table, which avoids the ordering problem entirely and reads better than a twelve-column scroll.
+
+Verified live against a local mock Jira: only the resolved ids reach the wire (`fields=summary%2Ccustomfield_10016%2Ccustomfield_10050`), ADF descriptions extract to text, arrays join, the wrapper object flattens in the table and stays raw in JSON, CSV column order matches what was typed, an absent field warns and renders empty, and the default `get` still sends no `fields` parameter and prints the curated view.
+
+Both load-bearing behaviours were verified by reverting them: ignoring the explicit columns turns the CSV header into `Story Points,key,status`, and replacing the ambiguity check with `.find()` makes the site answer silently with one of two different fields.
+
+775 tests pass. Documented in `docs/26082026_jira_field_selection.md`, with `docs/index.md`, `docs/c4model.md` and README updated.
+
+Self-review of the above, by running the binary against a mock Jira and reading what it actually sent, found three defects the tests had not:
+
+- `--fields ""` and `--fields ,` fetched the field list before erroring, since an empty token is not a custom field id. Now rejected before any request.
+- `--fields summary,Summary` sent `fields=summary,summary` and printed two identical columns: duplicates were detected on the token, not the resolved id.
+- An empty search result printed `[]` under table, CSV, markdown and quiet, where every other list command prints "No issues found" or nothing. That is #110 reintroduced on a new path; the empty case now goes through `render_list_or_empty`.
+
+Each has a test verified to fail against the pre-fix code. A wildcard mixed with named fields now warns, since Jira reads `*all,summary` as everything. 779 tests pass.

@@ -108,6 +108,12 @@ crates/
    # Jira - Issues
    atlassian-cli jira issue search --jql "project = DEV order by created desc" --limit 5
    atlassian-cli jira issue get DEV-123
+   # Pick the fields you want, by id or by the display name from `jira fields list`.
+   # Columns come back in the order you ask for them; `all` returns everything.
+   atlassian-cli jira issue get DEV-123 --fields summary,status
+   atlassian-cli jira issue get DEV-123 --fields "Story Points" --format json
+   atlassian-cli jira issue get DEV-123 --fields all --format json
+   atlassian-cli jira issue search --project DEV --fields status,"Story Points" --format csv
    atlassian-cli jira issue create --project DEV --issue-type Task --summary "Test task"
    # Custom fields — discover IDs via `jira fields list`:
    atlassian-cli jira issue create --project DEV --issue-type Task --summary "cf test" \
