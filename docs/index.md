@@ -45,6 +45,7 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 
 | Document | Date | What it covers |
 | --- | --- | --- |
+| [28082026_wiki_base_url_normalisation.md](28082026_wiki_base_url_normalisation.md) | 2026-08-28 | A `/wiki` base URL no longer doubles the segment: site-root normalisation for Jira, Confluence and JSM clients |
 | [26082026_jira_field_selection.md](26082026_jira_field_selection.md) | 2026-08-26 | `--fields` on `jira issue get` and `search`: ids or display names, ordered columns, and ordered rendering in `crates/output` |
 | [26082026_auth_product_dispatch.md](26082026_auth_product_dispatch.md) | 2026-08-26 | `auth whoami`/`test`/`status` dispatch on the profile's product, the `--space` filter fix, and 401s that keep the server's reason |
 | [16082026_bb_pr_reviewer_status.md](16082026_bb_pr_reviewer_status.md) | 2026-08-16 | `bb pr reviewers` listing with approval status, `--all`, and the `--add` endpoint fix |

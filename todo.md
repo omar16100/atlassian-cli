@@ -1785,3 +1785,25 @@ Self-review of the above, by running the binary against a mock Jira and reading 
 - An empty search result printed `[]` under table, CSV, markdown and quiet, where every other list command prints "No issues found" or nothing. That is #110 reintroduced on a new path; the empty case now goes through `render_list_or_empty`.
 
 Each has a test verified to fail against the pre-fix code. A wildcard mixed with named fields now warns, since Jira reads `*all,summary` as everything. 779 tests pass.
+
+### Issue #133: a `/wiki` base URL doubled the segment on every command
+
+Filed while reviewing PR #131, which had compensated for the three `auth` commands only. Reproduced first against a local logging server: a profile with `base_url: <host>/wiki` requested `/wiki/wiki/api/v2/pages` for Confluence and `/wiki/rest/api/3/issue/DEV-1` for Jira, so both 404. The client appends to the base rather than replacing its path, and every command spells its own prefix.
+
+- `site_base_url` in `crates/config`, plus a `Profile` accessor, strips one trailing `/wiki`. `strip_suffix` not `trim_end_matches`, so a `/wiki/wiki` typo loses one segment and stays visibly odd rather than silently becoming the site root, and `/mywiki` is untouched.
+- Applied at the four sites that build a client from a profile: `resolve_profile_for_product` in `main.rs` (which covers Jira, Confluence and JSM at once) and the three in `auth.rs`. Bamboo is excluded deliberately: separate resolver, Server product, and a context path there is legitimate and already pinned by a test.
+- **Deviated from the plan on one point.** The plan said to normalise at `auth login` too. That would have destroyed the only signal a Confluence-only profile carries: `user_info_path` reads the trailing `/wiki` to choose between Jira's and Confluence's user endpoint, so stripping it at save would have reintroduced the 401 PR #131 existed to fix. Detection now reads the base as written, the client is built from the site root, and the two compose. `auth login` keeps the value and prints a note that the prefix is not needed.
+- That split makes `CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED` and its branch dead; both deleted.
+- `crates/api` untouched: `normalize_base_url` is published, and teaching a generic HTTP client about one product's path segment is the wrong layer.
+
+New `crates/cli/tests/wiki_base_url_e2e.rs`, the coverage that never existed: three of its five tests fail against the pre-fix code, and each mounts the doubled path expecting zero hits so a regression fails loudly rather than turning into a user's 404. One test exists purely to catch the plausible-but-wrong fix of normalising before detection, and it does: reverting to that variant fails it.
+
+Verified live for all four base shapes (plain, `/wiki`, `/ex/confluence/<id>`, `/ex/confluence/<id>/wiki`): every path carries exactly one `/wiki` for Confluence and none for Jira, and `auth whoami` reports the right product for each. 791 tests pass. Documented in `docs/28082026_wiki_base_url_normalisation.md`; the #131 doc's open limitation now points at the fix.
+
+Fable review of the above returned "safe to merge" with three minor findings, all fair and all fixed:
+
+- **The login note lied for `https://site/wiki//`.** My condition compared `site_base_url` (which stripped one trailing slash) against `trim_end_matches('/')` (which strips all of them), so a doubled trailing slash left the base unnormalised while login told the user it was harmless. Verified: it still requested `/wiki/wiki/api/v2/pages`. `site_base_url` now trims all trailing slashes before looking for the suffix.
+- **`/WIKI` was detected as Confluence but not normalised**, because detection lowercases and my strip did not. The two disagreeing is the doubling again, so the suffix match now ignores case. Both cases verified live: each now resolves to a single `/wiki/api/v2/pages`.
+- **My claim that four of the five e2e tests fail pre-fix was wrong; it is three.** I had tested against a hybrid (client normalisation reverted but the new `user_info_path` kept), not the real parent commit. Re-checked in a worktree at `2c830f4`: `a_wiki_base_is_still_recognised_as_confluence` passes both ways, because PR #131's unprefixed constant reached the same URL by another route. It is a guard against normalising before detection, not a regression test for this bug, and the doc now says so.
+
+Also removed a stale doc comment the reviewer spotted, and documented the one user-visible behaviour change: under a `/wiki` base, `jira api` now resolves from the site root. 794 tests pass.
