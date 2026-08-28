@@ -118,6 +118,41 @@ pub struct Profile {
     pub bitbucket_remote: Option<String>,
 }
 
+/// The Confluence prefix, which belongs to the request path and not to the base.
+const WIKI_SUFFIX: &str = "/wiki";
+
+/// A site base URL with a trailing `/wiki` removed.
+///
+/// The API client appends request paths to the base rather than replacing the
+/// base's path, and every Confluence command spells `/wiki` itself while every
+/// Jira command spells `/rest/api/3`. So a profile stored as
+/// `https://site.atlassian.net/wiki` asked for `/wiki/wiki/api/v2/pages` and
+/// `/wiki/rest/api/3/issue/KEY`, and both 404. Writing `/wiki` into the base is
+/// an easy mistake to make, because it is how the Confluence REST documentation
+/// spells the full URL.
+///
+/// `strip_suffix` and not `trim_end_matches`: the latter would eat every
+/// repetition, so a `/wiki/wiki` typo would silently become the site root
+/// instead of losing one segment and staying visibly odd.
+///
+/// Only for Jira, Confluence and JSM. Bamboo is a Server product where a context
+/// path in the base is legitimate, and it resolves its own base URL.
+pub fn site_base_url(base_url: &str) -> &str {
+    let trimmed = base_url.strip_suffix('/').unwrap_or(base_url);
+    trimmed.strip_suffix(WIKI_SUFFIX).unwrap_or(trimmed)
+}
+
+impl Profile {
+    /// `base_url` as the site root, for building a Jira, Confluence or JSM client.
+    ///
+    /// Callers that need to tell the two products apart must read `base_url`
+    /// itself: a trailing `/wiki` is the only hint a Confluence-only profile
+    /// gives, and this strips it.
+    pub fn site_base_url(&self) -> Option<&str> {
+        self.base_url.as_deref().map(site_base_url)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -478,5 +513,88 @@ mod tests {
         assert_eq!(ci_profile.workspace.as_deref(), Some("myteam"));
         // No email required for bearer profiles
         assert!(ci_profile.email.is_none());
+    }
+
+    #[test]
+    fn a_trailing_wiki_is_stripped_from_a_site_base_url() {
+        assert_eq!(
+            site_base_url("https://site.atlassian.net/wiki"),
+            "https://site.atlassian.net"
+        );
+        assert_eq!(
+            site_base_url("https://site.atlassian.net/wiki/"),
+            "https://site.atlassian.net"
+        );
+    }
+
+    #[test]
+    fn a_site_root_is_left_alone() {
+        assert_eq!(
+            site_base_url("https://site.atlassian.net"),
+            "https://site.atlassian.net"
+        );
+        assert_eq!(
+            site_base_url("https://site.atlassian.net/"),
+            "https://site.atlassian.net"
+        );
+    }
+
+    /// The reason for `strip_suffix` over `trim_end_matches`: a word merely
+    /// ending in "wiki" is not the Confluence prefix.
+    #[test]
+    fn a_path_that_merely_ends_in_wiki_is_left_alone() {
+        assert_eq!(
+            site_base_url("https://example.com/mywiki"),
+            "https://example.com/mywiki"
+        );
+        assert_eq!(
+            site_base_url("https://wiki.example.com"),
+            "https://wiki.example.com"
+        );
+    }
+
+    /// One segment, not all of them, so a doubled typo stays visible rather
+    /// than silently resolving to the site root.
+    #[test]
+    fn only_one_wiki_segment_is_removed() {
+        assert_eq!(
+            site_base_url("https://site.atlassian.net/wiki/wiki"),
+            "https://site.atlassian.net/wiki"
+        );
+    }
+
+    /// The OAuth gateway form, which the Confluence REST docs spell with the
+    /// `/wiki` already attached.
+    #[test]
+    fn the_gateway_form_reduces_to_its_cloud_id_root() {
+        assert_eq!(
+            site_base_url("https://api.atlassian.com/ex/confluence/cloud-id/wiki"),
+            "https://api.atlassian.com/ex/confluence/cloud-id"
+        );
+        assert_eq!(
+            site_base_url("https://api.atlassian.com/ex/jira/cloud-id"),
+            "https://api.atlassian.com/ex/jira/cloud-id"
+        );
+    }
+
+    /// Bamboo resolves its own base and never calls this, but a context path
+    /// must survive if it ever does.
+    #[test]
+    fn an_unrelated_context_path_survives() {
+        assert_eq!(
+            site_base_url("https://example.com/bamboo"),
+            "https://example.com/bamboo"
+        );
+    }
+
+    #[test]
+    fn the_profile_accessor_follows_the_same_rule() {
+        let profile = Profile {
+            base_url: Some("https://site.atlassian.net/wiki/".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(profile.site_base_url(), Some("https://site.atlassian.net"));
+
+        assert_eq!(Profile::default().site_base_url(), None);
     }
 }

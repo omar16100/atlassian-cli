@@ -336,7 +336,13 @@ fn resolve_profile_for_product(
 ) -> Result<ProductProfile> {
     let (base, profile) = resolve_base_profile(config, requested)?;
 
-    let base_url = profile.base_url.clone().ok_or_else(|| {
+    // The site root, so a base URL written as `https://site.atlassian.net/wiki`
+    // works. Every Confluence command spells `/wiki` itself and every Jira
+    // command spells `/rest/api/3`, and the client appends to the base rather
+    // than replacing its path, so leaving the suffix on asked for
+    // `/wiki/wiki/api/v2/pages` and `/wiki/rest/api/3/issue/KEY`. Bamboo has its
+    // own resolver below and keeps its context path.
+    let base_url = profile.site_base_url().map(str::to_string).ok_or_else(|| {
         anyhow!(
             "Profile '{}' is missing a base_url. Run `atlassian-cli auth login --base-url <URL>`",
             base.name

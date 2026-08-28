@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
 use atlassian_cli_auth::{bitbucket_token_key, token_key, CredentialStore, BITBUCKET_API_URL};
-use atlassian_cli_config::Config;
+use atlassian_cli_config::{site_base_url, Config};
 use atlassian_cli_output::OutputRenderer;
 use clap::{Args, Subcommand};
 use serde::Serialize;
@@ -20,14 +20,6 @@ const JIRA_MYSELF_PATH: &str = "/rest/api/3/myself";
 /// everywhere else. v1 needs no extra scope and returns the same fields.
 const CONFLUENCE_CURRENT_USER_PATH: &str = "/wiki/rest/api/user/current";
 
-/// The same endpoint, for a base URL that already ends in `/wiki`.
-///
-/// `ApiClient` appends to the base rather than replacing its path
-/// (`normalize_base_url` gives the base a trailing slash, `safe_join` strips
-/// the leading slash off the path), so prepending `/wiki` to a base that
-/// carries it already asks for `/wiki/wiki/rest/api/user/current`.
-const CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED: &str = "/rest/api/user/current";
-
 /// Pick the user-info endpoint that matches the profile's product.
 ///
 /// Both Jira and Confluence expose accountId / displayName / email, so callers
@@ -37,18 +29,16 @@ const CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED: &str = "/rest/api/user/current";
 ///
 /// Hardcoding the Jira path made every Confluence profile 401 with a Jira
 /// error, and no token or scope could fix it.
+///
+/// **Takes the base URL as the user wrote it, not the site root.** A trailing
+/// `/wiki` is the only hint a Confluence-only profile on a plain site gives, and
+/// `site_base_url` removes it. Callers pair this with a client built from the
+/// site root, so the returned path's own `/wiki` lands exactly once.
 fn user_info_path(base_url: &str) -> &'static str {
     let lower = base_url.to_lowercase();
     let trimmed = lower.trim_end_matches('/');
 
-    // Checked first, and separately from the gateway form: a gateway base can
-    // itself end in `/wiki` (`/ex/confluence/<cloudId>/wiki`), and that spelling
-    // needs the unprefixed path just as much as a plain site does.
-    if trimmed.ends_with("/wiki") {
-        return CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED;
-    }
-
-    if lower.contains("/ex/confluence/") || lower.contains("/wiki/") {
+    if lower.contains("/ex/confluence/") || lower.contains("/wiki/") || trimmed.ends_with("/wiki") {
         return CONFLUENCE_CURRENT_USER_PATH;
     }
 
@@ -371,6 +361,20 @@ fn login_jira_confluence(
 
     let base_url = atlassian_cli_api::normalize_base_url(base_url);
 
+    // Deliberately stored as typed, `/wiki` and all. Stripping it here would be
+    // tidier to look at and would lose the only signal a Confluence-only
+    // profile carries: `user_info_path` reads that suffix to decide which
+    // product's user endpoint `auth whoami`, `auth test` and `auth status`
+    // should call, and without it they would go back to Jira's and 401. Every
+    // request path is built from the site root regardless, via
+    // `Profile::site_base_url`.
+    if site_base_url(base_url.as_str()) != base_url.as_str().trim_end_matches('/') {
+        println!(
+            "Note: /wiki is added automatically for Confluence requests, so it is not needed \
+             in the base URL. Keeping it is harmless and marks this profile as Confluence."
+        );
+    }
+
     let email = args
         .email
         .as_ref()
@@ -639,7 +643,11 @@ async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> R
         )
     })?;
 
-    let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
+    // The client is built from the site root, while the product is detected from
+    // the base URL as written: a trailing `/wiki` is the only hint a
+    // Confluence-only profile gives, and `site_base_url` removes it.
+    let client =
+        atlassian_cli_api::ApiClient::new(site_base_url(base_url))?.with_basic_auth(email, &token);
 
     let path = user_info_path(base_url);
     let product = product_label(base_url);
@@ -726,7 +734,9 @@ async fn test_site_auth(
 
     println!("Testing {product} authentication for profile '{profile_name}'...");
 
-    let client = atlassian_cli_api::ApiClient::new(base_url)?.with_basic_auth(email, &token);
+    // Detection on the base as written, the client on the site root. See `whoami`.
+    let client =
+        atlassian_cli_api::ApiClient::new(site_base_url(base_url))?.with_basic_auth(email, &token);
 
     let result: Result<serde_json::Value> = client
         .get(user_info_path(base_url))
@@ -869,7 +879,8 @@ async fn auth_status(
         let service = product_label(base_url).to_string();
 
         if let Some(token) = get_token(store, profile_name) {
-            let client = atlassian_cli_api::ApiClient::new(base_url)
+            // Detection on the base as written, the client on the site root.
+            let client = atlassian_cli_api::ApiClient::new(site_base_url(base_url))
                 .ok()
                 .map(|c| c.with_basic_auth(email, &token));
 
@@ -1101,15 +1112,18 @@ mod tests {
     /// A `/wiki` base is Confluence, but takes the unprefixed path, since the
     /// base already carries the segment. `wiki_base_url_does_not_double_the_wiki_segment`
     /// pins what that resolves to.
+    /// A `/wiki` base is a Confluence profile. The suffix is the hint, and it is
+    /// read here from the base as written, before `site_base_url` strips it for
+    /// the client.
     #[test]
     fn wiki_base_path_uses_confluence_endpoint() {
         assert_eq!(
             user_info_path("https://example.atlassian.net/wiki"),
-            CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED
+            CONFLUENCE_CURRENT_USER_PATH
         );
         assert_eq!(
             user_info_path("https://example.atlassian.net/wiki/"),
-            CONFLUENCE_CURRENT_USER_PATH_UNPREFIXED
+            CONFLUENCE_CURRENT_USER_PATH
         );
         assert_eq!(
             product_label("https://example.atlassian.net/wiki"),
@@ -1170,7 +1184,9 @@ mod tests {
     /// strips the path's leading one, so the two concatenate. A base that
     /// already ends in `/wiki` therefore produced `/wiki/wiki/...`.
     fn resolved(base_url: &str) -> String {
-        atlassian_cli_api::ApiClient::new(base_url)
+        // Exactly what the commands do: the client on the site root, the
+        // product detected from the base as written.
+        atlassian_cli_api::ApiClient::new(site_base_url(base_url))
             .expect("base URL should parse")
             .resolve_url(user_info_path(base_url))
             .expect("path should join")

@@ -56,10 +56,12 @@ The tests assert on the **resolved URL** rather than on which constant the
 dispatch returned. Asserting the constant proves nothing here, since the whole
 fault lives in how the path and the base combine.
 
-Note that a `base_url` ending in `/wiki` is still wrong for every other
-Confluence command, which build `/wiki/api/v2/...` themselves and hit the same
-doubling. Normalising a trailing `/wiki` off the base at `auth login` time is
-worth doing separately.
+A `base_url` ending in `/wiki` was also wrong for every other Confluence and
+Jira command, which build their own paths and hit the same doubling. That was
+filed as #133 and fixed separately: see
+[28082026_wiki_base_url_normalisation.md](28082026_wiki_base_url_normalisation.md).
+The unprefixed constant described above is gone with it, since the client is now
+built from the site root.
 
 ## `confluence page list --space` was silently ignored
 
