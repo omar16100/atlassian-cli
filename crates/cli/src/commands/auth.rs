@@ -368,6 +368,9 @@ fn login_jira_confluence(
     // should call, and without it they would go back to Jira's and 401. Every
     // request path is built from the site root regardless, via
     // `Profile::site_base_url`.
+    // Both sides trim trailing slashes the same way. Comparing a
+    // single-slash-trimmed string against `site_base_url`, which trims all of
+    // them, made `https://site/wiki//` look normalised when it was not.
     if site_base_url(base_url.as_str()) != base_url.as_str().trim_end_matches('/') {
         println!(
             "Note: /wiki is added automatically for Confluence requests, so it is not needed \
@@ -1109,9 +1112,6 @@ mod tests {
         assert_eq!(product_label(url), "Confluence");
     }
 
-    /// A `/wiki` base is Confluence, but takes the unprefixed path, since the
-    /// base already carries the segment. `wiki_base_url_does_not_double_the_wiki_segment`
-    /// pins what that resolves to.
     /// A `/wiki` base is a Confluence profile. The suffix is the hint, and it is
     /// read here from the base as written, before `site_base_url` strips it for
     /// the client.

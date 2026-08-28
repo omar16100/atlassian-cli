@@ -37,9 +37,13 @@ pub fn site_base_url(base_url: &str) -> &str;
 impl Profile { pub fn site_base_url(&self) -> Option<&str>; }
 ```
 
-`strip_suffix` rather than `trim_end_matches`, so a `/wiki/wiki` typo loses one
-segment and stays visibly odd instead of silently resolving to the site root,
-and so a path merely ending in the letters "wiki" (`/mywiki`) is untouched.
+One segment is removed, not every repetition, so a `/wiki/wiki` typo loses one
+and stays visibly odd instead of silently resolving to the site root, and a path
+merely ending in the letters "wiki" (`/mywiki`) is untouched. Trailing slashes
+are all trimmed first, and the match ignores case, so `/wiki//` and `/WIKI` are
+normalised too: the case rule matters because product detection lowercases, and
+the two disagreeing would mean a base detected as Confluence but left to
+double.
 
 Applied at four places, which is every site that builds a client from a profile:
 
@@ -94,7 +98,7 @@ and the user's file is never rewritten behind their back.
 ## Verification
 
 The bug was reproduced against a local logging server before anything was
-edited, and each test was confirmed to fail against the pre-fix code.
+edited.
 
 Every base-URL shape, one run each, showing the path the server actually
 received:
@@ -111,7 +115,9 @@ Tests:
 - Unit, `crates/config`: `/wiki` and `/wiki/` stripped; a site root untouched;
   `/mywiki` and a `wiki.` hostname untouched; `/wiki/wiki` loses one segment
   only; the gateway form reduces to its cloud-id root; an unrelated context path
-  survives; and the `Profile` accessor follows the same rule.
+  survives; repeated trailing slashes do not hide the suffix; the match ignores
+  case; degenerate input reduces to an empty string rather than panicking on a
+  slice boundary; and the `Profile` accessor follows the same rule.
 - Unit, `crates/cli/src/commands/auth.rs`: a `/wiki` base now selects the
   prefixed Confluence constant, and the `resolved()` helper applies the same
   normalisation the commands do, so the resolved-URL assertions test the real
@@ -121,8 +127,23 @@ Tests:
   both of its requests, `jira issue get` hits `/rest/api/3/issue/DEV-1` with no
   prefix, and `auth whoami` still reports `Product: Confluence`. Each test also
   mounts the doubled path expecting zero hits, so a regression fails loudly here
-  instead of becoming a 404 for a user. Four of the five fail against the pre-fix
-  code.
+  instead of becoming a 404 for a user.
+
+  **Three of the five fail against the pre-fix code**, checked in a worktree at
+  the parent commit. `a_wiki_base_is_still_recognised_as_confluence` passes both
+  before and after, because PR #131's unprefixed constant produced the same final
+  URL by a different route; it is a guard against the plausible-but-wrong fix of
+  normalising before detection, not a regression test for this bug. It does fail
+  against that variant. `a_site_root_base_is_unaffected` is a no-change guard and
+  passes both ways by design.
+
+## Behaviour change worth knowing
+
+Under a `/wiki` base, `jira api` now resolves from the site root:
+`jira api /rest/api/3/myself` requests `/rest/api/3/myself` where it previously
+requested `/wiki/rest/api/3/myself`. The old composition only ever produced 404s,
+but anyone who had worked around it by omitting a prefix should re-check their
+scripts.
 
 ## Limitations
 

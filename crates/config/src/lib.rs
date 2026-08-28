@@ -131,15 +131,30 @@ const WIKI_SUFFIX: &str = "/wiki";
 /// an easy mistake to make, because it is how the Confluence REST documentation
 /// spells the full URL.
 ///
-/// `strip_suffix` and not `trim_end_matches`: the latter would eat every
-/// repetition, so a `/wiki/wiki` typo would silently become the site root
-/// instead of losing one segment and staying visibly odd.
+/// One `/wiki` segment is removed, not every repetition: a `/wiki/wiki` typo
+/// should lose one and stay visibly odd rather than silently becoming the site
+/// root. Trailing slashes are all removed first, so `/wiki//` is handled like
+/// `/wiki` instead of slipping through the suffix check.
+///
+/// The comparison ignores case, matching the product detection in
+/// `commands/auth.rs`, which lowercases before looking for the same segment.
+/// The two disagreeing would mean a `/WIKI` base detected as Confluence but not
+/// normalised, which is the doubling all over again.
 ///
 /// Only for Jira, Confluence and JSM. Bamboo is a Server product where a context
 /// path in the base is legitimate, and it resolves its own base URL.
 pub fn site_base_url(base_url: &str) -> &str {
-    let trimmed = base_url.strip_suffix('/').unwrap_or(base_url);
-    trimmed.strip_suffix(WIKI_SUFFIX).unwrap_or(trimmed)
+    let trimmed = base_url.trim_end_matches('/');
+
+    let split = trimmed.len().saturating_sub(WIKI_SUFFIX.len());
+    if trimmed.len() >= WIKI_SUFFIX.len()
+        && trimmed.is_char_boundary(split)
+        && trimmed[split..].eq_ignore_ascii_case(WIKI_SUFFIX)
+    {
+        return &trimmed[..split];
+    }
+
+    trimmed
 }
 
 impl Profile {
@@ -561,6 +576,48 @@ mod tests {
             site_base_url("https://site.atlassian.net/wiki/wiki"),
             "https://site.atlassian.net/wiki"
         );
+    }
+
+    /// Every trailing slash goes before the suffix is looked for. Stripping
+    /// only one left `/wiki//` unnormalised, so it still doubled while
+    /// `auth login` told the user the URL was fine.
+    #[test]
+    fn repeated_trailing_slashes_do_not_hide_the_suffix() {
+        assert_eq!(
+            site_base_url("https://site.atlassian.net/wiki//"),
+            "https://site.atlassian.net"
+        );
+        assert_eq!(
+            site_base_url("https://site.atlassian.net//"),
+            "https://site.atlassian.net"
+        );
+    }
+
+    /// Product detection lowercases before looking for the same segment. If
+    /// this did not, a `/WIKI` base would be called Confluence and left
+    /// unnormalised, which is the doubling again.
+    #[test]
+    fn the_suffix_match_ignores_case() {
+        assert_eq!(
+            site_base_url("https://site.atlassian.net/WIKI"),
+            "https://site.atlassian.net"
+        );
+        assert_eq!(
+            site_base_url("https://site.atlassian.net/Wiki/"),
+            "https://site.atlassian.net"
+        );
+    }
+
+    /// Degenerate input reduces to an empty string rather than panicking on a
+    /// slice boundary; `ApiClient::new` then reports it as an unparseable URL.
+    #[test]
+    fn degenerate_input_does_not_panic() {
+        assert_eq!(site_base_url("/wiki"), "");
+        assert_eq!(site_base_url(""), "");
+        assert_eq!(site_base_url("/"), "");
+        assert_eq!(site_base_url("wiki"), "wiki");
+        // Multi-byte, to prove the boundary guard is doing something.
+        assert_eq!(site_base_url("https://x/päge"), "https://x/päge");
     }
 
     /// The OAuth gateway form, which the Confluence REST docs spell with the
