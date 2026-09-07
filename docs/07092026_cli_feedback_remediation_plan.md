@@ -14,12 +14,26 @@ Deferred, and not claimed as done:
 | 8 | both `whoami` commands | `pipeline_status`, `approve_pull_request` and `get_pr_diff` still bypass the renderer |
 | 11 | the envelope carries `total`/`truncated`/`next` | the default flip and `--no-envelope`, plus the ~20 direct `render(&rows)` conversions |
 
-Also not done, and listed here so the gap is visible rather than implied:
-pagination reaches the sites the report was about plus the destructive ones,
-while `bb branch list`, `repo list`, `workspace list`, `commits`, webhooks and
-the JSM tree remain single-request. `encode_ref_path` guards the paths that
-delete; `commits.rs` still interpolates a revision raw, which can misaddress a
-read.
+Also not done, and listed here so the gap is visible rather than implied. This
+list is kept current; an earlier version of it went stale when the follow-up
+branch converted more than it claimed.
+
+- **Pagination.** Done for every Bitbucket list and for `jira project list`.
+  **Not** done for the rest of the Jira tree (webhooks, automation, audit, field
+  and workflow lists), nor for JSM or Opsgenie.
+- **Path safety.** Every DELETE site in the Bitbucket tree is guarded, and
+  `crates/api` refuses a restructuring path centrally. Roughly 89 raw
+  `format!` interpolations remain across Jira, JSM and Opsgenie; the central
+  guard catches `.`/`..`, backslash, control characters and `#`, but a `?` in an
+  interpolated value cannot be caught centrally and needs per-site encoding.
+- **Confirmation.** `bb bulk`, `bb branch delete` and `bb repo delete` are
+  gated. Roughly ten deletes across Jira, JSM, Opsgenie and Bamboo have no
+  confirmation at all; several others use a `--force` flag rather than a typed
+  name. Which pattern those should adopt is a product decision, not a mechanical
+  sweep.
+- **`archive-repos`** still carries a subcommand name that describes something
+  it does not do. Its help text now says so; renaming it is a breaking change
+  held for the next major.
 
 **This branch should ship as 0.9.0, not 0.8.x** (`Cargo.toml` still says
 `0.8.0`; the bump is part of the release step, not of this work). It carries deliberate breaking changes:
