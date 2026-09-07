@@ -2381,3 +2381,20 @@ Still to convert on this branch: `workspace list`, `project list`, `commits`,
 `webhooks`, `ssh-keys`.
 
 882 tests across 32 suites, clippy clean.
+
+### Follow-up: workspace, project and commit lists paginated
+
+Same conversion as `branch list` / `repo list`, using the shared `page_size` and
+`warn_if_truncated` helpers. `WorkspaceList`, `ProjectList` and `CommitList`
+deleted in favour of `BitbucketPage<T>`.
+
+`bb commit list --branch <rev>` also interpolated the revision raw. A revision
+containing `#` truncated the path and listed a different branch's commits; one
+containing `..` addressed another repository. Read-only, so the consequence was
+a confidently wrong answer rather than data loss -- which is still the failure
+class this whole effort is about. Now goes through `encode_ref_path`.
+
+Remaining unconverted lists: `webhooks`, `ssh-keys`, and the Jira/JSM/Opsgenie
+trees.
+
+882 tests across 32 suites, clippy clean.

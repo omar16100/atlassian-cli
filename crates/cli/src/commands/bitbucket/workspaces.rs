@@ -1,16 +1,12 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use atlassian_cli_api::ApiClient;
 use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::BitbucketContext;
+use super::utils::{page_size, warn_if_truncated, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
-
-#[derive(Deserialize)]
-struct WorkspaceList {
-    values: Vec<Workspace>,
-}
 
 #[derive(Deserialize)]
 struct Workspace {
@@ -20,11 +16,6 @@ struct Workspace {
     uuid: Option<String>,
     #[serde(rename = "type", default)]
     workspace_type: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct ProjectList {
-    values: Vec<Project>,
 }
 
 #[derive(Deserialize)]
@@ -41,15 +32,18 @@ struct Project {
 
 pub async fn list_workspaces(ctx: &BitbucketContext<'_>, limit: usize) -> Result<()> {
     let query = form_urlencoded::Serializer::new(String::new())
-        .append_pair("pagelen", &limit.min(100).to_string())
+        .append_pair("pagelen", &page_size(limit).to_string())
         .finish();
     let path = format!("/2.0/workspaces?{query}");
 
-    let response: WorkspaceList = ctx
-        .client
-        .get(&path)
-        .await
-        .context("Failed to list workspaces")?;
+    let (workspaces, page) = fetch_paged::<BitbucketPage<Workspace>>(
+        &ctx.client,
+        &path,
+        PageLimits::from_cli_limit(limit),
+    )
+    .await
+    .context("Failed to list workspaces")?;
+    warn_if_truncated(&page, workspaces.len(), "workspaces");
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -58,8 +52,7 @@ pub async fn list_workspaces(ctx: &BitbucketContext<'_>, limit: usize) -> Result
         workspace_type: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = workspaces
         .iter()
         .map(|ws| Row {
             slug: ws.slug.as_str(),
@@ -108,15 +101,18 @@ pub async fn list_projects(
     limit: usize,
 ) -> Result<()> {
     let query = form_urlencoded::Serializer::new(String::new())
-        .append_pair("pagelen", &limit.min(100).to_string())
+        .append_pair("pagelen", &page_size(limit).to_string())
         .finish();
     let path = format!("/2.0/workspaces/{workspace}/projects?{query}");
 
-    let response: ProjectList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list projects in workspace {workspace}"))?;
+    let (projects, page) = fetch_paged::<BitbucketPage<Project>>(
+        &ctx.client,
+        &path,
+        PageLimits::from_cli_limit(limit),
+    )
+    .await
+    .with_context(|| format!("Failed to list projects in workspace {workspace}"))?;
+    warn_if_truncated(&page, projects.len(), "projects");
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -126,8 +122,7 @@ pub async fn list_projects(
         visibility: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = projects
         .iter()
         .map(|proj| Row {
             key: proj.key.as_str(),
