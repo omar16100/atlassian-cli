@@ -950,9 +950,9 @@ enum BulkCommands {
     ///
     /// Despite the command name, this does NOT archive: Bitbucket Cloud has no
     /// repository archive API. It sets has_issues and has_wiki to false, which
-    /// makes any existing issues and wiki pages inaccessible. Only the first
-    /// 100 repositories are examined. Lists candidates by default; pass
-    /// --execute to apply.
+    /// makes any existing issues and wiki pages inaccessible. Every repository
+    /// in the workspace is examined, not just the first page. Lists candidates
+    /// by default; pass --execute to apply.
     ArchiveRepos {
         /// Days threshold for staleness. Must be at least 1.
         ///
@@ -975,9 +975,9 @@ enum BulkCommands {
     /// Delete branches by name. Does NOT check merge status.
     ///
     /// Any branch except main, master, develop, development and --exclude
-    /// matches is a candidate, whether or not it was ever merged. Only the
-    /// first 100 branches are considered; pagination is not yet implemented.
-    /// Lists candidates by default; pass --execute to actually delete.
+    /// matches is a candidate, whether or not it was ever merged. EVERY branch
+    /// in the repository is considered, not just the first page. Lists
+    /// candidates by default; pass --execute to actually delete.
     DeleteBranches {
         /// Repository slug.
         repo: String,

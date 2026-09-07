@@ -1,6 +1,6 @@
 # `bb bulk`: honest naming and confirmation gates
 
-Status: in progress on `feat/cli-feedback-remediation`.
+Status: complete on `feat/cli-feedback-remediation`, pending release.
 
 ## Problem
 
@@ -146,9 +146,12 @@ data loss, the deletions that did happen are the most important thing to print.
   since stdin is inherited. The comparison logic is split into
   `confirmation_matches` and tested directly; the terminal branch is verified
   by hand.
-- The pagination defect is untouched. The command still sees only the first 100
-  branches. That is deliberate sequencing: the safety gate lands first, and
-  pagination follows in a later step of the remediation plan.
+- The pagination defect was fixed later on the same branch, once the safety gate
+  existed. The command now follows the branch listing to completion, and a list
+  that cannot be completed within the request budget is an error rather than a
+  silent truncation. This document previously said the cap was untouched; that
+  was true when written and false by the end of the branch, which is exactly the
+  kind of stale claim this work was about.
 
 ## The same class, in the same file: `archive-repos`
 

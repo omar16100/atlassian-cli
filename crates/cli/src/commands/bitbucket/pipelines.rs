@@ -1124,7 +1124,11 @@ pub async fn list_steps(
 /// to Table, CSV and Markdown alike, so this is only reached for the two
 /// human-read formats; CSV and the structured formats go through the ordinary
 /// path and keep every field.
-const STEP_TABLE_COLUMNS: [&str; 6] = [
+/// `uuid` stays: it is the argument `bb pipeline logs <pipeline> <step-uuid>`
+/// takes, so dropping it would have made the table unable to feed the command
+/// it exists to support. Only `logs_url` is omitted, and only here.
+const STEP_TABLE_COLUMNS: [&str; 7] = [
+    "uuid",
     "name",
     "status",
     "started",
@@ -1645,7 +1649,7 @@ mod tests {
             !STEP_TABLE_COLUMNS.contains(&"logs_url"),
             "logs_url must not be a table column"
         );
-        for expected in ["name", "status", "duration"] {
+        for expected in ["uuid", "name", "status", "duration"] {
             assert!(
                 STEP_TABLE_COLUMNS.contains(&expected),
                 "{expected} should still be shown"

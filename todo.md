@@ -2289,3 +2289,41 @@ needed. It blocks nothing.
 879 tests across 32 suites, clippy clean. (An intermediate run reported 25
 suites / 725 tests: cargo stops after a failing binary, so that was the abort,
 not a regression.)
+
+### Merge review: the help text understated a destructive command's blast radius
+
+The whole-branch review's verdict was "merge after fixing three documentation
+issues", and the blocking one was mine and self-inflicted.
+
+`bb bulk delete-branches --help` still said "Only the first 100 branches are
+considered; pagination is not yet implemented". That was true when written in
+the safety commit, and false three commits later when the same branch made the
+command follow pagination to completion. So a user could read `--help`, believe
+`--execute --yes` was bounded to 100 branches, and be wrong -- on the exact
+command this branch exists to make safe, and in exactly the
+authoritative-looking-but-wrong style the whole effort was about. Same for
+`archive-repos`. Both corrected.
+
+`docs/07092026_bulk_delete_branches_safety.md` carried the same stale claim in
+its Limitations section, and still said "in progress".
+
+The plan document claimed "all 17 findings are addressed in code". That
+overstated three of them, and the review was right to reject it:
+
+- finding 5 shipped `uuid` columns, not the member/name resolver;
+- finding 8 fixed both `whoami` commands, not `pipeline_status`,
+  `approve_pull_request` or `get_pr_diff`;
+- finding 11 shipped the envelope fields, not the default flip.
+
+Now "addressed or explicitly deferred", with a table of what actually shipped
+versus what did not, plus the pagination and `encode_ref_path` gaps stated
+outright rather than implied. The Phase 1a call-site list also named four sites
+as converted that were never reached; they are now marked not converted.
+
+Also restored `uuid` to the steps table. Dropping `logs_url` had quietly taken
+`uuid` with it, and `uuid` is the argument `bb pipeline logs <pipeline>
+<step-uuid>` takes -- so the table could no longer feed the command it exists to
+support. That was an undisclosed breaking change; only `logs_url` was ever meant
+to go.
+
+879 tests across 32 suites, clippy clean.

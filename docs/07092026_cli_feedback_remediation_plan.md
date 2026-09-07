@@ -3,10 +3,26 @@
 Status: complete on `feat/cli-feedback-remediation`, pending review and release.
 879 tests across 32 suites, clippy clean under `-D warnings`.
 
-**All 17 findings are addressed in code.** Findings 4 and 12 need only a
-release; nothing on this branch reaches a user until a tag exists.
+**All 17 findings are addressed or explicitly deferred.** Findings 4 and 12 need
+only a release; nothing on this branch reaches a user until a tag exists.
 
-**This branch is 0.9.0, not 0.8.x.** It carries deliberate breaking changes:
+Deferred, and not claimed as done:
+
+| Finding | Shipped | Deferred |
+| --- | --- | --- |
+| 5 | `uuid` columns on `permission list` and `pr reviewers`, so a UUID is obtainable | the member/name resolver described under Phase 2 |
+| 8 | both `whoami` commands | `pipeline_status`, `approve_pull_request` and `get_pr_diff` still bypass the renderer |
+| 11 | the envelope carries `total`/`truncated`/`next` | the default flip and `--no-envelope`, plus the ~20 direct `render(&rows)` conversions |
+
+Also not done, and listed here so the gap is visible rather than implied:
+pagination reaches the sites the report was about plus the destructive ones,
+while `bb branch list`, `repo list`, `workspace list`, `commits`, webhooks and
+the JSM tree remain single-request. `encode_ref_path` guards the paths that
+delete; `commits.rs` still interpolates a revision raw, which can misaddress a
+read.
+
+**This branch should ship as 0.9.0, not 0.8.x** (`Cargo.toml` still says
+`0.8.0`; the bump is part of the release step, not of this work). It carries deliberate breaking changes:
 `bb bulk delete-branches` and `archive-repos` list instead of acting, `bb branch
 delete` requires the branch name typed, `--dry-run` conflicts with `--execute`,
 and the envelope's `truncated` is now tri-state. The original sequencing in this
@@ -288,7 +304,10 @@ Genuine truncations, in severity order:
   currently lands in another.
 - `pullrequests.rs:643` (finding 16), and `:275`.
 - `permissions.rs` — the re-pathed `permissions-config` lists are paginated too.
-- `branches.rs:55`, `repos.rs:38`, `workspaces.rs:43,110`, `commits.rs:90`.
+- **Not converted:** `branches.rs:55`, `repos.rs:38`, `workspaces.rs:43,110`,
+  `commits.rs:90`. These were listed as in scope and were not reached; they
+  still cap at `pagelen=min(limit,100)` with no cursor follow, so `--limit 500`
+  silently returns 100.
 
 **Not converted:** `variables.rs` already paginates correctly. Touching it is
 refactoring, not a fix, and is out of scope.
