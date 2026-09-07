@@ -40,17 +40,36 @@ pub struct ListMeta {
     /// omits `size` on collections it considers expensive. Absent is not zero,
     /// and it is serialized as absent rather than as `0` for that reason.
     pub total: Option<u64>,
-    /// Whether the rows are a complete answer.
-    pub truncated: bool,
+    /// Whether the rows are a complete answer, when the caller knows.
+    ///
+    /// `None` means unknown, and is serialized as absent rather than as
+    /// `false`. Most list commands are still a single request against a
+    /// server-paginated endpoint: they cannot tell whether more exists, and
+    /// asserting `truncated: false` there would be a confident false claim of
+    /// exactly the kind this field was added to prevent.
+    pub truncated: Option<bool>,
     /// An opaque marker for where a truncated result stopped, when the source
     /// provides one.
     pub next: Option<String>,
 }
 
 impl ListMeta {
-    /// A complete result of unknown total: what a non-paginated caller means.
-    pub fn complete() -> Self {
+    /// What a caller that did not paginate knows: nothing.
+    ///
+    /// Deliberately not called `complete()`. The callers that use it have not
+    /// established completeness, and naming it so invited the envelope to
+    /// assert it.
+    pub fn unknown() -> Self {
         Self::default()
+    }
+
+    /// A result whose completeness has been established.
+    pub fn known(total: Option<u64>, truncated: bool, next: Option<String>) -> Self {
+        Self {
+            total,
+            truncated: Some(truncated),
+            next,
+        }
     }
 }
 
@@ -66,7 +85,9 @@ struct ListEnvelope<'a, T: Serialize> {
     count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     total: Option<u64>,
-    truncated: bool,
+    /// Absent when the caller could not establish completeness.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    truncated: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     next: Option<&'a str>,
 }
@@ -138,7 +159,7 @@ impl OutputRenderer {
     /// Render a list/array of items. When --envelope is enabled and format is JSON/YAML,
     /// wraps output in `{"data": [...], "count": N, ...}`. Otherwise renders as normal.
     pub fn render_list<T: Serialize>(&self, items: &[T]) -> Result<()> {
-        self.render_list_with_meta(items, &ListMeta::complete())
+        self.render_list_with_meta(items, &ListMeta::unknown())
     }
 
     /// Render a list that knows whether it is complete.

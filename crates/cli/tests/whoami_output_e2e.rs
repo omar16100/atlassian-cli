@@ -121,10 +121,14 @@ async fn the_table_form_is_still_labelled_lines() {
     assert!(stdout.contains("Profile: local"), "{stdout}");
     assert!(stdout.contains("Product: Jira"), "{stdout}");
     assert!(stdout.contains("Account ID: acc-123"), "{stdout}");
-    assert!(
-        !stdout.contains('|') && !stdout.contains('+'),
-        "the readable form must not have become a table: {stdout}"
-    );
+    // `tabled` draws with Unicode box characters (Style::rounded), so checking
+    // for ASCII `|`/`+` would have passed even if the output became a table.
+    for border in ['│', '─', '╭', '┼', '╰'] {
+        assert!(
+            !stdout.contains(border),
+            "the readable form must not have become a table: {stdout}"
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -140,4 +144,28 @@ async fn whoami_yaml_is_parseable() {
     let parsed: serde_yaml::Value = serde_yaml::from_str(&stdout)
         .unwrap_or_else(|e| panic!("-f yaml did not produce YAML ({e}): {stdout}"));
     assert_eq!(parsed["account_id"].as_str(), Some("acc-123"));
+}
+
+/// `-f quiet` and `-f csv` are consumed by line-oriented scripts. The old code
+/// printed labelled lines for every format; only the structured formats should
+/// have changed.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn line_oriented_formats_keep_their_text_form() {
+    let server = jira_identity_server().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    for format in ["quiet", "csv"] {
+        let out = run(&config, &["auth", "whoami", "-f", format]);
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        assert!(out.status.success(), "{format}: {stdout}");
+        assert!(
+            stdout.contains("Account ID: acc-123"),
+            "-f {format} must keep the labelled lines, got: {stdout}"
+        );
+        assert!(
+            !stdout.trim_start().starts_with('{'),
+            "-f {format} must not emit a JSON object: {stdout}"
+        );
+    }
 }

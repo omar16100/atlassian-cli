@@ -344,13 +344,19 @@ pub async fn whoami(
             .context("Failed to fetch workspaces from Bitbucket API (Bearer auth)")?;
 
         #[derive(Serialize)]
+        struct WorkspaceRef<'a> {
+            slug: &'a str,
+            name: &'a str,
+        }
+
+        #[derive(Serialize)]
         struct BearerView<'a> {
             #[serde(skip_serializing_if = "Option::is_none")]
             profile: Option<&'a str>,
             product: &'a str,
             auth_type: &'a str,
             note: &'a str,
-            workspaces: Vec<String>,
+            workspaces: Vec<WorkspaceRef<'a>>,
         }
 
         let view = BearerView {
@@ -361,33 +367,31 @@ pub async fn whoami(
             workspaces: data
                 .values
                 .iter()
-                .map(|ws| {
-                    format!(
-                        "{} ({})",
-                        ws["slug"].as_str().unwrap_or("?"),
-                        ws["name"].as_str().unwrap_or("?")
-                    )
+                .map(|ws| WorkspaceRef {
+                    slug: ws["slug"].as_str().unwrap_or("?"),
+                    name: ws["name"].as_str().unwrap_or("?"),
                 })
                 .collect(),
         };
 
         return match renderer.format() {
-            OutputFormat::Table | OutputFormat::Markdown => {
+            OutputFormat::Json | OutputFormat::Yaml => renderer.render(&view),
+            _ => {
+                // `auth whoami --bitbucket` supplies a profile and prints the
+                // Profile/Product preamble; plain `bb whoami` has neither and
+                // must keep the output it always had.
                 if let Some(profile) = view.profile {
                     println!("Profile: {profile}");
+                    println!("Product: {}", view.product);
                 }
-                println!("Product: {}", view.product);
                 println!("Auth type: {}", view.auth_type);
                 println!("{}.", view.note);
-                if !view.workspaces.is_empty() {
-                    println!("Accessible workspaces:");
-                    for workspace in &view.workspaces {
-                        println!("  {workspace}");
-                    }
+                println!("Accessible workspaces:");
+                for workspace in &view.workspaces {
+                    println!("  {} ({})", workspace.slug, workspace.name);
                 }
                 Ok(())
             }
-            _ => renderer.render(&view),
         };
     }
 
@@ -417,17 +421,17 @@ pub async fn whoami(
     };
 
     match renderer.format() {
-        OutputFormat::Table | OutputFormat::Markdown => {
+        OutputFormat::Json | OutputFormat::Yaml => renderer.render(&view),
+        _ => {
             if let Some(profile) = view.profile {
                 println!("Profile: {profile}");
+                println!("Product: {}", view.product);
             }
-            println!("Product: {}", view.product);
             println!("Username: {}", view.username);
             println!("Display Name: {}", view.display_name);
             println!("Account ID: {}", view.account_id);
             println!("UUID: {}", view.uuid);
             Ok(())
         }
-        _ => renderer.render(&view),
     }
 }

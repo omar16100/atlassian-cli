@@ -2188,3 +2188,42 @@ unreported `active` flag is absent rather than false, and the table form is
 still labelled lines rather than a one-row grid.
 
 869 tests across 32 suites, clippy clean.
+
+### Review round: the envelope was making a confident false claim
+
+The worst finding of this round was mine, and it was the exact failure class
+this branch exists to remove.
+
+`truncated` was an unconditional envelope field fed by a `ListMeta::complete()`
+default, so the ~70 list commands that are still a single GET against a
+server-paginated endpoint began emitting `"truncated": false` over results the
+server had already cut short. Before the envelope change they were merely
+silent about completeness; afterwards they asserted it. The name
+`complete()` was itself the invitation.
+
+`truncated` is now `Option<bool>`, absent when unknown, and the constructor is
+`ListMeta::unknown()` -- deliberately not `complete()`, because those callers
+have established nothing. Paginated callers use `ListMeta::known(..)`. Test
+verified to fail against the asserting version.
+
+Two regressions I introduced in the whoami commit, both found by the same
+review:
+
+- **`-f quiet` and `-f csv` started dumping pretty JSON.** The old code printed
+  labelled lines for *every* format; I restricted the readable arm to Table and
+  Markdown, so the two line-oriented formats -- the ones scripts consume -- fell
+  through to the object renderer. Only Json and Yaml should ever have changed.
+- **Plain `bb whoami` gained a `Product:` line it never had**, and stopped
+  printing the "Accessible workspaces:" header on an empty list. The
+  Profile/Product preamble belongs to `auth whoami --bitbucket`, which supplies
+  a profile; plain `bb whoami` has none and now prints only when it does.
+
+Also: the bearer view serialised workspaces as preformatted `"slug (name)"`
+strings, which is useless in the machine format the change exists to serve.
+Now structured `{slug, name}`.
+
+And the table-guard assertion in the whoami test checked for ASCII `|`/`+`,
+but `tabled` draws with Unicode box characters, so it would have passed even if
+the output had become a table. Now checks the characters actually used.
+
+871 tests across 32 suites, clippy clean.

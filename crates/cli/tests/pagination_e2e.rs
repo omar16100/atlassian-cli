@@ -376,3 +376,40 @@ async fn limit_zero_returns_everything() {
         "--limit 0 fetched everything, so nothing was truncated: {stderr}"
     );
 }
+
+/// A command that does not paginate cannot know whether more exists, so the
+/// envelope must stay silent rather than assert completeness.
+///
+/// The first version of the envelope made `truncated` an unconditional field
+/// fed by a `ListMeta::complete()` default, so roughly seventy single-GET list
+/// commands began emitting a confident `"truncated": false` over results the
+/// server had already cut short -- the exact class of authoritative-looking
+/// wrong answer this work exists to remove.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_non_paginating_command_does_not_claim_completeness() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/project/search"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "values": [{"id": "1", "key": "DEV", "name": "Dev", "projectTypeKey": "software"}]
+        })))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &["--envelope", "jira", "project", "list", "-f", "json"],
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{stdout}");
+
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(parsed["data"].is_array(), "{stdout}");
+    assert!(
+        parsed.get("truncated").is_none(),
+        "a command that cannot establish completeness must not assert it: {stdout}"
+    );
+}

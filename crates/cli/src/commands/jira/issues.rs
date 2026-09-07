@@ -154,11 +154,11 @@ pub async fn search_issues(
         );
     }
 
-    let meta = ListMeta {
-        total: page.total,
-        truncated: page.truncated,
-        next: page.next.as_ref().map(describe_cursor),
-    };
+    let meta = ListMeta::known(
+        page.total,
+        page.truncated,
+        page.next.as_ref().map(describe_cursor),
+    );
 
     #[derive(Serialize)]
     struct Row<'a> {

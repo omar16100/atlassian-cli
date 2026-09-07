@@ -738,13 +738,17 @@ fn render_identity<T: Serialize>(
     lines: &[(&str, String)],
 ) -> Result<()> {
     match renderer.format() {
-        OutputFormat::Table | OutputFormat::Markdown => {
+        // Only the structured formats change. The old code printed these lines
+        // for *every* format, so restricting the readable arm to Table and
+        // Markdown silently turned `-f quiet` and `-f csv` -- both consumed by
+        // line-oriented scripts -- into a pretty-printed JSON object.
+        OutputFormat::Json | OutputFormat::Yaml => renderer.render(view),
+        _ => {
             for (label, value) in lines {
                 println!("{label}: {value}");
             }
             Ok(())
         }
-        _ => renderer.render(view),
     }
 }
 
