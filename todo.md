@@ -2447,3 +2447,41 @@ not exist. They now get a message without a remedy they cannot use.
 
 885 tests across 32 suites, clippy clean, unit suite verified under a
 pseudo-TTY.
+
+## Live verification: attempted, not possible — all testing is mock-based
+
+Both stored profiles (`ntuclink`, `ntuclink-bb`) have expired tokens: Jira
+returns "Client must be authenticated to access this resource", Bitbucket
+"Token is invalid, expired, or not supported for this endpoint". So **no part of
+this work has been exercised against a real Atlassian instance.** Every test is
+wiremock or the built binary against a mock server.
+
+The attempt did establish two things a mock cannot:
+
+- `auth whoami --bitbucket` reached the **Bitbucket** API and failed there, not
+  with "Profile missing base_url". That is finding 9's actual defect, so the
+  dispatch fix works against a real endpoint.
+- `auth scopes` built its client, called `ApiClient::response_header`, reached
+  api.bitbucket.org and surfaced a 401 with the right hint — the command is
+  genuinely wired, not merely compiling.
+
+**Untested against a live API**, and worth stating before release:
+
+- Pagination against real cursors. Every multi-page test uses a mock whose
+  `next` URL we construct. Bitbucket's real `next` shape, and Jira's real
+  `nextPageToken`/`isLast` behaviour at a page boundary, are unverified.
+- `permissions-config/users` and `/groups` — the response shape is taken from
+  Atlassian's docs, never seen.
+- `effective-default-reviewers` — same, including whether the account is nested
+  under `user` or carries a top-level `uuid`.
+- `scope_hint` against a real 403. The body shape is from Atlassian's
+  documentation and community reports, not observed.
+- `x-oauth-scopes` — that Bitbucket actually sets this header on the endpoints
+  `auth scopes` calls.
+- `bb api` / `confluence api` against real endpoints (only `--dry-run` tested).
+- Every `--execute` path. No branch or repository has been deleted by this code.
+
+Anyone releasing this should re-authenticate and run at least: `auth whoami -f
+json`, `auth scopes`, `bb permission list`, `bb pr list --limit 0` on a
+repository with more than 100 pull requests, and `bb bulk delete-branches`
+WITHOUT `--execute` on a repository with more than 100 branches.
