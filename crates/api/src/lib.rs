@@ -312,6 +312,55 @@ pub struct ApiClient {
     rate_limiter: RateLimiter,
 }
 
+/// Refuse a request path that the URL parser would restructure.
+///
+/// Every command builds its path with `format!`, so keeping them safe has meant
+/// each call site remembering to encode the values it interpolates. That is a
+/// discipline, and it failed repeatedly: across several rounds of fixing, a
+/// guard was applied to one caller and not its siblings, then derived from a
+/// list of characters rather than from what the parser does. Roughly forty
+/// interpolation sites across Jira, JSM and Opsgenie have never been audited at
+/// all.
+///
+/// So the check lives here instead, at the one point every request passes
+/// through. It rejects what no legitimate Atlassian path contains:
+///
+/// - a `.` or `..` path component, which resolves to a different resource;
+/// - a backslash, which the WHATWG parser treats as a path separator;
+/// - a tab, CR, LF or other control character, which the parser strips before
+///   parsing, so `.<TAB>.` becomes `..`.
+///
+/// Values needing these characters literally must be percent-encoded by the
+/// caller, which is what `encode_path_segment` in the CLI does. This is the net
+/// beneath that, not a replacement for it: a caller that encodes correctly is
+/// unaffected, and one that forgets gets an error instead of a request against
+/// the wrong resource.
+fn reject_restructuring_path(path: &str) -> Result<()> {
+    if let Some(bad) = path.chars().find(|c| c.is_control() || *c == '\\') {
+        debug!(
+            ?bad,
+            path, "Refusing a path containing a restructuring character"
+        );
+        return Err(ApiError::InvalidUrl(
+            url::ParseError::InvalidDomainCharacter,
+        ));
+    }
+
+    // Only the path portion: a query value may legitimately contain anything,
+    // and it cannot move the request to another resource.
+    let path_only = path.split(['?', '#']).next().unwrap_or(path);
+    for segment in path_only.split('/') {
+        if segment == "." || segment == ".." {
+            debug!(path, "Refusing a path containing a dot component");
+            return Err(ApiError::InvalidUrl(
+                url::ParseError::InvalidDomainCharacter,
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 impl ApiClient {
     pub fn new(base_url: impl AsRef<str>) -> Result<Self> {
         let url = Url::parse(base_url.as_ref()).map_err(ApiError::InvalidUrl)?;
@@ -377,6 +426,8 @@ impl ApiClient {
     /// Safely join a path to the base URL, ensuring the origin remains unchanged
     /// to prevent SSRF attacks.
     fn safe_join(&self, path: &str) -> Result<Url> {
+        reject_restructuring_path(path)?;
+
         let joined = self
             .base_url
             .join(path.strip_prefix('/').unwrap_or(path))
@@ -993,6 +1044,57 @@ impl ApiClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The net beneath per-call-site encoding. Each of these was demonstrated
+    /// to retarget a request through `Url::join`, and the CLI has roughly forty
+    /// interpolation sites that have never been audited.
+    #[test]
+    fn a_restructuring_path_is_refused_before_it_is_joined() {
+        for bad in [
+            "/2.0/repositories/w/r/hooks/..",
+            "/2.0/repositories/w/r/hooks/.",
+            "/2.0/repositories/w/r/hooks/..\\",
+            "/2.0/repositories/w/r/hooks/a\\..\\x",
+            "/2.0/repositories/w/r/hooks/.\t.",
+            "/2.0/repositories/w/r/hooks/.\n.",
+            "/rest/api/3/issue/../../admin",
+        ] {
+            assert!(
+                reject_restructuring_path(bad).is_err(),
+                "{bad:?} must be refused"
+            );
+        }
+    }
+
+    /// The guard must not reject the paths the CLI actually builds, including
+    /// already-encoded segments and dots inside a component.
+    #[test]
+    fn ordinary_paths_are_unaffected() {
+        for good in [
+            "/2.0/repositories/w/r/hooks/%7Babc-123%7D",
+            "/2.0/repositories/w/r/refs/branches/feature/login",
+            "/2.0/repositories/w/r/refs/branches/release/2026.09.1",
+            "/rest/api/3/search/jql?jql=project%20%3D%20DEV&maxResults=100",
+            "/rest/api/3/issue/DEV-1",
+            "/2.0/repositories/w/r/commits/v1.2.3",
+        ] {
+            assert!(
+                reject_restructuring_path(good).is_ok(),
+                "{good:?} must be allowed"
+            );
+        }
+    }
+
+    /// A query value is not part of the path and cannot move the request, so
+    /// JQL containing a dot or a `..` range must still be allowed through.
+    #[test]
+    fn a_dot_in_the_query_is_not_a_path_component() {
+        assert!(
+            reject_restructuring_path("/rest/api/3/search/jql?jql=fixVersion%20in%20(1.0)").is_ok()
+        );
+        assert!(reject_restructuring_path("/x?range=a..b").is_ok());
+    }
+
     use wiremock::matchers::{body_string, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 

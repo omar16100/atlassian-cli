@@ -2595,3 +2595,30 @@ change the request path, the other asserts hostile inputs cannot escape their
 prefix or inject a query — asserting the property, not which mechanism fired.
 
 894 tests across 32 suites, clippy clean.
+
+### The real fix: guard the choke point, not each call site
+
+Four consecutive review rounds found a defect in the previous round's fix. That
+is not bad luck, it is a signal: URL safety was being enforced per call site,
+which requires never forgetting, across roughly forty `format!` interpolations —
+most of them in Jira, JSM and Opsgenie, never audited at all.
+
+`safe_join` (`crates/api/src/lib.rs`) is the one point every request passes
+through. `reject_restructuring_path` now runs there and refuses what no
+legitimate Atlassian path contains:
+
+- a `.` or `..` path component;
+- a backslash, which the WHATWG parser treats as a separator;
+- a tab, CR, LF or other control character, which the parser strips *before*
+  parsing, so `.<TAB>.` becomes `..`.
+
+Only the path is examined. A query value may legitimately contain a dot or a
+`..` range — JQL does — and cannot move the request to another resource.
+
+This is a net beneath the per-site encoding, not a replacement for it. A caller
+that encodes correctly is unaffected; one that forgets now gets an error instead
+of a request against the wrong resource. Every previously demonstrated bypass
+(`..\`, `a\..\x`, `.<TAB>.`, plain `..`) is refused here regardless of which
+command built the path, including the forty sites this work never touched.
+
+897 tests across 32 suites, clippy clean.
