@@ -1,14 +1,10 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::{encode_ref_path, BitbucketContext};
+use super::utils::{encode_ref_path, page_size, warn_if_truncated, BitbucketContext};
 use crate::commands::common::{confirm_destructive, render_success, MutationResult};
-
-#[derive(Deserialize)]
-struct RepoList {
-    values: Vec<Repo>,
-}
 
 #[derive(Deserialize)]
 struct Repo {
@@ -35,15 +31,15 @@ struct BranchRef {
 
 pub async fn list_repos(ctx: &BitbucketContext<'_>, workspace: &str, limit: usize) -> Result<()> {
     let query = form_urlencoded::Serializer::new(String::new())
-        .append_pair("pagelen", &limit.min(100).to_string())
+        .append_pair("pagelen", &page_size(limit).to_string())
         .finish();
     let path = format!("/2.0/repositories/{workspace}?{query}");
 
-    let response: RepoList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list repositories for workspace {workspace}"))?;
+    let (repositories, page) =
+        fetch_paged::<BitbucketPage<Repo>>(&ctx.client, &path, PageLimits::from_cli_limit(limit))
+            .await
+            .with_context(|| format!("Failed to list repositories for workspace {workspace}"))?;
+    warn_if_truncated(&page, repositories.len(), "repositories");
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -54,8 +50,7 @@ pub async fn list_repos(ctx: &BitbucketContext<'_>, workspace: &str, limit: usiz
         language: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = repositories
         .iter()
         .map(|repo| Row {
             slug: repo.slug.as_str(),

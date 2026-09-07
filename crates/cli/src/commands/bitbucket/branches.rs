@@ -1,14 +1,10 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::{encode_ref_path, BitbucketContext};
+use super::utils::{encode_ref_path, page_size, warn_if_truncated, BitbucketContext};
 use crate::commands::common::{confirm_destructive, render_success, MutationResult};
-
-#[derive(Deserialize)]
-struct BranchList {
-    values: Vec<Branch>,
-}
 
 #[derive(Deserialize)]
 struct Branch {
@@ -51,16 +47,18 @@ pub async fn list_branches(
     repo_slug: &str,
     limit: usize,
 ) -> Result<()> {
+    // `--limit 500` used to return 100: the request capped pagelen and never
+    // followed the cursor, so the shortfall was invisible. `--limit 0` means all.
     let query = form_urlencoded::Serializer::new(String::new())
-        .append_pair("pagelen", &limit.min(100).to_string())
+        .append_pair("pagelen", &page_size(limit).to_string())
         .finish();
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches?{query}");
 
-    let response: BranchList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list branches for {workspace}/{repo_slug}"))?;
+    let (branches, page) =
+        fetch_paged::<BitbucketPage<Branch>>(&ctx.client, &path, PageLimits::from_cli_limit(limit))
+            .await
+            .with_context(|| format!("Failed to list branches for {workspace}/{repo_slug}"))?;
+    warn_if_truncated(&page, branches.len(), "branches");
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -70,8 +68,7 @@ pub async fn list_branches(
         message: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = branches
         .iter()
         .map(|branch| Row {
             name: branch.name.as_str(),

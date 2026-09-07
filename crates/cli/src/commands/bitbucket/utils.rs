@@ -98,9 +98,44 @@ pub fn encode_ref_path(name: &str) -> anyhow::Result<String> {
     Ok(out)
 }
 
+/// Page size for a list command's first request.
+///
+/// `--limit 0` means "everything", so it asks for a full page rather than
+/// clamping to zero and fetching nothing.
+pub fn page_size(limit: usize) -> usize {
+    if limit == 0 {
+        100
+    } else {
+        limit.clamp(1, 100)
+    }
+}
+
+/// Warn on stderr when a list came back incomplete.
+///
+/// stderr, so a piped `-f json` result stays machine-readable. The envelope
+/// carries this structurally for the commands wired to `ListMeta`; this is the
+/// signal for everything else, and for the tabular formats, which have no field
+/// to put it in.
+pub fn warn_if_truncated(page: &atlassian_cli_api::pagination::PageInfo, shown: usize, noun: &str) {
+    if page.truncated {
+        eprintln!(
+            "warning: showing {shown} {noun}; more exist. Raise --limit, or use --limit 0 for all."
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_zero_limit_asks_for_a_full_page() {
+        // Clamping to 0 here would fetch nothing while claiming to fetch all.
+        assert_eq!(page_size(0), 100);
+        assert_eq!(page_size(25), 25);
+        assert_eq!(page_size(500), 100);
+        assert_eq!(page_size(1), 1);
+    }
 
     /// The bug this exists for: `#` truncates the path at the client, so the
     /// request lands on a different — and possibly protected — ref.

@@ -2357,3 +2357,27 @@ Still outstanding on this branch, from the same review:
   addresses `main` -- read-only, so misinformation rather than damage.
 
 881 tests across 32 suites, clippy clean.
+
+### Follow-up: `branch list` and `repo list` no longer truncate silently
+
+The generalised form of the original finding 2. Both capped `pagelen` at
+`limit.min(100)` and never followed the cursor, so `--limit 500` returned 100
+with nothing to say the rest existed -- the same silent, authoritative-looking
+shortfall the remediation branch fixed for search and steps.
+
+Both now use `fetch_paged`, honour `--limit 0` as "everything", and warn on
+stderr when the result is short. Two helpers moved into `bitbucket/utils.rs` so
+the remaining conversions do not each re-derive them:
+
+- `page_size(limit)` -- `--limit 0` asks for a full page rather than clamping to
+  zero and fetching nothing, which is the bug that shipped in the first version
+  of the Jira fix.
+- `warn_if_truncated(page, shown, noun)` -- stderr, so a piped `-f json` result
+  stays parseable.
+
+`BranchList` and `RepoList` deleted; `BitbucketPage<T>` replaces them.
+
+Still to convert on this branch: `workspace list`, `project list`, `commits`,
+`webhooks`, `ssh-keys`.
+
+882 tests across 32 suites, clippy clean.
