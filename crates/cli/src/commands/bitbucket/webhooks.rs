@@ -129,8 +129,13 @@ pub async fn delete_webhook(
 ) -> Result<()> {
     // A uuid of `..` normalises to the repository endpoint -- a delete with no
     // confirmation at all -- and one carrying `#` truncates to a different hook.
+    // The slug is encoded too, not just the uuid. A slug of `r#x` truncates the
+    // path to the repository endpoint, turning "delete webhook" -- which has no
+    // confirmation prompt -- into a repository delete.
     let path = format!(
-        "/2.0/repositories/{workspace}/{repo_slug}/hooks/{}",
+        "/2.0/repositories/{}/{}/hooks/{}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?,
         encode_path_segment(webhook_uuid)?
     );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
@@ -241,7 +246,9 @@ pub async fn delete_ssh_key(
     key_uuid: &str,
 ) -> Result<()> {
     let path = format!(
-        "/2.0/repositories/{workspace}/{repo_slug}/deploy-keys/{}",
+        "/2.0/repositories/{}/{}/deploy-keys/{}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?,
         encode_path_segment(key_uuid)?
     );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {

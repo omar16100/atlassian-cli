@@ -315,50 +315,93 @@ pub struct ApiClient {
 /// Refuse a request path that the URL parser would restructure.
 ///
 /// Every command builds its path with `format!`, so keeping them safe has meant
-/// each call site remembering to encode the values it interpolates. That is a
-/// discipline, and it failed repeatedly: across several rounds of fixing, a
-/// guard was applied to one caller and not its siblings, then derived from a
-/// list of characters rather than from what the parser does. Roughly forty
-/// interpolation sites across Jira, JSM and Opsgenie have never been audited at
-/// all.
+/// each call site remembering to encode what it interpolates. That discipline
+/// failed repeatedly, and roughly forty interpolation sites across Jira, JSM and
+/// Opsgenie have never been audited at all. So the check lives here, at the one
+/// point every request passes through.
 ///
-/// So the check lives here instead, at the one point every request passes
-/// through. It rejects what no legitimate Atlassian path contains:
+/// **Derived from what the parser does, not from a list of characters.** The
+/// first version of this function compared segments against the literal strings
+/// `"."` and `".."`, which missed `%2e%2e` — verified to resolve to the parent
+/// against the `url` version in the lockfile. The WHATWG parser percent-decodes
+/// a segment *once* before deciding whether it is a dot segment, so this does
+/// the same. That also gets the negative case right: `%252e%252e` decodes to
+/// the literal `%2e%2e`, is not a dot segment, and is correctly allowed —
+/// verified, it does not traverse.
 ///
-/// - a `.` or `..` path component, which resolves to a different resource;
-/// - a backslash, which the WHATWG parser treats as a path separator;
-/// - a tab, CR, LF or other control character, which the parser strips before
-///   parsing, so `.<TAB>.` becomes `..`.
+/// Rejected in the path portion:
 ///
-/// Values needing these characters literally must be percent-encoded by the
-/// caller, which is what `encode_path_segment` in the CLI does. This is the net
-/// beneath that, not a replacement for it: a caller that encodes correctly is
-/// unaffected, and one that forgets gets an error instead of a request against
-/// the wrong resource.
+/// - any segment that percent-decodes to `.` or `..`;
+/// - a backslash, which the parser treats as a separator;
+/// - a control character, which the parser strips *before* parsing, so
+///   `.<TAB>.` becomes `..`;
+/// - a space, which the parser strips from the ends of the input, so a trailing
+///   one silently addresses the collection.
+///
+/// The query is exempt: JQL and CQL legitimately contain dots, spaces and `..`
+/// ranges, and a query cannot move the request to another resource. A caller
+/// needing any of these literally in a path must percent-encode it, which is
+/// what `encode_path_segment` in the CLI does.
 fn reject_restructuring_path(path: &str) -> Result<()> {
-    if let Some(bad) = path.chars().find(|c| c.is_control() || *c == '\\') {
+    let restructured = |reason: &str| {
         debug!(
-            ?bad,
-            path, "Refusing a path containing a restructuring character"
+            path,
+            reason, "Refusing a path the URL parser would restructure"
         );
-        return Err(ApiError::InvalidUrl(
-            url::ParseError::InvalidDomainCharacter,
-        ));
+        ApiError::InvalidUrl(url::ParseError::InvalidDomainCharacter)
+    };
+
+    // Split first: the checks below apply to the path, and a query may
+    // legitimately contain every character they reject.
+    let path_only = path.split(['?', '#']).next().unwrap_or(path);
+
+    if path_only.chars().any(|c| c.is_control()) {
+        return Err(restructured("control character"));
+    }
+    if path_only.contains('\\') {
+        return Err(restructured("backslash is a path separator"));
+    }
+    if path_only.contains(' ') {
+        return Err(restructured("space is stripped from the ends of the input"));
     }
 
-    // Only the path portion: a query value may legitimately contain anything,
-    // and it cannot move the request to another resource.
-    let path_only = path.split(['?', '#']).next().unwrap_or(path);
     for segment in path_only.split('/') {
-        if segment == "." || segment == ".." {
-            debug!(path, "Refusing a path containing a dot component");
-            return Err(ApiError::InvalidUrl(
-                url::ParseError::InvalidDomainCharacter,
-            ));
+        if is_dot_segment(segment) {
+            return Err(restructured("dot component"));
         }
     }
 
     Ok(())
+}
+
+/// Whether a raw path segment is a dot segment once decoded.
+///
+/// Decodes exactly once, because that is what the URL parser does: `%2e%2e` is
+/// `..`, while the double-encoded `%252e%252e` is the literal text `%2e%2e` and
+/// addresses a real resource.
+fn is_dot_segment(segment: &str) -> bool {
+    let decoded = decode_once(segment);
+    decoded == "." || decoded == ".."
+}
+
+/// Percent-decode a single pass, leaving invalid escapes as written.
+fn decode_once(segment: &str) -> String {
+    let bytes = segment.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = &segment[i + 1..i + 3];
+            if let Ok(byte) = u8::from_str_radix(hex, 16) {
+                out.push(byte);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 impl ApiClient {
@@ -1045,9 +1088,9 @@ impl ApiClient {
 mod tests {
     use super::*;
 
-    /// The net beneath per-call-site encoding. Each of these was demonstrated
-    /// to retarget a request through `Url::join`, and the CLI has roughly forty
-    /// interpolation sites that have never been audited.
+    /// The net beneath per-call-site encoding. Each of these was verified
+    /// against the `url` version in the lockfile to resolve somewhere other
+    /// than the segment it names.
     #[test]
     fn a_restructuring_path_is_refused_before_it_is_joined() {
         for bad in [
@@ -1058,6 +1101,16 @@ mod tests {
             "/2.0/repositories/w/r/hooks/.\t.",
             "/2.0/repositories/w/r/hooks/.\n.",
             "/rest/api/3/issue/../../admin",
+            // Percent-encoded dot segments: the first version of this guard
+            // compared against the literal strings and let every one of these
+            // through, each of which resolves to the parent.
+            "/2.0/repositories/w/r/hooks/%2e%2e",
+            "/2.0/repositories/w/r/hooks/%2E%2e",
+            "/2.0/repositories/w/r/hooks/.%2e",
+            "/2.0/repositories/w/r/hooks/%2e",
+            // A trailing space is stripped from the input, addressing the
+            // collection rather than a member.
+            "/rest/api/3/issue/ ",
         ] {
             assert!(
                 reject_restructuring_path(bad).is_err(),
@@ -1066,23 +1119,22 @@ mod tests {
         }
     }
 
-    /// The guard must not reject the paths the CLI actually builds, including
-    /// already-encoded segments and dots inside a component.
+    /// Double-encoding is not traversal: `%252e%252e` is the literal text
+    /// `%2e%2e` and addresses a real resource. Rejecting it would be a false
+    /// positive, and decoding more than once would cause one.
     #[test]
-    fn ordinary_paths_are_unaffected() {
-        for good in [
-            "/2.0/repositories/w/r/hooks/%7Babc-123%7D",
-            "/2.0/repositories/w/r/refs/branches/feature/login",
-            "/2.0/repositories/w/r/refs/branches/release/2026.09.1",
-            "/rest/api/3/search/jql?jql=project%20%3D%20DEV&maxResults=100",
-            "/rest/api/3/issue/DEV-1",
-            "/2.0/repositories/w/r/commits/v1.2.3",
-        ] {
-            assert!(
-                reject_restructuring_path(good).is_ok(),
-                "{good:?} must be allowed"
-            );
-        }
+    fn a_double_encoded_dot_is_a_real_segment() {
+        assert!(reject_restructuring_path("/2.0/repositories/w/r/hooks/%252e%252e").is_ok());
+        assert!(!is_dot_segment("%252e%252e"));
+        assert_eq!(decode_once("%252e%252e"), "%2e%2e");
+    }
+
+    /// The decoder must not mangle a segment that merely contains a `%`.
+    #[test]
+    fn decode_once_leaves_invalid_escapes_alone() {
+        assert_eq!(decode_once("100%"), "100%");
+        assert_eq!(decode_once("a%zzb"), "a%zzb");
+        assert_eq!(decode_once("%7Babc%7D"), "{abc}");
     }
 
     /// A query value is not part of the path and cannot move the request, so

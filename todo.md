@@ -2622,3 +2622,44 @@ of a request against the wrong resource. Every previously demonstrated bypass
 command built the path, including the forty sites this work never touched.
 
 897 tests across 32 suites, clippy clean.
+
+### The choke point, derived from the parser this time
+
+The fifth round found the same failure in the guard the fourth round was meant
+to end: it compared segments against the literal strings `"."` and `".."`, so
+`%2e%2e` went straight through. Verified against the lockfile's `url`:
+
+```
+hooks/%2e%2e  -> /2.0/repositories/w/r/     (the repository endpoint)
+hooks/%2E%2e  -> /2.0/repositories/w/r/
+hooks/.%2e    -> /2.0/repositories/w/r/
+hooks/%252e%252e -> hooks/%252e%252e        (does NOT traverse)
+```
+
+Enumerating spellings is what kept failing. The rule is now taken from what the
+parser does: it percent-decodes a segment **once** before deciding, so
+`is_dot_segment` decodes once and compares. That gets the negative case right
+too — `%252e%252e` decodes to the literal `%2e%2e`, is a real resource, and is
+correctly allowed. Decoding twice would have introduced a false rejection while
+fixing a false negative.
+
+Also now rejected in the path: a raw space, because the parser strips spaces
+from the ends of the input, so `/rest/api/3/issue/ ` addresses the collection.
+
+**A second unconfirmed-delete path closed.** `bb webhook delete` and
+`bb ssh-key delete` encoded the uuid but interpolated `{repo_slug}` raw, so a
+slug of `r#x` truncated the path to the repository endpoint — turning a command
+with no confirmation prompt into a repository delete. Both now encode the
+workspace and slug as well.
+
+**False-rejection sweep re-run against the stricter guard**: of 217 literal
+request paths in the CLI, 216 pass and the one flagged is prose, not a path
+(`workspaces.rs:370`, the bearer `whoami` note). No legitimate path is refused.
+
+Corrections to the previous entry, which overstated: "only the path portion is
+examined" was false — the control and backslash checks ran on the whole string,
+which refused a legitimate `jira api` query containing a backslash. The split
+now happens first. And "every bypass demonstrated over the previous rounds is
+refused" was false: `?` injection and the bare space survived at raw sites.
+
+898 tests across 32 suites, clippy clean.
