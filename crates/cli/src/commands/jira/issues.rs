@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, JiraPage, PageLimits};
 use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -123,33 +124,34 @@ pub async fn search_issues(
         return super::field_selection::search_rows(ctx, &final_jql, limit, fields).await;
     }
 
-    #[derive(Deserialize)]
-    struct SearchResponse {
-        issues: Vec<Issue>,
-        #[allow(dead_code)]
-        #[serde(rename = "isLast")]
-        is_last: Option<bool>,
-        #[allow(dead_code)]
-        #[serde(rename = "nextPageToken")]
-        next_page_token: Option<String>,
-    }
-
-    let max_results = limit.min(1000);
+    // `isLast` and `nextPageToken` used to be parsed here and then marked
+    // `#[allow(dead_code)]`, so a search returning exactly the server's cap was
+    // indistinguishable from a complete result. Jira caps `maxResults` at 100
+    // server-side whatever is asked for, so `--limit 250` silently returned 100.
+    let page_size = limit.clamp(1, 100);
     let query = format!(
-        "/rest/api/3/search/jql?jql={}&maxResults={}&fields=key,summary,status,assignee,issuetype",
+        "/rest/api/3/search/jql?jql={}&maxResults={page_size}&fields=key,summary,status,assignee,issuetype",
         urlencoding::encode(&final_jql),
-        max_results
     );
 
-    let response: SearchResponse = ctx
-        .client
-        .get(&query)
-        .await
-        .context("Failed to execute search")?;
+    let (issues, page) =
+        fetch_paged::<JiraPage<Issue>>(&ctx.client, &query, PageLimits::new(Some(limit)))
+            .await
+            .context("Failed to execute search")?;
 
-    if response.issues.is_empty() {
+    if issues.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No issues found");
+    }
+
+    if page.truncated {
+        // stderr, so a piped `-f json` result stays machine-readable. The
+        // envelope carries this properly in the next release; until then a
+        // visible warning still beats an authoritative-looking wrong answer.
+        eprintln!(
+            "warning: showing {} issues; more match this query. Raise --limit, or use --limit 0 for all.",
+            issues.len()
+        );
     }
 
     #[derive(Serialize)]
@@ -161,8 +163,7 @@ pub async fn search_issues(
         issue_type: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .issues
+    let rows: Vec<Row<'_>> = issues
         .iter()
         .map(|issue| Row {
             key: issue.key.as_str(),

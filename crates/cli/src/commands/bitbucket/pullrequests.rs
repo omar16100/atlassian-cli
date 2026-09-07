@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
@@ -635,17 +636,21 @@ pub async fn list_pr_comments(
     repo_slug: &str,
     pr_id: i64,
 ) -> Result<()> {
-    #[derive(Deserialize)]
-    struct CommentList {
-        values: Vec<Comment>,
-    }
+    // Was a single unpaginated GET, and Bitbucket serves 20 comments per page by
+    // default, so any busier pull request was silently cut short.
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments?pagelen=100"
+    );
+    let (comments, _) =
+        fetch_paged::<BitbucketPage<Comment>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}"
+                )
+            })?;
 
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
-    let response: CommentList = ctx.client.get(&path).await.with_context(|| {
-        format!("Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}")
-    })?;
-
-    let rows: Vec<CommentRow<'_>> = response.values.iter().map(comment_row).collect();
+    let rows: Vec<CommentRow<'_>> = comments.iter().map(comment_row).collect();
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, "No comments found");

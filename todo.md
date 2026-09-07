@@ -2065,3 +2065,36 @@ Benches repointed from the deleted `PagedResponse` arithmetic to what the path
 now actually does per page.
 
 851 tests across 30 suites, clippy clean.
+
+### Step 3: the truncation sites wired to `fetch_paged`
+
+All the silent-truncation findings, in the order the plan set.
+
+- **`bulk.rs` first**, both functions. These drive deletions and feature
+  disabling, so an incomplete list is an **error** here rather than a labelled
+  truncation: "these are the branches, probably" is not something to confirm
+  against. Removing the accidental 100-item cap was only safe because the
+  confirmation gate landed first.
+- **All three `/steps/` sites** (finding 1): `fetch_steps`, `get_pipeline_logs`,
+  and `pipeline_has_failed_steps`. The last one decides `--wait` exit status, so
+  a failure on page two used to be invisible.
+- **Both Jira search paths** (finding 2). `search_issues` parsed `isLast` and
+  `nextPageToken` and then ignored them; `search_rows` (the `--fields` path)
+  never parsed them at all. Jira caps `maxResults` at 100 server-side whatever
+  is sent, so `--limit 250` returned 100 in silence. Truncation now warns on
+  stderr, which keeps a piped `-f json` result machine-readable; the envelope
+  carries it properly in 0.9.0.
+- **`pr comments`** (finding 16), which Bitbucket serves 20 at a time.
+
+New `crates/cli/tests/pagination_e2e.rs` drives the built binary against a mock
+Jira, covering both search paths, the truncation warning, and the guarantee that
+a *complete* result does not claim to be truncated.
+
+**A verification of mine was vacuous and I nearly recorded it as real.** To check
+the e2e test could fail, I patched `PageLimits` to a one-page budget with a
+Python string replace -- but `cargo fmt` had already collapsed that call onto one
+line, so the pattern matched nothing, the binary was unchanged, and the test
+"passed". Redone with an assertion that the edit applied: it then failed with
+"DEV-3 missing -- the second page was dropped", and passed again once restored.
+
+857 tests across 31 suites, clippy clean.

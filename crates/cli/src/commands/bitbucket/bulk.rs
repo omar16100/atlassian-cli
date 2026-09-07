@@ -1,13 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
 use super::utils::{encode_ref_path, BitbucketContext};
 use crate::commands::common::confirm_destructive;
-
-#[derive(Deserialize)]
-struct RepositoryList {
-    values: Vec<Repository>,
-}
 
 #[derive(Deserialize)]
 struct Repository {
@@ -15,11 +11,6 @@ struct Repository {
     name: String,
     #[serde(default)]
     updated_on: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct BranchList {
-    values: Vec<Branch>,
 }
 
 #[derive(Deserialize)]
@@ -84,8 +75,9 @@ pub(crate) fn is_stale(
 /// rails are what changed: listing is the default, `--execute` performs the
 /// change, and `--execute` needs the workspace typed back or `--yes`.
 ///
-/// Like every other list in this file, it examines only the first 100
-/// repositories. Pagination is sequenced after the safety work.
+/// The listing is followed to completion; a list that cannot be completed
+/// within the request budget is an error rather than a silent truncation,
+/// because it drives mutations.
 pub async fn disable_features_on_stale_repos(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -94,11 +86,19 @@ pub async fn disable_features_on_stale_repos(
     assume_yes: bool,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}?pagelen=100");
-    let response: RepositoryList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list repositories in workspace {workspace}"))?;
+    let (repositories, page) =
+        fetch_paged::<BitbucketPage<Repository>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to list repositories in workspace {workspace}"))?;
+
+    // Same reasoning as delete_branches: this list drives mutations.
+    if page.truncated {
+        bail!(
+            "Refusing to continue: only {} repositories could be listed before the request \
+             budget ran out, so the set shown would be incomplete.",
+            repositories.len()
+        );
+    }
 
     let now = chrono::Utc::now();
 
@@ -110,8 +110,7 @@ pub async fn disable_features_on_stale_repos(
         action: &'a str,
     }
 
-    let targets: Vec<&Repository> = response
-        .values
+    let targets: Vec<&Repository> = repositories
         .iter()
         .filter(|repo| is_stale(repo.updated_on.as_deref(), now, days_threshold))
         .collect();
@@ -122,7 +121,6 @@ pub async fn disable_features_on_stale_repos(
             &format!(
                 "About to disable the issue tracker and wiki on {} repositor(ies) in {workspace}.\n\
                  This is not archiving: existing issues and wiki pages become inaccessible.\n\
-                 Only the first 100 repositories were examined.\n\
                  Re-run without --execute to list them first.",
                 targets.len()
             ),
@@ -222,11 +220,11 @@ pub(crate) fn is_protected(name: &str, exclude_patterns: &[String]) -> bool {
 /// command deletes every branch that is not in `PROTECTED_BRANCHES` and not
 /// matched by `--exclude`, which includes live feature and release branches.
 ///
-/// It also examines only the first 100 branches: the request sets `pagelen=100`
-/// and never follows `next`. The listing, the confirmation count and the
-/// deletions are all capped at that first page. Fixing this is deliberately
-/// sequenced after the safety gate, because removing the cap without the gate
-/// would have widened the blast radius rather than narrowing it.
+/// The listing is now followed to completion rather than capped at the first
+/// page. That cap was previously the only bound on the blast radius, which is
+/// why the safety gate landed first: removing it before the gate existed would
+/// have widened the damage rather than narrowing it. A list that cannot be
+/// completed within the request budget is an error here, not a truncation.
 ///
 /// Rather than quietly narrow a command people may already depend on, the
 /// behaviour is unchanged and the safety rails are what changed:
@@ -248,11 +246,21 @@ pub async fn delete_branches(
     assume_yes: bool,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches?pagelen=100");
-    let response: BranchList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list branches for {workspace}/{repo_slug}"))?;
+    let (branches, page) =
+        fetch_paged::<BitbucketPage<Branch>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to list branches for {workspace}/{repo_slug}"))?;
+
+    // Everywhere else a truncated list is labelled and rendered. Here it is an
+    // error: an incomplete branch list feeds deletions, and "these are the
+    // branches, probably" is not something to confirm against.
+    if page.truncated {
+        bail!(
+            "Refusing to continue: only {} branches could be listed before the request \
+             budget ran out, so the set shown would be incomplete.",
+            branches.len()
+        );
+    }
 
     #[derive(Serialize)]
     struct DeletableBranch<'a> {
@@ -261,8 +269,7 @@ pub async fn delete_branches(
         action: &'a str,
     }
 
-    let targets: Vec<&Branch> = response
-        .values
+    let targets: Vec<&Branch> = branches
         .iter()
         .filter(|branch| !is_protected(&branch.name, &exclude_patterns))
         .collect();
@@ -274,7 +281,6 @@ pub async fn delete_branches(
             &format!(
                 "About to delete {} branch(es) from {workspace}/{repo_slug}.\n\
                  Merge status is NOT checked: unmerged branches will be deleted.\n\
-                 Only the first 100 branches were examined.\n\
                  Re-run without --execute to list them first.",
                 targets.len()
             ),
@@ -546,6 +552,92 @@ mod tests {
             .unwrap();
 
         assert_eq!(put_count(&server).await, 1, "only the stale repository");
+    }
+
+    /// The truncation defect this branch set out to fix, on the destructive
+    /// path: a second page of branches must be seen, not silently dropped.
+    #[tokio::test]
+    async fn every_page_of_branches_is_listed() {
+        let server = MockServer::start().await;
+        let page_two = format!(
+            "{}/2.0/repositories/ws/repo/refs/branches?page=2",
+            server.uri()
+        );
+
+        Mock::given(method("GET"))
+            .and(path_regex(r".*/refs/branches$"))
+            .and(wiremock::matchers::query_param("page", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "values": [{"name": "second-page", "target": {"date": "2026-01-01"}}]
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(r".*/refs/branches$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "values": [{"name": "first-page", "target": {"date": "2026-01-01"}}],
+                "next": page_two
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("DELETE"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = ctx_for(&server, &renderer);
+
+        delete_branches(&ctx, "ws", "repo", vec![], true, true)
+            .await
+            .unwrap();
+
+        let deleted = delete_paths(&server).await;
+        assert_eq!(deleted.len(), 2, "both pages must be acted on: {deleted:?}");
+        assert!(deleted.iter().any(|p| p.ends_with("/second-page")));
+    }
+
+    /// A list that cannot be completed must abort rather than confirm against a
+    /// partial set. Everywhere else truncation is a label; here it is an error.
+    #[tokio::test]
+    async fn an_incompletable_branch_list_refuses_to_delete() {
+        let server = MockServer::start().await;
+        let forever = format!(
+            "{}/2.0/repositories/ws/repo/refs/branches?page=next",
+            server.uri()
+        );
+
+        Mock::given(method("GET"))
+            .and(path_regex(r".*/refs/branches$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "values": [{"name": "a", "target": {"date": "2026-01-01"}}],
+                "next": forever
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("DELETE"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = ctx_for(&server, &renderer);
+
+        let err = delete_branches(&ctx, "ws", "repo", vec![], true, true)
+            .await
+            .expect_err("an incomplete listing must not proceed to deletion");
+
+        assert!(
+            format!("{err:#}").contains("Refusing to continue"),
+            "unexpected error: {err:#}"
+        );
+        assert!(
+            delete_paths(&server).await.is_empty(),
+            "nothing may be deleted from an incomplete list"
+        );
     }
 
     /// The single most important test in this file. If someone makes deletion
