@@ -35,11 +35,47 @@ struct Target {
     date: Option<String>,
 }
 
-pub async fn archive_stale_repos(
+/// Decide whether a repository counts as stale.
+///
+/// Extracted so the threshold arithmetic is testable without HTTP or a clock.
+/// A repository with no `updated_on` is never stale: absent data is not
+/// evidence of disuse, and treating it as such would mutate repositories on the
+/// strength of a missing field.
+pub(crate) fn is_stale(
+    updated_on: Option<&str>,
+    now: chrono::DateTime<chrono::Utc>,
+    days: i64,
+) -> bool {
+    let Some(updated) = updated_on else {
+        return false;
+    };
+    let Ok(updated_date) = chrono::DateTime::parse_from_rfc3339(updated) else {
+        return false;
+    };
+    now.signed_duration_since(updated_date) > chrono::Duration::days(days)
+}
+
+/// Disable the issue tracker and wiki on stale repositories.
+///
+/// This was called "archive stale repositories" and reported `archived`. It
+/// does not archive anything: Bitbucket Cloud has no repository archive API,
+/// and the `PUT` sets only `has_issues: false` and `has_wiki: false`. The
+/// label described an operation that never happened, while the operation that
+/// did happen — turning off two features, hiding any issues and wiki pages
+/// filed in them — went unnamed.
+///
+/// As with `delete_branches`, the behaviour is kept and the description and
+/// rails are what changed: listing is the default, `--execute` performs the
+/// change, and `--execute` needs the workspace typed back or `--yes`.
+///
+/// Like every other list in this file, it examines only the first 100
+/// repositories. Pagination is sequenced after the safety work.
+pub async fn disable_features_on_stale_repos(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
     days_threshold: i64,
-    dry_run: bool,
+    execute: bool,
+    assume_yes: bool,
 ) -> Result<()> {
     let path = format!("/2.0/repositories/{workspace}?pagelen=100");
     let response: RepositoryList = ctx
@@ -49,7 +85,6 @@ pub async fn archive_stale_repos(
         .with_context(|| format!("Failed to list repositories in workspace {workspace}"))?;
 
     let now = chrono::Utc::now();
-    let threshold = chrono::Duration::days(days_threshold);
 
     #[derive(Serialize)]
     struct StaleRepo<'a> {
@@ -59,56 +94,92 @@ pub async fn archive_stale_repos(
         action: &'a str,
     }
 
-    let mut stale_repos = Vec::new();
+    let targets: Vec<&Repository> = response
+        .values
+        .iter()
+        .filter(|repo| is_stale(repo.updated_on.as_deref(), now, days_threshold))
+        .collect();
 
-    for repo in &response.values {
-        if let Some(updated) = &repo.updated_on {
-            if let Ok(updated_date) = chrono::DateTime::parse_from_rfc3339(updated) {
-                let age = now.signed_duration_since(updated_date);
-                if age > threshold {
-                    stale_repos.push(StaleRepo {
-                        slug: repo.slug.as_str(),
-                        name: repo.name.as_str(),
-                        last_updated: updated,
-                        action: if dry_run { "would archive" } else { "archived" },
-                    });
-
-                    if !dry_run {
-                        let update_path = format!("/2.0/repositories/{workspace}/{}", repo.slug);
-                        let payload = serde_json::json!({
-                            "has_issues": false,
-                            "has_wiki": false,
-                        });
-
-                        let _: serde_json::Value = ctx
-                            .client
-                            .put(&update_path, &payload)
-                            .await
-                            .with_context(|| {
-                                format!("Failed to archive repository {}", repo.slug)
-                            })?;
-
-                        tracing::info!(
-                            repo_slug = repo.slug.as_str(),
-                            workspace,
-                            "Repository archived"
-                        );
-                    }
-                }
-            }
-        }
+    if execute && !assume_yes && !targets.is_empty() {
+        confirm_destructive(
+            workspace,
+            &format!(
+                "About to disable the issue tracker and wiki on {} repositor(ies) in {workspace}.\n\
+                 This is not archiving: existing issues and wiki pages become inaccessible.\n\
+                 Only the first 100 repositories were examined.\n\
+                 Re-run without --execute to list them first.",
+                targets.len()
+            ),
+        )?;
     }
 
-    if dry_run {
-        println!(
-            "DRY RUN - No changes made. Found {} stale repositories:",
-            stale_repos.len()
+    let mut rows = Vec::with_capacity(targets.len());
+    let mut failure: Option<anyhow::Error> = None;
+
+    for repo in targets {
+        if execute {
+            let update_path = format!("/2.0/repositories/{workspace}/{}", repo.slug);
+            let payload = serde_json::json!({
+                "has_issues": false,
+                "has_wiki": false,
+            });
+
+            let result: Result<serde_json::Value> = ctx
+                .client
+                .put(&update_path, &payload)
+                .await
+                .with_context(|| format!("Failed to disable features on repository {}", repo.slug));
+
+            // Same reasoning as delete_branches: report what already changed
+            // rather than aborting with only the failing name.
+            if let Err(err) = result {
+                failure = Some(err);
+                break;
+            }
+
+            tracing::info!(
+                repo_slug = repo.slug.as_str(),
+                workspace,
+                "Issue tracker and wiki disabled"
+            );
+        }
+
+        rows.push(StaleRepo {
+            slug: repo.slug.as_str(),
+            name: repo.name.as_str(),
+            last_updated: repo.updated_on.as_deref().unwrap_or(""),
+            action: if execute {
+                "issues and wiki disabled"
+            } else {
+                "would disable issues and wiki"
+            },
+        });
+    }
+
+    if let Some(err) = failure {
+        if !rows.is_empty() {
+            eprintln!(
+                "Stopped after an error. {} repositor(ies) were already changed:",
+                rows.len()
+            );
+            ctx.renderer.render_list(&rows)?;
+        }
+        return Err(err);
+    }
+
+    if !execute && !rows.is_empty() {
+        eprintln!(
+            "Listing only. {} repositor(ies) match. Pass --execute to disable \
+             their issue tracker and wiki.",
+            rows.len()
         );
     }
 
     ctx.renderer.render_list_or_empty(
-        &stale_repos,
-        "No stale repositories found (threshold: {days_threshold} days)",
+        &rows,
+        // Was a plain string containing a literal `{days_threshold}`, which
+        // printed verbatim because it was never a format string.
+        &format!("No stale repositories found (threshold: {days_threshold} days)"),
     )
 }
 
@@ -344,6 +415,91 @@ mod tests {
             .filter(|r| r.method == wiremock::http::Method::DELETE)
             .map(|r| r.url.path().to_string())
             .collect()
+    }
+
+    /// A repository with no `updated_on` must never be treated as stale:
+    /// acting on a missing field would mutate repositories on no evidence.
+    #[test]
+    fn missing_updated_on_is_never_stale() {
+        let now = chrono::Utc::now();
+        assert!(!is_stale(None, now, 180));
+        assert!(!is_stale(Some("not-a-date"), now, 180));
+    }
+
+    #[test]
+    fn staleness_compares_against_the_threshold() {
+        let now = chrono::Utc::now();
+        let old = (now - chrono::Duration::days(200)).to_rfc3339();
+        let recent = (now - chrono::Duration::days(10)).to_rfc3339();
+        assert!(is_stale(Some(&old), now, 180));
+        assert!(!is_stale(Some(&recent), now, 180));
+    }
+
+    async fn server_with_repos(slugs_and_dates: &[(&str, String)]) -> MockServer {
+        let server = MockServer::start().await;
+        let values: Vec<_> = slugs_and_dates
+            .iter()
+            .map(|(slug, date)| {
+                serde_json::json!({ "slug": slug, "name": slug, "updated_on": date })
+            })
+            .collect();
+
+        Mock::given(method("GET"))
+            .and(path_regex(r"^/2\.0/repositories/[^/]+$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "values": values
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+            .mount(&server)
+            .await;
+
+        server
+    }
+
+    async fn put_count(server: &MockServer) -> usize {
+        server
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|r| r.method == wiremock::http::Method::PUT)
+            .count()
+    }
+
+    /// The archive-repos equivalent of the gate test below: without --execute
+    /// nothing is mutated.
+    #[tokio::test]
+    async fn stale_repo_listing_mutates_nothing() {
+        let old = (chrono::Utc::now() - chrono::Duration::days(400)).to_rfc3339();
+        let server = server_with_repos(&[("dusty", old)]).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = ctx_for(&server, &renderer);
+
+        disable_features_on_stale_repos(&ctx, "ws", 180, false, false)
+            .await
+            .unwrap();
+
+        assert_eq!(put_count(&server).await, 0, "listing must not PUT");
+    }
+
+    #[tokio::test]
+    async fn execute_disables_features_only_on_stale_repos() {
+        let now = chrono::Utc::now();
+        let old = (now - chrono::Duration::days(400)).to_rfc3339();
+        let fresh = (now - chrono::Duration::days(3)).to_rfc3339();
+        let server = server_with_repos(&[("dusty", old), ("busy", fresh)]).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = ctx_for(&server, &renderer);
+
+        disable_features_on_stale_repos(&ctx, "ws", 180, true, true)
+            .await
+            .unwrap();
+
+        assert_eq!(put_count(&server).await, 1, "only the stale repository");
     }
 
     /// The single most important test in this file. If someone makes deletion

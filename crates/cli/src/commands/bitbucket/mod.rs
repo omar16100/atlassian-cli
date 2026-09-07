@@ -927,13 +927,26 @@ enum CommitCommands {
 
 #[derive(Subcommand, Debug, Clone)]
 enum BulkCommands {
-    /// Archive stale repositories.
+    /// Disable the issue tracker and wiki on stale repositories.
+    ///
+    /// Despite the command name, this does NOT archive: Bitbucket Cloud has no
+    /// repository archive API. It sets has_issues and has_wiki to false, which
+    /// makes any existing issues and wiki pages inaccessible. Only the first
+    /// 100 repositories are examined. Lists candidates by default; pass
+    /// --execute to apply.
     ArchiveRepos {
         /// Days threshold for staleness.
         #[arg(long, default_value_t = 180)]
         days: i64,
-        /// Dry run mode.
+        /// Apply the change. Without this, candidates are only listed.
         #[arg(long)]
+        execute: bool,
+        /// Skip the typed confirmation required by --execute.
+        #[arg(long)]
+        yes: bool,
+        /// Deprecated: listing is now the default. Cannot be combined with
+        /// --execute, which it would otherwise silently override.
+        #[arg(long, hide = true, conflicts_with = "execute")]
         dry_run: bool,
     },
     /// Delete branches by name. Does NOT check merge status.
@@ -1724,8 +1737,16 @@ pub async fn execute(
             }
         },
         BitbucketCommands::Bulk(cmd) => match cmd {
-            BulkCommands::ArchiveRepos { days, dry_run } => {
-                bulk::archive_stale_repos(&ctx, &workspace, days, dry_run).await
+            BulkCommands::ArchiveRepos {
+                days,
+                execute,
+                yes,
+                dry_run,
+            } => {
+                // See the DeleteBranches arm: clap already rejects the pair, and
+                // the `&&` keeps --dry-run a veto if that guard is ever removed.
+                let execute = execute && !dry_run;
+                bulk::disable_features_on_stale_repos(&ctx, &workspace, days, execute, yes).await
             }
             BulkCommands::DeleteBranches {
                 repo,

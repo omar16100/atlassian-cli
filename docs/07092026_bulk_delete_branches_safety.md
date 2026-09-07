@@ -1,4 +1,4 @@
-# `bb bulk delete-branches`: honest naming and a confirmation gate
+# `bb bulk`: honest naming and confirmation gates
 
 Status: in progress on `feat/cli-feedback-remediation`.
 
@@ -125,20 +125,45 @@ data loss, the deletions that did happen are the most important thing to print.
   branches. That is deliberate sequencing: the safety gate lands first, and
   pagination follows in a later step of the remediation plan.
 
-## Related, not fixed here
+## The same class, in the same file: `archive-repos`
 
-`archive_stale_repos` in the same file has the same class of defect. It reports
-`"archived"` but issues a `PUT` setting only `has_issues: false` and
-`has_wiki: false`, which disables the issue tracker and wiki rather than
-archiving anything. The label does not match the action. Tracked in the
-remediation plan.
+`archive_stale_repos` reported `"archived"` and archived nothing. Bitbucket
+Cloud has no repository archive API; the `PUT` set only `has_issues: false` and
+`has_wiki: false`. The label named an operation that never happened, while the
+operation that did happen — turning off two features, making any issues and wiki
+pages filed in them inaccessible — went unnamed.
+
+Treated the same way, for the same reason:
+
+- Renamed to `disable_features_on_stale_repos`. The `archive-repos` subcommand
+  name is kept, because renaming the CLI surface is a breaking change; its help
+  text now opens with "Despite the command name, this does NOT archive".
+- The reported action is `issues and wiki disabled`, not `archived`.
+- Listing is the default; `--execute` applies; `--execute` needs the workspace
+  typed back or `--yes`.
+- Partial failures are rendered before the error, as above.
+
+Two further bugs fixed while there:
+
+- The empty message was a plain string containing a literal `{days_threshold}`,
+  never a `format!`, so it printed the placeholder verbatim.
+- Staleness is extracted as `is_stale`, which now treats a **missing
+  `updated_on` as not stale**. The old inline logic did the same by accident,
+  via nested `if let`, but nothing recorded the intent or tested it. Acting on
+  an absent field would mutate repositories on no evidence.
+
+Renaming the `archive-repos` subcommand to match what it does is a candidate
+for the next breaking release.
 
 ## Tests
 
-16 new tests. **810 pass across 29 suites, against a 794-test baseline on
+20 new tests. **814 pass across 29 suites, against a 794-test baseline on
 `main`.** `cargo clippy --workspace --all-targets -- -D warnings` is clean.
 
 Selection rules, in `bitbucket/bulk.rs` — fast, no HTTP:
+
+- `missing_updated_on_is_never_stale`
+- `staleness_compares_against_the_threshold`
 
 - `protected_branches_are_never_selected`
 - `exclude_patterns_match_as_substrings`
@@ -155,6 +180,9 @@ the existing pattern in `bitbucket/pullrequests.rs`:
 - `execute_with_yes_deletes_only_unprotected_branches`
 - `exclude_patterns_are_honoured_under_execute`
 - `a_hash_in_a_branch_name_cannot_delete_the_protected_ref`
+- `stale_repo_listing_mutates_nothing` — the `archive-repos` equivalent: no
+  `PUT` without `--execute`
+- `execute_disables_features_only_on_stale_repos`
 
 Path encoding, in `bitbucket/utils.rs`:
 

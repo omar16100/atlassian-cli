@@ -1910,3 +1910,25 @@ Fable review of the diff confirmed the gate logic (no path deletes without
 critical tests verified to FAIL against deliberately reverted code:
 `encode_ref_path` removed breaks the hash test, `if execute` → `if true` breaks
 the listing test.
+
+### `archive-repos` had the same mislabelling defect
+
+`archive_stale_repos` reported "archived" and archived nothing: Bitbucket Cloud
+has no repository archive API, and the PUT set only `has_issues: false` /
+`has_wiki: false`. The label named an operation that never happened; the one
+that did (hiding existing issues and wiki pages) went unnamed.
+
+Renamed to `disable_features_on_stale_repos` with the same rails as
+delete-branches: listing default, `--execute`, typed workspace confirmation or
+`--yes`, partial failures rendered before the error. The `archive-repos`
+subcommand name is kept because renaming the CLI surface is breaking; help now
+opens "Despite the command name, this does NOT archive". Renaming it is a 0.9.0
+candidate.
+
+Also fixed: the empty message was a plain string containing a literal
+`{days_threshold}` (never a format!), so it printed the placeholder verbatim.
+Staleness extracted as `is_stale`, which treats a missing `updated_on` as not
+stale — the old nested `if let` did this by accident with nothing recording the
+intent.
+
+814 tests pass, clippy clean under -D warnings.

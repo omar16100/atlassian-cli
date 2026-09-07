@@ -45,7 +45,7 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 
 | Document | Date | What it covers |
 | --- | --- | --- |
-| [07092026_bulk_delete_branches_safety.md](07092026_bulk_delete_branches_safety.md) | 2026-09-07 | `bb bulk delete-branches` deleted unmerged branches: honest naming, listing by default, `--execute` plus typed confirmation |
+| [07092026_bulk_delete_branches_safety.md](07092026_bulk_delete_branches_safety.md) | 2026-09-07 | `bb bulk` deleted unmerged branches and mislabelled a feature-disable as archiving: honest naming, listing by default, `--execute` plus typed confirmation, and ref-name path encoding |
 | [28082026_wiki_base_url_normalisation.md](28082026_wiki_base_url_normalisation.md) | 2026-08-28 | A `/wiki` base URL no longer doubles the segment: site-root normalisation for Jira, Confluence and JSM clients |
 | [26082026_jira_field_selection.md](26082026_jira_field_selection.md) | 2026-08-26 | `--fields` on `jira issue get` and `search`: ids or display names, ordered columns, and ordered rendering in `crates/output` |
 | [26082026_auth_product_dispatch.md](26082026_auth_product_dispatch.md) | 2026-08-26 | `auth whoami`/`test`/`status` dispatch on the profile's product, the `--space` filter fix, and 401s that keep the server's reason |
