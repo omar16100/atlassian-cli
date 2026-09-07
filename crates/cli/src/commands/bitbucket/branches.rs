@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::BitbucketContext;
+use super::utils::{encode_ref_path, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
@@ -111,7 +111,10 @@ pub async fn get_branch(
     repo_slug: &str,
     branch_name: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{branch_name}");
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
+        encode_ref_path(branch_name)
+    );
     let branch: Branch = ctx.client.get(&path).await.with_context(|| {
         format!("Failed to fetch branch {branch_name} from {workspace}/{repo_slug}")
     })?;
@@ -214,7 +217,10 @@ pub async fn delete_branch(
         }
     }
 
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{branch_name}");
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
+        encode_ref_path(branch_name)
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to delete branch {branch_name} from {workspace}/{repo_slug}")
     })?;

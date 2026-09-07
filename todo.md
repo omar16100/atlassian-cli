@@ -1807,3 +1807,106 @@ Fable review of the above returned "safe to merge" with three minor findings, al
 - **My claim that four of the five e2e tests fail pre-fix was wrong; it is three.** I had tested against a hybrid (client normalisation reverted but the new `user_info_path` kept), not the real parent commit. Re-checked in a worktree at `2c830f4`: `a_wiki_base_is_still_recognised_as_confluence` passes both ways, because PR #131's unprefixed constant reached the same URL by another route. It is a guard against normalising before detection, not a regression test for this bug, and the doc now says so.
 
 Also removed a stale doc comment the reviewer spotted, and documented the one user-visible behaviour change: under a `/wiki` base, `jira api` now resolves from the site root. 794 tests pass.
+
+## 2026-09-07 — user feedback triage and remediation plan
+
+Planning only; no code changed yet. `docs/07092026_cli_feedback_remediation_plan.md`.
+
+A user filed 14 findings after a day of live Jira and Bitbucket work. Each was
+checked against `main` before being accepted, then the plan was reviewed
+adversarially, which corrected five of my own conclusions and found two more
+defects nobody had reported.
+
+- The reporter ran **v0.2.8**. The tap formula is fine (pins v0.7.2); their
+  install was stale. But `main` is two feature merges past the newest tag, so
+  `--fields` (`2c830f4`, 2026-08-28) is written and unreleased. Cutting 0.8.0 is
+  now step zero of the plan rather than the last step.
+- **Finding 1 has three call sites, not one.** `get_pipeline_logs`
+  (`pipelines.rs:909`) and `pipeline_has_failed_steps` (`:1557`) do the same
+  single unpaginated GET as `fetch_steps`. The second can miss a failure on page
+  two, which silently corrupts `--wait` exit status.
+- **Finding 2 has two.** `field_selection::search_rows` (`:447-464`) never parses
+  `nextPageToken` at all, so the `--fields` path cannot even detect the boundary
+  that `search_issues` sees and ignores. `--fields` is the recommended
+  workaround for the missing `parent`/`labels`, so a user escaping one defect
+  lands in another.
+- **Two unreported truncations found.** `bulk.rs:43,121` (feeds *destructive*
+  repo and branch cleanup) and `pullrequests.rs:643` (PR comments, Bitbucket
+  default 20).
+- Corrections to my own draft: the formula is not stale; `pagination.rs` is not
+  uncalled (the benches construct `PagedResponse`); `variables.rs` already
+  paginates correctly and was wrongly listed as broken; the proposed
+  `fetch_paged<T>` with a runtime cursor enum does not type-check against real
+  call sites, because items live under `values` vs `issues` — replaced with a
+  generic-wrapper `Page` trait.
+- **Scope preflight reopened.** The 403 body (`error.detail.granted`/`required`)
+  is confirmed, so reactive enrichment is sound. The cached preflight is not: it
+  fails closed, so adding a scope server-side leaves the user locally refused
+  with no request sent and nothing to refresh the cache. Recommendation is
+  403-enrichment plus a non-blocking `auth scopes`.
+- Endpoint facts pinned: `permissions-config/users|groups` for finding 3, and
+  `effective-default-reviewers` (not `default-reviewers`) for finding 6, since
+  the plain form omits project-level reviewers.
+
+### Step 0 implemented: `bb bulk delete-branches` safety gate
+
+Branch `feat/cli-feedback-remediation`. `docs/07092026_bulk_delete_branches_safety.md`.
+
+Found while planning the pagination fix, and it reordered the whole plan. The
+command advertised "Delete merged branches" and never checked merge status: the
+only filter was four hardcoded names plus `--exclude`, so live unmerged feature
+and release branches were deleted. Present in released v0.7.2, confirmed with
+`git show v0.7.2:...bulk.rs`, so not a regression.
+
+The `pagelen=100` truncation was the only bound on the blast radius. Fixing
+pagination first, as the plan originally said, would have removed that cap and
+let it delete every branch in the repo.
+
+Selection behaviour deliberately unchanged; merge detection was considered and
+rejected because it would silently narrow a command people may rely on. Instead:
+renamed `delete_merged_branches` to `delete_branches`, help text now says merge
+status is not checked, listing is the default, `--execute` required to delete,
+`--execute` requires typing the repo slug or `--yes`, and no terminal without
+`--yes` refuses rather than hangs. `--dry-run` kept, hidden, honoured as a veto
+(`execute && !dry_run`) so an old script passing it can never start deleting.
+
+Behaviour change: an invocation that omitted `--dry-run` used to delete and now
+lists.
+
+800 tests pass (794 baseline + 6). One test pins the defect itself so the rename
+cannot later be mistaken for a merge-detection fix. Help output verified against
+the built binary.
+
+Not fixed, same file: `archive_stale_repos` reports "archived" but only sets
+`has_issues: false` / `has_wiki: false`, disabling the issue tracker and wiki.
+Same class of mislabelled action.
+
+### Review round on step 0 found a worse bug than the one being fixed
+
+Fable review of the diff confirmed the gate logic (no path deletes without
+`--execute` and either `--yes` or a matched typed slug), but found:
+
+- **`#` in a branch name deleted the wrong ref.** Git allows `main#old`; `#`
+  starts a URL fragment, so the path resolved to `.../refs/branches/main` and
+  the fragment was never sent. Deleting `main#old` deleted `main`, through the
+  protected-name check, while the prompt displayed `main#old`. Verified with
+  `git check-ref-format` and by resolving the URL. New `encode_ref_path` in
+  `bitbucket/utils.rs` percent-encodes all but the RFC 3986 unreserved set,
+  keeping `/` so `feature/login` still works and encoding `%` so `foo%23`
+  cannot be re-decoded server-side. Same defect fixed in `bb branch delete` and
+  `bb branch get` (`branches.rs`).
+- **Partial deletions were unreported.** `?` on a failed DELETE discarded the
+  accumulated rows, so failing on branch 5 of 40 left four deleted and printed
+  nothing but the failing name. Now records, breaks, renders what was deleted,
+  then returns the error.
+- **No test guarded the gate.** The original 6 tests covered pure helpers only.
+  Added wiremock tests over `BitbucketContext`, following the existing pattern
+  in `pullrequests.rs`.
+- `--dry-run` help said "does nothing" while it vetoed `--execute`; now
+  `conflicts_with = "execute"` plus accurate wording. Doc and help no longer
+  claim "every branch" when only the first 100 are examined.
+
+810 tests pass (794 baseline + 16), clippy clean with `-D warnings`. Both
+critical tests verified to FAIL against deliberately reverted code:
+`encode_ref_path` removed breaks the hash test, `if execute` → `if true` breaks
+the listing test.

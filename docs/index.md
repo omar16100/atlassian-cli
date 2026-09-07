@@ -45,6 +45,7 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 
 | Document | Date | What it covers |
 | --- | --- | --- |
+| [07092026_bulk_delete_branches_safety.md](07092026_bulk_delete_branches_safety.md) | 2026-09-07 | `bb bulk delete-branches` deleted unmerged branches: honest naming, listing by default, `--execute` plus typed confirmation |
 | [28082026_wiki_base_url_normalisation.md](28082026_wiki_base_url_normalisation.md) | 2026-08-28 | A `/wiki` base URL no longer doubles the segment: site-root normalisation for Jira, Confluence and JSM clients |
 | [26082026_jira_field_selection.md](26082026_jira_field_selection.md) | 2026-08-26 | `--fields` on `jira issue get` and `search`: ids or display names, ordered columns, and ordered rendering in `crates/output` |
 | [26082026_auth_product_dispatch.md](26082026_auth_product_dispatch.md) | 2026-08-26 | `auth whoami`/`test`/`status` dispatch on the profile's product, the `--space` filter fix, and 401s that keep the server's reason |
@@ -61,6 +62,15 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 | [20022026_bitbucket_bearer_auth.md](20022026_bitbucket_bearer_auth.md) | 2026-02-20 | Bitbucket bearer token support alongside app passwords |
 | [14012026.md](14012026.md) | 2026-01-14 | JSM, Opsgenie and Bamboo implementation |
 | [26122025.md](26122025.md) | 2025-12-26 | Confluence draft publishing fix |
+
+## Plans
+
+Per-task working documents, updated as the work progresses. A plan is retired
+once its work ships and the change is written up under "Features and changes".
+
+| Document | Date | What it covers |
+| --- | --- | --- |
+| [07092026_cli_feedback_remediation_plan.md](07092026_cli_feedback_remediation_plan.md) | 2026-09-07 | Triage and remediation of 16 findings (14 reported, 2 found in review): silent truncation and shared pagination, list-output envelope, product-agnostic `api` passthrough, scope handling, Bitbucket permission endpoints, reviewer resolution |
 
 ## Examples
 

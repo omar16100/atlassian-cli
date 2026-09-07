@@ -936,15 +936,27 @@ enum BulkCommands {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Delete merged branches.
+    /// Delete branches by name. Does NOT check merge status.
+    ///
+    /// Any branch except main, master, develop, development and --exclude
+    /// matches is a candidate, whether or not it was ever merged. Only the
+    /// first 100 branches are considered; pagination is not yet implemented.
+    /// Lists candidates by default; pass --execute to actually delete.
     DeleteBranches {
         /// Repository slug.
         repo: String,
         /// Exclude patterns (comma-separated).
         #[arg(long, value_delimiter = ',')]
         exclude: Vec<String>,
-        /// Dry run mode.
+        /// Delete the matched branches. Without this, they are only listed.
         #[arg(long)]
+        execute: bool,
+        /// Skip the typed confirmation required by --execute.
+        #[arg(long)]
+        yes: bool,
+        /// Deprecated: listing is now the default. Cannot be combined with
+        /// --execute, which it would otherwise silently override.
+        #[arg(long, hide = true, conflicts_with = "execute")]
         dry_run: bool,
     },
 }
@@ -1718,8 +1730,19 @@ pub async fn execute(
             BulkCommands::DeleteBranches {
                 repo,
                 exclude,
+                execute,
+                yes,
                 dry_run,
-            } => bulk::delete_merged_branches(&ctx, &workspace, &repo, exclude, dry_run).await,
+            } => {
+                // `--dry-run` used to be the only thing standing between a bare
+                // invocation and mass deletion. Listing is now the default, so
+                // the flag is redundant. clap rejects it alongside --execute,
+                // making this `&&` redundant too; it stays as the belt to that
+                // braces, so removing the `conflicts_with` can never silently
+                // turn `--dry-run` into a no-op that deletes.
+                let execute = execute && !dry_run;
+                bulk::delete_branches(&ctx, &workspace, &repo, exclude, execute, yes).await
+            }
         },
         BitbucketCommands::Whoami => unreachable!("handled above"),
     }
