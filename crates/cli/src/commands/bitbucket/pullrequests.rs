@@ -4,7 +4,7 @@ use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::{page_size, warn_if_truncated, BitbucketContext};
+use super::utils::{encode_path_segment, page_size, warn_if_truncated, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 /// Information about a pull request for pipeline operations
@@ -609,7 +609,11 @@ pub async fn approve_pull_request(
         user: User,
     }
 
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/approve");
+    let path = format!(
+        "/2.0/repositories/{}/{}/pullrequests/{pr_id}/approve",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?
+    );
     let approval: Approval = ctx
         .client
         .post(&path, &serde_json::json!({}))
@@ -638,7 +642,11 @@ pub async fn unapprove_pull_request(
     repo_slug: &str,
     pr_id: i64,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/approve");
+    let path = format!(
+        "/2.0/repositories/{}/{}/pullrequests/{pr_id}/approve",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to unapprove pull request {pr_id} in {workspace}/{repo_slug}")
     })?;

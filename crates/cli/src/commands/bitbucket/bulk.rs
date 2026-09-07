@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
-use super::utils::{encode_ref_path, BitbucketContext};
+use super::utils::{encode_path_segment, encode_ref_path, BitbucketContext};
 use crate::commands::common::confirm_destructive;
 
 #[derive(Deserialize)]
@@ -303,8 +303,15 @@ pub async fn delete_branches(
                     break;
                 }
             };
-            let delete_path =
-                format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{encoded}");
+            // The workspace and slug are encoded too, not only the branch name.
+            // With `--yes` the confirmation above is skipped entirely, and a
+            // slug of `r?x` would truncate every iteration of this loop onto
+            // the repository itself.
+            let delete_path = format!(
+                "/2.0/repositories/{}/{}/refs/branches/{encoded}",
+                encode_path_segment(workspace)?,
+                encode_path_segment(repo_slug)?
+            );
             let result: Result<serde_json::Value> =
                 ctx.client.delete(&delete_path).await.with_context(|| {
                     format!(

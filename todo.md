@@ -2702,3 +2702,45 @@ rather than `format!`, which is a refactor of the whole command layer.
 
 901 tests across 32 suites, clippy clean. False-rejection sweep: 217 of 217
 literal paths accepted.
+
+### Round 7: the pattern broke, and the last two siblings are closed
+
+The seventh review returned the first clean verdict on the mechanism:
+*"nothing in this commit makes anything worse, and every previously working path
+still works."* Independently fuzzed against the lockfile's `url`: **0 panics over
+4,393 inputs**, **0 parser disagreements over 3,640 differentials**. All three
+round-5 defects — the panic, the space over-rejection, the `#` exemption — are
+precisely fixed, and round 5's habit of introducing new mechanism defects did
+not repeat.
+
+It also settled a worry of mine that turned out to be unfounded: I expected
+rejecting `#` to break JQL searching for a literal `#`. It does not. JQL, CQL
+and the `--query` passthrough all go through `urlencoding::encode`, so a `#`
+becomes `%23` before the guard sees the string.
+
+Two destructive siblings had still been missed, both one `?` in a slug away from
+an unconfirmed repository delete:
+
+- `unapprove_pull_request` (`pullrequests.rs`) — an unconfirmed DELETE whose
+  slug of `r?x` resolved to `DELETE /2.0/repositories/w/r`.
+- the `delete_branches` loop (`bulk.rs`) — where `--yes` skips the confirmation
+  entirely, so every iteration would have truncated onto the repository.
+
+Both now encode the workspace and slug. **Audited afterwards: no raw
+`{workspace}/{repo_slug}` prefix remains at any DELETE site in the Bitbucket
+tree.** The remaining raw prefixes are GET, POST and PUT, where truncation lands
+on endpoints that do not destroy data.
+
+Corrections to the previous entry, which over-claimed twice:
+
+- "no path this CLI builds contains a literal `#`" is false for *runtime*
+  values: `browse_source` interpolates a repository file path, and git permits
+  `#` in filenames. That case never worked (it silently truncated before), and a
+  pre-encoded `%23` passes, so nothing regresses — but the claim was the same
+  literal-sweep blindspot I had just conceded for spaces, restated a paragraph
+  later.
+- the rejection reason "leading or trailing space is stripped" is not literally
+  true when a query follows: for `/x ?a=b` the parser encodes rather than
+  strips. The guard still refuses, which is the conservative direction.
+
+901 tests across 32 suites, clippy clean.
