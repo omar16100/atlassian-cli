@@ -191,12 +191,12 @@ enum RepoCommands {
         #[arg(long)]
         language: Option<String>,
     },
-    /// Delete a repository.
+    /// Delete a repository, its pull requests, issues and wiki.
     Delete {
         /// Repository slug.
         slug: String,
-        /// Skip confirmation prompt.
-        #[arg(long)]
+        /// Skip the typed confirmation. `--yes` matches the other commands.
+        #[arg(long, visible_alias = "yes")]
         force: bool,
     },
 }

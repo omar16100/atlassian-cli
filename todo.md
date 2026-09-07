@@ -2327,3 +2327,33 @@ support. That was an undisclosed breaking change; only `logs_url` was ever meant
 to go.
 
 879 tests across 32 suites, clippy clean.
+
+## Follow-up branch: `fix/destructive-confirmation-consistency`
+
+Started after the merge review flagged that the conventions established on
+`feat/cli-feedback-remediation` turned existing commands into outliers. Kept
+separate deliberately: the remediation branch is reviewed and merge-ready, and
+stacking more onto it would have invalidated that review.
+
+**`bb repo delete` had the exact defect fixed for `bb branch delete`** -- the
+bespoke `[y/N]` prompt on stdout (corrupting `-f json`), a bare "y" accepted,
+and EOF cancelling with exit 0 so a scheduled job could not tell the repository
+still existed. Deleting a repository is far less recoverable than deleting a
+branch, and it carried the weaker guard. Now uses `confirm_destructive` with the
+slug typed back, and `--force` gains `--yes` as an alias.
+
+The slug also goes through `encode_ref_path`, so a value carrying `..` cannot
+address a different repository than the one named in the confirmation.
+
+Still outstanding on this branch, from the same review:
+
+- ~10 delete commands with **no** confirmation at all: `webhooks.rs:132,241`,
+  `variables.rs:344`, `jira/issues.rs:807,937`, `jira/fields_workflows.rs:184`,
+  `jira/projects.rs:400,603`, `bamboo/branches.rs:128`, the JSM deletes and the
+  Opsgenie deletes.
+- Six list commands that still truncate silently (`branch list`, `repo list`,
+  `workspace list`, `commits`, webhooks, ssh-keys).
+- `commits.rs:151,192,242` interpolate a revision raw, so `main#old` silently
+  addresses `main` -- read-only, so misinformation rather than damage.
+
+881 tests across 32 suites, clippy clean.

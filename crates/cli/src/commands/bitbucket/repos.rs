@@ -2,8 +2,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::BitbucketContext;
-use crate::commands::common::{render_success, MutationResult};
+use super::utils::{encode_ref_path, BitbucketContext};
+use crate::commands::common::{confirm_destructive, render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct RepoList {
@@ -233,19 +233,24 @@ pub async fn delete_repo(
     slug: &str,
     force: bool,
 ) -> Result<()> {
+    // Was the same bespoke prompt `bb branch delete` used to have: written to
+    // **stdout**, so it corrupted `-f json`; satisfied by a bare "y"; and on
+    // EOF -- a cron job with no terminal -- it cancelled and exited 0, so the
+    // caller could not tell the repository still existed. Deleting a repository
+    // is less recoverable than deleting a branch, and it had the weaker guard.
     if !force {
-        use std::io::{self, Write};
-        print!("Are you sure you want to delete repository {workspace}/{slug}? [y/N]: ");
-        io::stdout().flush()?;
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        if !input.trim().eq_ignore_ascii_case("y") {
-            tracing::info!("Repository deletion cancelled");
-            return Ok(());
-        }
+        confirm_destructive(
+            slug,
+            &format!(
+                "About to delete the repository {workspace}/{slug}.\n\
+                 This removes its code, pull requests, issues and wiki."
+            ),
+        )?;
     }
 
-    let path = format!("/2.0/repositories/{workspace}/{slug}");
+    // Rejects a slug carrying `..` or a fragment, which would otherwise address
+    // a different resource than the one just confirmed.
+    let path = format!("/2.0/repositories/{workspace}/{}", encode_ref_path(slug)?);
     let _: serde_json::Value = ctx
         .client
         .delete(&path)
@@ -258,4 +263,78 @@ pub async fn delete_repo(
         &format!("✅ Repository {workspace}/{slug} deleted"),
         &MutationResult::with_id(format!("Repository {workspace}/{slug} deleted"), slug),
     )
+}
+#[cfg(test)]
+mod repo_delete_tests {
+    use super::*;
+    use atlassian_cli_api::ApiClient;
+    use atlassian_cli_output::{OutputFormat, OutputRenderer};
+    use wiremock::matchers::method;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    /// Without a terminal and without --force, the command must refuse rather
+    /// than delete or hang. The old prompt cancelled on EOF and exited 0, so a
+    /// scheduled job could not tell the repository still existed.
+    #[tokio::test]
+    async fn a_non_interactive_delete_refuses_without_force() {
+        let server = MockServer::start().await;
+        Mock::given(method("DELETE"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = BitbucketContext {
+            client: ApiClient::new(server.uri()).unwrap(),
+            renderer: &renderer,
+            is_bearer: false,
+        };
+
+        let err = delete_repo(&ctx, "ws", "repo", false)
+            .await
+            .expect_err("must refuse without a terminal");
+        assert!(
+            format!("{err:#}").contains("Refusing to continue"),
+            "unexpected error: {err:#}"
+        );
+
+        let deletes = server
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|r| r.method == wiremock::http::Method::DELETE)
+            .count();
+        assert_eq!(deletes, 0, "nothing may be deleted when confirmation fails");
+    }
+
+    /// A slug carrying a dot segment would address a different resource than
+    /// the one named in the confirmation.
+    #[tokio::test]
+    async fn a_traversal_slug_is_refused() {
+        let server = MockServer::start().await;
+        Mock::given(method("DELETE"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = BitbucketContext {
+            client: ApiClient::new(server.uri()).unwrap(),
+            renderer: &renderer,
+            is_bearer: false,
+        };
+
+        let err = delete_repo(&ctx, "ws", "a/../../other/repo", true)
+            .await
+            .expect_err("a dot-segment slug must be refused");
+        assert!(
+            format!("{err:#}").contains("would change which resource"),
+            "unexpected error: {err:#}"
+        );
+        assert_eq!(
+            server.received_requests().await.unwrap_or_default().len(),
+            0
+        );
+    }
 }
