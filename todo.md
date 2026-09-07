@@ -2515,3 +2515,32 @@ Remaining offset-paged Jira lists, now that the shape is supported:
 workflow lists, and the JSM tree.
 
 891 tests across 32 suites, clippy clean.
+
+### The guard was applied to one of the callers its own doc named
+
+The review's verdict was "do not merge", and it was right for the reason this
+branch keeps repeating: `encode_path_segment`'s doc comment said it existed for
+"a repository slug, a webhook uuid or a key id", and only the repository slug
+was converted. Left open: `delete_webhook` and `delete_ssh_key` (both raw), the
+permission user id (still using the `/`-permitting ref helper), the environment
+uuid, and the pipeline identifier. A webhook uuid of `..` normalises to the
+**repository** endpoint — a delete with no confirmation at all.
+
+**Not fixed by encoding, deliberately.** Those identifiers are brace-wrapped,
+and `encode_path_segment` would send `%7B...%7D` where Bitbucket currently
+receives `{...}`. That is correct per RFC 3986 and a change to the bytes on the
+wire, and nothing here has been verified against a live instance. An existing
+test (`test_braced_uuid_preserved_in_api_path`) asserts the braces must survive,
+which settles it. New `reject_retargeting` refuses `/`, `#`, `%` and dot
+components while leaving the encoding untouched: the hole closes without betting
+on an untested wire change.
+
+The pipeline identifier is guarded at `resolve_pipeline_id`, the single point
+its six interpolations all flow through — the one place that covers them all and
+cannot be forgotten when a seventh appears.
+
+Also fixed: `bb pipeline list --help` rendered "Maximum number of results.
+Maximum results. 0 fetches every page" — the doc pass added a line without
+removing the old one, on the one command the sweep had not converted.
+
+892 tests across 32 suites, clippy clean.

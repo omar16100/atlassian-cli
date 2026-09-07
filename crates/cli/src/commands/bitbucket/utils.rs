@@ -144,6 +144,36 @@ pub fn warn_if_truncated_with(
     }
 }
 
+/// Reject an identifier that would address a different resource, without
+/// changing how it is sent.
+///
+/// The uuid-shaped identifiers Bitbucket uses are brace-wrapped (`{abc-123}`),
+/// and today they go onto the wire as the URL library encodes them.
+/// `encode_path_segment` would percent-encode the braces as well, which is
+/// correct per RFC 3986 but a change to the bytes Bitbucket receives — and
+/// nothing in this work has been verified against a live instance. So the
+/// retargeting characters are rejected and the encoding is left exactly as it
+/// is: the hole closes without betting on an untested wire change.
+pub fn reject_retargeting(value: &str, what: &str) -> anyhow::Result<()> {
+    if value.is_empty() {
+        anyhow::bail!("{what} cannot be empty");
+    }
+    if value.contains('/') || value.contains('#') || value.contains('%') {
+        anyhow::bail!(
+            "Invalid {what} {value:?}: '/', '#' and '%' would address a different resource"
+        );
+    }
+    for segment in value.split('/') {
+        if segment == "." || segment == ".." {
+            anyhow::bail!("Invalid {what} {value:?}: a dot component would retarget the request");
+        }
+    }
+    if value == "." || value == ".." {
+        anyhow::bail!("Invalid {what} {value:?}: a dot component would retarget the request");
+    }
+    Ok(())
+}
+
 /// Percent-encode a single path segment, rejecting anything that would make it
 /// more than one.
 ///
@@ -165,6 +195,20 @@ pub fn encode_path_segment(value: &str) -> anyhow::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retargeting_identifiers_are_rejected_without_re_encoding() {
+        // The legitimate shape is untouched: no encoding decision is taken.
+        assert!(reject_retargeting("{abc-123}", "webhook uuid").is_ok());
+        assert!(reject_retargeting("d6a3f1", "key id").is_ok());
+
+        for bad in ["..", ".", "a/b", "abc#x", "abc%2e", ""] {
+            assert!(
+                reject_retargeting(bad, "webhook uuid").is_err(),
+                "{bad} must be rejected"
+            );
+        }
+    }
 
     /// The hole this exists to close: a slug with a `/` reached the
     /// branch-delete endpoint while the message still said "repository".

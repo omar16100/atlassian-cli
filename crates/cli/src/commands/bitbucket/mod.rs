@@ -523,7 +523,6 @@ enum ProjectCommands {
 enum PipelineCommands {
     /// List pipelines.
     List {
-        /// Maximum number of results.
         /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,

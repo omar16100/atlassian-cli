@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
-use super::utils::{encode_ref_path, BitbucketContext};
+use super::utils::{encode_path_segment, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
@@ -155,7 +155,7 @@ pub async fn list_repo_permissions(
 fn user_permission_path(workspace: &str, repo_slug: &str, user_id: &str) -> Result<String> {
     Ok(format!(
         "/2.0/repositories/{workspace}/{repo_slug}/permissions-config/users/{}",
-        encode_ref_path(user_id)?
+        encode_path_segment(user_id)?
     ))
 }
 

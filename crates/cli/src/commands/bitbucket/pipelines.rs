@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use url::{self, form_urlencoded};
 
-use super::utils::BitbucketContext;
+use super::utils::{reject_retargeting, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 use crate::query::FilterBuilder;
 
@@ -418,6 +418,11 @@ pub async fn resolve_pipeline_id(
         || identifier.contains('-')
         || !identifier.chars().all(|c| c.is_ascii_digit())
     {
+        // The single gate for a user-supplied pipeline identifier. Its result is
+        // interpolated into six different paths, so validating here is both the
+        // one place that covers them all and the one place that cannot be
+        // forgotten when a seventh is added.
+        reject_retargeting(identifier, "pipeline identifier")?;
         return Ok(identifier.to_string());
     }
 
