@@ -2163,3 +2163,28 @@ whole JSM tree are still single-GET. The commit body scoped itself correctly to
 "the sites the report was actually about", but the subject overstated it.
 
 865 tests across 31 suites, clippy clean.
+
+### Finding 8: `-f json` honoured by both `whoami` commands
+
+`auth whoami` and `bb whoami` printed every field through `println!`, so a
+script asking for JSON received the text form. Both now route the machine
+formats through the renderer.
+
+The human output is deliberately unchanged, and getting that right took two
+attempts. The first version derived the readable labels from the serialized
+struct, which reordered the fields alphabetically and printed "Account Id"
+instead of "Account ID" -- a regression in the output people read, introduced
+while fixing the one they parse. The labelled lines are now passed explicitly.
+
+`active` is omitted rather than defaulted: only Jira reports it, and emitting
+`false` for Confluence would claim the account is disabled when the API never
+said either way. Tested.
+
+`bb whoami` takes the profile name as an `Option`, because that path has no
+profile context and an empty string would render a blank field.
+
+New `crates/cli/tests/whoami_output_e2e.rs`: JSON parses, YAML parses, the
+unreported `active` flag is absent rather than false, and the table form is
+still labelled lines rather than a one-row grid.
+
+869 tests across 32 suites, clippy clean.

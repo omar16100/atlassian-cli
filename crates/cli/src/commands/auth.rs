@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{anyhow, Context, Result};
 use atlassian_cli_auth::{bitbucket_token_key, token_key, CredentialStore, BITBUCKET_API_URL};
 use atlassian_cli_config::{site_base_url, Config};
-use atlassian_cli_output::OutputRenderer;
+use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Args, Subcommand};
 use serde::Serialize;
 use tracing::debug;
@@ -243,7 +243,7 @@ pub async fn handle(
         AuthCommand::Logout(args) => logout(args, config, config_path, store),
         AuthCommand::List(args) => list_profiles(args, config, store, renderer),
         AuthCommand::Status(args) => auth_status(args, config, store, renderer).await,
-        AuthCommand::Whoami(args) => whoami(args, config, store).await,
+        AuthCommand::Whoami(args) => whoami(args, config, store, renderer).await,
         AuthCommand::Test(args) => test_auth(args, config, store).await,
     }
 }
@@ -631,7 +631,12 @@ fn read_token_from_stdin(args: &LoginArgs) -> Result<String> {
     Ok(token.trim().to_owned())
 }
 
-async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<()> {
+async fn whoami(
+    args: WhoamiArgs,
+    config: &Config,
+    store: &CredentialStore,
+    renderer: &OutputRenderer,
+) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
@@ -643,7 +648,14 @@ async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> R
     // of which a Bitbucket-only profile has. This dispatches the way
     // `test_auth` does.
     if args.bitbucket {
-        return bitbucket_whoami(config, store, profile_name, profile.email.as_deref()).await;
+        return bitbucket_whoami(
+            config,
+            store,
+            profile_name,
+            profile.email.as_deref(),
+            renderer,
+        )
+        .await;
     }
 
     let base_url = profile
@@ -673,24 +685,67 @@ async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> R
         .await
         .with_context(|| format!("Failed to fetch user information from {product} API"))?;
 
-    println!("Profile: {}", profile_name);
-    println!("Product: {}", product);
-    println!(
-        "Display Name: {}",
-        display_name(&user_data).unwrap_or("Unknown")
-    );
-    println!("Email: {}", email_address(&user_data).unwrap_or("Unknown"));
-    println!(
-        "Account ID: {}",
-        user_data["accountId"].as_str().unwrap_or("Unknown")
-    );
-    // Only Jira reports `active`. Printing a default for Confluence would claim
-    // the account is disabled when the API simply never said either way.
-    if let Some(active) = user_data["active"].as_bool() {
-        println!("Active: {}", active);
+    #[derive(Serialize)]
+    struct WhoamiView<'a> {
+        profile: &'a str,
+        product: &'a str,
+        display_name: &'a str,
+        email: &'a str,
+        account_id: &'a str,
+        /// Only Jira reports this. Omitted rather than defaulted, because
+        /// printing `false` would claim the account is disabled when the API
+        /// simply never said either way.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        active: Option<bool>,
     }
 
-    Ok(())
+    let view = WhoamiView {
+        profile: profile_name,
+        product,
+        display_name: display_name(&user_data).unwrap_or("Unknown"),
+        email: email_address(&user_data).unwrap_or("Unknown"),
+        account_id: user_data["accountId"].as_str().unwrap_or("Unknown"),
+        active: user_data["active"].as_bool(),
+    };
+
+    let mut lines = vec![
+        ("Profile", view.profile.to_string()),
+        ("Product", view.product.to_string()),
+        ("Display Name", view.display_name.to_string()),
+        ("Email", view.email.to_string()),
+        ("Account ID", view.account_id.to_string()),
+    ];
+    if let Some(active) = view.active {
+        lines.push(("Active", active.to_string()));
+    }
+
+    render_identity(renderer, &view, &lines)
+}
+
+/// Render an identity, keeping the human output people already read.
+///
+/// `-f json` was ignored here entirely: every field went out through
+/// `println!`, so a script asking for JSON got the text form and could not
+/// parse it. Only the machine formats change.
+///
+/// The readable lines are passed in explicitly rather than derived from the
+/// serialized struct. Deriving them reordered the fields alphabetically and
+/// turned "Account ID" into "Account Id", which is a regression in the output
+/// people actually read, in the name of fixing the one they parse.
+fn render_identity<T: Serialize>(
+    renderer: &OutputRenderer,
+    view: &T,
+    lines: &[(&str, String)],
+) -> Result<()> {
+    match renderer.format() {
+        OutputFormat::Table | OutputFormat::Markdown => {
+            for (label, value) in lines {
+                println!("{label}: {value}");
+            }
+            Ok(())
+        }
+        _ => renderer.render(view),
+    }
 }
 
 /// Report the Bitbucket identity for a profile.
@@ -704,6 +759,7 @@ async fn bitbucket_whoami(
     store: &CredentialStore,
     profile_name: &str,
     email: Option<&str>,
+    renderer: &OutputRenderer,
 ) -> Result<()> {
     let is_bearer = is_bitbucket_bearer(config, profile_name);
 
@@ -734,9 +790,8 @@ async fn bitbucket_whoami(
         atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_basic_auth(email, &token)
     };
 
-    println!("Profile: {profile_name}");
-    println!("Product: Bitbucket");
-    crate::commands::bitbucket::workspaces::whoami(&client, is_bearer).await
+    crate::commands::bitbucket::workspaces::whoami(&client, is_bearer, renderer, Some(profile_name))
+        .await
 }
 
 /// Display name, across both products.
@@ -1144,6 +1199,7 @@ mod tests {
 
         // An empty directory, so no stored credential can satisfy the lookup.
         let store = CredentialStore::new(dir.path());
+        let renderer = OutputRenderer::new(OutputFormat::Json);
         let err = whoami(
             WhoamiArgs {
                 profile: None,
@@ -1151,6 +1207,7 @@ mod tests {
             },
             &config,
             &store,
+            &renderer,
         )
         .await
         .expect_err("no Bitbucket token is configured");

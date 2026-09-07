@@ -999,7 +999,7 @@ pub async fn execute(
 ) -> Result<()> {
     // Whoami doesn't require workspace
     if matches!(args.command, BitbucketCommands::Whoami) {
-        return workspaces::whoami(&client, is_bearer).await;
+        return workspaces::whoami(&client, is_bearer, renderer, None).await;
     }
 
     // Neither does the raw passthrough, and requiring one would defeat it: the
