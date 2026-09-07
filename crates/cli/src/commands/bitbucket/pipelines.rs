@@ -1096,8 +1096,42 @@ pub async fn list_steps(
 
     tracing::debug!(pipeline_uuid, count = steps.len(), "Listed pipeline steps");
 
-    ctx.renderer.render_list_or_empty(&steps, "No steps found")
+    // `logs_url` is a full Bitbucket URL, long enough that including it pushes
+    // the table past any terminal width and wraps every row into unreadability
+    // -- the reported symptom was that JSON was the only usable format here.
+    // The structured formats keep it: it is genuinely useful to a script, and
+    // dropping it there would trade one broken format for another.
+    match ctx.renderer.format() {
+        OutputFormat::Table | OutputFormat::Markdown => {
+            if steps.is_empty() {
+                println!("No steps found");
+                return Ok(());
+            }
+            let rows: Vec<serde_json::Value> = steps
+                .iter()
+                .map(serde_json::to_value)
+                .collect::<Result<_, _>>()?;
+            let columns: Vec<String> = STEP_TABLE_COLUMNS.iter().map(|c| c.to_string()).collect();
+            ctx.renderer.render_rows_ordered(&rows, &columns)
+        }
+        _ => ctx.renderer.render_list_or_empty(&steps, "No steps found"),
+    }
 }
+
+/// Columns shown in the tabular views of `pipeline steps`.
+///
+/// Deliberately omits `logs_url`. `render_rows_ordered` applies one column list
+/// to Table, CSV and Markdown alike, so this is only reached for the two
+/// human-read formats; CSV and the structured formats go through the ordinary
+/// path and keep every field.
+const STEP_TABLE_COLUMNS: [&str; 6] = [
+    "name",
+    "status",
+    "started",
+    "completed",
+    "duration",
+    "trigger",
+];
 
 pub async fn pipeline_status(
     ctx: &BitbucketContext<'_>,
@@ -1601,6 +1635,44 @@ pub async fn pipeline_has_failed_steps(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The reported symptom: `logs_url` is a full Bitbucket URL, and including
+    /// it pushed the steps table past any terminal width, leaving JSON as the
+    /// only usable format.
+    #[test]
+    fn the_steps_table_omits_the_logs_url_column() {
+        assert!(
+            !STEP_TABLE_COLUMNS.contains(&"logs_url"),
+            "logs_url must not be a table column"
+        );
+        for expected in ["name", "status", "duration"] {
+            assert!(
+                STEP_TABLE_COLUMNS.contains(&expected),
+                "{expected} should still be shown"
+            );
+        }
+    }
+
+    /// Dropping it from the table must not drop it from the data. A script
+    /// reading `-f json` still needs the link.
+    #[test]
+    fn a_step_still_serialises_its_logs_url() {
+        let step = StepInfo {
+            uuid: "{s-1}".to_string(),
+            name: "build".to_string(),
+            status: "SUCCESSFUL".to_string(),
+            started: None,
+            completed: None,
+            duration: None,
+            logs_url: Some("https://bitbucket.org/w/r/pipelines/results/1/steps/2".to_string()),
+            trigger: None,
+        };
+        let value = serde_json::to_value(&step).unwrap();
+        assert!(
+            value.get("logs_url").is_some(),
+            "the structured formats must keep it: {value}"
+        );
+    }
 
     #[test]
     fn test_status_icons() {

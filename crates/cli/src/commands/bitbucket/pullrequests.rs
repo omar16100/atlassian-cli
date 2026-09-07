@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
+use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
@@ -44,7 +45,7 @@ struct PullRequest {
     reviewers: Option<Vec<User>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct User {
     display_name: String,
     #[serde(default)]
@@ -79,7 +80,7 @@ struct RepositoryWorkspace {
     slug: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Participant {
     #[serde(default)]
     approved: bool,
@@ -104,6 +105,11 @@ fn participant_status(approved: bool, state: Option<&str>) -> &'static str {
 #[derive(Serialize)]
 struct ReviewerRow<'a> {
     name: &'a str,
+    /// The value `pr create --reviewers` and `pr reviewers --add` expect.
+    /// Without it, listing reviewers told you who they were but not how to
+    /// name them to any other command, which is why reading a UUID meant
+    /// driving a browser.
+    uuid: &'a str,
     role: &'a str,
     status: &'a str,
     participated_on: &'a str,
@@ -117,6 +123,7 @@ fn reviewer_rows(participants: &[Participant], show_all: bool) -> Vec<ReviewerRo
         .filter(|p| show_all || p.role == "REVIEWER")
         .map(|p| ReviewerRow {
             name: p.user.display_name.as_str(),
+            uuid: p.user.uuid.as_deref().unwrap_or(""),
             role: p.role.as_str(),
             status: participant_status(p.approved, p.state.as_deref()),
             participated_on: p.participated_on.as_deref().unwrap_or(""),
@@ -339,14 +346,26 @@ pub async fn get_pull_request(
         updated: &'a str,
         comments: String,
         tasks: String,
+        /// Kept for the table, which cannot show a nested list.
         approvals: String,
+        /// Who the reviewers are and where each stands.
+        ///
+        /// The count above answered "how many approved" and nothing else: not
+        /// who they were, not their UUIDs, not whether anyone had requested
+        /// changes. Reading any of that meant leaving the CLI entirely. Only
+        /// the structured formats get it, because a nested array has nowhere
+        /// to go in a table.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        reviewers: Vec<ReviewerRow<'a>>,
     }
 
-    let approvals = pr
-        .participants
-        .as_ref()
-        .map(|p| p.iter().filter(|part| part.approved).count())
-        .unwrap_or(0);
+    let participants = pr.participants.clone().unwrap_or_default();
+    let approvals = participants.iter().filter(|part| part.approved).count();
+
+    let reviewers = match ctx.renderer.format() {
+        OutputFormat::Table | OutputFormat::Markdown => Vec::new(),
+        _ => reviewer_rows(&participants, false),
+    };
 
     let view = View {
         id: pr.id,
@@ -361,6 +380,7 @@ pub async fn get_pull_request(
         comments: pr.comment_count.map(|c| c.to_string()).unwrap_or_default(),
         tasks: pr.task_count.map(|t| t.to_string()).unwrap_or_default(),
         approvals: approvals.to_string(),
+        reviewers,
     };
 
     ctx.renderer.render(&view)

@@ -2227,3 +2227,24 @@ but `tabled` draws with Unicode box characters, so it would have passed even if
 the output had become a table. Now checks the characters actually used.
 
 871 tests across 32 suites, clippy clean.
+
+### Findings 10 and 13
+
+**Finding 13: `pr get` hid the reviewers.** It emitted `approvals` as a bare
+count string, which answered "how many approved" and nothing else -- not who,
+not their UUIDs, not whether anyone had requested changes. Reading any of that
+meant leaving the CLI. `pr get` now carries the reviewer detail in the
+structured formats (a nested array has nowhere to go in a table, so the count
+stays for those), and `pr reviewers` gained a `uuid` column, so its output is
+valid input to `pr create --reviewers` and `pr reviewers --add`.
+
+**Finding 10: `logs_url` made the steps table unusable.** It is a full
+Bitbucket URL, long enough to push the table past any terminal width. The
+column-taking renderer helpers are private, and the one public entry
+(`render_rows_ordered`) applies a single column list to Table, CSV and Markdown
+alike -- so the fix is caller-side: the two human-read formats go through an
+explicit column list that omits `logs_url`, and every other format keeps it. A
+script reading `-f json` still needs the link, so dropping it everywhere would
+have traded one broken format for another. Both halves tested.
+
+873 tests across 32 suites, clippy clean.
