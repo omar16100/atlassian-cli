@@ -2007,3 +2007,61 @@ uses `confirm_destructive`. `--force` keeps working and gains `--yes` as an
 alias.
 
 835 tests across 30 suites, clippy clean.
+
+### Review round on the passthrough/permissions commits, plus the pagination primitive
+
+Fable confirmed `encode_ref_path`'s rejection is complete at the URL layer
+(`%2e%2e` cannot survive, since `%` encodes first; backslash encodes before
+WHATWG parsing; no false rejections against real git rules), the endpoints and
+passthrough wiring are correct, and `--dry-run` genuinely sends nothing. Fixed
+what it found:
+
+- **`auth whoami --bitbucket` did not share main.rs's token fallback.** A
+  profile whose single token serves every other `bb` command failed here alone.
+  Now mirrors `resolve_profile_for_bitbucket`.
+- **The dispatch test depended on the ambient environment.** `get_bitbucket_token`
+  reads BITBUCKET_TOKEN et al before the credential store, so a developer shell
+  exporting one changed which error came back. Now asserts on where it did *not*
+  reach (the base_url check) and accepts either Bitbucket-side error. Scrubbing
+  env instead would race every other test in the process. Verified passing both
+  with and without BITBUCKET_TOKEN set.
+- **The new permissions listing was itself unpaginated** -- the defect class this
+  branch exists to fix. Bitbucket's default page is 10, so a repo with more than
+  ten grants reported a partial set, which is exactly the "looks unprotected
+  when it is not" failure the fix was for. Now uses the new `fetch_paged`.
+- **The `id` column overstated its usefulness.** It merged uuid, account_id and
+  group slug, but `pr create --reviewers` brace-wraps whatever it gets and sends
+  it as a uuid, so an account_id became a malformed UUID and a group slug was
+  never valid at all. Split into `uuid` / `account_id` / `slug` so the column
+  that is valid reviewer input is the only one that looks like it.
+- **A rejected ref name mid-loop bypassed the partial-failure reporting** via
+  `?`, discarding the record of branches already deleted -- the exact thing that
+  mechanism exists to prevent. Now routed through it, with a test for a hostile
+  name in a *later* slot.
+- **One assertion was vacuous** (checked for a branch the mock never served).
+  Replaced with distinct-branch counting; the naive "exactly 2 requests" version
+  was wrong because a 500 is retryable and the client legitimately retries.
+
+### Step 3 groundwork: the shared pagination primitive
+
+`crates/api/src/pagination.rs` rewritten. The old `Paginator`/`PagedResponse`
+was dead in production and shaped for a Jira endpoint that no longer exists.
+
+`BitbucketPage<T>` and `JiraPage<T>` implement one `Page` trait, so the driver is
+generic over the wrapper rather than the item, which is what makes `values` vs
+`issues` work without a serde_json::Value round-trip. `Continuation` is an enum:
+Bitbucket returns an absolute URL, Jira an opaque token that must be placed in a
+query parameter, and the parameter name travels with the token so `crates/api`
+never hardcodes a Jira detail.
+
+Guards that came out of the design, each tested: `isLast` beats a trailing token
+(Jira echoes one on the last page, and following it loops forever); the token
+goes back on the *original* path with any previous token replaced (otherwise
+page three carries two); an empty page with a cursor stops the walk; the request
+budget marks the result truncated rather than failing; a cross-origin `next` URL
+is refused by `safe_join`.
+
+Benches repointed from the deleted `PagedResponse` arithmetic to what the path
+now actually does per page.
+
+851 tests across 30 suites, clippy clean.

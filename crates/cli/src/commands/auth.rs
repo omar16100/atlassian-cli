@@ -707,14 +707,19 @@ async fn bitbucket_whoami(
 ) -> Result<()> {
     let is_bearer = is_bitbucket_bearer(config, profile_name);
 
-    let token = get_bitbucket_token(store, profile_name).ok_or_else(|| {
-        anyhow!(
-            "No Bitbucket token found for profile '{profile_name}'. \
-            Set BITBUCKET_TOKEN or ATLASSIAN_CLI_BITBUCKET_TOKEN_{}, \
-            or run `atlassian-cli auth login --bitbucket`",
-            profile_name.to_uppercase()
-        )
-    })?;
+    // The same fallback `resolve_profile_for_bitbucket` uses in main.rs. Without
+    // it, a profile whose single token serves every other `bb` command would
+    // fail here alone, which is a confusing way to answer "who am I".
+    let token = get_bitbucket_token(store, profile_name)
+        .or_else(|| get_token(store, profile_name))
+        .ok_or_else(|| {
+            anyhow!(
+                "No Bitbucket token found for profile '{profile_name}'. \
+                Set BITBUCKET_TOKEN or ATLASSIAN_CLI_BITBUCKET_TOKEN_{}, \
+                or run `atlassian-cli auth login --bitbucket`",
+                profile_name.to_uppercase()
+            )
+        })?;
 
     let client = if is_bearer {
         atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_bearer_token(&token)
@@ -1150,14 +1155,22 @@ mod tests {
         .await
         .expect_err("no Bitbucket token is configured");
 
+        // Assert on where it did NOT get to, rather than on one exact message.
+        // `get_bitbucket_token` consults ATLASSIAN_CLI_BITBUCKET_TOKEN_*,
+        // ATLASSIAN_BITBUCKET_TOKEN and BITBUCKET_TOKEN from the process
+        // environment, so a developer or CI shell exporting any of them changes
+        // which Bitbucket-side error comes back. Both are equally good evidence
+        // of the thing under test: that dispatch happened before the
+        // Jira/Confluence requirements. Scrubbing the environment instead would
+        // mean `remove_var` racing every other test in the process.
         let message = format!("{err:#}");
-        assert!(
-            message.contains("No Bitbucket token found"),
-            "expected the Bitbucket token error, got: {message}"
-        );
         assert!(
             !message.contains("base_url"),
             "must not have reached the Jira/Confluence base_url check: {message}"
+        );
+        assert!(
+            message.contains("No Bitbucket token found") || message.contains("missing an email"),
+            "expected a Bitbucket-side error, got: {message}"
         );
     }
 

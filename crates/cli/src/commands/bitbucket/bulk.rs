@@ -286,10 +286,19 @@ pub async fn delete_branches(
 
     for branch in targets {
         if execute {
-            let delete_path = format!(
-                "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
-                encode_ref_path(&branch.name)?
-            );
+            // Not `?`: a rejected name this far into the loop means earlier
+            // branches are already deleted, and returning here would discard
+            // that record -- the exact thing the failure handling below exists
+            // to prevent.
+            let encoded = match encode_ref_path(&branch.name) {
+                Ok(encoded) => encoded,
+                Err(err) => {
+                    failure = Some(err);
+                    break;
+                }
+            };
+            let delete_path =
+                format!("/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{encoded}");
             let result: Result<serde_json::Value> =
                 ctx.client.delete(&delete_path).await.with_context(|| {
                     format!(
@@ -619,6 +628,48 @@ mod tests {
         );
     }
 
+    /// A hostile name in a *later* slot must not discard the record of the
+    /// deletions that already happened. The earlier test only covered a
+    /// rejected name in the first position, where there is nothing to lose.
+    #[tokio::test]
+    async fn a_late_traversal_name_still_reports_earlier_deletions() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path_regex(r".*/refs/branches$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "values": [
+                    {"name": "aaa", "target": {"date": "2026-01-01"}},
+                    {"name": "x/../../../../../../repositories/w2/r2",
+                     "target": {"date": "2026-01-01"}}
+                ]
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("DELETE"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = ctx_for(&server, &renderer);
+
+        let err = delete_branches(&ctx, "ws", "repo", vec![], true, true)
+            .await
+            .expect_err("the hostile name must abort the run");
+        assert!(
+            format!("{err:#}").contains("would change which resource"),
+            "unexpected error: {err:#}"
+        );
+
+        let deleted = delete_paths(&server).await;
+        assert_eq!(deleted.len(), 1, "only the safe branch: {deleted:?}");
+        assert!(deleted[0].ends_with("/aaa"));
+        assert!(
+            !deleted.iter().any(|p| p.contains("/repositories/w2/r2")),
+            "the retargeted path must never be requested: {deleted:?}"
+        );
+    }
+
     /// A failure part-way through must still report what was already deleted,
     /// rather than aborting with only the failing name.
     #[tokio::test]
@@ -659,8 +710,21 @@ mod tests {
             "the first delete really happened: {deleted:?}"
         );
         assert!(
-            !deleted.iter().any(|p| p.ends_with("/ccc")),
-            "must stop at the failure rather than continuing"
+            deleted.iter().any(|p| p.ends_with("/bbb")),
+            "the failing delete was attempted: {deleted:?}"
+        );
+        // Count distinct branches, not requests: a 500 is retryable, so the
+        // client legitimately asks for `bbb` more than once.
+        let mut distinct: Vec<&str> = deleted
+            .iter()
+            .filter_map(|p| p.rsplit('/').next())
+            .collect();
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(
+            distinct,
+            vec!["aaa", "bbb"],
+            "must stop at the failure rather than continuing: {deleted:?}"
         );
     }
 

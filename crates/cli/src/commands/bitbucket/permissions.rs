@@ -7,16 +7,11 @@
 //! to read both and merge them.
 
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
 use super::utils::{encode_ref_path, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
-
-#[derive(Deserialize)]
-struct PermissionList {
-    #[serde(default)]
-    values: Vec<Permission>,
-}
 
 #[derive(Deserialize)]
 struct Permission {
@@ -46,15 +41,22 @@ struct Group {
 
 /// One row of the merged listing.
 ///
-/// `id` exists because of a specific complaint: `pr create --reviewers` demands
-/// UUIDs and nothing in the CLI could produce one. This listing is the natural
-/// place to find them, so the output of this command is now valid input to that
-/// one.
+/// The columns are split rather than merged into one `id`, because they are not
+/// interchangeable. `pr create --reviewers` wraps whatever it is given in braces
+/// and sends it as a `uuid`, so **only `uuid` is valid input to that flag**. An
+/// `account_id` sent the same way becomes a malformed UUID the API rejects, and
+/// a group `slug` is never reviewer input at all. A single column would have
+/// invited exactly that mistake.
 #[derive(Serialize)]
 struct Row {
     entity_type: &'static str,
     entity_name: String,
-    id: String,
+    /// Users only, and only when the account exposes it. Valid `--reviewers` input.
+    uuid: String,
+    /// Users only. Identifies the account, but is not reviewer input.
+    account_id: String,
+    /// Groups only.
+    slug: String,
     permission: String,
 }
 
@@ -62,13 +64,9 @@ fn user_row(perm: &Permission, user: &User) -> Row {
     Row {
         entity_type: "user",
         entity_name: user.display_name.clone(),
-        // The UUID is what the reviewer flags take; the account id is the
-        // fallback for accounts that withhold it.
-        id: user
-            .uuid
-            .clone()
-            .or_else(|| user.account_id.clone())
-            .unwrap_or_default(),
+        uuid: user.uuid.clone().unwrap_or_default(),
+        account_id: user.account_id.clone().unwrap_or_default(),
+        slug: String::new(),
         permission: perm.permission.clone(),
     }
 }
@@ -77,15 +75,17 @@ fn group_row(perm: &Permission, group: &Group) -> Row {
     Row {
         entity_type: "group",
         entity_name: group.name.clone(),
-        id: group.slug.clone().unwrap_or_default(),
+        uuid: String::new(),
+        account_id: String::new(),
+        slug: group.slug.clone().unwrap_or_default(),
         permission: perm.permission.clone(),
     }
 }
 
-/// Turn one `permissions-config` page into rows, ignoring entries that name
-/// neither a user nor a group.
-fn rows_from(list: &PermissionList) -> Vec<Row> {
-    list.values
+/// Turn `permissions-config` entries into rows, ignoring any that name neither
+/// a user nor a group.
+fn rows_from(values: &[Permission]) -> Vec<Row> {
+    values
         .iter()
         .filter_map(|perm| match (&perm.user, &perm.group) {
             (Some(user), _) => Some(user_row(perm, user)),
@@ -102,21 +102,29 @@ pub async fn list_repo_permissions(
 ) -> Result<()> {
     let base = format!("/2.0/repositories/{workspace}/{repo_slug}/permissions-config");
 
-    let users: PermissionList = ctx
-        .client
-        .get(&format!("{base}/users"))
-        .await
-        .with_context(|| {
-            format!("Failed to list user permissions for repository {workspace}/{repo_slug}")
-        })?;
+    // Paginated, not a bare GET. Bitbucket's default page is 10, so a repository
+    // with more than ten grants would otherwise report a partial set -- and a
+    // partial permission listing is precisely the failure this command's fix was
+    // meant to remove: it makes a repository look less exposed than it is.
+    let (users, _) = fetch_paged::<BitbucketPage<Permission>>(
+        &ctx.client,
+        &format!("{base}/users?pagelen=100"),
+        PageLimits::new(None),
+    )
+    .await
+    .with_context(|| {
+        format!("Failed to list user permissions for repository {workspace}/{repo_slug}")
+    })?;
 
-    let groups: PermissionList = ctx
-        .client
-        .get(&format!("{base}/groups"))
-        .await
-        .with_context(|| {
-            format!("Failed to list group permissions for repository {workspace}/{repo_slug}")
-        })?;
+    let (groups, _) = fetch_paged::<BitbucketPage<Permission>>(
+        &ctx.client,
+        &format!("{base}/groups?pagelen=100"),
+        PageLimits::new(None),
+    )
+    .await
+    .with_context(|| {
+        format!("Failed to list group permissions for repository {workspace}/{repo_slug}")
+    })?;
 
     let mut rows = rows_from(&users);
     rows.extend(rows_from(&groups));
@@ -228,45 +236,47 @@ mod tests {
 
     #[test]
     fn users_and_groups_both_become_rows() {
-        let list: PermissionList = serde_json::from_value(serde_json::json!({
-            "values": [
-                {"permission": "admin", "user": {"display_name": "Benji", "uuid": "{u-1}"}},
-                {"permission": "read", "group": {"name": "Devs", "slug": "devs"}},
-            ]
-        }))
+        let values: Vec<Permission> = serde_json::from_value(serde_json::json!([
+            {"permission": "admin", "user": {"display_name": "Benji", "uuid": "{u-1}"}},
+            {"permission": "read", "group": {"name": "Devs", "slug": "devs"}},
+        ]))
         .unwrap();
 
-        let rows = rows_from(&list);
+        let rows = rows_from(&values);
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].entity_type, "user");
-        assert_eq!(rows[0].id, "{u-1}");
+        assert_eq!(rows[0].uuid, "{u-1}");
         assert_eq!(rows[1].entity_type, "group");
-        assert_eq!(rows[1].id, "devs");
+        assert_eq!(rows[1].slug, "devs");
+        // A group has no uuid, so nothing invites piping it into --reviewers.
+        assert!(rows[1].uuid.is_empty());
     }
 
-    /// A user who withholds their UUID still has an account id, and that is
-    /// better than an empty column.
+    /// An account id must NOT land in the uuid column. `pr create --reviewers`
+    /// brace-wraps whatever it is given and sends it as a uuid, so an account id
+    /// there becomes a malformed UUID the API rejects.
     #[test]
-    fn account_id_is_the_fallback_when_uuid_is_absent() {
-        let list: PermissionList = serde_json::from_value(serde_json::json!({
-            "values": [{
-                "permission": "write",
-                "user": {"display_name": "Sam", "account_id": "acc-9"}
-            }]
-        }))
+    fn an_account_id_never_masquerades_as_a_uuid() {
+        let values: Vec<Permission> = serde_json::from_value(serde_json::json!([{
+            "permission": "write",
+            "user": {"display_name": "Sam", "account_id": "acc-9"}
+        }]))
         .unwrap();
 
-        assert_eq!(rows_from(&list)[0].id, "acc-9");
+        let rows = rows_from(&values);
+        assert_eq!(rows[0].account_id, "acc-9");
+        assert!(
+            rows[0].uuid.is_empty(),
+            "an absent uuid must stay absent, not borrow the account id"
+        );
     }
 
     #[test]
     fn entries_naming_neither_principal_are_dropped() {
-        let list: PermissionList = serde_json::from_value(serde_json::json!({
-            "values": [{"permission": "read"}]
-        }))
-        .unwrap();
+        let values: Vec<Permission> =
+            serde_json::from_value(serde_json::json!([{"permission": "read"}])).unwrap();
 
-        assert!(rows_from(&list).is_empty());
+        assert!(rows_from(&values).is_empty());
     }
 
     /// Listing must read both collections. Reading only one silently omits
