@@ -1932,3 +1932,46 @@ stale — the old nested `if let` did this by accident with nothing recording th
 intent.
 
 814 tests pass, clippy clean under -D warnings.
+
+### Second review round: the encoding fix was only half a fix
+
+Fable found that `encode_ref_path` closed the `#` hole but left a worse one, and
+that my doc had overclaimed by saying the ref-targeting class was closed.
+
+Preserving `/` and `.` together lets `Url::join` normalise dot segments, and
+`safe_join` only checks the origin. Verified against the project's own url 2.5:
+
+- `feature/../main` -> DELETE /2.0/repositories/w/r/refs/branches/main
+- `a/../../../../../../repositories/w2/r2` -> DELETE /2.0/repositories/w2/r2
+
+The second turns a branch delete into a **repository delete**, same origin, so
+nothing upstream rejects it, and it is reachable from directly typed input to
+`bb branch delete`. `encode_ref_path` now returns Result and rejects `.`/`..`
+components, empty components, and leading/trailing `/`. Costs nothing: git
+already forbids all of them. Dots inside a component still fine.
+
+Also fixed this round:
+
+- `chrono::Duration::days` panics on an overflowing value and `--days` is user
+  input; now `try_days`, plus a clap range of 1..=36500. `--days 0` previously
+  made every repository "stale", which with `--execute --yes` in a script is a
+  workspace-wide change from a typo.
+- Unparseable `updated_on` now logs a warning instead of silently counting as
+  not-stale; a server-side date format change would otherwise turn the command
+  into a permanent "No stale repositories found".
+- Partial-failure rendering and the traversal abort now have tests; both were
+  headline behaviours with zero coverage.
+- Threshold boundary is tested (strict `>`, so exactly-at-threshold is not
+  stale).
+
+Finding 3 also done: `bb permission list` reads both permissions-config/users
+and /groups and merges them; grant/revoke use permissions-config/users/{id},
+percent-encoded because Bitbucket UUIDs are brace-wrapped. The listing gained an
+`id` column, which is most of finding 5 as a side effect: `pr create
+--reviewers` needs UUIDs and nothing in the CLI could previously produce one.
+
+Finding 9 done: `auth whoami --bitbucket`. The flag alone would have fixed
+nothing, since `whoami` hard-requires base_url and a Jira token; it now
+dispatches to the Bitbucket path the way `auth test` does.
+
+830 tests pass (794 baseline + 36), clippy clean under -D warnings.

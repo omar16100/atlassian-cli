@@ -16,7 +16,9 @@ mod time_parser;
 pub mod utils;
 mod variables;
 mod webhooks;
-mod workspaces;
+// `auth whoami --bitbucket` reuses the identity reporting here rather than
+// reimplementing the bearer/basic split.
+pub(crate) mod workspaces;
 
 use utils::BitbucketContext;
 
@@ -935,8 +937,12 @@ enum BulkCommands {
     /// 100 repositories are examined. Lists candidates by default; pass
     /// --execute to apply.
     ArchiveRepos {
-        /// Days threshold for staleness.
-        #[arg(long, default_value_t = 180)]
+        /// Days threshold for staleness. Must be at least 1.
+        ///
+        /// Rejecting 0 and negatives matters: either would make every
+        /// repository "stale", which with --execute --yes in a script is a
+        /// workspace-wide change from a typo.
+        #[arg(long, default_value_t = 180, value_parser = clap::value_parser!(i64).range(1..=36_500))]
         days: i64,
         /// Apply the change. Without this, candidates are only listed.
         #[arg(long)]

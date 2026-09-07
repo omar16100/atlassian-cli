@@ -113,7 +113,7 @@ pub async fn get_branch(
 ) -> Result<()> {
     let path = format!(
         "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
-        encode_ref_path(branch_name)
+        encode_ref_path(branch_name)?
     );
     let branch: Branch = ctx.client.get(&path).await.with_context(|| {
         format!("Failed to fetch branch {branch_name} from {workspace}/{repo_slug}")
@@ -219,7 +219,7 @@ pub async fn delete_branch(
 
     let path = format!(
         "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
-        encode_ref_path(branch_name)
+        encode_ref_path(branch_name)?
     );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to delete branch {branch_name} from {workspace}/{repo_slug}")

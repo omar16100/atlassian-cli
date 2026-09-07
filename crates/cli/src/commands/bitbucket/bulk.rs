@@ -50,9 +50,25 @@ pub(crate) fn is_stale(
         return false;
     };
     let Ok(updated_date) = chrono::DateTime::parse_from_rfc3339(updated) else {
+        // Not stale, but say so. A server-side date-format change would
+        // otherwise turn this command into a permanent "No stale repositories
+        // found" with nothing to explain why.
+        tracing::warn!(
+            updated_on = updated,
+            "Ignoring repository: last-updated timestamp is not valid RFC 3339"
+        );
         return false;
     };
-    now.signed_duration_since(updated_date) > chrono::Duration::days(days)
+    // `try_days` rather than `days`: the latter panics on a value large enough
+    // to overflow, and `--days` comes from the command line.
+    let Some(threshold) = chrono::Duration::try_days(days) else {
+        tracing::warn!(
+            days,
+            "Staleness threshold is out of range; treating nothing as stale"
+        );
+        return false;
+    };
+    now.signed_duration_since(updated_date) > threshold
 }
 
 /// Disable the issue tracker and wiki on stale repositories.
@@ -272,7 +288,7 @@ pub async fn delete_branches(
         if execute {
             let delete_path = format!(
                 "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
-                encode_ref_path(&branch.name)
+                encode_ref_path(&branch.name)?
             );
             let result: Result<serde_json::Value> =
                 ctx.client.delete(&delete_path).await.with_context(|| {
@@ -426,6 +442,27 @@ mod tests {
         assert!(!is_stale(Some("not-a-date"), now, 180));
     }
 
+    /// Exactly at the threshold is not stale: the comparison is strict.
+    #[test]
+    fn the_threshold_boundary_is_exclusive() {
+        let now = chrono::Utc::now();
+        let exactly = (now - chrono::Duration::days(180)).to_rfc3339();
+        assert!(!is_stale(Some(&exactly), now, 180));
+
+        let a_moment_older =
+            (now - chrono::Duration::days(180) - chrono::Duration::seconds(1)).to_rfc3339();
+        assert!(is_stale(Some(&a_moment_older), now, 180));
+    }
+
+    /// `chrono::Duration::days` panics on an overflowing value, and `--days`
+    /// is user input.
+    #[test]
+    fn an_absurd_threshold_does_not_panic() {
+        let now = chrono::Utc::now();
+        let old = (now - chrono::Duration::days(500)).to_rfc3339();
+        assert!(!is_stale(Some(&old), now, i64::MAX));
+    }
+
     #[test]
     fn staleness_compares_against_the_threshold() {
         let now = chrono::Utc::now();
@@ -557,6 +594,73 @@ mod tests {
         assert!(
             deleted[0].contains("main%23old"),
             "expected the encoded ref, got: {deleted:?}"
+        );
+    }
+
+    /// End-to-end guard for the traversal hole: a hostile listing entry must
+    /// abort the run, not issue a DELETE against the retargeted path.
+    #[tokio::test]
+    async fn a_traversal_branch_name_aborts_without_deleting() {
+        let server = server_with_branches(&["a/../../../../../../repositories/w2/r2"]).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = ctx_for(&server, &renderer);
+
+        let err = delete_branches(&ctx, "ws", "repo", vec![], true, true)
+            .await
+            .expect_err("a dot-segment ref name must be refused");
+
+        assert!(
+            format!("{err:#}").contains("would change which resource"),
+            "unexpected error: {err:#}"
+        );
+        assert!(
+            delete_paths(&server).await.is_empty(),
+            "nothing may be deleted when a name is refused"
+        );
+    }
+
+    /// A failure part-way through must still report what was already deleted,
+    /// rather than aborting with only the failing name.
+    #[tokio::test]
+    async fn a_partial_failure_reports_what_was_deleted() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path_regex(r".*/refs/branches$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "values": [
+                    {"name": "aaa", "target": {"date": "2026-01-01"}},
+                    {"name": "bbb", "target": {"date": "2026-01-01"}}
+                ]
+            })))
+            .mount(&server)
+            .await;
+        // First branch succeeds, second is refused by the server.
+        Mock::given(method("DELETE"))
+            .and(path_regex(r".*/refs/branches/aaa$"))
+            .respond_with(ResponseTemplate::new(204))
+            .mount(&server)
+            .await;
+        Mock::given(method("DELETE"))
+            .and(path_regex(r".*/refs/branches/bbb$"))
+            .respond_with(ResponseTemplate::new(500))
+            .mount(&server)
+            .await;
+
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let ctx = ctx_for(&server, &renderer);
+
+        delete_branches(&ctx, "ws", "repo", vec![], true, true)
+            .await
+            .expect_err("the second delete fails");
+
+        let deleted = delete_paths(&server).await;
+        assert!(
+            deleted.iter().any(|p| p.ends_with("/aaa")),
+            "the first delete really happened: {deleted:?}"
+        );
+        assert!(
+            !deleted.iter().any(|p| p.ends_with("/ccc")),
+            "must stop at the failure rather than continuing"
         );
     }
 

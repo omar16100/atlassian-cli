@@ -148,6 +148,9 @@ pub struct WhoamiArgs {
     /// Profile to use (defaults to default profile)
     #[arg(long)]
     pub profile: Option<String>,
+    /// Report the Bitbucket identity instead of Jira/Confluence.
+    #[arg(long)]
+    pub bitbucket: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -633,6 +636,16 @@ async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> R
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
 
+    // `auth test` has taken `--bitbucket` since Bitbucket support landed, so
+    // "check the Bitbucket profile" was a natural thing to type here too, and
+    // it was rejected. Adding the flag alone would not have been enough: the
+    // body below hard-requires `base_url` and a Jira/Confluence token, neither
+    // of which a Bitbucket-only profile has. This dispatches the way
+    // `test_auth` does.
+    if args.bitbucket {
+        return bitbucket_whoami(config, store, profile_name, profile.email.as_deref()).await;
+    }
+
     let base_url = profile
         .base_url
         .as_deref()
@@ -678,6 +691,47 @@ async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> R
     }
 
     Ok(())
+}
+
+/// Report the Bitbucket identity for a profile.
+///
+/// Bitbucket credentials live under their own key and their own base URL, so
+/// this shares nothing with the site path above except the profile lookup. The
+/// bearer case is delegated rather than reimplemented: access tokens cannot use
+/// `/2.0/user` at all, and `workspaces::whoami` already encodes that split.
+async fn bitbucket_whoami(
+    config: &Config,
+    store: &CredentialStore,
+    profile_name: &str,
+    email: Option<&str>,
+) -> Result<()> {
+    let is_bearer = is_bitbucket_bearer(config, profile_name);
+
+    let token = get_bitbucket_token(store, profile_name).ok_or_else(|| {
+        anyhow!(
+            "No Bitbucket token found for profile '{profile_name}'. \
+            Set BITBUCKET_TOKEN or ATLASSIAN_CLI_BITBUCKET_TOKEN_{}, \
+            or run `atlassian-cli auth login --bitbucket`",
+            profile_name.to_uppercase()
+        )
+    })?;
+
+    let client = if is_bearer {
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_bearer_token(&token)
+    } else {
+        // Basic auth needs the account email as the username. A Bitbucket-only
+        // profile can legitimately lack one, and an empty username produces a
+        // 401 whose message says nothing useful, so say it here instead.
+        let email = email.filter(|value| !value.is_empty()).context(
+            "Profile is missing an email, which Bitbucket basic auth uses as the username. \
+             Re-run `atlassian-cli auth login --bitbucket`, or use an access token.",
+        )?;
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_basic_auth(email, &token)
+    };
+
+    println!("Profile: {profile_name}");
+    println!("Product: Bitbucket");
+    crate::commands::bitbucket::workspaces::whoami(&client, is_bearer).await
 }
 
 /// Display name, across both products.
@@ -1046,6 +1100,66 @@ async fn auth_status(
 mod tests {
     use super::*;
     use atlassian_cli_config::Profile;
+
+    use clap::Parser;
+
+    /// `auth test` has always taken `--bitbucket`; `auth whoami` rejected it,
+    /// so the natural "check my Bitbucket profile" invocation failed.
+    #[test]
+    fn whoami_accepts_the_bitbucket_flag() {
+        #[derive(Parser)]
+        struct Wrapper {
+            #[command(flatten)]
+            args: WhoamiArgs,
+        }
+
+        let parsed = Wrapper::try_parse_from(["x", "--bitbucket"]).expect("--bitbucket must parse");
+        assert!(parsed.args.bitbucket);
+
+        let default = Wrapper::try_parse_from(["x"]).unwrap();
+        assert!(!default.args.bitbucket, "Jira/Confluence stays the default");
+    }
+
+    /// The flag alone would have fixed nothing: `whoami` hard-requires
+    /// `base_url` and a Jira token, neither of which a Bitbucket-only profile
+    /// has. Dispatching must therefore happen before those checks. A profile
+    /// with no `base_url` and no credentials must fail on the missing
+    /// *Bitbucket* token, not on the missing base URL.
+    #[tokio::test]
+    async fn bitbucket_whoami_dispatches_before_the_base_url_check() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let mut config = Config {
+            default_profile: Some("bbonly".to_string()),
+            ..Default::default()
+        };
+        config
+            .profiles
+            .insert("bbonly".to_string(), Profile::default());
+
+        // An empty directory, so no stored credential can satisfy the lookup.
+        let store = CredentialStore::new(dir.path());
+        let err = whoami(
+            WhoamiArgs {
+                profile: None,
+                bitbucket: true,
+            },
+            &config,
+            &store,
+        )
+        .await
+        .expect_err("no Bitbucket token is configured");
+
+        let message = format!("{err:#}");
+        assert!(
+            message.contains("No Bitbucket token found"),
+            "expected the Bitbucket token error, got: {message}"
+        );
+        assert!(
+            !message.contains("base_url"),
+            "must not have reached the Jira/Confluence base_url check: {message}"
+        );
+    }
 
     #[test]
     fn test_is_bitbucket_bearer_default_is_false() {

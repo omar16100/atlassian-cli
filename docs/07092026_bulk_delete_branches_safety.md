@@ -93,6 +93,31 @@ is an ordinary branch name and Bitbucket expects those slashes as real
 separators. `%` is encoded, so a branch literally named `foo%23` cannot be
 re-decoded by the server into a different ref.
 
+#### Encoding alone was not enough
+
+A second review round found that the fix above closed only half the hole, and
+that this document had overclaimed by saying otherwise.
+
+Preserving `/` and `.` together lets `Url::join` normalise the path away, and
+`safe_join` only checks the origin (`crates/api/src/lib.rs:379-392`). Verified
+against the project's own `url` 2.5:
+
+| Branch name | Path actually requested |
+| --- | --- |
+| `feature/../main` | `/2.0/repositories/w/r/refs/branches/main` |
+| `a/../../../../../../repositories/w2/r2` | `/2.0/repositories/w2/r2` |
+
+The first deletes the protected ref. **The second turns a branch delete into a
+repository delete**, on the same origin, so nothing upstream rejects it. It is
+reachable from directly typed input: `bb branch delete '<that name>'`.
+
+Encoding cannot fix this without also encoding the legitimate separators, so
+`encode_ref_path` now **rejects** names with a `.` or `..` component, an empty
+component, or a leading or trailing `/`, and returns `Result`. Rejecting costs
+nothing: `git check-ref-format` already forbids all of those, so no real ref can
+take that path. A dot *inside* a component (`v1.2.3`, `release/2026.09.1`) is
+still fine.
+
 The same defect was present in `bb branch delete`
 (`bitbucket/branches.rs`), which is a single-branch delete with the same
 consequence, and in `bb branch get`. All three sites now encode.
@@ -157,13 +182,15 @@ for the next breaking release.
 
 ## Tests
 
-20 new tests. **814 pass across 29 suites, against a 794-test baseline on
+36 new tests. **830 pass across 29 suites, against a 794-test baseline on
 `main`.** `cargo clippy --workspace --all-targets -- -D warnings` is clean.
 
 Selection rules, in `bitbucket/bulk.rs` — fast, no HTTP:
 
 - `missing_updated_on_is_never_stale`
 - `staleness_compares_against_the_threshold`
+- `the_threshold_boundary_is_exclusive`
+- `an_absurd_threshold_does_not_panic`
 
 - `protected_branches_are_never_selected`
 - `exclude_patterns_match_as_substrings`
@@ -180,6 +207,8 @@ the existing pattern in `bitbucket/pullrequests.rs`:
 - `execute_with_yes_deletes_only_unprotected_branches`
 - `exclude_patterns_are_honoured_under_execute`
 - `a_hash_in_a_branch_name_cannot_delete_the_protected_ref`
+- `a_traversal_branch_name_aborts_without_deleting`
+- `a_partial_failure_reports_what_was_deleted`
 - `stale_repo_listing_mutates_nothing` — the `archive-repos` equivalent: no
   `PUT` without `--execute`
 - `execute_disables_features_only_on_stale_repos`
@@ -187,6 +216,11 @@ the existing pattern in `bitbucket/pullrequests.rs`:
 Path encoding, in `bitbucket/utils.rs`:
 
 - `hash_in_a_branch_name_is_encoded`
+- `dot_segments_are_rejected` — the traversal hole, including the
+  branch-delete-becomes-repository-delete case
+- `empty_and_edge_slash_names_are_rejected`
+- `dots_within_a_component_are_allowed`
+- `no_accepted_name_can_retarget_the_path`
 - `slashes_are_preserved_as_path_separators`
 - `percent_is_encoded_so_the_server_cannot_re_decode_it`
 - `ordinary_names_are_unchanged`
@@ -211,8 +245,11 @@ deliberately reverted tree:
   the real deletion of `main`.
 - Replacing `if execute` with `if true` in the delete loop makes
   `listing_is_the_default_and_deletes_nothing` fail.
+- Disabling the dot-segment guard makes both `dot_segments_are_rejected` and
+  `a_traversal_branch_name_aborts_without_deleting` fail.
+- Dropping the groups request makes `listing_reads_both_users_and_groups` fail.
 
-Both pass again once restored.
+All pass again once restored.
 
 Help output was checked against the built binary rather than inferred from the
 source.
