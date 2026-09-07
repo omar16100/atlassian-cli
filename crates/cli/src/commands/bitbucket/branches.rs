@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
 use super::utils::{encode_ref_path, BitbucketContext};
-use crate::commands::common::{render_success, MutationResult};
+use crate::commands::common::{confirm_destructive, render_success, MutationResult};
 
 #[derive(Deserialize)]
 struct BranchList {
@@ -203,18 +203,17 @@ pub async fn delete_branch(
     branch_name: &str,
     force: bool,
 ) -> Result<()> {
+    // Was a bespoke `[y/N]` prompt on **stdout**, which corrupted `-f json`,
+    // accepted a bare "y" for a destructive act, and on EOF -- a cron job with
+    // no terminal -- cancelled and exited 0, so the caller could not tell the
+    // deletion had not happened. `confirm_destructive` puts this on the same
+    // footing as the bulk commands: stderr, the branch name typed back, and a
+    // hard error rather than a silent no-op when there is no terminal.
     if !force {
-        use std::io::{self, Write};
-        print!(
-            "Are you sure you want to delete branch {branch_name} from {workspace}/{repo_slug}? [y/N]: "
-        );
-        io::stdout().flush()?;
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        if !input.trim().eq_ignore_ascii_case("y") {
-            tracing::info!("Branch deletion cancelled");
-            return Ok(());
-        }
+        confirm_destructive(
+            branch_name,
+            &format!("About to delete branch {branch_name} from {workspace}/{repo_slug}."),
+        )?;
     }
 
     let path = format!(

@@ -1975,3 +1975,35 @@ nothing, since `whoami` hard-requires base_url and a Jira token; it now
 dispatches to the Bitbucket path the way `auth test` does.
 
 830 tests pass (794 baseline + 36), clippy clean under -D warnings.
+
+### 1c: `api` passthrough wired for Bitbucket and Confluence
+
+The reporter's top request. `commands/api.rs` was already product-agnostic, so
+Confluence was the two-line copy of `jira/mod.rs` the plan predicted.
+
+Bitbucket was not, exactly as the review warned. `bitbucket::execute` requires a
+workspace before it builds its context, and only `Whoami` escapes that. Wired at
+the bottom of the match the way Jira's is, `bb api /2.0/user` fails with
+"Workspace required" for anyone outside a Bitbucket checkout -- on the one
+command whose purpose is reaching what the typed commands cannot. It now takes
+the same early exit `Whoami` does. Verified: with the naive wiring the new test
+`bb_api_resolves_without_a_workspace` fails with exactly that error.
+
+`jsm api` deliberately not added: same client and same base URL as `jira api`,
+so it would be a confusing alias.
+
+New `crates/cli/tests/passthrough_wiring_e2e.rs` drives the built binary with
+`--dry-run` (resolves the request, sends nothing), so it covers Bitbucket
+without needing a mock for api.bitbucket.org, whose base URL is a constant
+rather than a profile field. Also asserts the passthrough does NOT resolve
+against the Atlassian site, which would send Bitbucket credentials to the Jira
+host, and that typed commands still require a workspace.
+
+`bb branch delete` brought onto the same footing as the bulk commands: its
+bespoke `[y/N]` prompt went to **stdout** (corrupting `-f json`), accepted a bare
+"y" for a destructive act, and on EOF -- a cron job with no terminal -- cancelled
+and exited 0, so the caller could not tell the deletion had not happened. Now
+uses `confirm_destructive`. `--force` keeps working and gains `--yes` as an
+alias.
+
+835 tests across 30 suites, clippy clean.

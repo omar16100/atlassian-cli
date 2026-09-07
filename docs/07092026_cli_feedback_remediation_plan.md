@@ -1,7 +1,13 @@
 # CLI feedback remediation plan
 
-Status: in progress on `feat/cli-feedback-remediation`. Step 0 (finding 17) is
-implemented; 800 tests pass. Steps 1-4 not started.
+Status: in progress on `feat/cli-feedback-remediation`. 835 tests pass.
+
+- **Step 0 (finding 17) done**, plus findings 15's sibling in `archive-repos`
+  and a path-traversal defect found in review.
+- **Step 2 done**: 1c passthrough (`bb api`, `confluence api`), finding 3
+  (permission endpoints), finding 9 (`auth whoami --bitbucket`).
+- Step 1 (release 0.8.0) is pending authorisation; it is outward-facing.
+- Step 3 (pagination) and step 4 (0.9.0 breaking changes) not started.
 
 ## Context
 

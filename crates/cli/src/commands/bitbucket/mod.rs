@@ -130,6 +130,15 @@ enum BitbucketCommands {
 
     /// Show current authenticated Bitbucket user.
     Whoami,
+
+    /// Call any Bitbucket REST endpoint with the profile's credentials.
+    ///
+    /// The escape hatch for anything the typed commands do not expose. Paths
+    /// are relative to https://api.bitbucket.org, e.g. /2.0/user.
+    #[command(
+        long_about = "Call any Bitbucket REST endpoint with the profile's credentials.\n\nThe escape hatch for fields the typed commands drop. Paths are relative to https://api.bitbucket.org.\n\nExamples:\n  bb api /2.0/user\n  bb api /2.0/repositories/{workspace}/{repo}/pullrequests/1\n  bb api /2.0/repositories/{workspace}/{repo}/default-reviewers"
+    )]
+    Api(crate::commands::api::ApiArgs),
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -224,8 +233,8 @@ enum BranchCommands {
         repo: String,
         /// Branch name.
         branch: String,
-        /// Skip confirmation prompt.
-        #[arg(long)]
+        /// Skip the typed confirmation. `--yes` matches the bulk commands.
+        #[arg(long, visible_alias = "yes")]
         force: bool,
     },
     /// Add branch protection (restriction).
@@ -991,6 +1000,15 @@ pub async fn execute(
     // Whoami doesn't require workspace
     if matches!(args.command, BitbucketCommands::Whoami) {
         return workspaces::whoami(&client, is_bearer).await;
+    }
+
+    // Neither does the raw passthrough, and requiring one would defeat it: the
+    // command exists to reach endpoints the typed commands cannot, including
+    // workspace-less ones like /2.0/user. Wired at the bottom of the match
+    // below -- where the Jira equivalent sits -- it would have failed with
+    // "Workspace required" for anyone outside a Bitbucket checkout.
+    if let BitbucketCommands::Api(api_args) = args.command {
+        return crate::commands::api::run(&client, renderer, api_args).await;
     }
 
     // Detect git context for auto-detection
@@ -1771,7 +1789,9 @@ pub async fn execute(
                 bulk::delete_branches(&ctx, &workspace, &repo, exclude, execute, yes).await
             }
         },
-        BitbucketCommands::Whoami => unreachable!("handled above"),
+        BitbucketCommands::Whoami | BitbucketCommands::Api(_) => {
+            unreachable!("handled above, before the workspace gate")
+        }
     }
 }
 
