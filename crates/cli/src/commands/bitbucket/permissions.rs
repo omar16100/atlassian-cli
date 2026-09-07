@@ -106,7 +106,7 @@ pub async fn list_repo_permissions(
     // with more than ten grants would otherwise report a partial set -- and a
     // partial permission listing is precisely the failure this command's fix was
     // meant to remove: it makes a repository look less exposed than it is.
-    let (users, _) = fetch_paged::<BitbucketPage<Permission>>(
+    let (users, users_page) = fetch_paged::<BitbucketPage<Permission>>(
         &ctx.client,
         &format!("{base}/users?pagelen=100"),
         PageLimits::new(None),
@@ -116,7 +116,7 @@ pub async fn list_repo_permissions(
         format!("Failed to list user permissions for repository {workspace}/{repo_slug}")
     })?;
 
-    let (groups, _) = fetch_paged::<BitbucketPage<Permission>>(
+    let (groups, groups_page) = fetch_paged::<BitbucketPage<Permission>>(
         &ctx.client,
         &format!("{base}/groups?pagelen=100"),
         PageLimits::new(None),
@@ -125,6 +125,15 @@ pub async fn list_repo_permissions(
     .with_context(|| {
         format!("Failed to list group permissions for repository {workspace}/{repo_slug}")
     })?;
+
+    // A partial permission listing is the failure this endpoint fix was for: it
+    // makes a repository look less exposed than it is.
+    if users_page.truncated || groups_page.truncated {
+        eprintln!(
+            "warning: the permission listing for {workspace}/{repo_slug} is incomplete; \
+             some grants are not shown."
+        );
+    }
 
     let mut rows = rows_from(&users);
     rows.extend(rows_from(&groups));

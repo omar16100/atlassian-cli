@@ -83,7 +83,11 @@ pub trait Page: DeserializeOwned {
 /// A Bitbucket collection page.
 #[derive(Debug, Clone, Deserialize)]
 pub struct BitbucketPage<T> {
-    #[serde(default = "Vec::new")]
+    /// Required, deliberately. The hand-rolled wrappers this replaces all
+    /// demanded the key, so a 200 whose body lacks it was a loud parse error.
+    /// Defaulting it to empty would turn a malformed response into an
+    /// authoritative-looking "nothing here" -- and `pipeline_has_failed_steps`
+    /// would read that as success.
     pub values: Vec<T>,
     #[serde(default)]
     pub next: Option<String>,
@@ -106,7 +110,7 @@ impl<T: DeserializeOwned> Page for BitbucketPage<T> {
 /// A Jira `/search/jql` page.
 #[derive(Debug, Clone, Deserialize)]
 pub struct JiraPage<T> {
-    #[serde(default = "Vec::new")]
+    /// Required, for the same reason as `BitbucketPage::values`.
     pub issues: Vec<T>,
     #[serde(default, rename = "nextPageToken")]
     pub next_page_token: Option<String>,
@@ -164,6 +168,16 @@ impl PageLimits {
         }
     }
 
+    /// Build limits from a CLI `--limit`, where **0 means everything**.
+    ///
+    /// The commands advertise `--limit 0` for "all". Passing it straight
+    /// through as `Some(0)` made `items.len() >= 0` true on the first page, so
+    /// the result was truncated to nothing and the warning cheerfully advised
+    /// using the flag that had just emptied it.
+    pub fn from_cli_limit(limit: usize) -> Self {
+        Self::new(if limit == 0 { None } else { Some(limit) })
+    }
+
     pub fn with_budget(mut self, budget: usize) -> Self {
         self.budget = budget;
         self
@@ -203,8 +217,14 @@ pub async fn fetch_paged<P: Page>(
         // The caller's limit wins over anything the server would still offer.
         if let Some(limit) = limits.limit {
             if items.len() >= limit {
+                // Compare before truncating. The previous form asked whether
+                // `items.len() < total`, but Jira reports no total at all, so a
+                // final page that overshot the limit was reported complete
+                // while silently dropping rows -- the exact failure this module
+                // exists to remove.
+                let dropped = items.len() > limit;
                 items.truncate(limit);
-                info.truncated = cursor.is_some() || items.len() < total.unwrap_or(0) as usize;
+                info.truncated = dropped || cursor.is_some();
                 info.next = cursor;
                 return Ok((items, info));
             }
@@ -218,7 +238,12 @@ pub async fn fetch_paged<P: Page>(
         // A server that keeps handing back a cursor with no items would
         // otherwise spin until the budget runs out.
         if empty_page {
+            // The server still claims more exists, so this is incomplete, not
+            // complete. Saying otherwise would let bulk.rs's `truncated` bail
+            // pass and confirm a deletion against a partial list.
             warn!("Stopping pagination: the server returned an empty page with a cursor");
+            info.truncated = true;
+            info.next = Some(cursor);
             return Ok((items, info));
         }
 
@@ -601,6 +626,122 @@ mod tests {
             result.is_err(),
             "a cross-origin cursor must not be followed"
         );
+    }
+
+    /// Jira reports no total, so the old `items.len() < total.unwrap_or(0)`
+    /// check evaluated to false and a final page that overshot the limit was
+    /// reported as complete while dropping rows.
+    #[tokio::test]
+    async fn overshooting_the_limit_on_a_final_page_is_still_truncation() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path_matcher("/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [{"name": "a"}, {"name": "b"}, {"name": "c"}],
+                "isLast": true
+            })))
+            .mount(&server)
+            .await;
+
+        let (items, info) = fetch_paged::<JiraPage<Item>>(
+            &client_for(&server),
+            "/search",
+            PageLimits::new(Some(2)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(items.len(), 2);
+        assert!(
+            info.truncated,
+            "a page that overshot the limit dropped rows and must say so"
+        );
+    }
+
+    /// Exactly filling the limit with nothing left is complete, not truncated.
+    #[tokio::test]
+    async fn hitting_the_limit_exactly_is_not_truncation() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path_matcher("/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "issues": [{"name": "a"}, {"name": "b"}],
+                "isLast": true
+            })))
+            .mount(&server)
+            .await;
+
+        let (items, info) = fetch_paged::<JiraPage<Item>>(
+            &client_for(&server),
+            "/search",
+            PageLimits::new(Some(2)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(items.len(), 2);
+        assert!(!info.truncated, "nothing was dropped: {info:?}");
+    }
+
+    /// An abandoned walk is incomplete. bulk.rs refuses to delete on this flag,
+    /// so reporting it as complete would let a partial list drive deletions.
+    #[tokio::test]
+    async fn an_abandoned_walk_is_reported_as_truncated() {
+        let server = MockServer::start().await;
+        let forever = format!("{}/items?page=next", server.uri());
+
+        Mock::given(method("GET"))
+            .and(path_matcher("/items"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [],
+                "next": forever
+            })))
+            .mount(&server)
+            .await;
+
+        let (_, info) = fetch_paged::<BitbucketPage<Item>>(
+            &client_for(&server),
+            "/items",
+            PageLimits::new(None),
+        )
+        .await
+        .unwrap();
+
+        assert!(info.truncated, "the server said more exists: {info:?}");
+    }
+
+    /// A 200 whose body lacks the items key is malformed, not empty.
+    #[tokio::test]
+    async fn a_body_without_the_items_key_is_an_error() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path_matcher("/items"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"page": 1})))
+            .mount(&server)
+            .await;
+
+        let result = fetch_paged::<BitbucketPage<Item>>(
+            &client_for(&server),
+            "/items",
+            PageLimits::new(None),
+        )
+        .await;
+
+        assert!(
+            result.is_err(),
+            "a missing values key must not read as an empty result"
+        );
+    }
+
+    /// `--limit 0` is documented as "everything". Passed through as `Some(0)`
+    /// it returned nothing at all.
+    #[test]
+    fn a_zero_cli_limit_means_no_limit() {
+        assert_eq!(PageLimits::from_cli_limit(0).limit, None);
+        assert_eq!(PageLimits::from_cli_limit(25).limit, Some(25));
     }
 
     #[test]

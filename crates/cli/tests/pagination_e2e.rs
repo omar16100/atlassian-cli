@@ -339,3 +339,40 @@ async fn a_complete_enveloped_result_is_not_marked_truncated() {
     );
     assert!(parsed.get("next").is_none(), "{stdout}");
 }
+
+/// `--limit 0` is advertised in the truncation warning as meaning "all". It
+/// used to return nothing: passed through as a limit of zero, the first page
+/// was immediately truncated to empty, and the warning then advised the flag
+/// that had just emptied the result.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn limit_zero_returns_everything() {
+    let server = two_page_search().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "search",
+            "--jql",
+            "project = DEV",
+            "--limit",
+            "0",
+            "-f",
+            "json",
+        ],
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    assert!(out.status.success(), "{stdout}");
+    for key in ["DEV-1", "DEV-2", "DEV-3"] {
+        assert!(stdout.contains(key), "--limit 0 dropped {key}: {stdout}");
+    }
+    assert!(
+        !stderr.contains("more match this query"),
+        "--limit 0 fetched everything, so nothing was truncated: {stderr}"
+    );
+}

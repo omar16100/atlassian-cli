@@ -2123,3 +2123,43 @@ plan. Landing it while a review was in flight over the pagination commits would
 have made both harder to reason about. It stays gated to 0.9.0.
 
 859 tests across 31 suites, clippy clean.
+
+### Review round on pagination: two reproduced correctness bugs
+
+Fable ran the HEAD binary against a mock Jira and reproduced both.
+
+- **`--limit 0` returned nothing while the CLI advertised it as "all".**
+  `limit` went straight through as `Some(0)`, so `items.len() >= 0` was true on
+  the first page and the result was truncated to empty -- then the warning
+  advised using the flag that had just emptied it. New
+  `PageLimits::from_cli_limit` maps 0 to None, and page size asks for a full
+  page rather than `clamp(1,100) == 1`. e2e test verified to fail against the
+  pass-through behaviour.
+- **`truncated` was falsely unset when the limit boundary fell inside the final
+  page.** The check was `cursor.is_some() || items.len() < total.unwrap_or(0)`,
+  and `JiraPage` always reports `total: None`, so a last page overshooting the
+  limit dropped rows and reported the result complete. Now compares the
+  pre-truncation length. Inconsistent before, too: the same data at `--limit 1`
+  warned, at `--limit 2` did not.
+
+Also fixed from that review:
+
+- An empty page carrying a cursor abandoned the walk without setting
+  `truncated`, which was the one path where bulk.rs's `if page.truncated
+  { bail! }` could pass and let a partial list drive deletions.
+- `#[serde(default)]` on `values`/`issues` masked a malformed 200 as an empty
+  list; the wrappers it replaced all required the key. Restored, because
+  `pipeline_has_failed_steps` would have read a malformed body as "no failures"
+  and exited success.
+- Every Bitbucket site discarded `PageInfo`, so budget truncation was invisible
+  in the output. They now warn. `pipeline_has_failed_steps` goes further and
+  **errors**: it decides an exit code, and "I did not see a failure" is not "there
+  was no failure" when the walk was cut short.
+
+**Scope correction.** The previous commit subject said "every silently
+truncating list". That was wrong: `bb branch list`, `repo list`, `workspace
+list`, `commits`, webhooks, the Jira project/webhook/automation lists and the
+whole JSM tree are still single-GET. The commit body scoped itself correctly to
+"the sites the report was actually about", but the subject overstated it.
+
+865 tests across 31 suites, clippy clean.

@@ -641,7 +641,7 @@ pub async fn list_pr_comments(
     let path = format!(
         "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments?pagelen=100"
     );
-    let (comments, _) =
+    let (comments, comments_page) =
         fetch_paged::<BitbucketPage<Comment>>(&ctx.client, &path, PageLimits::new(None))
             .await
             .with_context(|| {
@@ -649,6 +649,13 @@ pub async fn list_pr_comments(
                     "Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}"
                 )
             })?;
+
+    if comments_page.truncated {
+        eprintln!(
+            "warning: showing {} comments for pull request {pr_id}; the thread is longer.",
+            comments.len()
+        );
+    }
 
     let rows: Vec<CommentRow<'_>> = comments.iter().map(comment_row).collect();
 

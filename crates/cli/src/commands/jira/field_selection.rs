@@ -450,7 +450,7 @@ pub(crate) async fn search_rows(
     // that the other one saw and discarded. `--fields` is the documented
     // workaround for the fields `issue get` drops, so a user escaping one
     // defect landed silently in another.
-    let page_size = limit.clamp(1, 100);
+    let page_size = if limit == 0 { 100 } else { limit.clamp(1, 100) };
     let query = format!(
         "/rest/api/3/search/jql?jql={}&maxResults={page_size}&fields={}",
         urlencoding::encode(jql),
@@ -458,7 +458,7 @@ pub(crate) async fn search_rows(
     );
 
     let (issues, page) =
-        fetch_paged::<JiraPage<RawIssue>>(&ctx.client, &query, PageLimits::new(Some(limit)))
+        fetch_paged::<JiraPage<RawIssue>>(&ctx.client, &query, PageLimits::from_cli_limit(limit))
             .await
             .context("Failed to execute search")?;
 

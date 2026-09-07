@@ -500,10 +500,17 @@ async fn fetch_steps(
     let path = format!(
         "/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/?pagelen=100"
     );
-    let (steps, _) =
+    let (steps, page) =
         fetch_paged::<BitbucketPage<PipelineStep>>(&ctx.client, &path, PageLimits::new(None))
             .await
             .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
+
+    if page.truncated {
+        eprintln!(
+            "warning: showing {} steps for pipeline {pipeline_uuid}; the list is incomplete.",
+            steps.len()
+        );
+    }
 
     let clean_pipeline_uuid = pipeline_uuid.trim_matches('{').trim_matches('}');
     Ok(steps
@@ -905,10 +912,17 @@ pub async fn get_pipeline_logs(
     let path = format!(
         "/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/?pagelen=100"
     );
-    let (all_steps, _) =
+    let (all_steps, page) =
         fetch_paged::<BitbucketPage<PipelineStep>>(&ctx.client, &path, PageLimits::new(None))
             .await
             .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
+
+    if page.truncated {
+        eprintln!(
+            "warning: examined {} steps for pipeline {pipeline_uuid}; the list is incomplete.",
+            all_steps.len()
+        );
+    }
 
     let mut steps_to_show: Vec<&PipelineStep> = all_steps.iter().collect();
 
@@ -1555,16 +1569,29 @@ pub async fn pipeline_has_failed_steps(
     let path = format!(
         "/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/?pagelen=100"
     );
-    let (steps, _) =
+    let (steps, page) =
         fetch_paged::<BitbucketPage<PipelineStep>>(&ctx.client, &path, PageLimits::new(None))
             .await
             .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
-    Ok(steps.iter().any(|step| {
+    let found_failure = steps.iter().any(|step| {
         step.state
             .as_ref()
             .is_some_and(|state| matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR"))
-    }))
+    });
+
+    // This decides an exit code. "I did not see a failure" is not the same as
+    // "there was no failure" when the walk was cut short, and reporting the
+    // former as success is how a broken build passes CI.
+    if !found_failure && page.truncated {
+        anyhow::bail!(
+            "Could not determine whether pipeline {pipeline_uuid} failed: only {} steps could \
+             be listed and no failure was seen among them.",
+            steps.len()
+        );
+    }
+
+    Ok(found_failure)
 }
 
 // ============================================================================
