@@ -1,13 +1,9 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
-use super::utils::BitbucketContext;
+use super::utils::{warn_if_truncated, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
-
-#[derive(Deserialize)]
-struct WebhookList {
-    values: Vec<Webhook>,
-}
 
 #[derive(Deserialize)]
 struct Webhook {
@@ -19,11 +15,6 @@ struct Webhook {
     active: bool,
     #[serde(default)]
     events: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct SshKeyList {
-    values: Vec<SshKey>,
 }
 
 #[derive(Deserialize)]
@@ -40,13 +31,15 @@ pub async fn list_webhooks(
     workspace: &str,
     repo_slug: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/hooks");
+    // No pagelen and no cursor follow: Bitbucket's default page bounded this,
+    // so a repository with many hooks silently reported a subset.
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/hooks?pagelen=100");
 
-    let response: WebhookList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list webhooks for {workspace}/{repo_slug}"))?;
+    let (webhooks, page) =
+        fetch_paged::<BitbucketPage<Webhook>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to list webhooks for {workspace}/{repo_slug}"))?;
+    warn_if_truncated(&page, webhooks.len(), "webhooks");
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -57,8 +50,7 @@ pub async fn list_webhooks(
         description: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = webhooks
         .iter()
         .map(|webhook| Row {
             uuid: webhook.uuid.as_str(),
@@ -162,13 +154,13 @@ pub async fn list_ssh_keys(
     workspace: &str,
     repo_slug: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys");
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys?pagelen=100");
 
-    let response: SshKeyList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list SSH keys for {workspace}/{repo_slug}"))?;
+    let (keys, page) =
+        fetch_paged::<BitbucketPage<SshKey>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to list SSH keys for {workspace}/{repo_slug}"))?;
+    warn_if_truncated(&page, keys.len(), "SSH keys");
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -177,8 +169,7 @@ pub async fn list_ssh_keys(
         key_preview: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = keys
         .iter()
         .map(|key| Row {
             uuid: key.uuid.as_str(),

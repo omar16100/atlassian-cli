@@ -2398,3 +2398,14 @@ Remaining unconverted lists: `webhooks`, `ssh-keys`, and the Jira/JSM/Opsgenie
 trees.
 
 882 tests across 32 suites, clippy clean.
+
+### Follow-up: webhook and ssh-key lists paginated
+
+Both requested without any `pagelen` at all, so Bitbucket's default page size
+bounded them and a repository with many hooks or deploy keys silently reported a
+subset. `WebhookList` and `SshKeyList` deleted.
+
+That completes the Bitbucket list sweep. Remaining unconverted: the Jira, JSM
+and Opsgenie trees.
+
+882 tests across 32 suites, clippy clean.
