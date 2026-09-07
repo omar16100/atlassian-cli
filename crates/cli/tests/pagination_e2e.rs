@@ -259,3 +259,83 @@ async fn a_complete_search_does_not_warn() {
         "a complete result must not claim to be truncated: {stderr}"
     );
 }
+
+/// The stderr warning is a stopgap for the tabular formats. A machine consumer
+/// needs the signal *in* the output, which is what `--envelope` is for: a bare
+/// array cannot say "there is more".
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_envelope_carries_the_truncation_signal() {
+    let server = two_page_search().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "--envelope",
+            "jira",
+            "issue",
+            "search",
+            "--jql",
+            "project = DEV",
+            "--limit",
+            "1",
+            "-f",
+            "json",
+        ],
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{stdout}");
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).unwrap_or_else(|e| panic!("not JSON ({e}): {stdout}"));
+
+    assert_eq!(parsed["truncated"], serde_json::json!(true), "{stdout}");
+    assert_eq!(parsed["count"], serde_json::json!(1), "{stdout}");
+    assert!(parsed["data"].is_array(), "{stdout}");
+    assert!(
+        parsed.get("next").is_some(),
+        "a truncated result should say where it stopped: {stdout}"
+    );
+}
+
+/// The counterpart: a complete result must not claim truncation, and must not
+/// invent a total Jira never reported.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_complete_enveloped_result_is_not_marked_truncated() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/search/jql"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "issues": [issue("DEV-1")],
+            "isLast": true
+        })))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "--envelope",
+            "jira",
+            "issue",
+            "search",
+            "--jql",
+            "project = DEV",
+            "-f",
+            "json",
+        ],
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let parsed: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    assert_eq!(parsed["truncated"], serde_json::json!(false), "{stdout}");
+    assert!(
+        parsed.get("total").is_none(),
+        "Jira reports no total; the envelope must not invent one: {stdout}"
+    );
+    assert!(parsed.get("next").is_none(), "{stdout}");
+}

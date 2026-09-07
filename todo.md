@@ -2098,3 +2098,28 @@ line, so the pattern matched nothing, the binary was unchanged, and the test
 "DEV-3 missing -- the second page was dropped", and passed again once restored.
 
 857 tests across 31 suites, clippy clean.
+
+### Envelope carries the truncation signal (step 4, first half)
+
+`ListEnvelope` gains `total`, `truncated` and `next` alongside the existing
+`data`/`count`. Those two keep their names: renaming to `values`/`total` would
+break every current `--envelope` user for no gain.
+
+`total` and `next` are omitted entirely when unknown rather than serialized as
+zero or null, because absent is not zero -- Jira's `/search/jql` reports no
+total at all, and treating that as 0 would let a consumer render a confident
+wrong count.
+
+`render_list_with_meta` is the new entry point; `render_list` delegates to it
+with a "complete, total unknown" meta, so the ~70 existing call sites are
+untouched. Jira search feeds real `PageInfo` through. The stderr warning stays
+as well as the envelope, because the tabular formats have no field to carry the
+signal and a silently short table is the original complaint.
+
+**The default flip is deliberately NOT in this commit.** Making the envelope
+default for JSON/YAML touches ~20 direct `render(&rows)` call sites across four
+products plus ~10 test files, and it is the one genuinely breaking change in the
+plan. Landing it while a review was in flight over the pagination commits would
+have made both harder to reason about. It stays gated to 0.9.0.
+
+859 tests across 31 suites, clippy clean.

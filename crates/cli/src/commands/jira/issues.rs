@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, JiraPage, PageLimits};
-use atlassian_cli_output::OutputFormat;
+use atlassian_cli_output::{ListMeta, OutputFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -145,14 +145,20 @@ pub async fn search_issues(
     }
 
     if page.truncated {
-        // stderr, so a piped `-f json` result stays machine-readable. The
-        // envelope carries this properly in the next release; until then a
-        // visible warning still beats an authoritative-looking wrong answer.
+        // stderr as well as the envelope: `--envelope` is not yet the default,
+        // and the tabular formats have no field to carry this, so a table would
+        // otherwise be silently short -- the original complaint.
         eprintln!(
-            "warning: showing {} issues; more match this query. Raise --limit, or use --limit 0 for all.",
+            "warning: showing {} issues; more match this query. Raise --limit to see more.",
             issues.len()
         );
     }
+
+    let meta = ListMeta {
+        total: page.total,
+        truncated: page.truncated,
+        next: page.next.as_ref().map(describe_cursor),
+    };
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -189,7 +195,26 @@ pub async fn search_issues(
         })
         .collect();
 
-    ctx.renderer.render_list_or_empty(&rows, "No issues found")
+    if rows.is_empty()
+        && matches!(
+            ctx.renderer.format(),
+            OutputFormat::Table | OutputFormat::Markdown
+        )
+    {
+        println!("No issues found");
+        return Ok(());
+    }
+    ctx.renderer.render_list_with_meta(&rows, &meta)
+}
+
+/// Render a cursor as something a person can compare, without implying it is a
+/// URL a caller should fetch itself.
+pub(super) fn describe_cursor(cursor: &atlassian_cli_api::pagination::Continuation) -> String {
+    use atlassian_cli_api::pagination::Continuation;
+    match cursor {
+        Continuation::Token { value, .. } => value.clone(),
+        Continuation::Url(url) => url.clone(),
+    }
 }
 
 pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
