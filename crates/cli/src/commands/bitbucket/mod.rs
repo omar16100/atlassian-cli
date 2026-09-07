@@ -312,9 +312,17 @@ enum PrCommands {
         /// PR description.
         #[arg(long)]
         description: Option<String>,
-        /// Reviewer UUIDs (comma-separated).
+        /// Reviewer UUIDs (comma-separated). `bb permission list` and
+        /// `bb pr reviewers` both report the uuid to use.
         #[arg(long, value_delimiter = ',')]
         reviewers: Vec<String>,
+        /// Also add the repository's configured default reviewers.
+        ///
+        /// Atlassian apply these in the web UI only, so a pull request created
+        /// through the API gets none. Where a merge check requires a
+        /// default-reviewer approval, that leaves the pull request unmergeable.
+        #[arg(long)]
+        default_reviewers: bool,
     },
     /// Update pull request.
     Update {
@@ -1165,6 +1173,7 @@ pub async fn execute(
                 destination,
                 description,
                 reviewers,
+                default_reviewers,
             } => {
                 pullrequests::create_pull_request(
                     &ctx,
@@ -1175,6 +1184,7 @@ pub async fn execute(
                     &destination,
                     description.as_deref(),
                     reviewers,
+                    default_reviewers,
                 )
                 .await
             }

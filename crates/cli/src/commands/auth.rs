@@ -134,6 +134,15 @@ pub enum AuthCommand {
     Whoami(WhoamiArgs),
     /// Test authentication for a profile
     Test(TestArgs),
+    /// Show the scopes a Bitbucket token actually grants
+    Scopes(ScopesArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ScopesArgs {
+    /// Profile to inspect (defaults to default profile)
+    #[arg(long)]
+    pub profile: Option<String>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -245,6 +254,7 @@ pub async fn handle(
         AuthCommand::Status(args) => auth_status(args, config, store, renderer).await,
         AuthCommand::Whoami(args) => whoami(args, config, store, renderer).await,
         AuthCommand::Test(args) => test_auth(args, config, store).await,
+        AuthCommand::Scopes(args) => auth_scopes(args, config, store, renderer).await,
     }
 }
 
@@ -1158,6 +1168,99 @@ async fn auth_status(
     println!("Profile: {}", profile_name);
 
     renderer.render_list_or_empty(&statuses, "No services configured.")
+}
+
+/// Report the scopes a Bitbucket token grants, without blocking anything.
+///
+/// A cached scope list with a per-command preflight was considered and
+/// rejected. It fails closed: add a scope server-side and a stale cache refuses
+/// the command locally, so no request goes out, so no 403 arrives to correct
+/// the cache. A wrong entry in a hand-maintained command-to-scope map does the
+/// same thing, and refusing a command the token could actually run is worse
+/// than the mid-task 403 it was meant to replace. The server stays
+/// authoritative; this is a read-only answer to "what do I have".
+///
+/// Bitbucket exposes the granted scopes in the `x-oauth-scopes` response
+/// header, so any authenticated request reveals them.
+async fn auth_scopes(
+    args: ScopesArgs,
+    config: &Config,
+    store: &CredentialStore,
+    renderer: &OutputRenderer,
+) -> Result<()> {
+    let (profile_name, profile) = config
+        .resolve_profile(args.profile.as_deref())
+        .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
+
+    let is_bearer = is_bitbucket_bearer(config, profile_name);
+    let token = get_bitbucket_token(store, profile_name)
+        .or_else(|| get_token(store, profile_name))
+        .ok_or_else(|| anyhow!("No Bitbucket token found for profile '{profile_name}'."))?;
+
+    let client = if is_bearer {
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_bearer_token(&token)
+    } else {
+        let email = profile
+            .email
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .context(
+                "Profile is missing an email, which Bitbucket basic auth uses as a username.",
+            )?;
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_basic_auth(email, &token)
+    };
+
+    // Access tokens cannot reach /2.0/user; /2.0/workspaces works for both and
+    // returns the same scope header.
+    let endpoint = if is_bearer {
+        "/2.0/workspaces"
+    } else {
+        "/2.0/user"
+    };
+    let scopes = client
+        .response_header(endpoint, "x-oauth-scopes")
+        .await
+        .context("Failed to read the token's scopes from Bitbucket")?;
+
+    let scopes: Vec<String> = scopes
+        .unwrap_or_default()
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    #[derive(Serialize)]
+    struct ScopesView<'a> {
+        profile: &'a str,
+        product: &'a str,
+        auth_type: &'a str,
+        scopes: Vec<String>,
+    }
+
+    let view = ScopesView {
+        profile: profile_name,
+        product: "Bitbucket",
+        auth_type: if is_bearer { "Bearer" } else { "Basic" },
+        scopes,
+    };
+
+    match renderer.format() {
+        OutputFormat::Json | OutputFormat::Yaml => renderer.render(&view),
+        _ => {
+            println!("Profile: {}", view.profile);
+            println!("Product: {}", view.product);
+            println!("Auth type: {}", view.auth_type);
+            if view.scopes.is_empty() {
+                println!("Scopes: (none reported by the server)");
+            } else {
+                println!("Scopes:");
+                for scope in &view.scopes {
+                    println!("  {scope}");
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]

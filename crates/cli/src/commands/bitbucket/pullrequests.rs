@@ -396,6 +396,7 @@ pub async fn create_pull_request(
     dest_branch: &str,
     description: Option<&str>,
     reviewers: Vec<String>,
+    include_default_reviewers: bool,
 ) -> Result<()> {
     let mut payload = serde_json::json!({
         "title": title,
@@ -415,8 +416,20 @@ pub async fn create_pull_request(
         payload["description"] = serde_json::json!(desc);
     }
 
-    if !reviewers.is_empty() {
-        let reviewer_objs: Vec<_> = merge_reviewer_uuids(&[], &reviewers)
+    // Atlassian apply default reviewers in the web UI only; a PR created through
+    // the API gets none. Where a merge check requires a default-reviewer
+    // approval, that makes every API-created PR unmergeable until someone adds
+    // them by hand. Opt-in rather than automatic, so an existing scripted
+    // `pr create` does not silently start notifying people.
+    let defaults = if include_default_reviewers {
+        fetch_default_reviewers(ctx, workspace, repo_slug).await?
+    } else {
+        Vec::new()
+    };
+
+    let merged = merge_reviewer_uuids(&defaults, &reviewers);
+    if !merged.is_empty() {
+        let reviewer_objs: Vec<_> = merged
             .iter()
             .map(|uuid| serde_json::json!({ "uuid": uuid }))
             .collect();
@@ -811,6 +824,44 @@ fn merge_reviewer_uuids(existing: &[String], requested: &[String]) -> Vec<String
         merged.push(normalized);
     }
     merged
+}
+
+/// The repository's effective default reviewers.
+///
+/// `effective-default-reviewers`, not `default-reviewers`: the plain form
+/// returns only the repository's own list, while the effective one merges in
+/// those configured at project level and tags each with `reviewer_type`. Using
+/// the plain form would silently omit every project-level reviewer, which on a
+/// workspace that configures them centrally means omitting all of them.
+async fn fetch_default_reviewers(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+) -> Result<Vec<String>> {
+    #[derive(Deserialize)]
+    struct DefaultReviewer {
+        #[serde(default)]
+        user: Option<User>,
+        #[serde(default)]
+        uuid: Option<String>,
+    }
+
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/effective-default-reviewers?pagelen=100"
+    );
+    let (entries, _) =
+        fetch_paged::<BitbucketPage<DefaultReviewer>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| {
+                format!("Failed to fetch default reviewers for {workspace}/{repo_slug}")
+            })?;
+
+    // The payload nests the account under `user`; older shapes put the uuid at
+    // the top level. Accept either rather than silently returning nothing.
+    Ok(entries
+        .into_iter()
+        .filter_map(|entry| entry.user.and_then(|u| u.uuid).or(entry.uuid))
+        .collect())
 }
 
 /// Add reviewers to a pull request.

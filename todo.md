@@ -2248,3 +2248,44 @@ script reading `-f json` still needs the link, so dropping it everywhere would
 have traded one broken format for another. Both halves tested.
 
 873 tests across 32 suites, clippy clean.
+
+### Findings 6 and 7 — the two decisions I had not yet delivered
+
+Both were settled earlier and neither had been implemented; listing them as
+"deliberately not done" was wrong.
+
+**Finding 6: `--default-reviewers` on `pr create`.** Opt-in, as chosen, so an
+existing scripted `pr create` does not silently start notifying people. It reads
+`effective-default-reviewers`, **not** `default-reviewers`: the plain form
+returns only the repository's own list, while the effective one merges in
+project-level reviewers. On a workspace that configures them centrally, the
+plain form would have returned nothing and the flag would have looked like it
+did not work.
+
+**Finding 7: 403 enrichment, and `auth scopes`.** The cached preflight was
+dropped for the reasons already recorded (it fails closed, and refusing a
+command the token can run is worse than a mid-task 403).
+
+`scope_hint` parses `error.detail.granted`/`required` out of the 403 and names
+the missing scope. Two details shape the wording, and both matter:
+
+- Scopes are fixed when a token is created and cannot be widened, so the hint
+  says *create a replacement*, not "add the scope".
+- `granted` describes the token, not the account. When it already covers
+  everything required, the refusal is not about scopes at all -- it is
+  repository permissions or an IP allowlist -- and the hint says so rather than
+  sending the user to the token page for nothing.
+
+Two pre-existing tests pinned the old advice, which linked to
+`bitbucket.org/account/settings/app-passwords`. App passwords are deprecated and
+scopes cannot be edited after creation, so that link sent people somewhere that
+could not help them. Updated to assert the correct guidance rather than
+restoring the bad link.
+
+`auth scopes` reads the granted list from Bitbucket's `x-oauth-scopes` response
+header via a new `ApiClient::response_header`, so no endpoint or local cache is
+needed. It blocks nothing.
+
+879 tests across 32 suites, clippy clean. (An intermediate run reported 25
+suites / 725 tests: cargo stops after a failing binary, so that was the abort,
+not a regression.)
