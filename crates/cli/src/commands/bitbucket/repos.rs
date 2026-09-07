@@ -3,7 +3,7 @@ use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::{encode_ref_path, page_size, warn_if_truncated, BitbucketContext};
+use super::utils::{encode_path_segment, page_size, warn_if_truncated, BitbucketContext};
 use crate::commands::common::{confirm_destructive, render_success, MutationResult};
 
 #[derive(Deserialize)]
@@ -243,9 +243,14 @@ pub async fn delete_repo(
         )?;
     }
 
-    // Rejects a slug carrying `..` or a fragment, which would otherwise address
-    // a different resource than the one just confirmed.
-    let path = format!("/2.0/repositories/{workspace}/{}", encode_ref_path(slug)?);
+    // A single path segment: rejects `/`, `..` and fragments alike. Using the
+    // ref helper here preserved `/`, so a slug like "myrepo/refs/branches/main"
+    // reached the branch-delete endpoint and still reported a deleted
+    // repository.
+    let path = format!(
+        "/2.0/repositories/{workspace}/{}",
+        encode_path_segment(slug)?
+    );
     let _: serde_json::Value = ctx
         .client
         .delete(&path)
@@ -271,7 +276,7 @@ mod repo_delete_tests {
     /// than delete or hang. The old prompt cancelled on EOF and exited 0, so a
     /// scheduled job could not tell the repository still existed.
     #[tokio::test]
-    async fn a_non_interactive_delete_refuses_without_force() {
+    async fn a_delete_without_force_never_reaches_the_api() {
         let server = MockServer::start().await;
         Mock::given(method("DELETE"))
             .respond_with(ResponseTemplate::new(204))
@@ -285,13 +290,15 @@ mod repo_delete_tests {
             is_bearer: false,
         };
 
-        let err = delete_repo(&ctx, "ws", "repo", false)
+        // Assert the safety property, not the message. Whether stdin is a
+        // terminal is a property of the test runner -- under a pipe this is the
+        // no-terminal refusal, under a pseudo-terminal it is a confirmation
+        // mismatch on EOF. Both must reach the same outcome: nothing deleted.
+        // The refusal message itself is pinned in commands::common's tests,
+        // where the terminal check is injectable.
+        delete_repo(&ctx, "ws", "repo", false)
             .await
-            .expect_err("must refuse without a terminal");
-        assert!(
-            format!("{err:#}").contains("Refusing to continue"),
-            "unexpected error: {err:#}"
-        );
+            .expect_err("must not delete without --force");
 
         let deletes = server
             .received_requests()
@@ -320,16 +327,26 @@ mod repo_delete_tests {
             is_bearer: false,
         };
 
-        let err = delete_repo(&ctx, "ws", "a/../../other/repo", true)
-            .await
-            .expect_err("a dot-segment slug must be refused");
-        assert!(
-            format!("{err:#}").contains("would change which resource"),
-            "unexpected error: {err:#}"
-        );
+        // Two distinct rejections, both of which used to reach the API:
+        // a slug spanning path segments (which hit the branch-delete endpoint
+        // while still reporting a deleted repository), and a dot component.
+        for slug in ["a/../../other/repo", "myrepo/refs/branches/main", ".."] {
+            let err = delete_repo(&ctx, "ws", slug, true)
+                .await
+                .expect_err("slug must be refused");
+            // The two guards word their refusals differently; what matters is
+            // that the rejected value is named and nothing was sent.
+            let message = format!("{err:#}");
+            assert!(
+                message.contains(slug),
+                "{slug}: the error should name the value it refused: {message}"
+            );
+        }
+
         assert_eq!(
             server.received_requests().await.unwrap_or_default().len(),
-            0
+            0,
+            "no request may be sent for a rejected slug"
         );
     }
 }

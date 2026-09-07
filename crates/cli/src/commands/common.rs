@@ -70,9 +70,27 @@ pub fn confirmation_matches(expected: &str, typed: &str) -> bool {
 /// alternative to failing loudly is deleting someone's branches from a cron
 /// job that never had a chance to answer.
 pub fn confirm_destructive(expected: &str, warning: &str) -> Result<()> {
-    use std::io::{IsTerminal, Write};
+    confirm_destructive_on(
+        expected,
+        warning,
+        std::io::IsTerminal::is_terminal(&std::io::stdin()),
+    )
+}
 
-    if !std::io::stdin().is_terminal() {
+/// The body of [`confirm_destructive`], with the terminal check as a parameter.
+///
+/// Split out because a test cannot control whether `cargo test` inherits a
+/// terminal on stdin. A test asserting the no-terminal refusal passed under a
+/// pipe and failed under a pseudo-terminal, which made its result a property of
+/// the runner rather than of the code.
+pub(crate) fn confirm_destructive_on(
+    expected: &str,
+    warning: &str,
+    stdin_is_terminal: bool,
+) -> Result<()> {
+    use std::io::Write;
+
+    if !stdin_is_terminal {
         anyhow::bail!(
             "{warning}\nRefusing to continue: no terminal available to confirm. \
              Pass --yes to skip this prompt in a script."
@@ -100,6 +118,20 @@ pub fn confirm_destructive(expected: &str, warning: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Without a terminal the prompt must refuse, not proceed and not hang. A
+    /// scheduled job that never had a chance to answer must not delete.
+    #[test]
+    fn without_a_terminal_it_refuses() {
+        let err = confirm_destructive_on("repo", "about to delete", false)
+            .expect_err("must refuse when nothing can answer");
+        let message = format!("{err:#}");
+        assert!(message.contains("Refusing to continue"), "{message}");
+        assert!(
+            message.contains("--yes"),
+            "must say how to proceed: {message}"
+        );
+    }
 
     #[test]
     fn confirmation_requires_the_exact_resource_name() {

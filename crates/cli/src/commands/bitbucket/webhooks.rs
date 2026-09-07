@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
-use super::utils::{warn_if_truncated, BitbucketContext};
+use super::utils::{warn_if_truncated_with, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
@@ -39,7 +39,7 @@ pub async fn list_webhooks(
         fetch_paged::<BitbucketPage<Webhook>>(&ctx.client, &path, PageLimits::new(None))
             .await
             .with_context(|| format!("Failed to list webhooks for {workspace}/{repo_slug}"))?;
-    warn_if_truncated(&page, webhooks.len(), "webhooks");
+    warn_if_truncated_with(&page, webhooks.len(), "webhooks", false);
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -160,7 +160,7 @@ pub async fn list_ssh_keys(
         fetch_paged::<BitbucketPage<SshKey>>(&ctx.client, &path, PageLimits::new(None))
             .await
             .with_context(|| format!("Failed to list SSH keys for {workspace}/{repo_slug}"))?;
-    warn_if_truncated(&page, keys.len(), "SSH keys");
+    warn_if_truncated_with(&page, keys.len(), "SSH keys", false);
 
     #[derive(Serialize)]
     struct Row<'a> {

@@ -2409,3 +2409,41 @@ That completes the Bitbucket list sweep. Remaining unconverted: the Jira, JSM
 and Opsgenie trees.
 
 882 tests across 32 suites, clippy clean.
+
+### Review of the follow-up branch: five fixes
+
+**A slug guard that guarded the wrong thing.** `encode_ref_path` deliberately
+preserves `/`, because `feature/login` is one branch name spanning two path
+segments. A repository slug is never like that. Reusing the ref helper meant
+`bb repo delete "myrepo/refs/branches/main" --force` passed the guard, reached
+the **branch-delete** endpoint, deleted a branch, and reported "Repository
+myrepo/refs/branches/main deleted" -- while the comment above it claimed to
+prevent addressing a different resource than the one confirmed. New
+`encode_path_segment` rejects `/` outright; slugs are `[A-Za-z0-9._-]`, so
+nothing legitimate is lost.
+
+**A test whose result was a property of the test runner.** The no-terminal
+refusal test assumed `cargo test` never inherits a TTY on stdin. Under a
+pseudo-terminal it failed, and in a real terminal it would block waiting for
+keyboard input mid-run. The terminal check is now a parameter
+(`confirm_destructive_on`), so the refusal is pinned directly; the `delete_repo`
+test asserts the property that actually matters -- no request reaches the API --
+rather than a message that varies with the runner. Verified passing under
+`script -q /dev/null`.
+
+**"This completes the Bitbucket list sweep" was false.** `bb pr list`, the
+highest-traffic list command, still capped at 100 with no cursor follow. Now
+converted.
+
+**`--limit 0` was undocumented everywhere.** Seven list commands honour it and
+none said so; the only way to discover it was the stderr warning. All seven now
+document it. Checked each rather than assuming: `pipeline list` was not part of
+this branch's conversions but already treated 0 as unlimited
+(`pipelines.rs:612`), so the claim holds there too.
+
+**The truncation warning advised a flag two commands lack.** `webhook list` and
+`ssh-key list` have no `--limit`, so "Raise --limit" named something that does
+not exist. They now get a message without a remedy they cannot use.
+
+885 tests across 32 suites, clippy clean, unit suite verified under a
+pseudo-TTY.

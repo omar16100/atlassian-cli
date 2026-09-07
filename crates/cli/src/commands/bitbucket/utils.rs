@@ -117,16 +117,70 @@ pub fn page_size(limit: usize) -> usize {
 /// signal for everything else, and for the tabular formats, which have no field
 /// to put it in.
 pub fn warn_if_truncated(page: &atlassian_cli_api::pagination::PageInfo, shown: usize, noun: &str) {
-    if page.truncated {
+    warn_if_truncated_with(page, shown, noun, true)
+}
+
+/// As [`warn_if_truncated`], for commands that have no `--limit` flag.
+///
+/// `bb webhook list` and `bb ssh-key list` take no limit, so advising the user
+/// to raise one names a flag that does not exist. There the shortfall can only
+/// come from the request budget, and the honest thing is to say the result is
+/// incomplete without prescribing a remedy that is unavailable.
+pub fn warn_if_truncated_with(
+    page: &atlassian_cli_api::pagination::PageInfo,
+    shown: usize,
+    noun: &str,
+    has_limit_flag: bool,
+) {
+    if !page.truncated {
+        return;
+    }
+    if has_limit_flag {
         eprintln!(
             "warning: showing {shown} {noun}; more exist. Raise --limit, or use --limit 0 for all."
         );
+    } else {
+        eprintln!("warning: showing {shown} {noun}; the list is incomplete.");
     }
+}
+
+/// Percent-encode a single path segment, rejecting anything that would make it
+/// more than one.
+///
+/// `encode_ref_path` deliberately preserves `/`, because `feature/login` is one
+/// branch name spanning two path segments. A repository slug, a webhook uuid or
+/// a key id is never like that: Bitbucket slugs are `[A-Za-z0-9._-]`. Reusing
+/// the ref helper for them left a hole -- `bb repo delete "myrepo/refs/branches/main"`
+/// passed the guard, reached the branch-delete endpoint, deleted a branch, and
+/// reported "Repository myrepo/refs/branches/main deleted".
+pub fn encode_path_segment(value: &str) -> anyhow::Result<String> {
+    if value.contains('/') {
+        anyhow::bail!(
+            "Invalid identifier {value:?}: '/' would address a different resource than the one named"
+        );
+    }
+    encode_ref_path(value)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The hole this exists to close: a slug with a `/` reached the
+    /// branch-delete endpoint while the message still said "repository".
+    #[test]
+    fn a_slug_containing_a_slash_is_rejected() {
+        assert!(encode_path_segment("myrepo/refs/branches/main").is_err());
+        assert!(encode_path_segment("a/b").is_err());
+    }
+
+    #[test]
+    fn an_ordinary_slug_passes_and_is_still_encoded() {
+        assert_eq!(encode_path_segment("my-repo.v2").unwrap(), "my-repo.v2");
+        assert_eq!(encode_path_segment("odd#name").unwrap(), "odd%23name");
+        assert!(encode_path_segment("..").is_err());
+        assert!(encode_path_segment("").is_err());
+    }
 
     #[test]
     fn a_zero_limit_asks_for_a_full_page() {
