@@ -75,7 +75,10 @@ pub async fn list_repos(ctx: &BitbucketContext<'_>, workspace: &str, limit: usiz
 }
 
 pub async fn get_repo(ctx: &BitbucketContext<'_>, workspace: &str, slug: &str) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{slug}");
+    let path = format!(
+        "/2.0/repositories/{workspace}/{}",
+        encode_path_segment(slug)?
+    );
     let repo: Repo = ctx
         .client
         .get(&path)
@@ -138,7 +141,10 @@ pub async fn create_repo(
         payload["project"] = serde_json::json!({"key": pk});
     }
 
-    let path = format!("/2.0/repositories/{workspace}/{slug}");
+    let path = format!(
+        "/2.0/repositories/{workspace}/{}",
+        encode_path_segment(slug)?
+    );
     let repo: Repo = ctx
         .client
         .post(&path, &payload)
@@ -191,7 +197,10 @@ pub async fn update_repo(
         payload["language"] = serde_json::json!(l);
     }
 
-    let path = format!("/2.0/repositories/{workspace}/{slug}");
+    let path = format!(
+        "/2.0/repositories/{workspace}/{}",
+        encode_path_segment(slug)?
+    );
     let repo: Repo = ctx
         .client
         .put(&path, &payload)

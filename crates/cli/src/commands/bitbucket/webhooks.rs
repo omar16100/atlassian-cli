@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
-use super::utils::{reject_retargeting, warn_if_truncated_with, BitbucketContext};
+use super::utils::{encode_path_segment, warn_if_truncated_with, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
@@ -129,8 +129,10 @@ pub async fn delete_webhook(
 ) -> Result<()> {
     // A uuid of `..` normalises to the repository endpoint -- a delete with no
     // confirmation at all -- and one carrying `#` truncates to a different hook.
-    reject_retargeting(webhook_uuid, "webhook uuid")?;
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/hooks/{webhook_uuid}");
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/hooks/{}",
+        encode_path_segment(webhook_uuid)?
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to delete webhook {webhook_uuid} from {workspace}/{repo_slug}")
     })?;
@@ -238,8 +240,10 @@ pub async fn delete_ssh_key(
     repo_slug: &str,
     key_uuid: &str,
 ) -> Result<()> {
-    reject_retargeting(key_uuid, "SSH key id")?;
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys/{key_uuid}");
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/deploy-keys/{}",
+        encode_path_segment(key_uuid)?
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to delete SSH key {key_uuid} from {workspace}/{repo_slug}")
     })?;

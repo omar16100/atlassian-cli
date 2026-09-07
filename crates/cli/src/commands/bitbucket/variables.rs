@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::utils::{reject_retargeting, BitbucketContext};
+use super::utils::{encode_path_segment, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 // ---------------------------------------------------------------------------
@@ -129,12 +129,10 @@ pub fn build_var_base_url(scope: &VarScope) -> Result<String> {
             workspace,
             repo_slug,
             env_uuid,
-        } => {
-            reject_retargeting(env_uuid, "environment uuid")?;
-            format!(
-                "/2.0/repositories/{workspace}/{repo_slug}/deployments_config/environments/{env_uuid}/variables/"
-            )
-        }
+        } => format!(
+            "/2.0/repositories/{workspace}/{repo_slug}/deployments_config/environments/{}/variables/",
+            encode_path_segment(env_uuid)?
+        ),
     })
 }
 
@@ -621,7 +619,11 @@ mod tests {
 
     #[test]
     fn test_build_var_base_url_deployment() {
-        // env_uuid comes from API with braces, used raw in URL
+        // The uuid is percent-encoded here rather than interpolated raw, which
+        // is what stops a value like `..\` retargeting the request. This is not
+        // a change to what Bitbucket receives: `Url::join` already encodes the
+        // braces, so the raw and encoded forms produce byte-identical request
+        // paths. The assertion below proves that rather than asserting it.
         let scope = VarScope::Deployment {
             workspace: "myws".to_string(),
             repo_slug: "myrepo".to_string(),
@@ -630,8 +632,51 @@ mod tests {
         let url = build_var_base_url(&scope).unwrap();
         assert_eq!(
             url,
-            "/2.0/repositories/myws/myrepo/deployments_config/environments/{abc-123}/variables/"
+            "/2.0/repositories/myws/myrepo/deployments_config/environments/%7Babc-123%7D/variables/"
         );
+
+        let base = url::Url::parse("https://api.bitbucket.org/").unwrap();
+        let sent = base.join(url.trim_start_matches('/')).unwrap();
+        let raw_equivalent = base
+            .join(
+                "2.0/repositories/myws/myrepo/deployments_config/environments/{abc-123}/variables/",
+            )
+            .unwrap();
+        assert_eq!(
+            sent.path(),
+            raw_equivalent.path(),
+            "encoding must not change the request path"
+        );
+    }
+
+    /// A hostile environment uuid must not be able to address a different
+    /// resource. Two mechanisms achieve that and the test asserts the property,
+    /// not which one fired: `/` and dot components are refused outright, while
+    /// everything else is percent-encoded into a single inert segment.
+    #[test]
+    fn a_retargeting_env_uuid_cannot_change_the_target() {
+        let base = url::Url::parse("https://api.bitbucket.org/").unwrap();
+        let prefix = "/2.0/repositories/myws/myrepo/deployments_config/environments/";
+
+        for hostile in ["..", ".", "a/b", "{u}#x", "..\\", ".\t.", "{u}?x=1", " "] {
+            let scope = VarScope::Deployment {
+                workspace: "myws".to_string(),
+                repo_slug: "myrepo".to_string(),
+                env_uuid: hostile.to_string(),
+            };
+
+            let Ok(url) = build_var_base_url(&scope) else {
+                continue; // refused outright, which is also correct
+            };
+
+            let sent = base.join(url.trim_start_matches('/')).unwrap();
+            assert!(
+                sent.path().starts_with(prefix),
+                "{hostile:?} escaped its prefix: {}",
+                sent.path()
+            );
+            assert_eq!(sent.query(), None, "{hostile:?} injected a query: {sent}");
+        }
     }
 
     #[test]

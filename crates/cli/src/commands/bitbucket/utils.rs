@@ -144,31 +144,33 @@ pub fn warn_if_truncated_with(
     }
 }
 
-/// Reject an identifier that would address a different resource, without
-/// changing how it is sent.
+/// Accept only an identifier that cannot restructure a URL, without changing
+/// how it is sent.
 ///
-/// The uuid-shaped identifiers Bitbucket uses are brace-wrapped (`{abc-123}`),
-/// and today they go onto the wire as the URL library encodes them.
-/// `encode_path_segment` would percent-encode the braces as well, which is
-/// correct per RFC 3986 but a change to the bytes Bitbucket receives — and
-/// nothing in this work has been verified against a live instance. So the
-/// retargeting characters are rejected and the encoding is left exactly as it
-/// is: the hole closes without betting on an untested wire change.
-pub fn reject_retargeting(value: &str, what: &str) -> anyhow::Result<()> {
+/// This started as a blacklist of `/`, `#`, `%` and dot components, derived
+/// from the characters a review had named. That was the wrong method and it
+/// leaked: the WHATWG parser behind `Url::join` treats `\\` as `/`, so `..\\`
+/// still resolved to the parent — the repository endpoint, reached by a delete
+/// with no confirmation. It also strips tab, CR and LF before parsing, so
+/// `".\t."` became `..`, and it splits on a raw `?`. Enumerating what the
+/// parser does is a losing game; this permits only what is known safe.
+///
+/// Used where the value is also reused verbatim outside the URL — a pipeline
+/// uuid is trimmed of its braces to build a browser link — so it cannot simply
+/// be percent-encoded in place. Everywhere else, prefer
+/// [`encode_path_segment`], whose output is inert by construction.
+pub fn accept_safe_identifier(value: &str, what: &str) -> anyhow::Result<()> {
     if value.is_empty() {
         anyhow::bail!("{what} cannot be empty");
     }
-    if value.contains('/') || value.contains('#') || value.contains('%') {
+    let permitted = |c: char| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '{' | '}');
+    if let Some(bad) = value.chars().find(|c| !permitted(*c)) {
         anyhow::bail!(
-            "Invalid {what} {value:?}: '/', '#' and '%' would address a different resource"
+            "Invalid {what} {value:?}: {bad:?} is not permitted in an identifier, because it can \
+             change which resource the request addresses"
         );
     }
-    for segment in value.split('/') {
-        if segment == "." || segment == ".." {
-            anyhow::bail!("Invalid {what} {value:?}: a dot component would retarget the request");
-        }
-    }
-    if value == "." || value == ".." {
+    if value.chars().all(|c| c == '.') {
         anyhow::bail!("Invalid {what} {value:?}: a dot component would retarget the request");
     }
     Ok(())
@@ -183,6 +185,14 @@ pub fn reject_retargeting(value: &str, what: &str) -> anyhow::Result<()> {
 /// the ref helper for them left a hole -- `bb repo delete "myrepo/refs/branches/main"`
 /// passed the guard, reached the branch-delete endpoint, deleted a branch, and
 /// reported "Repository myrepo/refs/branches/main deleted".
+///
+/// Percent-encoding a brace-wrapped uuid is **not** a change to what Bitbucket
+/// receives, contrary to what an earlier revision of this file asserted.
+/// `Url::join` already encodes `{` and `}`: a raw `{abc-123}` and a
+/// pre-encoded `%7Babc-123%7D` produce byte-identical request paths. Verified
+/// against the `url` version in the lockfile. That mistaken belief is why the
+/// weaker guard above exists at all, and why it is now confined to the one
+/// case that genuinely cannot encode.
 pub fn encode_path_segment(value: &str) -> anyhow::Result<String> {
     if value.contains('/') {
         anyhow::bail!(
@@ -197,17 +207,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn retargeting_identifiers_are_rejected_without_re_encoding() {
-        // The legitimate shape is untouched: no encoding decision is taken.
-        assert!(reject_retargeting("{abc-123}", "webhook uuid").is_ok());
-        assert!(reject_retargeting("d6a3f1", "key id").is_ok());
+    fn the_identifier_whitelist_rejects_what_the_url_parser_reinterprets() {
+        assert!(accept_safe_identifier("{abc-123}", "webhook uuid").is_ok());
+        assert!(accept_safe_identifier("d6a3f1", "key id").is_ok());
+        assert!(accept_safe_identifier("build.42", "pipeline id").is_ok());
 
-        for bad in ["..", ".", "a/b", "abc#x", "abc%2e", ""] {
+        // Each of these was demonstrated to retarget the request through
+        // Url::join: backslash is a separator, tab/CR/LF are stripped before
+        // parsing, `?` starts a query, and a bare space trims to nothing.
+        for bad in [
+            "..", ".", "...", "a/b", "abc#x", "abc%2e", "..\\", "a\\..\\x", ".\t.", ".\n.",
+            "{u}?x=1", " ", "",
+        ] {
             assert!(
-                reject_retargeting(bad, "webhook uuid").is_err(),
-                "{bad} must be rejected"
+                accept_safe_identifier(bad, "webhook uuid").is_err(),
+                "{bad:?} must be rejected"
             );
         }
+    }
+
+    /// The claim the weaker guard was originally justified by, pinned so it
+    /// cannot be reasserted: encoding a braced uuid changes nothing on the wire.
+    #[test]
+    fn encoding_a_braced_uuid_does_not_change_the_request_path() {
+        let base = Url::parse("https://api.bitbucket.org/").unwrap();
+        let raw = base.join("2.0/repositories/w/r/hooks/{abc-123}").unwrap();
+        let encoded = base
+            .join(&format!(
+                "2.0/repositories/w/r/hooks/{}",
+                encode_path_segment("{abc-123}").unwrap()
+            ))
+            .unwrap();
+        assert_eq!(raw.path(), encoded.path());
+        assert_eq!(raw.path(), "/2.0/repositories/w/r/hooks/%7Babc-123%7D");
     }
 
     /// The hole this exists to close: a slug with a `/` reached the

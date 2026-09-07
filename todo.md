@@ -2544,3 +2544,54 @@ Maximum results. 0 fetches every page" — the doc pass added a line without
 removing the old one, on the one command the sweep had not converted.
 
 892 tests across 32 suites, clippy clean.
+
+### The guard's justification was false, and the guard leaked
+
+Fourth recurrence of this branch's pattern, and the worst reasoning error in it.
+
+**The premise was wrong.** The previous commit refused to percent-encode
+brace-wrapped uuids, arguing it would change the bytes Bitbucket receives, and
+cited `test_braced_uuid_preserved_in_api_path` as evidence. Verified against the
+`url` version in the lockfile:
+
+```
+raw   {abc-123}      -> path /2.0/.../hooks/%7Babc-123%7D
+encoded %7Babc-123%7D -> path /2.0/.../hooks/%7Babc-123%7D
+```
+
+`Url::join` already encodes the braces. The two forms are byte-identical on the
+wire, so the "untested wire change" being avoided was not a change at all. The
+test proves nothing: it asserts on the path string built by `format!`, before
+`safe_join` ever sees it. I rejected the correct fix on a premise I had not
+tested, having flagged that premise as the thing I was least sure of.
+
+**The weaker guard leaked, exactly as that choice invited.** Its rejection set
+was derived from the characters a review had named rather than from what the URL
+parser does. Empirically:
+
+| input | resolves to |
+| --- | --- |
+| `..\` | `/2.0/repositories/w/r/` — the repository endpoint |
+| `a\..\x` | `.../hooks/x` |
+| `.<TAB>.` | `/2.0/repositories/w/r/` |
+| `{u}?x=1` | `.../hooks/%7Bu%7D` with `?x=1` injected |
+| `" "` | `.../hooks/` — the collection |
+
+WHATWG treats `\` as `/`, strips tab/CR/LF before parsing, and splits on `?`.
+Enumerating what a parser does is a losing game.
+
+**Fixed properly.** `encode_path_segment` now guards webhook uuid, ssh key id,
+environment uuid, project key and every repository slug site — its output is
+inert by construction, so all five inputs above become harmless. Where the value
+is reused verbatim outside the URL (a pipeline uuid is trimmed of braces to
+build a browser link, so it cannot be encoded in place), `accept_safe_identifier`
+permits only `[A-Za-z0-9-_.{}]` — a whitelist, not a blacklist.
+
+`delete_project` was also still raw, despite the previous commit's title
+claiming every single-segment identifier was guarded.
+
+Two tests now pin the corrected understanding: one proves encoding does not
+change the request path, the other asserts hostile inputs cannot escape their
+prefix or inject a query — asserting the property, not which mechanism fired.
+
+894 tests across 32 suites, clippy clean.

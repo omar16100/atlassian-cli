@@ -5,7 +5,7 @@ use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::{page_size, warn_if_truncated, BitbucketContext};
+use super::utils::{encode_path_segment, page_size, warn_if_truncated, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 #[derive(Deserialize)]
@@ -145,7 +145,10 @@ pub async fn get_project(
     workspace: &str,
     project_key: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/workspaces/{workspace}/projects/{project_key}");
+    let path = format!(
+        "/2.0/workspaces/{workspace}/projects/{}",
+        encode_path_segment(project_key)?
+    );
     let project: Project = ctx.client.get(&path).await.with_context(|| {
         format!("Failed to fetch project {project_key} in workspace {workspace}")
     })?;
@@ -242,7 +245,10 @@ pub async fn update_project(
         payload["description"] = serde_json::json!(d);
     }
 
-    let path = format!("/2.0/workspaces/{workspace}/projects/{project_key}");
+    let path = format!(
+        "/2.0/workspaces/{workspace}/projects/{}",
+        encode_path_segment(project_key)?
+    );
     let project: Project = ctx.client.put(&path, &payload).await.with_context(|| {
         format!("Failed to update project {project_key} in workspace {workspace}")
     })?;
@@ -287,7 +293,10 @@ pub async fn delete_project(
         }
     }
 
-    let path = format!("/2.0/workspaces/{workspace}/projects/{project_key}");
+    let path = format!(
+        "/2.0/workspaces/{workspace}/projects/{}",
+        encode_path_segment(project_key)?
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to delete project {project_key} from workspace {workspace}")
     })?;
