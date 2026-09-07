@@ -1,13 +1,16 @@
 # CLI feedback remediation plan
 
-Status: in progress on `feat/cli-feedback-remediation`. 835 tests pass.
+Status: complete on `feat/cli-feedback-remediation`, pending review and release.
+879 tests across 32 suites, clippy clean under `-D warnings`.
 
-- **Step 0 (finding 17) done**, plus findings 15's sibling in `archive-repos`
-  and a path-traversal defect found in review.
-- **Step 2 done**: 1c passthrough (`bb api`, `confluence api`), finding 3
-  (permission endpoints), finding 9 (`auth whoami --bitbucket`).
-- Step 1 (release 0.8.0) is pending authorisation; it is outward-facing.
-- Step 3 (pagination) and step 4 (0.9.0 breaking changes) not started.
+**All 17 findings are addressed in code.** Findings 4 and 12 need only a
+release; nothing on this branch reaches a user until a tag exists.
+
+**This branch is 0.9.0, not 0.8.x.** It carries deliberate breaking changes:
+`bb bulk delete-branches` and `archive-repos` list instead of acting, `bb branch
+delete` requires the branch name typed, `--dry-run` conflicts with `--execute`,
+and the envelope's `truncated` is now tri-state. The original sequencing in this
+document binned several of those as patch-safe; that was wrong.
 
 ## Context
 

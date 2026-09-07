@@ -287,12 +287,12 @@ one atomic rename, then the original is renamed to `.migrated`.
 │           │                      │                      │                 │
 │           ▼                      ▼                      ▼                 │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐        │
-│  │   RetryConfig    │  │   RateLimiter    │  │    Paginator     │        │
+│  │   RetryConfig    │  │   RateLimiter    │  │   fetch_paged    │        │
 │  │                  │  │                  │  │                  │        │
-│  │ - Exponential    │  │ - x-ratelimit    │  │ - Multi-page     │        │
-│  │   backoff        │  │   header tracking│  │   aggregation    │        │
-│  │ - Max 3 attempts │  │ - Auto-throttle  │  │ - Streaming      │        │
-│  │ - 500ms-30s      │  │ - 80% warning    │  │   collection     │        │
+│  │ - Exponential    │  │ - x-ratelimit    │  │ - Follows the    │        │
+│  │   backoff        │  │   header tracking│  │   server cursor  │        │
+│  │ - Max 3 attempts │  │ - Auto-throttle  │  │ - Reports        │        │
+│  │ - 500ms-30s      │  │ - 80% warning    │  │   truncation     │        │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘        │
 │                                  │                                         │
 │                                  ▼                                         │
@@ -325,9 +325,52 @@ pub struct ApiClient {
     rate_limiter: RateLimiter,
 }
 
-// Methods: get<T>, post<T>, put<T>, delete<T>, get_text
+// Methods: get<T>, post<T>, put<T>, delete<T>, get_text, response_header
 // Features: HTTPS enforcement, SSRF protection, automatic retry
 ```
+
+**Pagination** (`crates/api/src/pagination.rs`).
+
+Until v0.9.0 this module exposed a `Paginator` trait and `PagedResponse` that
+no production code called, shaped for a Jira endpoint that has since been
+removed. The behaviour it was meant to provide had instead been hand-rolled
+three times inside the Bitbucket command modules, in three forms with three
+different levels of care about the URL the server handed back. List commands
+therefore issued a single request and rendered whatever came back, so a
+Bitbucket collection returned 10 of 11 items and a Jira search returned the
+server's cap of 100 — in both cases with nothing in the output to distinguish
+that from a complete answer.
+
+```rust
+pub trait Page: DeserializeOwned {
+    type Item;
+    fn into_parts(self) -> (Vec<Self::Item>, Option<Continuation>, Option<u64>);
+}
+
+pub async fn fetch_paged<P: Page>(
+    client: &ApiClient, path: &str, limits: PageLimits,
+) -> Result<(Vec<P::Item>, PageInfo)>
+```
+
+The *wrapper* is generic, not the item: `BitbucketPage<T>` keys on `values`,
+`JiraPage<T>` on `issues`. A single `fetch_paged<T>` cannot work, because
+`ApiClient::get::<T>` deserializes the whole body and nothing tells it which key
+holds the items; passing the key as a string would mean a `serde_json::Value`
+round-trip that costs a second parse and discards type errors.
+
+`Continuation` is an enum because the products differ substantively: Bitbucket
+returns an absolute URL (resolved through `safe_join`, so a cursor pointing at
+another origin is refused), Jira an opaque token that the driver places back on
+the *original* path, replacing any previous one — appending would put two
+`nextPageToken` values on the third page.
+
+`PageInfo.truncated` is the contract with `crates/output`: `ListMeta` carries it
+into the JSON/YAML envelope, and it is `Option<bool>` so that a command which
+never paginated reports *nothing* rather than asserting completeness it has not
+established.
+
+Data flow: **command → fetch_paged → ApiClient::get (per page) → PageInfo →
+ListMeta → OutputRenderer envelope.**
 
 ---
 
