@@ -154,7 +154,9 @@ pub async fn list_repo_permissions(
 /// than on something this code states.
 fn user_permission_path(workspace: &str, repo_slug: &str, user_id: &str) -> Result<String> {
     Ok(format!(
-        "/2.0/repositories/{workspace}/{repo_slug}/permissions-config/users/{}",
+        "/2.0/repositories/{}/{}/permissions-config/users/{}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?,
         encode_path_segment(user_id)?
     ))
 }

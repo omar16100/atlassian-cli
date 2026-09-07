@@ -2663,3 +2663,42 @@ now happens first. And "every bypass demonstrated over the previous rounds is
 refused" was false: `?` injection and the bare space survived at raw sites.
 
 898 tests across 32 suites, clippy clean.
+
+### Round 6: the mechanism converged; the crash and the regression were mine
+
+The sixth review returned the first genuinely good news about the guard itself:
+tested over 2,379 adversarial segment combinations against the real parser,
+`is_dot_segment` had **zero disagreements** — no traversal missed, no real
+resource refused. The dot-segment core is correct.
+
+Three things it found were still wrong, and all three were introduced by me in
+round 5:
+
+- **A reachable panic.** `decode_once` byte-sliced the `str` to read the two hex
+  digits, so `jira issue get 'x-%2é'` aborted the process: byte index 5 lands
+  inside the `é`. Reproduced, then fixed by reading the digits from the bytes.
+  A guard that crashes on an ordinary identifier is worse than the hole it
+  closes.
+- **A false-rejection regression.** I refused *every* space in a path. The
+  parser only strips them from the ends; an interior space is encoded
+  harmlessly. That broke `bb commit browse` for the ordinary case of a
+  repository file whose name contains a space. Narrowed to the edges. My
+  earlier "no legitimate path is refused" was therefore false — the sweep only
+  covers literals and structurally cannot see a runtime file path.
+- **`#` was exempted by the query split**, so the truncation class stayed open
+  at every raw site. No path this CLI builds contains a literal `#`, so it is
+  now refused before the split: zero false positives, whole class closed
+  centrally.
+
+The `?` half cannot be closed centrally, because a query is legitimate. Encoded
+the prefixes at the destructive, unconfirmed siblings the review named:
+`unprotect_branch`, `revoke_repo_permission`, `delete_variable`, and
+`delete_branch` (which confirmed the *branch* name while a slug of `r#x` would
+have deleted the *repository*).
+
+Remaining and not attempted here: ~89 raw interpolation sites across Jira, JSM
+and Opsgenie. The durable fix for that class is a segment-based path builder
+rather than `format!`, which is a refactor of the whole command layer.
+
+901 tests across 32 suites, clippy clean. False-rejection sweep: 217 of 217
+literal paths accepted.

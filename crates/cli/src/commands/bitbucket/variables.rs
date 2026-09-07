@@ -121,16 +121,23 @@ pub fn build_var_base_url(scope: &VarScope) -> Result<String> {
         VarScope::Repository {
             workspace,
             repo_slug,
-        } => format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines_config/variables/"),
-        VarScope::Workspace { workspace } => {
-            format!("/2.0/workspaces/{workspace}/pipelines-config/variables/")
-        }
+        } => format!(
+            "/2.0/repositories/{}/{}/pipelines_config/variables/",
+            encode_path_segment(workspace)?,
+            encode_path_segment(repo_slug)?
+        ),
+        VarScope::Workspace { workspace } => format!(
+            "/2.0/workspaces/{}/pipelines-config/variables/",
+            encode_path_segment(workspace)?
+        ),
         VarScope::Deployment {
             workspace,
             repo_slug,
             env_uuid,
         } => format!(
-            "/2.0/repositories/{workspace}/{repo_slug}/deployments_config/environments/{}/variables/",
+            "/2.0/repositories/{}/{}/deployments_config/environments/{}/variables/",
+            encode_path_segment(workspace)?,
+            encode_path_segment(repo_slug)?,
             encode_path_segment(env_uuid)?
         ),
     })

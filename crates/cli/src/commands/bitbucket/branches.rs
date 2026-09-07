@@ -3,7 +3,9 @@ use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::{encode_ref_path, page_size, warn_if_truncated, BitbucketContext};
+use super::utils::{
+    encode_path_segment, encode_ref_path, page_size, warn_if_truncated, BitbucketContext,
+};
 use crate::commands::common::{confirm_destructive, render_success, MutationResult};
 
 #[derive(Deserialize)]
@@ -109,7 +111,9 @@ pub async fn get_branch(
     branch_name: &str,
 ) -> Result<()> {
     let path = format!(
-        "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
+        "/2.0/repositories/{}/{}/refs/branches/{}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?,
         encode_ref_path(branch_name)?
     );
     let branch: Branch = ctx.client.get(&path).await.with_context(|| {
@@ -214,7 +218,9 @@ pub async fn delete_branch(
     }
 
     let path = format!(
-        "/2.0/repositories/{workspace}/{repo_slug}/refs/branches/{}",
+        "/2.0/repositories/{}/{}/refs/branches/{}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?,
         encode_ref_path(branch_name)?
     );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
@@ -292,8 +298,11 @@ pub async fn unprotect_branch(
     repo_slug: &str,
     restriction_id: i64,
 ) -> Result<()> {
-    let path =
-        format!("/2.0/repositories/{workspace}/{repo_slug}/branch-restrictions/{restriction_id}");
+    let path = format!(
+        "/2.0/repositories/{}/{}/branch-restrictions/{restriction_id}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to remove branch protection from {workspace}/{repo_slug}")
     })?;
