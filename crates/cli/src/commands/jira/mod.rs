@@ -464,7 +464,14 @@ enum CommentCommands {
 #[derive(Subcommand, Debug, Clone)]
 enum ProjectCommands {
     /// List all projects
-    List,
+    List {
+        /// Maximum results. 0 fetches every page.
+        ///
+        /// This command previously took no limit and returned whatever the
+        /// first page held, which was 50.
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
     /// Get project details
     Get {
         /// Project key
@@ -1119,7 +1126,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
             } => attachments::delete_attachment(&ctx, &attachment_id, force).await,
         },
         JiraCommands::Project(cmd) => match cmd {
-            ProjectCommands::List => projects::list_projects(&ctx).await,
+            ProjectCommands::List { limit } => projects::list_projects(&ctx, limit).await,
             ProjectCommands::Get { key } => projects::get_project(&ctx, &key).await,
             ProjectCommands::Create {
                 key,

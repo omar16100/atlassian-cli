@@ -2485,3 +2485,33 @@ Anyone releasing this should re-authenticate and run at least: `auth whoami -f
 json`, `auth scopes`, `bb permission list`, `bb pr list --limit 0` on a
 repository with more than 100 pull requests, and `bb bulk delete-branches`
 WITHOUT `--execute` on a repository with more than 100 branches.
+
+### Jira's second pagination shape, and `jira project list`
+
+Jira paginates two different ways and they are not interchangeable.
+`/search/jql` uses an opaque `nextPageToken`; the classic endpoints -- project
+search, webhooks, field and workflow lists -- return
+`startAt`/`maxResults`/`total`/`isLast` and expect the caller to advance the
+offset itself.
+
+The module deleted at the start of this work modelled only the second shape,
+and modelled it for an endpoint that had since moved to the first. That is
+precisely why nothing adopted it. `JiraOffsetPage<T>` now covers it properly,
+alongside `JiraPage<T>`, each applied where it belongs.
+
+Three guards, each tested: `isLast` wins where the endpoint sends it; otherwise
+the offset arithmetic against `total`; and an empty page ends the walk, because
+without either field the offset would advance by zero forever.
+
+`jira project list` was the first conversion, and it was worse than the
+Bitbucket cases: `/project/search` returns 50 per page and the command took
+**no `--limit` at all**, so it listed the first 50 projects and presented them
+as the project list, with no flag that could have revealed the shortfall. It now
+paginates, takes `--limit` (default 50, 0 for all) and warns when short. The e2e
+test was verified to fail against the single-page behaviour.
+
+Remaining offset-paged Jira lists, now that the shape is supported:
+`jira webhook list`, `jira automation list`, `jira audit`, the field and
+workflow lists, and the JSM tree.
+
+891 tests across 32 suites, clippy clean.

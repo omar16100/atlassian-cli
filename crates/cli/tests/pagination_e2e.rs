@@ -413,3 +413,43 @@ async fn a_non_paginating_command_does_not_claim_completeness() {
         "a command that cannot establish completeness must not assert it: {stdout}"
     );
 }
+
+/// Jira's classic endpoints paginate by offset, not by cursor, so they need a
+/// different page shape entirely. `jira project list` took no limit at all and
+/// returned whatever the first page held -- 50 projects, presented as the
+/// project list.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn jira_project_list_follows_offset_pages() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/project/search"))
+        .and(query_param("startAt", "2"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "values": [{"key": "THIRD", "name": "Third"}],
+            "startAt": 2, "total": 3
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/project/search"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "values": [{"key": "ONE", "name": "One"}, {"key": "TWO", "name": "Two"}],
+            "startAt": 0, "total": 3
+        })))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(&config, &["jira", "project", "list", "-f", "json"]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(out.status.success(), "{stdout}");
+    assert!(
+        stdout.contains("THIRD"),
+        "the second offset page was dropped: {stdout}"
+    );
+}
