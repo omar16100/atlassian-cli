@@ -268,6 +268,7 @@ enum IssueCommands {
     /// Transition an issue, by transition name or by destination status.
     ///
     /// `jira issue transitions <KEY>` lists what is available right now.
+    #[command(group = clap::ArgGroup::new("target").required(true).args(["transition", "to_status"]))]
     Transition {
         /// Issue key
         key: String,
@@ -282,8 +283,8 @@ enum IssueCommands {
         /// Show what would happen without sending anything.
         #[arg(long)]
         dry_run: bool,
-        /// Maximum transitions to walk for --to-status.
-        #[arg(long, default_value_t = 10)]
+        /// Maximum transitions to walk for --to-status. Ignored otherwise.
+        #[arg(long, default_value_t = 10, requires = "to_status")]
         max_hops: usize,
     },
 

@@ -692,6 +692,44 @@ fn find_by_destination<'a>(available: &'a [Transition], status: &str) -> Option<
     })
 }
 
+/// Transitions worth considering when no single hop reaches the target.
+///
+/// Two exclusions, both learned from a demonstrated failure. A status already
+/// visited would oscillate. And a status in Jira's **Done** category is excluded
+/// unless it is the target: "Won't Do", "Cancelled" and "Rejected" all live
+/// there, they are commonly offered from every status as global transitions,
+/// and entering one fires post-functions that set a resolution which survives
+/// reopening. A walk aiming at Done that quietly lands in Won't Do is worse than
+/// no walk at all.
+fn onward_candidates<'a>(
+    available: &'a [Transition],
+    visited: &[String],
+    target_status: &str,
+) -> Vec<&'a Transition> {
+    available
+        .iter()
+        .filter(|t| {
+            // No declared destination: cannot reason about it, so do not walk
+            // through it blindly.
+            let Some(to) = t.to.as_ref() else {
+                return false;
+            };
+            if visited
+                .iter()
+                .any(|seen| seen.eq_ignore_ascii_case(&to.name))
+            {
+                return false;
+            }
+            if to.name.eq_ignore_ascii_case(target_status) {
+                return true;
+            }
+            !to.category
+                .as_ref()
+                .is_some_and(|c| c.name.eq_ignore_ascii_case("Done"))
+        })
+        .collect()
+}
+
 /// Apply one transition and return the status the issue reports afterwards.
 async fn apply_transition(ctx: &JiraContext<'_>, key: &str, t: &Transition) -> Result<()> {
     let payload = serde_json::json!({ "transition": { "id": t.id } });
@@ -762,7 +800,17 @@ async fn transition_by_name(
     let landed = match destination {
         Some(name) => name,
         // The workflow did not say where it leads, so ask rather than guess.
-        None => current_status(ctx, key).await?,
+        // A failed read here must still make clear the transition happened.
+        None => match current_status(ctx, key).await {
+            Ok(name) => name,
+            Err(err) => {
+                return Err(err.context(format!(
+                    "{key} was transitioned via {:?}, but its new status could not be read. \
+                     The transition did take effect; do not re-run it.",
+                    target.name
+                )));
+            }
+        },
     };
 
     tracing::info!(%key, transition = %target.name, status = %landed, "Issue transitioned");
@@ -825,37 +873,48 @@ async fn transition_to_status(
     for hop in 0..max_hops {
         let available = fetch_transitions(ctx, key).await?;
 
-        // Prefer a transition that lands directly on the target.
-        let next = find_by_destination(&available, target_status).or_else(|| {
-            // Otherwise take the first transition to a status not yet visited,
-            // which keeps the walk from oscillating between two states.
-            available.iter().find(|t| {
-                t.to.as_ref().is_some_and(|to| {
-                    !visited
-                        .iter()
-                        .any(|seen| seen.eq_ignore_ascii_case(&to.name))
-                })
-            })
-        });
+        let here = visited.last().cloned().unwrap_or_default();
 
-        let Some(next) = next else {
-            bail!(
-                "{key} is in {} and no transition from there leads anywhere new.\n\
-                 Path so far: {}\n\
-                 Available now: {}",
-                visited.last().unwrap(),
-                visited.join(" -> "),
-                if available.is_empty() {
-                    "(none)".to_string()
-                } else {
-                    available
-                        .iter()
-                        .map(describe)
-                        .collect::<Vec<_>>()
-                        .join(", ")
+        // A transition landing directly on the target is never a guess.
+        let candidates = onward_candidates(&available, &visited, target_status);
+        let next =
+            match find_by_destination(&available, target_status) {
+                Some(direct) => direct,
+                None => {
+                    match candidates.as_slice() {
+                        // Exactly one way onward: forced, not chosen.
+                        [only] => only,
+                        [] => {
+                            bail!(
+                        "{key} is in {here} and nothing leads onward toward {target_status}.\n\
+                         Path so far: {}\n\
+                         Available now: {}\n\n\
+                         Transitions into a Done-category status are not taken automatically \
+                         unless they are the target, because they are usually terminal.",
+                        visited.join(" -> "),
+                        if available.is_empty() {
+                            "(none)".to_string()
+                        } else {
+                            available.iter().map(describe).collect::<Vec<_>>().join(", ")
+                        }
+                    )
+                        }
+                        // A real fork. The Jira API promises no ordering, so
+                        // "the first one" would be arbitrary. Hand the choice back.
+                        many => bail!(
+                            "{key} is in {here} and the route to {target_status} is ambiguous.\n\
+                         Path so far: {}\n\n\
+                         More than one transition leads onward:\n{}\n\n\
+                         Pick one with --transition, then re-run --to-status.",
+                            visited.join(" -> "),
+                            many.iter()
+                                .map(|t| format!("  {}", describe(t)))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        ),
+                    }
                 }
-            );
-        };
+            };
 
         let landing = next.to.as_ref().map(|to| to.name.clone());
 
@@ -871,9 +930,24 @@ async fn transition_to_status(
             )));
         }
 
+        // The transition has already been applied. If we cannot learn where it
+        // landed, that must not erase the record of what moved: reporting only
+        // "failed to read status" would leave the caller unaware the issue had
+        // been transitioned at all.
         let landed = match landing {
             Some(name) => name,
-            None => current_status(ctx, key).await?,
+            None => match current_status(ctx, key).await {
+                Ok(name) => name,
+                Err(err) => {
+                    return Err(err.context(format!(
+                        "{key} was transitioned via {:?} but its new status could not be read. \
+                         Completed {} transition(s). Path so far: {}",
+                        next.name,
+                        hop + 1,
+                        visited.join(" -> ")
+                    )));
+                }
+            },
         };
         visited.push(landed.clone());
 

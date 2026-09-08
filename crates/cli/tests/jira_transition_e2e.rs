@@ -120,7 +120,7 @@ async fn success_reports_the_resulting_status_not_the_transition_name() {
         .await;
     Mock::given(method("POST"))
         .and(path_matcher("/rest/api/3/issue/MLENG-1753/transitions"))
-        .respond_with(ResponseTemplate::new(204).set_body_json(serde_json::json!({})))
+        .respond_with(ResponseTemplate::new(204))
         .mount(&server)
         .await;
 
@@ -227,7 +227,7 @@ async fn to_status_walks_the_workflow() {
 
     Mock::given(method("POST"))
         .and(path_matcher("/rest/api/3/issue/MLENG-1753/transitions"))
-        .respond_with(ResponseTemplate::new(204).set_body_json(serde_json::json!({})))
+        .respond_with(ResponseTemplate::new(204))
         .mount(&server)
         .await;
 
@@ -297,4 +297,253 @@ async fn issue_get_exposes_the_status_category() {
         serde_json::json!("In Progress"),
         "the category is what tells a script this is not done: {stdout}"
     );
+}
+
+/// The failure a reviewer demonstrated live against the first version: a
+/// workflow offering `Abandon -> Won't Do` **first** made `--to-status Done`
+/// push the issue into Won't Do and strand it, leaving a valid route untaken.
+/// Jira promises no ordering of `transitions`, so "the first one" was arbitrary.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_walk_never_takes_a_done_category_detour() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "key": "MLENG-1753",
+            "fields": {"status": {"name": "Backlog", "statusCategory": {"name": "To Do"}}}
+        })))
+        .mount(&server)
+        .await;
+
+    // "Abandon" is listed first and leads somewhere unvisited, so the old
+    // heuristic took it. It is Done-category, so it must now be skipped.
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753/transitions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "transitions": [
+                {"id": "99", "name": "Abandon",
+                 "to": {"name": "Won't Do", "statusCategory": {"name": "Done"}}},
+                {"id": "11", "name": "Start work",
+                 "to": {"name": "Analysis", "statusCategory": {"name": "In Progress"}}}
+            ]
+        })))
+        .mount(&server)
+        .await;
+
+    Mock::given(method("POST"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753/transitions"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "transition",
+            "MLENG-1753",
+            "--to-status",
+            "Done",
+            "--max-hops",
+            "2",
+        ],
+    );
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // The error may legitimately *mention* Won't Do when listing what is
+    // available; what matters is that the issue never entered it. The path it
+    // reports, and the transitions it actually POSTed, are the evidence.
+    assert!(
+        !combined.contains("-> Won't Do\n") && !combined.contains("Backlog -> Won't Do"),
+        "the walk moved the issue into a Done-category detour: {combined}"
+    );
+
+    let posts: Vec<String> = server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|r| r.method == wiremock::http::Method::POST)
+        .map(|r| String::from_utf8_lossy(&r.body).to_string())
+        .collect();
+    assert!(
+        posts.iter().all(|b| !b.contains("\"99\"")),
+        "must not POST the Abandon transition: {posts:?}"
+    );
+}
+
+/// A genuine fork must be handed back, not resolved by picking one.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_ambiguous_route_refuses_and_lists_the_options() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "key": "MLENG-1753",
+            "fields": {"status": {"name": "Backlog", "statusCategory": {"name": "To Do"}}}
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753/transitions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "transitions": [
+                {"id": "11", "name": "Start work",
+                 "to": {"name": "Analysis", "statusCategory": {"name": "In Progress"}}},
+                {"id": "12", "name": "Triage",
+                 "to": {"name": "Triage", "statusCategory": {"name": "To Do"}}}
+            ]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "transition",
+            "MLENG-1753",
+            "--to-status",
+            "Done",
+        ],
+    );
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert!(!out.status.success(), "an ambiguous route must not proceed");
+    assert!(combined.contains("ambiguous"), "{combined}");
+    assert!(combined.contains("Start work"), "{combined}");
+    assert!(combined.contains("Triage"), "{combined}");
+
+    let posts = server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|r| r.method == wiremock::http::Method::POST)
+        .count();
+    assert_eq!(posts, 0, "nothing may move while the route is ambiguous");
+}
+
+/// A dead end must say where the issue is and what it offers.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_dead_end_reports_position_and_options() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "key": "MLENG-1753",
+            "fields": {"status": {"name": "Backlog", "statusCategory": {"name": "To Do"}}}
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753/transitions"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({"transitions": []})),
+        )
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "transition",
+            "MLENG-1753",
+            "--to-status",
+            "Done",
+        ],
+    );
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    assert!(!out.status.success());
+    assert!(combined.contains("Backlog"), "says where it is: {combined}");
+    assert!(combined.contains("nothing leads onward"), "{combined}");
+}
+
+/// `--to-status --dry-run` must be inert and must not imply it knows the whole
+/// route: transitions are visible only from the current status.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn to_status_dry_run_is_inert_and_honest_about_what_it_knows() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "key": "MLENG-1753",
+            "fields": {"status": {"name": "Backlog", "statusCategory": {"name": "To Do"}}}
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/MLENG-1753/transitions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "transitions": [transition("11", "Start work", "Analysis")]
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .respond_with(ResponseTemplate::new(204))
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "transition",
+            "MLENG-1753",
+            "--to-status",
+            "Done",
+            "--dry-run",
+        ],
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+
+    assert!(out.status.success(), "{stdout}");
+    assert!(
+        stdout.contains("unknowable in advance") || stdout.contains("cannot reach"),
+        "must not imply it knows the full route: {stdout}"
+    );
+
+    let posts = server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|r| r.method == wiremock::http::Method::POST)
+        .count();
+    assert_eq!(posts, 0, "a dry run must send nothing");
 }

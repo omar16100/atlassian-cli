@@ -2792,3 +2792,50 @@ dry-run output says this explicitly instead of implying a full plan.
 
 906 tests across 33 suites, clippy clean. The two tests covering the reported
 symptoms were verified to fail against the pre-fix behaviour.
+
+### Review: `--to-status` stranded issues in terminal states
+
+The reviewer reproduced it live rather than arguing it. Against a workflow where
+Backlog offers `Abandon -> Won't Do` **first**, `--to-status Done` POSTed the
+issue into Won't Do and then died there, leaving a valid two-hop route untaken.
+
+Three facts made the heuristic indefensible, not merely unlucky:
+
+- Jira guarantees **no ordering** of the `transitions` array, so "the first
+  unvisited one" was arbitrary.
+- Global transitions like Cancel and Close are offered from *every* status and
+  always point somewhere unvisited, so they were permanently eligible.
+- Entering a Done-category status fires post-functions that set a resolution,
+  which survives reopening. The damage is not undone by transitioning back.
+
+And the detail that stings: `Transition.to` already carried `statusCategory`.
+The information needed to avoid this was parsed and ignored.
+
+**The fix is to stop guessing.** A transition landing directly on the target is
+taken, because that is not a guess. Otherwise the candidates are filtered to
+unvisited, non-Done-category destinations, and then:
+
+- exactly one candidate: taken, because it is forced rather than chosen;
+- none: refuse, reporting where the issue is and what it offers;
+- more than one: refuse as **ambiguous**, list them, and hand the choice back.
+
+A real fork is a decision the user has to make; picking for them was the bug.
+
+Also fixed from that review:
+
+- **A failed status re-read after a successful POST erased the progress
+  report.** The command would say only "failed to read status", leaving the
+  caller unaware the issue had moved — and liable to re-run it. Both walk and
+  by-name paths now report what was applied first.
+- **Passing neither flag** produced a runtime `bail!` with no usage. Now a clap
+  `ArgGroup`, so it exits 2 with usage like any other argument error.
+- **`--max-hops` was silently ignored** with `--transition`; now `requires`.
+- **My own mocks returned `204` with a body**, which HTTP forbids. The client
+  retried, making the suite intermittently ~40x slower (36-42s against ~1s) and
+  leaving the test's pass dependent on retry configuration.
+
+Four paths that had no coverage now do: the Done-category detour, an ambiguous
+fork, a dead end, and `--to-status --dry-run`. The detour test was verified to
+fail against the original heuristic.
+
+910 tests across 33 suites, clippy clean.
