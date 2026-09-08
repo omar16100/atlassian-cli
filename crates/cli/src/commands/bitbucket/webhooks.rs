@@ -1,13 +1,9 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 
-use super::utils::BitbucketContext;
+use super::utils::{encode_path_segment, warn_if_truncated_with, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
-
-#[derive(Deserialize)]
-struct WebhookList {
-    values: Vec<Webhook>,
-}
 
 #[derive(Deserialize)]
 struct Webhook {
@@ -19,11 +15,6 @@ struct Webhook {
     active: bool,
     #[serde(default)]
     events: Vec<String>,
-}
-
-#[derive(Deserialize)]
-struct SshKeyList {
-    values: Vec<SshKey>,
 }
 
 #[derive(Deserialize)]
@@ -40,13 +31,15 @@ pub async fn list_webhooks(
     workspace: &str,
     repo_slug: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/hooks");
+    // No pagelen and no cursor follow: Bitbucket's default page bounded this,
+    // so a repository with many hooks silently reported a subset.
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/hooks?pagelen=100");
 
-    let response: WebhookList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list webhooks for {workspace}/{repo_slug}"))?;
+    let (webhooks, page) =
+        fetch_paged::<BitbucketPage<Webhook>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to list webhooks for {workspace}/{repo_slug}"))?;
+    warn_if_truncated_with(&page, webhooks.len(), "webhooks", false);
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -57,8 +50,7 @@ pub async fn list_webhooks(
         description: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = webhooks
         .iter()
         .map(|webhook| Row {
             uuid: webhook.uuid.as_str(),
@@ -135,7 +127,17 @@ pub async fn delete_webhook(
     repo_slug: &str,
     webhook_uuid: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/hooks/{webhook_uuid}");
+    // A uuid of `..` normalises to the repository endpoint -- a delete with no
+    // confirmation at all -- and one carrying `#` truncates to a different hook.
+    // The slug is encoded too, not just the uuid. A slug of `r#x` truncates the
+    // path to the repository endpoint, turning "delete webhook" -- which has no
+    // confirmation prompt -- into a repository delete.
+    let path = format!(
+        "/2.0/repositories/{}/{}/hooks/{}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?,
+        encode_path_segment(webhook_uuid)?
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to delete webhook {webhook_uuid} from {workspace}/{repo_slug}")
     })?;
@@ -162,13 +164,13 @@ pub async fn list_ssh_keys(
     workspace: &str,
     repo_slug: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys");
+    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys?pagelen=100");
 
-    let response: SshKeyList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list SSH keys for {workspace}/{repo_slug}"))?;
+    let (keys, page) =
+        fetch_paged::<BitbucketPage<SshKey>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to list SSH keys for {workspace}/{repo_slug}"))?;
+    warn_if_truncated_with(&page, keys.len(), "SSH keys", false);
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -177,8 +179,7 @@ pub async fn list_ssh_keys(
         key_preview: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = keys
         .iter()
         .map(|key| Row {
             uuid: key.uuid.as_str(),
@@ -244,7 +245,12 @@ pub async fn delete_ssh_key(
     repo_slug: &str,
     key_uuid: &str,
 ) -> Result<()> {
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/deploy-keys/{key_uuid}");
+    let path = format!(
+        "/2.0/repositories/{}/{}/deploy-keys/{}",
+        encode_path_segment(workspace)?,
+        encode_path_segment(repo_slug)?,
+        encode_path_segment(key_uuid)?
+    );
     let _: serde_json::Value = ctx.client.delete(&path).await.with_context(|| {
         format!("Failed to delete SSH key {key_uuid} from {workspace}/{repo_slug}")
     })?;

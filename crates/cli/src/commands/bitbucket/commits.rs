@@ -1,13 +1,9 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::BitbucketContext;
-
-#[derive(Deserialize)]
-struct CommitList {
-    values: Vec<Commit>,
-}
+use super::utils::{encode_ref_path, page_size, warn_if_truncated, BitbucketContext};
 
 #[derive(Deserialize)]
 struct Commit {
@@ -87,11 +83,17 @@ pub async fn list_commits(
     limit: usize,
 ) -> Result<()> {
     let mut query = form_urlencoded::Serializer::new(String::new());
-    query.append_pair("pagelen", &limit.min(100).to_string());
+    query.append_pair("pagelen", &page_size(limit).to_string());
 
     let path = if let Some(b) = branch {
+        // Encoded: a revision containing `#` would otherwise truncate the path
+        // and silently list a different branch's commits, and one containing
+        // `..` would address another repository entirely. Read-only, so the
+        // consequence is a confidently wrong answer rather than damage -- which
+        // is the failure this work exists to remove.
         format!(
-            "/2.0/repositories/{workspace}/{repo_slug}/commits/{b}?{}",
+            "/2.0/repositories/{workspace}/{repo_slug}/commits/{}?{}",
+            encode_ref_path(b)?,
             query.finish()
         )
     } else {
@@ -101,11 +103,11 @@ pub async fn list_commits(
         )
     };
 
-    let response: CommitList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to list commits for {workspace}/{repo_slug}"))?;
+    let (commits, page) =
+        fetch_paged::<BitbucketPage<Commit>>(&ctx.client, &path, PageLimits::from_cli_limit(limit))
+            .await
+            .with_context(|| format!("Failed to list commits for {workspace}/{repo_slug}"))?;
+    warn_if_truncated(&page, commits.len(), "commits");
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -115,8 +117,7 @@ pub async fn list_commits(
         date: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = commits
         .iter()
         .map(|commit| Row {
             hash: &commit.hash[..7.min(commit.hash.len())],

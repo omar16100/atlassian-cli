@@ -312,6 +312,124 @@ pub struct ApiClient {
     rate_limiter: RateLimiter,
 }
 
+/// Refuse a request path that the URL parser would restructure.
+///
+/// Every command builds its path with `format!`, so keeping them safe has meant
+/// each call site remembering to encode what it interpolates. That discipline
+/// failed repeatedly, and roughly forty interpolation sites across Jira, JSM and
+/// Opsgenie have never been audited at all. So the check lives here, at the one
+/// point every request passes through.
+///
+/// **Derived from what the parser does, not from a list of characters.** The
+/// first version of this function compared segments against the literal strings
+/// `"."` and `".."`, which missed `%2e%2e` — verified to resolve to the parent
+/// against the `url` version in the lockfile. The WHATWG parser percent-decodes
+/// a segment *once* before deciding whether it is a dot segment, so this does
+/// the same. That also gets the negative case right: `%252e%252e` decodes to
+/// the literal `%2e%2e`, is not a dot segment, and is correctly allowed —
+/// verified, it does not traverse.
+///
+/// Rejected in the path portion:
+///
+/// - any segment that percent-decodes to `.` or `..`;
+/// - a backslash, which the parser treats as a separator;
+/// - a control character, which the parser strips *before* parsing, so
+///   `.<TAB>.` becomes `..`;
+/// - a space, which the parser strips from the ends of the input, so a trailing
+///   one silently addresses the collection.
+///
+/// The query is exempt: JQL and CQL legitimately contain dots, spaces and `..`
+/// ranges, and a query cannot move the request to another resource. A caller
+/// needing any of these literally in a path must percent-encode it, which is
+/// what `encode_path_segment` in the CLI does.
+fn reject_restructuring_path(path: &str) -> Result<()> {
+    let restructured = |reason: &str| {
+        debug!(
+            path,
+            reason, "Refusing a path the URL parser would restructure"
+        );
+        ApiError::InvalidUrl(url::ParseError::InvalidDomainCharacter)
+    };
+
+    // A `#` anywhere is refused before the split, not exempted by it. A
+    // fragment is never sent on the wire, so an interpolated value containing
+    // one silently truncates the path: a repository slug of `r#x` turns
+    // `DELETE .../hooks/{uuid}` into `DELETE /2.0/repositories/w/r`. No path
+    // this CLI builds contains a literal `#`, so refusing it costs nothing and
+    // closes the whole class centrally, rather than one call site at a time.
+    if path.contains('#') {
+        return Err(restructured("fragment marker truncates the path"));
+    }
+
+    // Everything below concerns the path; a query may legitimately contain a
+    // dot, a space or a backslash, and cannot move the request elsewhere.
+    let path_only = path.split('?').next().unwrap_or(path);
+
+    if path_only.chars().any(|c| c.is_control()) {
+        return Err(restructured("control character"));
+    }
+    if path_only.contains('\\') {
+        return Err(restructured("backslash is a path separator"));
+    }
+    // Only the ends. The parser strips spaces from the ends of the whole input,
+    // so a trailing one addresses the collection -- but an interior space is
+    // encoded harmlessly, and refusing it broke `bb commit browse` on the
+    // ordinary case of a repository file whose name contains a space.
+    if path_only.trim_matches(' ') != path_only {
+        return Err(restructured("leading or trailing space is stripped"));
+    }
+
+    for segment in path_only.split('/') {
+        if is_dot_segment(segment) {
+            return Err(restructured("dot component"));
+        }
+    }
+
+    Ok(())
+}
+
+/// Whether a raw path segment is a dot segment once decoded.
+///
+/// Decodes exactly once, because that is what the URL parser does: `%2e%2e` is
+/// `..`, while the double-encoded `%252e%252e` is the literal text `%2e%2e` and
+/// addresses a real resource.
+fn is_dot_segment(segment: &str) -> bool {
+    let decoded = decode_once(segment);
+    decoded == "." || decoded == ".."
+}
+
+/// Value of one ASCII hex digit.
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// Percent-decode a single pass, leaving invalid escapes as written.
+fn decode_once(segment: &str) -> String {
+    // Read the two hex digits from the bytes, never by slicing the `str`.
+    // Slicing panicked on `x-%2é`: byte index 5 lands inside the `é`, so a
+    // perfectly ordinary identifier aborted the process before any request.
+    let bytes = segment.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let (Some(hi), Some(lo)) = (hex_value(bytes[i + 1]), hex_value(bytes[i + 2])) {
+                out.push(hi * 16 + lo);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 impl ApiClient {
     pub fn new(base_url: impl AsRef<str>) -> Result<Self> {
         let url = Url::parse(base_url.as_ref()).map_err(ApiError::InvalidUrl)?;
@@ -377,6 +495,8 @@ impl ApiClient {
     /// Safely join a path to the base URL, ensuring the origin remains unchanged
     /// to prevent SSRF attacks.
     fn safe_join(&self, path: &str) -> Result<Url> {
+        reject_restructuring_path(path)?;
+
         let joined = self
             .base_url
             .join(path.strip_prefix('/').unwrap_or(path))
@@ -993,6 +1113,101 @@ impl ApiClient {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The net beneath per-call-site encoding. Each of these was verified
+    /// against the `url` version in the lockfile to resolve somewhere other
+    /// than the segment it names.
+    #[test]
+    fn a_restructuring_path_is_refused_before_it_is_joined() {
+        for bad in [
+            "/2.0/repositories/w/r/hooks/..",
+            "/2.0/repositories/w/r/hooks/.",
+            "/2.0/repositories/w/r/hooks/..\\",
+            "/2.0/repositories/w/r/hooks/a\\..\\x",
+            "/2.0/repositories/w/r/hooks/.\t.",
+            "/2.0/repositories/w/r/hooks/.\n.",
+            "/rest/api/3/issue/../../admin",
+            // Percent-encoded dot segments: the first version of this guard
+            // compared against the literal strings and let every one of these
+            // through, each of which resolves to the parent.
+            "/2.0/repositories/w/r/hooks/%2e%2e",
+            "/2.0/repositories/w/r/hooks/%2E%2e",
+            "/2.0/repositories/w/r/hooks/.%2e",
+            "/2.0/repositories/w/r/hooks/%2e",
+            // A trailing space is stripped from the input, addressing the
+            // collection rather than a member.
+            "/rest/api/3/issue/ ",
+        ] {
+            assert!(
+                reject_restructuring_path(bad).is_err(),
+                "{bad:?} must be refused"
+            );
+        }
+    }
+
+    /// `decode_once` byte-sliced the `str` and aborted the process on an
+    /// ordinary identifier: byte index 5 of `x-%2é` lands inside the `é`.
+    #[test]
+    fn decode_once_does_not_panic_on_a_multibyte_char_after_a_percent() {
+        assert_eq!(decode_once("x-%2é"), "x-%2é");
+        assert_eq!(decode_once("%2é"), "%2é");
+        assert_eq!(decode_once("é%"), "é%");
+        assert_eq!(decode_once("%é2"), "%é2");
+        // And the request path built from one is refused or accepted, not a crash.
+        assert!(reject_restructuring_path("/rest/api/3/issue/x-%2é").is_ok());
+    }
+
+    /// A `#` in an interpolated value truncates the path, so it is refused
+    /// before the query split rather than exempted by it. A slug of `r#x`
+    /// turned a webhook delete into a repository delete.
+    #[test]
+    fn a_fragment_marker_is_refused_anywhere() {
+        assert!(reject_restructuring_path("/2.0/repositories/w/r#x/hooks/u").is_err());
+        assert!(reject_restructuring_path("/rest/api/3/issue/KEY-1#x").is_err());
+        assert!(reject_restructuring_path("/x?jql=a#b").is_err());
+    }
+
+    /// An interior space is encoded harmlessly by the parser; only the ends are
+    /// stripped. Refusing every space broke `bb commit browse` for a repository
+    /// file whose name contains one.
+    #[test]
+    fn only_edge_spaces_are_refused() {
+        assert!(reject_restructuring_path("/2.0/repositories/w/r/src/main/my file.txt").is_ok());
+        assert!(reject_restructuring_path("/rest/api/3/issue/ ").is_err());
+        assert!(reject_restructuring_path("/rest/api/3/issue/x ").is_err());
+        assert!(reject_restructuring_path(" /rest/api/3/issue/x").is_err());
+        // A space in the query is untouched.
+        assert!(reject_restructuring_path("/rest/api/3/search/jql?jql=a = b").is_ok());
+    }
+
+    /// Double-encoding is not traversal: `%252e%252e` is the literal text
+    /// `%2e%2e` and addresses a real resource. Rejecting it would be a false
+    /// positive, and decoding more than once would cause one.
+    #[test]
+    fn a_double_encoded_dot_is_a_real_segment() {
+        assert!(reject_restructuring_path("/2.0/repositories/w/r/hooks/%252e%252e").is_ok());
+        assert!(!is_dot_segment("%252e%252e"));
+        assert_eq!(decode_once("%252e%252e"), "%2e%2e");
+    }
+
+    /// The decoder must not mangle a segment that merely contains a `%`.
+    #[test]
+    fn decode_once_leaves_invalid_escapes_alone() {
+        assert_eq!(decode_once("100%"), "100%");
+        assert_eq!(decode_once("a%zzb"), "a%zzb");
+        assert_eq!(decode_once("%7Babc%7D"), "{abc}");
+    }
+
+    /// A query value is not part of the path and cannot move the request, so
+    /// JQL containing a dot or a `..` range must still be allowed through.
+    #[test]
+    fn a_dot_in_the_query_is_not_a_path_component() {
+        assert!(
+            reject_restructuring_path("/rest/api/3/search/jql?jql=fixVersion%20in%20(1.0)").is_ok()
+        );
+        assert!(reject_restructuring_path("/x?range=a..b").is_ok());
+    }
+
     use wiremock::matchers::{body_string, header, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 

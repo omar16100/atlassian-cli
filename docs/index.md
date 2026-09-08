@@ -70,6 +70,7 @@ once its work ships and the change is written up under "Features and changes".
 
 | Document | Date | What it covers |
 | --- | --- | --- |
+| [08092026_remaining_hardening.md](08092026_remaining_hardening.md) | 2026-09-08 | Open follow-up work found while remediating the 17 reported findings: path building by interpolation, unconfirmed deletes, pagination gaps outside Bitbucket, `-f json` holdouts, misdescriptive naming |
 | [07092026_cli_feedback_remediation_plan.md](07092026_cli_feedback_remediation_plan.md) | 2026-09-07 | Triage and remediation of 17 findings (14 reported, 3 found in review): silent truncation and shared pagination, list-output envelope, product-agnostic `api` passthrough, scope handling, Bitbucket permission endpoints, reviewer resolution |
 
 ## Examples

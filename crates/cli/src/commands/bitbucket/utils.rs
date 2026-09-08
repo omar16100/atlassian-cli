@@ -98,9 +98,174 @@ pub fn encode_ref_path(name: &str) -> anyhow::Result<String> {
     Ok(out)
 }
 
+/// Page size for a list command's first request.
+///
+/// `--limit 0` means "everything", so it asks for a full page rather than
+/// clamping to zero and fetching nothing.
+pub fn page_size(limit: usize) -> usize {
+    if limit == 0 {
+        100
+    } else {
+        limit.clamp(1, 100)
+    }
+}
+
+/// Warn on stderr when a list came back incomplete.
+///
+/// stderr, so a piped `-f json` result stays machine-readable. The envelope
+/// carries this structurally for the commands wired to `ListMeta`; this is the
+/// signal for everything else, and for the tabular formats, which have no field
+/// to put it in.
+pub fn warn_if_truncated(page: &atlassian_cli_api::pagination::PageInfo, shown: usize, noun: &str) {
+    warn_if_truncated_with(page, shown, noun, true)
+}
+
+/// As [`warn_if_truncated`], for commands that have no `--limit` flag.
+///
+/// `bb webhook list` and `bb ssh-key list` take no limit, so advising the user
+/// to raise one names a flag that does not exist. There the shortfall can only
+/// come from the request budget, and the honest thing is to say the result is
+/// incomplete without prescribing a remedy that is unavailable.
+pub fn warn_if_truncated_with(
+    page: &atlassian_cli_api::pagination::PageInfo,
+    shown: usize,
+    noun: &str,
+    has_limit_flag: bool,
+) {
+    if !page.truncated {
+        return;
+    }
+    if has_limit_flag {
+        eprintln!(
+            "warning: showing {shown} {noun}; more exist. Raise --limit, or use --limit 0 for all."
+        );
+    } else {
+        eprintln!("warning: showing {shown} {noun}; the list is incomplete.");
+    }
+}
+
+/// Accept only an identifier that cannot restructure a URL, without changing
+/// how it is sent.
+///
+/// This started as a blacklist of `/`, `#`, `%` and dot components, derived
+/// from the characters a review had named. That was the wrong method and it
+/// leaked: the WHATWG parser behind `Url::join` treats `\\` as `/`, so `..\\`
+/// still resolved to the parent — the repository endpoint, reached by a delete
+/// with no confirmation. It also strips tab, CR and LF before parsing, so
+/// `".\t."` became `..`, and it splits on a raw `?`. Enumerating what the
+/// parser does is a losing game; this permits only what is known safe.
+///
+/// Used where the value is also reused verbatim outside the URL — a pipeline
+/// uuid is trimmed of its braces to build a browser link — so it cannot simply
+/// be percent-encoded in place. Everywhere else, prefer
+/// [`encode_path_segment`], whose output is inert by construction.
+pub fn accept_safe_identifier(value: &str, what: &str) -> anyhow::Result<()> {
+    if value.is_empty() {
+        anyhow::bail!("{what} cannot be empty");
+    }
+    let permitted = |c: char| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '{' | '}');
+    if let Some(bad) = value.chars().find(|c| !permitted(*c)) {
+        anyhow::bail!(
+            "Invalid {what} {value:?}: {bad:?} is not permitted in an identifier, because it can \
+             change which resource the request addresses"
+        );
+    }
+    if value.chars().all(|c| c == '.') {
+        anyhow::bail!("Invalid {what} {value:?}: a dot component would retarget the request");
+    }
+    Ok(())
+}
+
+/// Percent-encode a single path segment, rejecting anything that would make it
+/// more than one.
+///
+/// `encode_ref_path` deliberately preserves `/`, because `feature/login` is one
+/// branch name spanning two path segments. A repository slug, a webhook uuid or
+/// a key id is never like that: Bitbucket slugs are `[A-Za-z0-9._-]`. Reusing
+/// the ref helper for them left a hole -- `bb repo delete "myrepo/refs/branches/main"`
+/// passed the guard, reached the branch-delete endpoint, deleted a branch, and
+/// reported "Repository myrepo/refs/branches/main deleted".
+///
+/// Percent-encoding a brace-wrapped uuid is **not** a change to what Bitbucket
+/// receives, contrary to what an earlier revision of this file asserted.
+/// `Url::join` already encodes `{` and `}`: a raw `{abc-123}` and a
+/// pre-encoded `%7Babc-123%7D` produce byte-identical request paths. Verified
+/// against the `url` version in the lockfile. That mistaken belief is why the
+/// weaker guard above exists at all, and why it is now confined to the one
+/// case that genuinely cannot encode.
+pub fn encode_path_segment(value: &str) -> anyhow::Result<String> {
+    if value.contains('/') {
+        anyhow::bail!(
+            "Invalid identifier {value:?}: '/' would address a different resource than the one named"
+        );
+    }
+    encode_ref_path(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_identifier_whitelist_rejects_what_the_url_parser_reinterprets() {
+        assert!(accept_safe_identifier("{abc-123}", "webhook uuid").is_ok());
+        assert!(accept_safe_identifier("d6a3f1", "key id").is_ok());
+        assert!(accept_safe_identifier("build.42", "pipeline id").is_ok());
+
+        // Each of these was demonstrated to retarget the request through
+        // Url::join: backslash is a separator, tab/CR/LF are stripped before
+        // parsing, `?` starts a query, and a bare space trims to nothing.
+        for bad in [
+            "..", ".", "...", "a/b", "abc#x", "abc%2e", "..\\", "a\\..\\x", ".\t.", ".\n.",
+            "{u}?x=1", " ", "",
+        ] {
+            assert!(
+                accept_safe_identifier(bad, "webhook uuid").is_err(),
+                "{bad:?} must be rejected"
+            );
+        }
+    }
+
+    /// The claim the weaker guard was originally justified by, pinned so it
+    /// cannot be reasserted: encoding a braced uuid changes nothing on the wire.
+    #[test]
+    fn encoding_a_braced_uuid_does_not_change_the_request_path() {
+        let base = Url::parse("https://api.bitbucket.org/").unwrap();
+        let raw = base.join("2.0/repositories/w/r/hooks/{abc-123}").unwrap();
+        let encoded = base
+            .join(&format!(
+                "2.0/repositories/w/r/hooks/{}",
+                encode_path_segment("{abc-123}").unwrap()
+            ))
+            .unwrap();
+        assert_eq!(raw.path(), encoded.path());
+        assert_eq!(raw.path(), "/2.0/repositories/w/r/hooks/%7Babc-123%7D");
+    }
+
+    /// The hole this exists to close: a slug with a `/` reached the
+    /// branch-delete endpoint while the message still said "repository".
+    #[test]
+    fn a_slug_containing_a_slash_is_rejected() {
+        assert!(encode_path_segment("myrepo/refs/branches/main").is_err());
+        assert!(encode_path_segment("a/b").is_err());
+    }
+
+    #[test]
+    fn an_ordinary_slug_passes_and_is_still_encoded() {
+        assert_eq!(encode_path_segment("my-repo.v2").unwrap(), "my-repo.v2");
+        assert_eq!(encode_path_segment("odd#name").unwrap(), "odd%23name");
+        assert!(encode_path_segment("..").is_err());
+        assert!(encode_path_segment("").is_err());
+    }
+
+    #[test]
+    fn a_zero_limit_asks_for_a_full_page() {
+        // Clamping to 0 here would fetch nothing while claiming to fetch all.
+        assert_eq!(page_size(0), 100);
+        assert_eq!(page_size(25), 25);
+        assert_eq!(page_size(500), 100);
+        assert_eq!(page_size(1), 1);
+    }
 
     /// The bug this exists for: `#` truncates the path at the client, so the
     /// request lands on a different — and possibly protected — ref.

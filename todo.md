@@ -2327,3 +2327,420 @@ support. That was an undisclosed breaking change; only `logs_url` was ever meant
 to go.
 
 879 tests across 32 suites, clippy clean.
+
+## Follow-up branch: `fix/destructive-confirmation-consistency`
+
+Started after the merge review flagged that the conventions established on
+`feat/cli-feedback-remediation` turned existing commands into outliers. Kept
+separate deliberately: the remediation branch is reviewed and merge-ready, and
+stacking more onto it would have invalidated that review.
+
+**`bb repo delete` had the exact defect fixed for `bb branch delete`** -- the
+bespoke `[y/N]` prompt on stdout (corrupting `-f json`), a bare "y" accepted,
+and EOF cancelling with exit 0 so a scheduled job could not tell the repository
+still existed. Deleting a repository is far less recoverable than deleting a
+branch, and it carried the weaker guard. Now uses `confirm_destructive` with the
+slug typed back, and `--force` gains `--yes` as an alias.
+
+The slug also goes through `encode_ref_path`, so a value carrying `..` cannot
+address a different repository than the one named in the confirmation.
+
+Still outstanding on this branch, from the same review:
+
+- ~10 delete commands with **no** confirmation at all: `webhooks.rs:132,241`,
+  `variables.rs:344`, `jira/issues.rs:807,937`, `jira/fields_workflows.rs:184`,
+  `jira/projects.rs:400,603`, `bamboo/branches.rs:128`, the JSM deletes and the
+  Opsgenie deletes.
+- Six list commands that still truncate silently (`branch list`, `repo list`,
+  `workspace list`, `commits`, webhooks, ssh-keys).
+- `commits.rs:151,192,242` interpolate a revision raw, so `main#old` silently
+  addresses `main` -- read-only, so misinformation rather than damage.
+
+881 tests across 32 suites, clippy clean.
+
+### Follow-up: `branch list` and `repo list` no longer truncate silently
+
+The generalised form of the original finding 2. Both capped `pagelen` at
+`limit.min(100)` and never followed the cursor, so `--limit 500` returned 100
+with nothing to say the rest existed -- the same silent, authoritative-looking
+shortfall the remediation branch fixed for search and steps.
+
+Both now use `fetch_paged`, honour `--limit 0` as "everything", and warn on
+stderr when the result is short. Two helpers moved into `bitbucket/utils.rs` so
+the remaining conversions do not each re-derive them:
+
+- `page_size(limit)` -- `--limit 0` asks for a full page rather than clamping to
+  zero and fetching nothing, which is the bug that shipped in the first version
+  of the Jira fix.
+- `warn_if_truncated(page, shown, noun)` -- stderr, so a piped `-f json` result
+  stays parseable.
+
+`BranchList` and `RepoList` deleted; `BitbucketPage<T>` replaces them.
+
+Still to convert on this branch: `workspace list`, `project list`, `commits`,
+`webhooks`, `ssh-keys`.
+
+882 tests across 32 suites, clippy clean.
+
+### Follow-up: workspace, project and commit lists paginated
+
+Same conversion as `branch list` / `repo list`, using the shared `page_size` and
+`warn_if_truncated` helpers. `WorkspaceList`, `ProjectList` and `CommitList`
+deleted in favour of `BitbucketPage<T>`.
+
+`bb commit list --branch <rev>` also interpolated the revision raw. A revision
+containing `#` truncated the path and listed a different branch's commits; one
+containing `..` addressed another repository. Read-only, so the consequence was
+a confidently wrong answer rather than data loss -- which is still the failure
+class this whole effort is about. Now goes through `encode_ref_path`.
+
+Remaining unconverted lists: `webhooks`, `ssh-keys`, and the Jira/JSM/Opsgenie
+trees.
+
+882 tests across 32 suites, clippy clean.
+
+### Follow-up: webhook and ssh-key lists paginated
+
+Both requested without any `pagelen` at all, so Bitbucket's default page size
+bounded them and a repository with many hooks or deploy keys silently reported a
+subset. `WebhookList` and `SshKeyList` deleted.
+
+That completes the Bitbucket list sweep. Remaining unconverted: the Jira, JSM
+and Opsgenie trees.
+
+882 tests across 32 suites, clippy clean.
+
+### Review of the follow-up branch: five fixes
+
+**A slug guard that guarded the wrong thing.** `encode_ref_path` deliberately
+preserves `/`, because `feature/login` is one branch name spanning two path
+segments. A repository slug is never like that. Reusing the ref helper meant
+`bb repo delete "myrepo/refs/branches/main" --force` passed the guard, reached
+the **branch-delete** endpoint, deleted a branch, and reported "Repository
+myrepo/refs/branches/main deleted" -- while the comment above it claimed to
+prevent addressing a different resource than the one confirmed. New
+`encode_path_segment` rejects `/` outright; slugs are `[A-Za-z0-9._-]`, so
+nothing legitimate is lost.
+
+**A test whose result was a property of the test runner.** The no-terminal
+refusal test assumed `cargo test` never inherits a TTY on stdin. Under a
+pseudo-terminal it failed, and in a real terminal it would block waiting for
+keyboard input mid-run. The terminal check is now a parameter
+(`confirm_destructive_on`), so the refusal is pinned directly; the `delete_repo`
+test asserts the property that actually matters -- no request reaches the API --
+rather than a message that varies with the runner. Verified passing under
+`script -q /dev/null`.
+
+**"This completes the Bitbucket list sweep" was false.** `bb pr list`, the
+highest-traffic list command, still capped at 100 with no cursor follow. Now
+converted.
+
+**`--limit 0` was undocumented everywhere.** Seven list commands honour it and
+none said so; the only way to discover it was the stderr warning. All seven now
+document it. Checked each rather than assuming: `pipeline list` was not part of
+this branch's conversions but already treated 0 as unlimited
+(`pipelines.rs:612`), so the claim holds there too.
+
+**The truncation warning advised a flag two commands lack.** `webhook list` and
+`ssh-key list` have no `--limit`, so "Raise --limit" named something that does
+not exist. They now get a message without a remedy they cannot use.
+
+885 tests across 32 suites, clippy clean, unit suite verified under a
+pseudo-TTY.
+
+## Live verification: attempted, not possible — all testing is mock-based
+
+Both stored profiles (`ntuclink`, `ntuclink-bb`) have expired tokens: Jira
+returns "Client must be authenticated to access this resource", Bitbucket
+"Token is invalid, expired, or not supported for this endpoint". So **no part of
+this work has been exercised against a real Atlassian instance.** Every test is
+wiremock or the built binary against a mock server.
+
+The attempt did establish two things a mock cannot:
+
+- `auth whoami --bitbucket` reached the **Bitbucket** API and failed there, not
+  with "Profile missing base_url". That is finding 9's actual defect, so the
+  dispatch fix works against a real endpoint.
+- `auth scopes` built its client, called `ApiClient::response_header`, reached
+  api.bitbucket.org and surfaced a 401 with the right hint — the command is
+  genuinely wired, not merely compiling.
+
+**Untested against a live API**, and worth stating before release:
+
+- Pagination against real cursors. Every multi-page test uses a mock whose
+  `next` URL we construct. Bitbucket's real `next` shape, and Jira's real
+  `nextPageToken`/`isLast` behaviour at a page boundary, are unverified.
+- `permissions-config/users` and `/groups` — the response shape is taken from
+  Atlassian's docs, never seen.
+- `effective-default-reviewers` — same, including whether the account is nested
+  under `user` or carries a top-level `uuid`.
+- `scope_hint` against a real 403. The body shape is from Atlassian's
+  documentation and community reports, not observed.
+- `x-oauth-scopes` — that Bitbucket actually sets this header on the endpoints
+  `auth scopes` calls.
+- `bb api` / `confluence api` against real endpoints (only `--dry-run` tested).
+- Every `--execute` path. No branch or repository has been deleted by this code.
+
+Anyone releasing this should re-authenticate and run at least: `auth whoami -f
+json`, `auth scopes`, `bb permission list`, `bb pr list --limit 0` on a
+repository with more than 100 pull requests, and `bb bulk delete-branches`
+WITHOUT `--execute` on a repository with more than 100 branches.
+
+### Jira's second pagination shape, and `jira project list`
+
+Jira paginates two different ways and they are not interchangeable.
+`/search/jql` uses an opaque `nextPageToken`; the classic endpoints -- project
+search, webhooks, field and workflow lists -- return
+`startAt`/`maxResults`/`total`/`isLast` and expect the caller to advance the
+offset itself.
+
+The module deleted at the start of this work modelled only the second shape,
+and modelled it for an endpoint that had since moved to the first. That is
+precisely why nothing adopted it. `JiraOffsetPage<T>` now covers it properly,
+alongside `JiraPage<T>`, each applied where it belongs.
+
+Three guards, each tested: `isLast` wins where the endpoint sends it; otherwise
+the offset arithmetic against `total`; and an empty page ends the walk, because
+without either field the offset would advance by zero forever.
+
+`jira project list` was the first conversion, and it was worse than the
+Bitbucket cases: `/project/search` returns 50 per page and the command took
+**no `--limit` at all**, so it listed the first 50 projects and presented them
+as the project list, with no flag that could have revealed the shortfall. It now
+paginates, takes `--limit` (default 50, 0 for all) and warns when short. The e2e
+test was verified to fail against the single-page behaviour.
+
+Remaining offset-paged Jira lists, now that the shape is supported:
+`jira webhook list`, `jira automation list`, `jira audit`, the field and
+workflow lists, and the JSM tree.
+
+891 tests across 32 suites, clippy clean.
+
+### The guard was applied to one of the callers its own doc named
+
+The review's verdict was "do not merge", and it was right for the reason this
+branch keeps repeating: `encode_path_segment`'s doc comment said it existed for
+"a repository slug, a webhook uuid or a key id", and only the repository slug
+was converted. Left open: `delete_webhook` and `delete_ssh_key` (both raw), the
+permission user id (still using the `/`-permitting ref helper), the environment
+uuid, and the pipeline identifier. A webhook uuid of `..` normalises to the
+**repository** endpoint — a delete with no confirmation at all.
+
+**Not fixed by encoding, deliberately.** Those identifiers are brace-wrapped,
+and `encode_path_segment` would send `%7B...%7D` where Bitbucket currently
+receives `{...}`. That is correct per RFC 3986 and a change to the bytes on the
+wire, and nothing here has been verified against a live instance. An existing
+test (`test_braced_uuid_preserved_in_api_path`) asserts the braces must survive,
+which settles it. New `reject_retargeting` refuses `/`, `#`, `%` and dot
+components while leaving the encoding untouched: the hole closes without betting
+on an untested wire change.
+
+The pipeline identifier is guarded at `resolve_pipeline_id`, the single point
+its six interpolations all flow through — the one place that covers them all and
+cannot be forgotten when a seventh appears.
+
+Also fixed: `bb pipeline list --help` rendered "Maximum number of results.
+Maximum results. 0 fetches every page" — the doc pass added a line without
+removing the old one, on the one command the sweep had not converted.
+
+892 tests across 32 suites, clippy clean.
+
+### The guard's justification was false, and the guard leaked
+
+Fourth recurrence of this branch's pattern, and the worst reasoning error in it.
+
+**The premise was wrong.** The previous commit refused to percent-encode
+brace-wrapped uuids, arguing it would change the bytes Bitbucket receives, and
+cited `test_braced_uuid_preserved_in_api_path` as evidence. Verified against the
+`url` version in the lockfile:
+
+```
+raw   {abc-123}      -> path /2.0/.../hooks/%7Babc-123%7D
+encoded %7Babc-123%7D -> path /2.0/.../hooks/%7Babc-123%7D
+```
+
+`Url::join` already encodes the braces. The two forms are byte-identical on the
+wire, so the "untested wire change" being avoided was not a change at all. The
+test proves nothing: it asserts on the path string built by `format!`, before
+`safe_join` ever sees it. I rejected the correct fix on a premise I had not
+tested, having flagged that premise as the thing I was least sure of.
+
+**The weaker guard leaked, exactly as that choice invited.** Its rejection set
+was derived from the characters a review had named rather than from what the URL
+parser does. Empirically:
+
+| input | resolves to |
+| --- | --- |
+| `..\` | `/2.0/repositories/w/r/` — the repository endpoint |
+| `a\..\x` | `.../hooks/x` |
+| `.<TAB>.` | `/2.0/repositories/w/r/` |
+| `{u}?x=1` | `.../hooks/%7Bu%7D` with `?x=1` injected |
+| `" "` | `.../hooks/` — the collection |
+
+WHATWG treats `\` as `/`, strips tab/CR/LF before parsing, and splits on `?`.
+Enumerating what a parser does is a losing game.
+
+**Fixed properly.** `encode_path_segment` now guards webhook uuid, ssh key id,
+environment uuid, project key and every repository slug site — its output is
+inert by construction, so all five inputs above become harmless. Where the value
+is reused verbatim outside the URL (a pipeline uuid is trimmed of braces to
+build a browser link, so it cannot be encoded in place), `accept_safe_identifier`
+permits only `[A-Za-z0-9-_.{}]` — a whitelist, not a blacklist.
+
+`delete_project` was also still raw, despite the previous commit's title
+claiming every single-segment identifier was guarded.
+
+Two tests now pin the corrected understanding: one proves encoding does not
+change the request path, the other asserts hostile inputs cannot escape their
+prefix or inject a query — asserting the property, not which mechanism fired.
+
+894 tests across 32 suites, clippy clean.
+
+### The real fix: guard the choke point, not each call site
+
+Four consecutive review rounds found a defect in the previous round's fix. That
+is not bad luck, it is a signal: URL safety was being enforced per call site,
+which requires never forgetting, across roughly forty `format!` interpolations —
+most of them in Jira, JSM and Opsgenie, never audited at all.
+
+`safe_join` (`crates/api/src/lib.rs`) is the one point every request passes
+through. `reject_restructuring_path` now runs there and refuses what no
+legitimate Atlassian path contains:
+
+- a `.` or `..` path component;
+- a backslash, which the WHATWG parser treats as a separator;
+- a tab, CR, LF or other control character, which the parser strips *before*
+  parsing, so `.<TAB>.` becomes `..`.
+
+Only the path is examined. A query value may legitimately contain a dot or a
+`..` range — JQL does — and cannot move the request to another resource.
+
+This is a net beneath the per-site encoding, not a replacement for it. A caller
+that encodes correctly is unaffected; one that forgets now gets an error instead
+of a request against the wrong resource. Every previously demonstrated bypass
+(`..\`, `a\..\x`, `.<TAB>.`, plain `..`) is refused here regardless of which
+command built the path, including the forty sites this work never touched.
+
+897 tests across 32 suites, clippy clean.
+
+### The choke point, derived from the parser this time
+
+The fifth round found the same failure in the guard the fourth round was meant
+to end: it compared segments against the literal strings `"."` and `".."`, so
+`%2e%2e` went straight through. Verified against the lockfile's `url`:
+
+```
+hooks/%2e%2e  -> /2.0/repositories/w/r/     (the repository endpoint)
+hooks/%2E%2e  -> /2.0/repositories/w/r/
+hooks/.%2e    -> /2.0/repositories/w/r/
+hooks/%252e%252e -> hooks/%252e%252e        (does NOT traverse)
+```
+
+Enumerating spellings is what kept failing. The rule is now taken from what the
+parser does: it percent-decodes a segment **once** before deciding, so
+`is_dot_segment` decodes once and compares. That gets the negative case right
+too — `%252e%252e` decodes to the literal `%2e%2e`, is a real resource, and is
+correctly allowed. Decoding twice would have introduced a false rejection while
+fixing a false negative.
+
+Also now rejected in the path: a raw space, because the parser strips spaces
+from the ends of the input, so `/rest/api/3/issue/ ` addresses the collection.
+
+**A second unconfirmed-delete path closed.** `bb webhook delete` and
+`bb ssh-key delete` encoded the uuid but interpolated `{repo_slug}` raw, so a
+slug of `r#x` truncated the path to the repository endpoint — turning a command
+with no confirmation prompt into a repository delete. Both now encode the
+workspace and slug as well.
+
+**False-rejection sweep re-run against the stricter guard**: of 217 literal
+request paths in the CLI, 216 pass and the one flagged is prose, not a path
+(`workspaces.rs:370`, the bearer `whoami` note). No legitimate path is refused.
+
+Corrections to the previous entry, which overstated: "only the path portion is
+examined" was false — the control and backslash checks ran on the whole string,
+which refused a legitimate `jira api` query containing a backslash. The split
+now happens first. And "every bypass demonstrated over the previous rounds is
+refused" was false: `?` injection and the bare space survived at raw sites.
+
+898 tests across 32 suites, clippy clean.
+
+### Round 6: the mechanism converged; the crash and the regression were mine
+
+The sixth review returned the first genuinely good news about the guard itself:
+tested over 2,379 adversarial segment combinations against the real parser,
+`is_dot_segment` had **zero disagreements** — no traversal missed, no real
+resource refused. The dot-segment core is correct.
+
+Three things it found were still wrong, and all three were introduced by me in
+round 5:
+
+- **A reachable panic.** `decode_once` byte-sliced the `str` to read the two hex
+  digits, so `jira issue get 'x-%2é'` aborted the process: byte index 5 lands
+  inside the `é`. Reproduced, then fixed by reading the digits from the bytes.
+  A guard that crashes on an ordinary identifier is worse than the hole it
+  closes.
+- **A false-rejection regression.** I refused *every* space in a path. The
+  parser only strips them from the ends; an interior space is encoded
+  harmlessly. That broke `bb commit browse` for the ordinary case of a
+  repository file whose name contains a space. Narrowed to the edges. My
+  earlier "no legitimate path is refused" was therefore false — the sweep only
+  covers literals and structurally cannot see a runtime file path.
+- **`#` was exempted by the query split**, so the truncation class stayed open
+  at every raw site. No path this CLI builds contains a literal `#`, so it is
+  now refused before the split: zero false positives, whole class closed
+  centrally.
+
+The `?` half cannot be closed centrally, because a query is legitimate. Encoded
+the prefixes at the destructive, unconfirmed siblings the review named:
+`unprotect_branch`, `revoke_repo_permission`, `delete_variable`, and
+`delete_branch` (which confirmed the *branch* name while a slug of `r#x` would
+have deleted the *repository*).
+
+Remaining and not attempted here: ~89 raw interpolation sites across Jira, JSM
+and Opsgenie. The durable fix for that class is a segment-based path builder
+rather than `format!`, which is a refactor of the whole command layer.
+
+901 tests across 32 suites, clippy clean. False-rejection sweep: 217 of 217
+literal paths accepted.
+
+### Round 7: the pattern broke, and the last two siblings are closed
+
+The seventh review returned the first clean verdict on the mechanism:
+*"nothing in this commit makes anything worse, and every previously working path
+still works."* Independently fuzzed against the lockfile's `url`: **0 panics over
+4,393 inputs**, **0 parser disagreements over 3,640 differentials**. All three
+round-5 defects — the panic, the space over-rejection, the `#` exemption — are
+precisely fixed, and round 5's habit of introducing new mechanism defects did
+not repeat.
+
+It also settled a worry of mine that turned out to be unfounded: I expected
+rejecting `#` to break JQL searching for a literal `#`. It does not. JQL, CQL
+and the `--query` passthrough all go through `urlencoding::encode`, so a `#`
+becomes `%23` before the guard sees the string.
+
+Two destructive siblings had still been missed, both one `?` in a slug away from
+an unconfirmed repository delete:
+
+- `unapprove_pull_request` (`pullrequests.rs`) — an unconfirmed DELETE whose
+  slug of `r?x` resolved to `DELETE /2.0/repositories/w/r`.
+- the `delete_branches` loop (`bulk.rs`) — where `--yes` skips the confirmation
+  entirely, so every iteration would have truncated onto the repository.
+
+Both now encode the workspace and slug. **Audited afterwards: no raw
+`{workspace}/{repo_slug}` prefix remains at any DELETE site in the Bitbucket
+tree.** The remaining raw prefixes are GET, POST and PUT, where truncation lands
+on endpoints that do not destroy data.
+
+Corrections to the previous entry, which over-claimed twice:
+
+- "no path this CLI builds contains a literal `#`" is false for *runtime*
+  values: `browse_source` interpolates a repository file path, and git permits
+  `#` in filenames. That case never worked (it silently truncated before), and a
+  pre-encoded `%23` passes, so nothing regresses — but the claim was the same
+  literal-sweep blindspot I had just conceded for spaces, restated a paragraph
+  later.
+- the rejection reason "leading or trailing space is stripped" is not literally
+  true when a query follows: for `/x ?a=b` the parser encodes rather than
+  strips. The guard still refuses, which is the conservative direction.
+
+901 tests across 32 suites, clippy clean.

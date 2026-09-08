@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, JiraOffsetPage, PageLimits};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -7,13 +8,7 @@ use crate::commands::common::{render_success, MutationResult};
 
 // Project Operations
 
-pub async fn list_projects(ctx: &JiraContext<'_>) -> Result<()> {
-    #[derive(Deserialize)]
-    struct ProjectsResponse {
-        #[serde(default)]
-        values: Vec<Project>,
-    }
-
+pub async fn list_projects(ctx: &JiraContext<'_>, limit: usize) -> Result<()> {
     #[derive(Deserialize)]
     struct Project {
         key: String,
@@ -30,11 +25,23 @@ pub async fn list_projects(ctx: &JiraContext<'_>) -> Result<()> {
         display_name: String,
     }
 
-    let response: ProjectsResponse = ctx
-        .client
-        .get("/rest/api/3/project/search")
-        .await
-        .context("Failed to list projects")?;
+    // `/project/search` is offset-paged and returns 50 per page by default, so
+    // this listed the first 50 projects and called it the project list. It took
+    // no --limit at all, which made the shortfall impossible to even notice.
+    let (projects, page) = fetch_paged::<JiraOffsetPage<Project>>(
+        &ctx.client,
+        "/rest/api/3/project/search?maxResults=50",
+        PageLimits::from_cli_limit(limit),
+    )
+    .await
+    .context("Failed to list projects")?;
+
+    if page.truncated {
+        eprintln!(
+            "warning: showing {} projects; more exist. Raise --limit, or use --limit 0 for all.",
+            projects.len()
+        );
+    }
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -44,8 +51,7 @@ pub async fn list_projects(ctx: &JiraContext<'_>) -> Result<()> {
         project_type: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .values
+    let rows: Vec<Row<'_>> = projects
         .iter()
         .map(|project| Row {
             key: project.key.as_str(),

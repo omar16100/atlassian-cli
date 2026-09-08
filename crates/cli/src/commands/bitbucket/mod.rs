@@ -148,6 +148,7 @@ enum RepoCommands {
         long_about = "List repositories inside a workspace.\n\nExamples:\n  bb repo list\n  bb repo list --limit 50\n  bb repo list --workspace my-team"
     )]
     List {
+        /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
@@ -191,12 +192,12 @@ enum RepoCommands {
         #[arg(long)]
         language: Option<String>,
     },
-    /// Delete a repository.
+    /// Delete a repository, its pull requests, issues and wiki.
     Delete {
         /// Repository slug.
         slug: String,
-        /// Skip confirmation prompt.
-        #[arg(long)]
+        /// Skip the typed confirmation. `--yes` matches the other commands.
+        #[arg(long, visible_alias = "yes")]
         force: bool,
     },
 }
@@ -207,6 +208,7 @@ enum BranchCommands {
     List {
         /// Repository slug.
         repo: String,
+        /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
@@ -286,6 +288,7 @@ enum PrCommands {
         repo: String,
         #[arg(long, default_value = "OPEN")]
         state: String,
+        /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
@@ -463,6 +466,7 @@ enum PrCommands {
 enum WorkspaceCommands {
     /// List workspaces.
     List {
+        /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
@@ -474,6 +478,7 @@ enum WorkspaceCommands {
 enum ProjectCommands {
     /// List projects in workspace.
     List {
+        /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
@@ -518,7 +523,7 @@ enum ProjectCommands {
 enum PipelineCommands {
     /// List pipelines.
     List {
-        /// Maximum number of results.
+        /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
         /// Sort field (prefix with - for desc): created_on, -created_on.
@@ -914,6 +919,7 @@ enum CommitCommands {
         /// Branch name.
         #[arg(long)]
         branch: Option<String>,
+        /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },

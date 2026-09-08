@@ -144,6 +144,65 @@ impl<T: DeserializeOwned> Page for JiraPage<T> {
     }
 }
 
+/// A Jira page from an endpoint that paginates by offset.
+///
+/// Jira has two pagination styles and they are not interchangeable.
+/// `/search/jql` uses an opaque `nextPageToken` ([`JiraPage`]); the classic
+/// endpoints -- project search, webhooks, field and workflow lists -- return
+/// `startAt`/`maxResults`/`total`/`isLast` and expect the caller to advance an
+/// offset itself.
+///
+/// The module this replaced modelled only this second shape, and modelled it
+/// for an endpoint that had since moved to the first, which is why nothing
+/// adopted it. Both are supported now, each where it applies.
+#[derive(Debug, Clone, Deserialize)]
+pub struct JiraOffsetPage<T> {
+    pub values: Vec<T>,
+    #[serde(default, rename = "startAt")]
+    pub start_at: Option<u64>,
+    #[serde(default, rename = "maxResults")]
+    pub max_results: Option<u64>,
+    #[serde(default)]
+    pub total: Option<u64>,
+    #[serde(default, rename = "isLast")]
+    pub is_last: Option<bool>,
+}
+
+/// The query parameter Jira's offset-paged endpoints advance.
+pub const JIRA_START_AT_PARAM: &str = "startAt";
+
+impl<T: DeserializeOwned> Page for JiraOffsetPage<T> {
+    type Item = T;
+
+    fn into_parts(self) -> (Vec<T>, Option<Continuation>, Option<u64>) {
+        let start = self.start_at.unwrap_or(0);
+        let returned = self.values.len() as u64;
+        let next_offset = start + returned;
+
+        // `isLast` is authoritative where the endpoint sends it. Otherwise fall
+        // back to the arithmetic, and treat an empty page as the end so a
+        // server that omits both cannot produce an endless walk.
+        let finished = match self.is_last {
+            Some(is_last) => is_last,
+            None => match self.total {
+                Some(total) => next_offset >= total,
+                None => returned == 0,
+            },
+        };
+
+        let cursor = if finished || returned == 0 {
+            None
+        } else {
+            Some(Continuation::Token {
+                param: JIRA_START_AT_PARAM.to_string(),
+                value: next_offset.to_string(),
+            })
+        };
+
+        (self.values, cursor, self.total)
+    }
+}
+
 /// How many items to collect, and how hard to work for them.
 #[derive(Debug, Clone, Copy)]
 pub struct PageLimits {
@@ -544,6 +603,54 @@ mod tests {
         );
     }
 
+    /// The offset walk end to end: three pages of an offset-paged endpoint,
+    /// with `startAt` advancing and never accumulating.
+    #[tokio::test]
+    async fn an_offset_paged_endpoint_is_followed_to_the_end() {
+        let server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path_matcher("/project/search"))
+            .and(query_param("startAt", "2"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{"name": "c"}], "startAt": 2, "total": 3
+            })))
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path_matcher("/project/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "values": [{"name": "a"}, {"name": "b"}], "startAt": 0, "total": 3
+            })))
+            .mount(&server)
+            .await;
+
+        let (items, info) = fetch_paged::<JiraOffsetPage<Item>>(
+            &client_for(&server),
+            "/project/search?expand=lead",
+            PageLimits::new(None),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(items.len(), 3, "every page collected");
+        assert!(!info.truncated);
+        assert_eq!(info.total, Some(3));
+
+        for request in server.received_requests().await.unwrap_or_default() {
+            let query = request.url.query().unwrap_or("");
+            assert!(
+                query.matches("startAt").count() <= 1,
+                "offset accumulated: {query}"
+            );
+            assert!(
+                query.contains("expand=lead"),
+                "the original query must survive: {query}"
+            );
+        }
+    }
+
     /// Jira's token goes back on the *original* path each time. Appending it to
     /// the previous request would put two `nextPageToken` values on page three.
     #[tokio::test]
@@ -742,6 +849,53 @@ mod tests {
     fn a_zero_cli_limit_means_no_limit() {
         assert_eq!(PageLimits::from_cli_limit(0).limit, None);
         assert_eq!(PageLimits::from_cli_limit(25).limit, Some(25));
+    }
+
+    fn offset_page(value: serde_json::Value) -> JiraOffsetPage<Item> {
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn an_offset_page_advances_by_what_it_returned() {
+        let page = offset_page(json!({
+            "values": [{"name": "a"}, {"name": "b"}],
+            "startAt": 0, "maxResults": 2, "total": 5
+        }));
+        let (items, cursor, total) = page.into_parts();
+        assert_eq!(items.len(), 2);
+        assert_eq!(
+            cursor,
+            Some(Continuation::Token {
+                param: JIRA_START_AT_PARAM.to_string(),
+                value: "2".to_string()
+            })
+        );
+        assert_eq!(total, Some(5));
+    }
+
+    /// `isLast` wins over the arithmetic where the endpoint sends it.
+    #[test]
+    fn is_last_ends_an_offset_walk() {
+        let page = offset_page(json!({
+            "values": [{"name": "a"}], "startAt": 0, "total": 99, "isLast": true
+        }));
+        assert_eq!(page.into_parts().1, None);
+    }
+
+    #[test]
+    fn reaching_the_total_ends_an_offset_walk() {
+        let page = offset_page(json!({
+            "values": [{"name": "a"}], "startAt": 4, "total": 5
+        }));
+        assert_eq!(page.into_parts().1, None);
+    }
+
+    /// Neither `isLast` nor `total`: an empty page must end the walk, or the
+    /// offset would advance by zero forever.
+    #[test]
+    fn an_empty_offset_page_ends_the_walk() {
+        let page = offset_page(json!({"values": [], "startAt": 10}));
+        assert_eq!(page.into_parts().1, None);
     }
 
     #[test]

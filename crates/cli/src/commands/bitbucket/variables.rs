@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::utils::BitbucketContext;
+use super::utils::{encode_path_segment, BitbucketContext};
 use crate::commands::common::{render_success, MutationResult};
 
 // ---------------------------------------------------------------------------
@@ -112,25 +112,35 @@ impl VarScope {
 }
 
 /// Build the base URL for variable operations at a given scope.
-pub fn build_var_base_url(scope: &VarScope) -> String {
-    match scope {
+///
+/// Fallible because the environment uuid is a single path segment taken from
+/// the command line: one containing `/`, a `..` component or a `#` would
+/// address a different resource than the one named.
+pub fn build_var_base_url(scope: &VarScope) -> Result<String> {
+    Ok(match scope {
         VarScope::Repository {
             workspace,
             repo_slug,
         } => format!(
-            "/2.0/repositories/{workspace}/{repo_slug}/pipelines_config/variables/"
+            "/2.0/repositories/{}/{}/pipelines_config/variables/",
+            encode_path_segment(workspace)?,
+            encode_path_segment(repo_slug)?
         ),
-        VarScope::Workspace { workspace } => {
-            format!("/2.0/workspaces/{workspace}/pipelines-config/variables/")
-        }
+        VarScope::Workspace { workspace } => format!(
+            "/2.0/workspaces/{}/pipelines-config/variables/",
+            encode_path_segment(workspace)?
+        ),
         VarScope::Deployment {
             workspace,
             repo_slug,
             env_uuid,
         } => format!(
-            "/2.0/repositories/{workspace}/{repo_slug}/deployments_config/environments/{env_uuid}/variables/"
+            "/2.0/repositories/{}/{}/deployments_config/environments/{}/variables/",
+            encode_path_segment(workspace)?,
+            encode_path_segment(repo_slug)?,
+            encode_path_segment(env_uuid)?
         ),
-    }
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +191,7 @@ pub async fn list_variables(
     scope: &VarScope,
     limit: usize,
 ) -> Result<()> {
-    let base_url = build_var_base_url(scope);
+    let base_url = build_var_base_url(scope)?;
     let is_table = matches!(
         ctx.renderer.format(),
         atlassian_cli_output::OutputFormat::Table | atlassian_cli_output::OutputFormat::Markdown
@@ -257,7 +267,7 @@ pub async fn create_variable(
     value: &str,
     secured: bool,
 ) -> Result<()> {
-    let base_url = build_var_base_url(scope);
+    let base_url = build_var_base_url(scope)?;
 
     tracing::debug!(scope = ?scope, key, secured, "Creating pipeline variable");
 
@@ -299,7 +309,7 @@ pub async fn update_variable(
     value: &str,
     secured_opt: Option<bool>,
 ) -> Result<()> {
-    let base_url = build_var_base_url(scope);
+    let base_url = build_var_base_url(scope)?;
 
     tracing::debug!(scope = ?scope, key, secured = ?secured_opt, "Updating pipeline variable");
 
@@ -346,7 +356,7 @@ pub async fn delete_variable(
     scope: &VarScope,
     key: &str,
 ) -> Result<()> {
-    let base_url = build_var_base_url(scope);
+    let base_url = build_var_base_url(scope)?;
 
     tracing::debug!(scope = ?scope, key, "Deleting pipeline variable");
 
@@ -457,7 +467,7 @@ async fn resolve_variable(
     scope: &VarScope,
     key: &str,
 ) -> Result<(Variable, String)> {
-    let base_url = build_var_base_url(scope);
+    let base_url = build_var_base_url(scope)?;
     let mut all_vars: Vec<Variable> = Vec::new();
     let mut next_url: Option<String> = None;
 
@@ -598,7 +608,7 @@ mod tests {
             workspace: "myws".to_string(),
             repo_slug: "myrepo".to_string(),
         };
-        let url = build_var_base_url(&scope);
+        let url = build_var_base_url(&scope).unwrap();
         assert_eq!(
             url,
             "/2.0/repositories/myws/myrepo/pipelines_config/variables/"
@@ -610,23 +620,70 @@ mod tests {
         let scope = VarScope::Workspace {
             workspace: "myws".to_string(),
         };
-        let url = build_var_base_url(&scope);
+        let url = build_var_base_url(&scope).unwrap();
         assert_eq!(url, "/2.0/workspaces/myws/pipelines-config/variables/");
     }
 
     #[test]
     fn test_build_var_base_url_deployment() {
-        // env_uuid comes from API with braces, used raw in URL
+        // The uuid is percent-encoded here rather than interpolated raw, which
+        // is what stops a value like `..\` retargeting the request. This is not
+        // a change to what Bitbucket receives: `Url::join` already encodes the
+        // braces, so the raw and encoded forms produce byte-identical request
+        // paths. The assertion below proves that rather than asserting it.
         let scope = VarScope::Deployment {
             workspace: "myws".to_string(),
             repo_slug: "myrepo".to_string(),
             env_uuid: "{abc-123}".to_string(),
         };
-        let url = build_var_base_url(&scope);
+        let url = build_var_base_url(&scope).unwrap();
         assert_eq!(
             url,
-            "/2.0/repositories/myws/myrepo/deployments_config/environments/{abc-123}/variables/"
+            "/2.0/repositories/myws/myrepo/deployments_config/environments/%7Babc-123%7D/variables/"
         );
+
+        let base = url::Url::parse("https://api.bitbucket.org/").unwrap();
+        let sent = base.join(url.trim_start_matches('/')).unwrap();
+        let raw_equivalent = base
+            .join(
+                "2.0/repositories/myws/myrepo/deployments_config/environments/{abc-123}/variables/",
+            )
+            .unwrap();
+        assert_eq!(
+            sent.path(),
+            raw_equivalent.path(),
+            "encoding must not change the request path"
+        );
+    }
+
+    /// A hostile environment uuid must not be able to address a different
+    /// resource. Two mechanisms achieve that and the test asserts the property,
+    /// not which one fired: `/` and dot components are refused outright, while
+    /// everything else is percent-encoded into a single inert segment.
+    #[test]
+    fn a_retargeting_env_uuid_cannot_change_the_target() {
+        let base = url::Url::parse("https://api.bitbucket.org/").unwrap();
+        let prefix = "/2.0/repositories/myws/myrepo/deployments_config/environments/";
+
+        for hostile in ["..", ".", "a/b", "{u}#x", "..\\", ".\t.", "{u}?x=1", " "] {
+            let scope = VarScope::Deployment {
+                workspace: "myws".to_string(),
+                repo_slug: "myrepo".to_string(),
+                env_uuid: hostile.to_string(),
+            };
+
+            let Ok(url) = build_var_base_url(&scope) else {
+                continue; // refused outright, which is also correct
+            };
+
+            let sent = base.join(url.trim_start_matches('/')).unwrap();
+            assert!(
+                sent.path().starts_with(prefix),
+                "{hostile:?} escaped its prefix: {}",
+                sent.path()
+            );
+            assert_eq!(sent.query(), None, "{hostile:?} injected a query: {sent}");
+        }
     }
 
     #[test]
@@ -760,7 +817,7 @@ mod tests {
             workspace: "ws".to_string(),
             repo_slug: "repo".to_string(),
         };
-        let base = build_var_base_url(&scope);
+        let base = build_var_base_url(&scope).unwrap();
         let braced_uuid = "{abc-def-123}";
         let path = format!("{base}{braced_uuid}");
         assert_eq!(
