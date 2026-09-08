@@ -14,9 +14,10 @@ Deferred, and not claimed as done:
 | 8 | both `whoami` commands | `pipeline_status`, `approve_pull_request` and `get_pr_diff` still bypass the renderer |
 | 11 | the envelope carries `total`/`truncated`/`next` | the default flip and `--no-envelope`, plus the ~20 direct `render(&rows)` conversions |
 
-Also not done, and listed here so the gap is visible rather than implied. This
-list is kept current; an earlier version of it went stale when the follow-up
-branch converted more than it claimed.
+Also not done, and listed here so the gap is visible rather than implied. The
+full version of this list, with counts taken from the tree, is
+[08092026_remaining_hardening.md](08092026_remaining_hardening.md); the summary
+below is kept in step with it.
 
 - **Pagination.** Done for every Bitbucket list and for `jira project list`.
   **Not** done for the rest of the Jira tree (webhooks, automation, audit, field
