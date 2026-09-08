@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use atlassian_cli_api::ApiClient;
+use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
@@ -315,38 +316,122 @@ struct BitbucketUser {
     uuid: String,
 }
 
-pub async fn whoami(client: &ApiClient, is_bearer: bool) -> Result<()> {
+/// Report the authenticated Bitbucket identity.
+///
+/// `-f json` was ignored here: every field went out through `println!`, so a
+/// script asking for JSON received the text form. The machine formats now go
+/// through the renderer; the human output is unchanged.
+pub async fn whoami(
+    client: &ApiClient,
+    is_bearer: bool,
+    renderer: &OutputRenderer,
+    // Omitted when the caller has no profile context, so the field is absent
+    // rather than empty.
+    profile_name: Option<&str>,
+) -> Result<()> {
     if is_bearer {
-        // Bearer tokens (access tokens) can't use /2.0/user — show accessible workspaces
-        let data: serde_json::Value = client
+        // Access tokens cannot use /2.0/user at all, so identity is reported as
+        // the set of workspaces the token can reach.
+        #[derive(Deserialize)]
+        struct WorkspaceList {
+            #[serde(default)]
+            values: Vec<serde_json::Value>,
+        }
+
+        let data: WorkspaceList = client
             .get("/2.0/workspaces")
             .await
             .context("Failed to fetch workspaces from Bitbucket API (Bearer auth)")?;
 
-        println!("Auth type: Bearer (access token)");
-        println!("/2.0/user is not available for access tokens.");
-        if let Some(workspaces) = data["values"].as_array() {
-            println!("Accessible workspaces:");
-            for ws in workspaces {
-                println!(
-                    "  {} ({})",
-                    ws["slug"].as_str().unwrap_or("?"),
-                    ws["name"].as_str().unwrap_or("?")
-                );
-            }
+        #[derive(Serialize)]
+        struct WorkspaceRef<'a> {
+            slug: &'a str,
+            name: &'a str,
         }
-        Ok(())
-    } else {
-        let user: BitbucketUser = client
-            .get("/2.0/user")
-            .await
-            .context("Failed to fetch current user from Bitbucket API")?;
 
-        println!("Username: {}", user.username);
-        println!("Display Name: {}", user.display_name);
-        println!("Account ID: {}", user.account_id);
-        println!("UUID: {}", user.uuid);
+        #[derive(Serialize)]
+        struct BearerView<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            profile: Option<&'a str>,
+            product: &'a str,
+            auth_type: &'a str,
+            note: &'a str,
+            workspaces: Vec<WorkspaceRef<'a>>,
+        }
 
-        Ok(())
+        let view = BearerView {
+            profile: profile_name,
+            product: "Bitbucket",
+            auth_type: "Bearer (access token)",
+            note: "/2.0/user is not available for access tokens",
+            workspaces: data
+                .values
+                .iter()
+                .map(|ws| WorkspaceRef {
+                    slug: ws["slug"].as_str().unwrap_or("?"),
+                    name: ws["name"].as_str().unwrap_or("?"),
+                })
+                .collect(),
+        };
+
+        return match renderer.format() {
+            OutputFormat::Json | OutputFormat::Yaml => renderer.render(&view),
+            _ => {
+                // `auth whoami --bitbucket` supplies a profile and prints the
+                // Profile/Product preamble; plain `bb whoami` has neither and
+                // must keep the output it always had.
+                if let Some(profile) = view.profile {
+                    println!("Profile: {profile}");
+                    println!("Product: {}", view.product);
+                }
+                println!("Auth type: {}", view.auth_type);
+                println!("{}.", view.note);
+                println!("Accessible workspaces:");
+                for workspace in &view.workspaces {
+                    println!("  {} ({})", workspace.slug, workspace.name);
+                }
+                Ok(())
+            }
+        };
+    }
+
+    let user: BitbucketUser = client
+        .get("/2.0/user")
+        .await
+        .context("Failed to fetch current user from Bitbucket API")?;
+
+    #[derive(Serialize)]
+    struct UserView<'a> {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        profile: Option<&'a str>,
+        product: &'a str,
+        username: &'a str,
+        display_name: &'a str,
+        account_id: &'a str,
+        uuid: &'a str,
+    }
+
+    let view = UserView {
+        profile: profile_name,
+        product: "Bitbucket",
+        username: &user.username,
+        display_name: &user.display_name,
+        account_id: &user.account_id,
+        uuid: &user.uuid,
+    };
+
+    match renderer.format() {
+        OutputFormat::Json | OutputFormat::Yaml => renderer.render(&view),
+        _ => {
+            if let Some(profile) = view.profile {
+                println!("Profile: {profile}");
+                println!("Product: {}", view.product);
+            }
+            println!("Username: {}", view.username);
+            println!("Display Name: {}", view.display_name);
+            println!("Account ID: {}", view.account_id);
+            println!("UUID: {}", view.uuid);
+            Ok(())
+        }
     }
 }

@@ -23,6 +23,15 @@ pub struct ConfluenceArgs {
 
 #[derive(Subcommand, Debug, Clone)]
 enum ConfluenceCommands {
+    /// Call any Confluence REST endpoint with the profile's credentials.
+    ///
+    /// The escape hatch for anything the typed commands do not expose. Paths
+    /// are relative to the profile's site, e.g. /wiki/api/v2/pages.
+    #[command(
+        long_about = "Call any Confluence REST endpoint with the profile's credentials.\n\nThe escape hatch for fields the typed commands drop. Paths are relative to the profile's site root, so they carry their own /wiki prefix.\n\nExamples:\n  confluence api /wiki/api/v2/pages\n  confluence api /wiki/rest/api/user/current"
+    )]
+    Api(crate::commands::api::ApiArgs),
+
     /// Space operations
     #[command(subcommand)]
     Space(SpaceCommands),
@@ -609,6 +618,9 @@ pub async fn execute(
     let ctx = ConfluenceContext { client, renderer };
 
     match args.command {
+        ConfluenceCommands::Api(api_args) => {
+            crate::commands::api::run(&ctx.client, ctx.renderer, api_args).await
+        }
         ConfluenceCommands::Space(cmd) => match cmd {
             SpaceCommands::List { limit, space_type } => {
                 spaces::list_spaces(&ctx, limit, space_type.as_deref()).await

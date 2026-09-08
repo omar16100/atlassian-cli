@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use atlassian_cli_output::OutputFormat;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -67,11 +68,6 @@ struct Target {
 struct CommitInfo {
     #[serde(default)]
     hash: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct StepList {
-    values: Vec<PipelineStep>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -499,17 +495,25 @@ async fn fetch_steps(
     pipeline_uuid: &str,
     include_details: bool,
 ) -> Result<Vec<StepInfo>> {
-    let path =
-        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
-    let response: StepList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
+    // Paginated. Bitbucket serves 10 steps per page by default, so build 568's
+    // eleven steps came back as ten with nothing to say one was missing.
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/?pagelen=100"
+    );
+    let (steps, page) =
+        fetch_paged::<BitbucketPage<PipelineStep>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
+
+    if page.truncated {
+        eprintln!(
+            "warning: showing {} steps for pipeline {pipeline_uuid}; the list is incomplete.",
+            steps.len()
+        );
+    }
 
     let clean_pipeline_uuid = pipeline_uuid.trim_matches('{').trim_matches('}');
-    Ok(response
-        .values
+    Ok(steps
         .iter()
         .map(|step| {
             let clean_step_uuid = step.uuid.trim_matches('{').trim_matches('}');
@@ -905,15 +909,22 @@ pub async fn get_pipeline_logs(
     );
 
     // Fetch all pipeline steps
-    let path =
-        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
-    let response: StepList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/?pagelen=100"
+    );
+    let (all_steps, page) =
+        fetch_paged::<BitbucketPage<PipelineStep>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
-    let mut steps_to_show: Vec<&PipelineStep> = response.values.iter().collect();
+    if page.truncated {
+        eprintln!(
+            "warning: examined {} steps for pipeline {pipeline_uuid}; the list is incomplete.",
+            all_steps.len()
+        );
+    }
+
+    let mut steps_to_show: Vec<&PipelineStep> = all_steps.iter().collect();
 
     // Filter by step UUID if specified
     if let Some(uuid) = step_uuid {
@@ -1085,8 +1096,46 @@ pub async fn list_steps(
 
     tracing::debug!(pipeline_uuid, count = steps.len(), "Listed pipeline steps");
 
-    ctx.renderer.render_list_or_empty(&steps, "No steps found")
+    // `logs_url` is a full Bitbucket URL, long enough that including it pushes
+    // the table past any terminal width and wraps every row into unreadability
+    // -- the reported symptom was that JSON was the only usable format here.
+    // The structured formats keep it: it is genuinely useful to a script, and
+    // dropping it there would trade one broken format for another.
+    match ctx.renderer.format() {
+        OutputFormat::Table | OutputFormat::Markdown => {
+            if steps.is_empty() {
+                println!("No steps found");
+                return Ok(());
+            }
+            let rows: Vec<serde_json::Value> = steps
+                .iter()
+                .map(serde_json::to_value)
+                .collect::<Result<_, _>>()?;
+            let columns: Vec<String> = STEP_TABLE_COLUMNS.iter().map(|c| c.to_string()).collect();
+            ctx.renderer.render_rows_ordered(&rows, &columns)
+        }
+        _ => ctx.renderer.render_list_or_empty(&steps, "No steps found"),
+    }
 }
+
+/// Columns shown in the tabular views of `pipeline steps`.
+///
+/// Deliberately omits `logs_url`. `render_rows_ordered` applies one column list
+/// to Table, CSV and Markdown alike, so this is only reached for the two
+/// human-read formats; CSV and the structured formats go through the ordinary
+/// path and keep every field.
+/// `uuid` stays: it is the argument `bb pipeline logs <pipeline> <step-uuid>`
+/// takes, so dropping it would have made the table unable to feed the command
+/// it exists to support. Only `logs_url` is omitted, and only here.
+const STEP_TABLE_COLUMNS: [&str; 7] = [
+    "uuid",
+    "name",
+    "status",
+    "started",
+    "completed",
+    "duration",
+    "trigger",
+];
 
 pub async fn pipeline_status(
     ctx: &BitbucketContext<'_>,
@@ -1553,19 +1602,34 @@ pub async fn pipeline_has_failed_steps(
     repo_slug: &str,
     pipeline_uuid: &str,
 ) -> Result<bool> {
-    let path =
-        format!("/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/");
-    let response: StepList = ctx
-        .client
-        .get(&path)
-        .await
-        .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
+    // Truncation here is worse than a short listing: a failure on the second
+    // page would be invisible, and this decides the --wait exit status.
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pipelines/{pipeline_uuid}/steps/?pagelen=100"
+    );
+    let (steps, page) =
+        fetch_paged::<BitbucketPage<PipelineStep>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
-    Ok(response.values.iter().any(|step| {
+    let found_failure = steps.iter().any(|step| {
         step.state
             .as_ref()
             .is_some_and(|state| matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR"))
-    }))
+    });
+
+    // This decides an exit code. "I did not see a failure" is not the same as
+    // "there was no failure" when the walk was cut short, and reporting the
+    // former as success is how a broken build passes CI.
+    if !found_failure && page.truncated {
+        anyhow::bail!(
+            "Could not determine whether pipeline {pipeline_uuid} failed: only {} steps could \
+             be listed and no failure was seen among them.",
+            steps.len()
+        );
+    }
+
+    Ok(found_failure)
 }
 
 // ============================================================================
@@ -1575,6 +1639,44 @@ pub async fn pipeline_has_failed_steps(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The reported symptom: `logs_url` is a full Bitbucket URL, and including
+    /// it pushed the steps table past any terminal width, leaving JSON as the
+    /// only usable format.
+    #[test]
+    fn the_steps_table_omits_the_logs_url_column() {
+        assert!(
+            !STEP_TABLE_COLUMNS.contains(&"logs_url"),
+            "logs_url must not be a table column"
+        );
+        for expected in ["uuid", "name", "status", "duration"] {
+            assert!(
+                STEP_TABLE_COLUMNS.contains(&expected),
+                "{expected} should still be shown"
+            );
+        }
+    }
+
+    /// Dropping it from the table must not drop it from the data. A script
+    /// reading `-f json` still needs the link.
+    #[test]
+    fn a_step_still_serialises_its_logs_url() {
+        let step = StepInfo {
+            uuid: "{s-1}".to_string(),
+            name: "build".to_string(),
+            status: "SUCCESSFUL".to_string(),
+            started: None,
+            completed: None,
+            duration: None,
+            logs_url: Some("https://bitbucket.org/w/r/pipelines/results/1/steps/2".to_string()),
+            trigger: None,
+        };
+        let value = serde_json::to_value(&step).unwrap();
+        assert!(
+            value.get("logs_url").is_some(),
+            "the structured formats must keep it: {value}"
+        );
+    }
 
     #[test]
     fn test_status_icons() {

@@ -20,6 +20,7 @@
 //! transformation of the data.
 
 use anyhow::{anyhow, bail, Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, JiraPage, PageLimits};
 use atlassian_cli_output::OutputFormat;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -444,26 +445,31 @@ pub(crate) async fn search_rows(
 ) -> Result<()> {
     let selection = resolve_field_ids(ctx, tokens).await?;
 
-    #[derive(Deserialize)]
-    struct SearchResponse {
-        #[serde(default)]
-        issues: Vec<RawIssue>,
-    }
-
+    // This path was worse than `search_issues`: it declared its own response
+    // struct with only `issues`, so it could not even detect the page boundary
+    // that the other one saw and discarded. `--fields` is the documented
+    // workaround for the fields `issue get` drops, so a user escaping one
+    // defect landed silently in another.
+    let page_size = if limit == 0 { 100 } else { limit.clamp(1, 100) };
     let query = format!(
-        "/rest/api/3/search/jql?jql={}&maxResults={}&fields={}",
+        "/rest/api/3/search/jql?jql={}&maxResults={page_size}&fields={}",
         urlencoding::encode(jql),
-        limit.min(1000),
         urlencoding::encode(&selection.query_value())
     );
 
-    let response: SearchResponse = ctx
-        .client
-        .get(&query)
-        .await
-        .context("Failed to execute search")?;
+    let (issues, page) =
+        fetch_paged::<JiraPage<RawIssue>>(&ctx.client, &query, PageLimits::from_cli_limit(limit))
+            .await
+            .context("Failed to execute search")?;
 
-    if response.issues.is_empty() {
+    if page.truncated {
+        eprintln!(
+            "warning: showing {} issues; more match this query. Raise --limit, or use --limit 0 for all.",
+            issues.len()
+        );
+    }
+
+    if issues.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No issues found");
         // Hand an empty result to the shared helper rather than falling through
@@ -477,9 +483,9 @@ pub(crate) async fn search_rows(
     }
 
     let mut columns: Vec<String> = vec![KEY_COLUMN.to_string()];
-    let mut rows = Vec::with_capacity(response.issues.len());
+    let mut rows = Vec::with_capacity(issues.len());
 
-    for issue in &response.issues {
+    for issue in &issues {
         let (row, row_columns) = project_issue(issue, &selection);
         // Under a wildcard the columns come from the payload, and issue types
         // differ in which fields they carry, so the set is the union.

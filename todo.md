@@ -1807,3 +1807,523 @@ Fable review of the above returned "safe to merge" with three minor findings, al
 - **My claim that four of the five e2e tests fail pre-fix was wrong; it is three.** I had tested against a hybrid (client normalisation reverted but the new `user_info_path` kept), not the real parent commit. Re-checked in a worktree at `2c830f4`: `a_wiki_base_is_still_recognised_as_confluence` passes both ways, because PR #131's unprefixed constant reached the same URL by another route. It is a guard against normalising before detection, not a regression test for this bug, and the doc now says so.
 
 Also removed a stale doc comment the reviewer spotted, and documented the one user-visible behaviour change: under a `/wiki` base, `jira api` now resolves from the site root. 794 tests pass.
+
+## 2026-09-07 — user feedback triage and remediation plan
+
+Planning only; no code changed yet. `docs/07092026_cli_feedback_remediation_plan.md`.
+
+A user filed 14 findings after a day of live Jira and Bitbucket work. Each was
+checked against `main` before being accepted, then the plan was reviewed
+adversarially, which corrected five of my own conclusions and found two more
+defects nobody had reported.
+
+- The reporter ran **v0.2.8**. The tap formula is fine (pins v0.7.2); their
+  install was stale. But `main` is two feature merges past the newest tag, so
+  `--fields` (`2c830f4`, 2026-08-28) is written and unreleased. Cutting 0.8.0 is
+  now step zero of the plan rather than the last step.
+- **Finding 1 has three call sites, not one.** `get_pipeline_logs`
+  (`pipelines.rs:909`) and `pipeline_has_failed_steps` (`:1557`) do the same
+  single unpaginated GET as `fetch_steps`. The second can miss a failure on page
+  two, which silently corrupts `--wait` exit status.
+- **Finding 2 has two.** `field_selection::search_rows` (`:447-464`) never parses
+  `nextPageToken` at all, so the `--fields` path cannot even detect the boundary
+  that `search_issues` sees and ignores. `--fields` is the recommended
+  workaround for the missing `parent`/`labels`, so a user escaping one defect
+  lands in another.
+- **Two unreported truncations found.** `bulk.rs:43,121` (feeds *destructive*
+  repo and branch cleanup) and `pullrequests.rs:643` (PR comments, Bitbucket
+  default 20).
+- Corrections to my own draft: the formula is not stale; `pagination.rs` is not
+  uncalled (the benches construct `PagedResponse`); `variables.rs` already
+  paginates correctly and was wrongly listed as broken; the proposed
+  `fetch_paged<T>` with a runtime cursor enum does not type-check against real
+  call sites, because items live under `values` vs `issues` — replaced with a
+  generic-wrapper `Page` trait.
+- **Scope preflight reopened.** The 403 body (`error.detail.granted`/`required`)
+  is confirmed, so reactive enrichment is sound. The cached preflight is not: it
+  fails closed, so adding a scope server-side leaves the user locally refused
+  with no request sent and nothing to refresh the cache. Recommendation is
+  403-enrichment plus a non-blocking `auth scopes`.
+- Endpoint facts pinned: `permissions-config/users|groups` for finding 3, and
+  `effective-default-reviewers` (not `default-reviewers`) for finding 6, since
+  the plain form omits project-level reviewers.
+
+### Step 0 implemented: `bb bulk delete-branches` safety gate
+
+Branch `feat/cli-feedback-remediation`. `docs/07092026_bulk_delete_branches_safety.md`.
+
+Found while planning the pagination fix, and it reordered the whole plan. The
+command advertised "Delete merged branches" and never checked merge status: the
+only filter was four hardcoded names plus `--exclude`, so live unmerged feature
+and release branches were deleted. Present in released v0.7.2, confirmed with
+`git show v0.7.2:...bulk.rs`, so not a regression.
+
+The `pagelen=100` truncation was the only bound on the blast radius. Fixing
+pagination first, as the plan originally said, would have removed that cap and
+let it delete every branch in the repo.
+
+Selection behaviour deliberately unchanged; merge detection was considered and
+rejected because it would silently narrow a command people may rely on. Instead:
+renamed `delete_merged_branches` to `delete_branches`, help text now says merge
+status is not checked, listing is the default, `--execute` required to delete,
+`--execute` requires typing the repo slug or `--yes`, and no terminal without
+`--yes` refuses rather than hangs. `--dry-run` kept, hidden, honoured as a veto
+(`execute && !dry_run`) so an old script passing it can never start deleting.
+
+Behaviour change: an invocation that omitted `--dry-run` used to delete and now
+lists.
+
+800 tests pass (794 baseline + 6). One test pins the defect itself so the rename
+cannot later be mistaken for a merge-detection fix. Help output verified against
+the built binary.
+
+Not fixed, same file: `archive_stale_repos` reports "archived" but only sets
+`has_issues: false` / `has_wiki: false`, disabling the issue tracker and wiki.
+Same class of mislabelled action.
+
+### Review round on step 0 found a worse bug than the one being fixed
+
+Fable review of the diff confirmed the gate logic (no path deletes without
+`--execute` and either `--yes` or a matched typed slug), but found:
+
+- **`#` in a branch name deleted the wrong ref.** Git allows `main#old`; `#`
+  starts a URL fragment, so the path resolved to `.../refs/branches/main` and
+  the fragment was never sent. Deleting `main#old` deleted `main`, through the
+  protected-name check, while the prompt displayed `main#old`. Verified with
+  `git check-ref-format` and by resolving the URL. New `encode_ref_path` in
+  `bitbucket/utils.rs` percent-encodes all but the RFC 3986 unreserved set,
+  keeping `/` so `feature/login` still works and encoding `%` so `foo%23`
+  cannot be re-decoded server-side. Same defect fixed in `bb branch delete` and
+  `bb branch get` (`branches.rs`).
+- **Partial deletions were unreported.** `?` on a failed DELETE discarded the
+  accumulated rows, so failing on branch 5 of 40 left four deleted and printed
+  nothing but the failing name. Now records, breaks, renders what was deleted,
+  then returns the error.
+- **No test guarded the gate.** The original 6 tests covered pure helpers only.
+  Added wiremock tests over `BitbucketContext`, following the existing pattern
+  in `pullrequests.rs`.
+- `--dry-run` help said "does nothing" while it vetoed `--execute`; now
+  `conflicts_with = "execute"` plus accurate wording. Doc and help no longer
+  claim "every branch" when only the first 100 are examined.
+
+810 tests pass (794 baseline + 16), clippy clean with `-D warnings`. Both
+critical tests verified to FAIL against deliberately reverted code:
+`encode_ref_path` removed breaks the hash test, `if execute` → `if true` breaks
+the listing test.
+
+### `archive-repos` had the same mislabelling defect
+
+`archive_stale_repos` reported "archived" and archived nothing: Bitbucket Cloud
+has no repository archive API, and the PUT set only `has_issues: false` /
+`has_wiki: false`. The label named an operation that never happened; the one
+that did (hiding existing issues and wiki pages) went unnamed.
+
+Renamed to `disable_features_on_stale_repos` with the same rails as
+delete-branches: listing default, `--execute`, typed workspace confirmation or
+`--yes`, partial failures rendered before the error. The `archive-repos`
+subcommand name is kept because renaming the CLI surface is breaking; help now
+opens "Despite the command name, this does NOT archive". Renaming it is a 0.9.0
+candidate.
+
+Also fixed: the empty message was a plain string containing a literal
+`{days_threshold}` (never a format!), so it printed the placeholder verbatim.
+Staleness extracted as `is_stale`, which treats a missing `updated_on` as not
+stale — the old nested `if let` did this by accident with nothing recording the
+intent.
+
+814 tests pass, clippy clean under -D warnings.
+
+### Second review round: the encoding fix was only half a fix
+
+Fable found that `encode_ref_path` closed the `#` hole but left a worse one, and
+that my doc had overclaimed by saying the ref-targeting class was closed.
+
+Preserving `/` and `.` together lets `Url::join` normalise dot segments, and
+`safe_join` only checks the origin. Verified against the project's own url 2.5:
+
+- `feature/../main` -> DELETE /2.0/repositories/w/r/refs/branches/main
+- `a/../../../../../../repositories/w2/r2` -> DELETE /2.0/repositories/w2/r2
+
+The second turns a branch delete into a **repository delete**, same origin, so
+nothing upstream rejects it, and it is reachable from directly typed input to
+`bb branch delete`. `encode_ref_path` now returns Result and rejects `.`/`..`
+components, empty components, and leading/trailing `/`. Costs nothing: git
+already forbids all of them. Dots inside a component still fine.
+
+Also fixed this round:
+
+- `chrono::Duration::days` panics on an overflowing value and `--days` is user
+  input; now `try_days`, plus a clap range of 1..=36500. `--days 0` previously
+  made every repository "stale", which with `--execute --yes` in a script is a
+  workspace-wide change from a typo.
+- Unparseable `updated_on` now logs a warning instead of silently counting as
+  not-stale; a server-side date format change would otherwise turn the command
+  into a permanent "No stale repositories found".
+- Partial-failure rendering and the traversal abort now have tests; both were
+  headline behaviours with zero coverage.
+- Threshold boundary is tested (strict `>`, so exactly-at-threshold is not
+  stale).
+
+Finding 3 also done: `bb permission list` reads both permissions-config/users
+and /groups and merges them; grant/revoke use permissions-config/users/{id},
+percent-encoded because Bitbucket UUIDs are brace-wrapped. The listing gained an
+`id` column, which is most of finding 5 as a side effect: `pr create
+--reviewers` needs UUIDs and nothing in the CLI could previously produce one.
+
+Finding 9 done: `auth whoami --bitbucket`. The flag alone would have fixed
+nothing, since `whoami` hard-requires base_url and a Jira token; it now
+dispatches to the Bitbucket path the way `auth test` does.
+
+830 tests pass (794 baseline + 36), clippy clean under -D warnings.
+
+### 1c: `api` passthrough wired for Bitbucket and Confluence
+
+The reporter's top request. `commands/api.rs` was already product-agnostic, so
+Confluence was the two-line copy of `jira/mod.rs` the plan predicted.
+
+Bitbucket was not, exactly as the review warned. `bitbucket::execute` requires a
+workspace before it builds its context, and only `Whoami` escapes that. Wired at
+the bottom of the match the way Jira's is, `bb api /2.0/user` fails with
+"Workspace required" for anyone outside a Bitbucket checkout -- on the one
+command whose purpose is reaching what the typed commands cannot. It now takes
+the same early exit `Whoami` does. Verified: with the naive wiring the new test
+`bb_api_resolves_without_a_workspace` fails with exactly that error.
+
+`jsm api` deliberately not added: same client and same base URL as `jira api`,
+so it would be a confusing alias.
+
+New `crates/cli/tests/passthrough_wiring_e2e.rs` drives the built binary with
+`--dry-run` (resolves the request, sends nothing), so it covers Bitbucket
+without needing a mock for api.bitbucket.org, whose base URL is a constant
+rather than a profile field. Also asserts the passthrough does NOT resolve
+against the Atlassian site, which would send Bitbucket credentials to the Jira
+host, and that typed commands still require a workspace.
+
+`bb branch delete` brought onto the same footing as the bulk commands: its
+bespoke `[y/N]` prompt went to **stdout** (corrupting `-f json`), accepted a bare
+"y" for a destructive act, and on EOF -- a cron job with no terminal -- cancelled
+and exited 0, so the caller could not tell the deletion had not happened. Now
+uses `confirm_destructive`. `--force` keeps working and gains `--yes` as an
+alias.
+
+835 tests across 30 suites, clippy clean.
+
+### Review round on the passthrough/permissions commits, plus the pagination primitive
+
+Fable confirmed `encode_ref_path`'s rejection is complete at the URL layer
+(`%2e%2e` cannot survive, since `%` encodes first; backslash encodes before
+WHATWG parsing; no false rejections against real git rules), the endpoints and
+passthrough wiring are correct, and `--dry-run` genuinely sends nothing. Fixed
+what it found:
+
+- **`auth whoami --bitbucket` did not share main.rs's token fallback.** A
+  profile whose single token serves every other `bb` command failed here alone.
+  Now mirrors `resolve_profile_for_bitbucket`.
+- **The dispatch test depended on the ambient environment.** `get_bitbucket_token`
+  reads BITBUCKET_TOKEN et al before the credential store, so a developer shell
+  exporting one changed which error came back. Now asserts on where it did *not*
+  reach (the base_url check) and accepts either Bitbucket-side error. Scrubbing
+  env instead would race every other test in the process. Verified passing both
+  with and without BITBUCKET_TOKEN set.
+- **The new permissions listing was itself unpaginated** -- the defect class this
+  branch exists to fix. Bitbucket's default page is 10, so a repo with more than
+  ten grants reported a partial set, which is exactly the "looks unprotected
+  when it is not" failure the fix was for. Now uses the new `fetch_paged`.
+- **The `id` column overstated its usefulness.** It merged uuid, account_id and
+  group slug, but `pr create --reviewers` brace-wraps whatever it gets and sends
+  it as a uuid, so an account_id became a malformed UUID and a group slug was
+  never valid at all. Split into `uuid` / `account_id` / `slug` so the column
+  that is valid reviewer input is the only one that looks like it.
+- **A rejected ref name mid-loop bypassed the partial-failure reporting** via
+  `?`, discarding the record of branches already deleted -- the exact thing that
+  mechanism exists to prevent. Now routed through it, with a test for a hostile
+  name in a *later* slot.
+- **One assertion was vacuous** (checked for a branch the mock never served).
+  Replaced with distinct-branch counting; the naive "exactly 2 requests" version
+  was wrong because a 500 is retryable and the client legitimately retries.
+
+### Step 3 groundwork: the shared pagination primitive
+
+`crates/api/src/pagination.rs` rewritten. The old `Paginator`/`PagedResponse`
+was dead in production and shaped for a Jira endpoint that no longer exists.
+
+`BitbucketPage<T>` and `JiraPage<T>` implement one `Page` trait, so the driver is
+generic over the wrapper rather than the item, which is what makes `values` vs
+`issues` work without a serde_json::Value round-trip. `Continuation` is an enum:
+Bitbucket returns an absolute URL, Jira an opaque token that must be placed in a
+query parameter, and the parameter name travels with the token so `crates/api`
+never hardcodes a Jira detail.
+
+Guards that came out of the design, each tested: `isLast` beats a trailing token
+(Jira echoes one on the last page, and following it loops forever); the token
+goes back on the *original* path with any previous token replaced (otherwise
+page three carries two); an empty page with a cursor stops the walk; the request
+budget marks the result truncated rather than failing; a cross-origin `next` URL
+is refused by `safe_join`.
+
+Benches repointed from the deleted `PagedResponse` arithmetic to what the path
+now actually does per page.
+
+851 tests across 30 suites, clippy clean.
+
+### Step 3: the truncation sites wired to `fetch_paged`
+
+All the silent-truncation findings, in the order the plan set.
+
+- **`bulk.rs` first**, both functions. These drive deletions and feature
+  disabling, so an incomplete list is an **error** here rather than a labelled
+  truncation: "these are the branches, probably" is not something to confirm
+  against. Removing the accidental 100-item cap was only safe because the
+  confirmation gate landed first.
+- **All three `/steps/` sites** (finding 1): `fetch_steps`, `get_pipeline_logs`,
+  and `pipeline_has_failed_steps`. The last one decides `--wait` exit status, so
+  a failure on page two used to be invisible.
+- **Both Jira search paths** (finding 2). `search_issues` parsed `isLast` and
+  `nextPageToken` and then ignored them; `search_rows` (the `--fields` path)
+  never parsed them at all. Jira caps `maxResults` at 100 server-side whatever
+  is sent, so `--limit 250` returned 100 in silence. Truncation now warns on
+  stderr, which keeps a piped `-f json` result machine-readable; the envelope
+  carries it properly in 0.9.0.
+- **`pr comments`** (finding 16), which Bitbucket serves 20 at a time.
+
+New `crates/cli/tests/pagination_e2e.rs` drives the built binary against a mock
+Jira, covering both search paths, the truncation warning, and the guarantee that
+a *complete* result does not claim to be truncated.
+
+**A verification of mine was vacuous and I nearly recorded it as real.** To check
+the e2e test could fail, I patched `PageLimits` to a one-page budget with a
+Python string replace -- but `cargo fmt` had already collapsed that call onto one
+line, so the pattern matched nothing, the binary was unchanged, and the test
+"passed". Redone with an assertion that the edit applied: it then failed with
+"DEV-3 missing -- the second page was dropped", and passed again once restored.
+
+857 tests across 31 suites, clippy clean.
+
+### Envelope carries the truncation signal (step 4, first half)
+
+`ListEnvelope` gains `total`, `truncated` and `next` alongside the existing
+`data`/`count`. Those two keep their names: renaming to `values`/`total` would
+break every current `--envelope` user for no gain.
+
+`total` and `next` are omitted entirely when unknown rather than serialized as
+zero or null, because absent is not zero -- Jira's `/search/jql` reports no
+total at all, and treating that as 0 would let a consumer render a confident
+wrong count.
+
+`render_list_with_meta` is the new entry point; `render_list` delegates to it
+with a "complete, total unknown" meta, so the ~70 existing call sites are
+untouched. Jira search feeds real `PageInfo` through. The stderr warning stays
+as well as the envelope, because the tabular formats have no field to carry the
+signal and a silently short table is the original complaint.
+
+**The default flip is deliberately NOT in this commit.** Making the envelope
+default for JSON/YAML touches ~20 direct `render(&rows)` call sites across four
+products plus ~10 test files, and it is the one genuinely breaking change in the
+plan. Landing it while a review was in flight over the pagination commits would
+have made both harder to reason about. It stays gated to 0.9.0.
+
+859 tests across 31 suites, clippy clean.
+
+### Review round on pagination: two reproduced correctness bugs
+
+Fable ran the HEAD binary against a mock Jira and reproduced both.
+
+- **`--limit 0` returned nothing while the CLI advertised it as "all".**
+  `limit` went straight through as `Some(0)`, so `items.len() >= 0` was true on
+  the first page and the result was truncated to empty -- then the warning
+  advised using the flag that had just emptied it. New
+  `PageLimits::from_cli_limit` maps 0 to None, and page size asks for a full
+  page rather than `clamp(1,100) == 1`. e2e test verified to fail against the
+  pass-through behaviour.
+- **`truncated` was falsely unset when the limit boundary fell inside the final
+  page.** The check was `cursor.is_some() || items.len() < total.unwrap_or(0)`,
+  and `JiraPage` always reports `total: None`, so a last page overshooting the
+  limit dropped rows and reported the result complete. Now compares the
+  pre-truncation length. Inconsistent before, too: the same data at `--limit 1`
+  warned, at `--limit 2` did not.
+
+Also fixed from that review:
+
+- An empty page carrying a cursor abandoned the walk without setting
+  `truncated`, which was the one path where bulk.rs's `if page.truncated
+  { bail! }` could pass and let a partial list drive deletions.
+- `#[serde(default)]` on `values`/`issues` masked a malformed 200 as an empty
+  list; the wrappers it replaced all required the key. Restored, because
+  `pipeline_has_failed_steps` would have read a malformed body as "no failures"
+  and exited success.
+- Every Bitbucket site discarded `PageInfo`, so budget truncation was invisible
+  in the output. They now warn. `pipeline_has_failed_steps` goes further and
+  **errors**: it decides an exit code, and "I did not see a failure" is not "there
+  was no failure" when the walk was cut short.
+
+**Scope correction.** The previous commit subject said "every silently
+truncating list". That was wrong: `bb branch list`, `repo list`, `workspace
+list`, `commits`, webhooks, the Jira project/webhook/automation lists and the
+whole JSM tree are still single-GET. The commit body scoped itself correctly to
+"the sites the report was actually about", but the subject overstated it.
+
+865 tests across 31 suites, clippy clean.
+
+### Finding 8: `-f json` honoured by both `whoami` commands
+
+`auth whoami` and `bb whoami` printed every field through `println!`, so a
+script asking for JSON received the text form. Both now route the machine
+formats through the renderer.
+
+The human output is deliberately unchanged, and getting that right took two
+attempts. The first version derived the readable labels from the serialized
+struct, which reordered the fields alphabetically and printed "Account Id"
+instead of "Account ID" -- a regression in the output people read, introduced
+while fixing the one they parse. The labelled lines are now passed explicitly.
+
+`active` is omitted rather than defaulted: only Jira reports it, and emitting
+`false` for Confluence would claim the account is disabled when the API never
+said either way. Tested.
+
+`bb whoami` takes the profile name as an `Option`, because that path has no
+profile context and an empty string would render a blank field.
+
+New `crates/cli/tests/whoami_output_e2e.rs`: JSON parses, YAML parses, the
+unreported `active` flag is absent rather than false, and the table form is
+still labelled lines rather than a one-row grid.
+
+869 tests across 32 suites, clippy clean.
+
+### Review round: the envelope was making a confident false claim
+
+The worst finding of this round was mine, and it was the exact failure class
+this branch exists to remove.
+
+`truncated` was an unconditional envelope field fed by a `ListMeta::complete()`
+default, so the ~70 list commands that are still a single GET against a
+server-paginated endpoint began emitting `"truncated": false` over results the
+server had already cut short. Before the envelope change they were merely
+silent about completeness; afterwards they asserted it. The name
+`complete()` was itself the invitation.
+
+`truncated` is now `Option<bool>`, absent when unknown, and the constructor is
+`ListMeta::unknown()` -- deliberately not `complete()`, because those callers
+have established nothing. Paginated callers use `ListMeta::known(..)`. Test
+verified to fail against the asserting version.
+
+Two regressions I introduced in the whoami commit, both found by the same
+review:
+
+- **`-f quiet` and `-f csv` started dumping pretty JSON.** The old code printed
+  labelled lines for *every* format; I restricted the readable arm to Table and
+  Markdown, so the two line-oriented formats -- the ones scripts consume -- fell
+  through to the object renderer. Only Json and Yaml should ever have changed.
+- **Plain `bb whoami` gained a `Product:` line it never had**, and stopped
+  printing the "Accessible workspaces:" header on an empty list. The
+  Profile/Product preamble belongs to `auth whoami --bitbucket`, which supplies
+  a profile; plain `bb whoami` has none and now prints only when it does.
+
+Also: the bearer view serialised workspaces as preformatted `"slug (name)"`
+strings, which is useless in the machine format the change exists to serve.
+Now structured `{slug, name}`.
+
+And the table-guard assertion in the whoami test checked for ASCII `|`/`+`,
+but `tabled` draws with Unicode box characters, so it would have passed even if
+the output had become a table. Now checks the characters actually used.
+
+871 tests across 32 suites, clippy clean.
+
+### Findings 10 and 13
+
+**Finding 13: `pr get` hid the reviewers.** It emitted `approvals` as a bare
+count string, which answered "how many approved" and nothing else -- not who,
+not their UUIDs, not whether anyone had requested changes. Reading any of that
+meant leaving the CLI. `pr get` now carries the reviewer detail in the
+structured formats (a nested array has nowhere to go in a table, so the count
+stays for those), and `pr reviewers` gained a `uuid` column, so its output is
+valid input to `pr create --reviewers` and `pr reviewers --add`.
+
+**Finding 10: `logs_url` made the steps table unusable.** It is a full
+Bitbucket URL, long enough to push the table past any terminal width. The
+column-taking renderer helpers are private, and the one public entry
+(`render_rows_ordered`) applies a single column list to Table, CSV and Markdown
+alike -- so the fix is caller-side: the two human-read formats go through an
+explicit column list that omits `logs_url`, and every other format keeps it. A
+script reading `-f json` still needs the link, so dropping it everywhere would
+have traded one broken format for another. Both halves tested.
+
+873 tests across 32 suites, clippy clean.
+
+### Findings 6 and 7 — the two decisions I had not yet delivered
+
+Both were settled earlier and neither had been implemented; listing them as
+"deliberately not done" was wrong.
+
+**Finding 6: `--default-reviewers` on `pr create`.** Opt-in, as chosen, so an
+existing scripted `pr create` does not silently start notifying people. It reads
+`effective-default-reviewers`, **not** `default-reviewers`: the plain form
+returns only the repository's own list, while the effective one merges in
+project-level reviewers. On a workspace that configures them centrally, the
+plain form would have returned nothing and the flag would have looked like it
+did not work.
+
+**Finding 7: 403 enrichment, and `auth scopes`.** The cached preflight was
+dropped for the reasons already recorded (it fails closed, and refusing a
+command the token can run is worse than a mid-task 403).
+
+`scope_hint` parses `error.detail.granted`/`required` out of the 403 and names
+the missing scope. Two details shape the wording, and both matter:
+
+- Scopes are fixed when a token is created and cannot be widened, so the hint
+  says *create a replacement*, not "add the scope".
+- `granted` describes the token, not the account. When it already covers
+  everything required, the refusal is not about scopes at all -- it is
+  repository permissions or an IP allowlist -- and the hint says so rather than
+  sending the user to the token page for nothing.
+
+Two pre-existing tests pinned the old advice, which linked to
+`bitbucket.org/account/settings/app-passwords`. App passwords are deprecated and
+scopes cannot be edited after creation, so that link sent people somewhere that
+could not help them. Updated to assert the correct guidance rather than
+restoring the bad link.
+
+`auth scopes` reads the granted list from Bitbucket's `x-oauth-scopes` response
+header via a new `ApiClient::response_header`, so no endpoint or local cache is
+needed. It blocks nothing.
+
+879 tests across 32 suites, clippy clean. (An intermediate run reported 25
+suites / 725 tests: cargo stops after a failing binary, so that was the abort,
+not a regression.)
+
+### Merge review: the help text understated a destructive command's blast radius
+
+The whole-branch review's verdict was "merge after fixing three documentation
+issues", and the blocking one was mine and self-inflicted.
+
+`bb bulk delete-branches --help` still said "Only the first 100 branches are
+considered; pagination is not yet implemented". That was true when written in
+the safety commit, and false three commits later when the same branch made the
+command follow pagination to completion. So a user could read `--help`, believe
+`--execute --yes` was bounded to 100 branches, and be wrong -- on the exact
+command this branch exists to make safe, and in exactly the
+authoritative-looking-but-wrong style the whole effort was about. Same for
+`archive-repos`. Both corrected.
+
+`docs/07092026_bulk_delete_branches_safety.md` carried the same stale claim in
+its Limitations section, and still said "in progress".
+
+The plan document claimed "all 17 findings are addressed in code". That
+overstated three of them, and the review was right to reject it:
+
+- finding 5 shipped `uuid` columns, not the member/name resolver;
+- finding 8 fixed both `whoami` commands, not `pipeline_status`,
+  `approve_pull_request` or `get_pr_diff`;
+- finding 11 shipped the envelope fields, not the default flip.
+
+Now "addressed or explicitly deferred", with a table of what actually shipped
+versus what did not, plus the pagination and `encode_ref_path` gaps stated
+outright rather than implied. The Phase 1a call-site list also named four sites
+as converted that were never reached; they are now marked not converted.
+
+Also restored `uuid` to the steps table. Dropping `logs_url` had quietly taken
+`uuid` with it, and `uuid` is the argument `bb pipeline logs <pipeline>
+<step-uuid>` takes -- so the table could no longer feed the command it exists to
+support. That was an undisclosed breaking change; only `logs_url` was ever meant
+to go.
+
+879 tests across 32 suites, clippy clean.

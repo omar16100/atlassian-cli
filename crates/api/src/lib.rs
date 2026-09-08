@@ -550,6 +550,49 @@ impl ApiClient {
     /// Get plain text content from an endpoint.
     /// Sets Accept: text/plain; charset=utf-8 header.
     /// Includes retry logic and rate limiting.
+    /// Issue a GET and return one response header, discarding the body.
+    ///
+    /// Exists for `auth scopes`: Bitbucket reports a token's granted scopes in
+    /// `x-oauth-scopes` on any authenticated response, so the scopes can be
+    /// read without a dedicated endpoint and without caching anything locally.
+    ///
+    /// Deliberately no retry wrapper: this is a diagnostic, and a caller asking
+    /// "what does my token grant" wants the answer or the error now, not three
+    /// backed-off attempts.
+    pub async fn response_header(&self, path: &str, header: &str) -> Result<Option<String>> {
+        if let Some(wait_secs) = self.rate_limiter.check_limit().await {
+            warn!(wait_secs, "Rate limit reached, waiting");
+            tokio::time::sleep(Duration::from_secs(wait_secs)).await;
+        }
+
+        let joined = self.safe_join(path)?;
+        debug!(method = "GET", url = %joined, header, "Reading response header");
+
+        let mut req = self.client.request(Method::GET, joined.clone());
+        req = self.apply_auth(req);
+        let response = req.send().await.map_err(ApiError::RequestFailed)?;
+
+        self.rate_limiter.update_from_response(&response).await;
+
+        let status = response.status();
+        if status == StatusCode::UNAUTHORIZED {
+            return Err(unauthorized_error(response).await);
+        }
+        if status == StatusCode::FORBIDDEN {
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Access forbidden".to_string());
+            return Err(ApiError::Forbidden { message });
+        }
+
+        Ok(response
+            .headers()
+            .get(header)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string))
+    }
+
     pub async fn get_text(&self, path: &str) -> Result<String> {
         if let Some(wait_secs) = self.rate_limiter.check_limit().await {
             warn!(wait_secs, "Rate limit reached, waiting");

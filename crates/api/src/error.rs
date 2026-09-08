@@ -66,9 +66,15 @@ impl ApiError {
             }
             ApiError::Forbidden { message } => {
                 let base = "Verify tokens with: atlassian-cli auth list\nTest auth with: atlassian-cli auth test [--bitbucket]".to_string();
+                if let Some(hint) = scope_hint(message) {
+                    return Some(hint);
+                }
                 let lower = message.to_lowercase();
                 if lower.contains("scope") || lower.contains("privilege") || lower.contains("permission") {
-                    Some(format!("{base}\nAdd missing scopes at: https://bitbucket.org/account/settings/app-passwords/"))
+                    Some(format!(
+                        "{base}\nIf this is a scope problem, note that a token's scopes are fixed when it is created: \
+                         make a replacement at https://id.atlassian.com/manage-profile/security/api-tokens"
+                    ))
                 } else {
                     Some(base)
                 }
@@ -127,33 +133,56 @@ mod tests {
         assert!(err.suggestion().unwrap().contains("auth test"));
     }
 
+    /// The hint used to point at bitbucket.org/account/settings/app-passwords.
+    /// App passwords are deprecated, and scopes cannot be edited after a token
+    /// is created, so that link sent people somewhere that could not help.
     #[test]
-    fn forbidden_with_scope_message_includes_app_passwords_link() {
+    fn forbidden_with_scope_message_points_at_a_replacement_token() {
         let err = ApiError::Forbidden {
             message: "Your credentials lack the required scope.".to_string(),
         };
         let hint = err.suggestion().unwrap();
         assert!(hint.contains("auth test"));
-        assert!(hint.contains("app-passwords"));
+        assert!(hint.contains("id.atlassian.com"), "{hint}");
+        assert!(hint.contains("replacement"), "{hint}");
+        assert!(!hint.contains("app-passwords"), "{hint}");
     }
 
     #[test]
-    fn forbidden_without_scope_omits_app_passwords_link() {
+    fn forbidden_without_scope_omits_the_token_advice() {
         let err = ApiError::Forbidden {
             message: "no access".to_string(),
         };
         let hint = err.suggestion().unwrap();
         assert!(hint.contains("auth test"));
-        assert!(!hint.contains("app-passwords"));
+        assert!(!hint.contains("replacement"), "{hint}");
     }
 
     #[test]
-    fn forbidden_with_permission_message_includes_link() {
+    fn forbidden_with_permission_message_includes_token_guidance() {
         let err = ApiError::Forbidden {
             message: "Insufficient Permission to access this resource".to_string(),
         };
         let hint = err.suggestion().unwrap();
-        assert!(hint.contains("app-passwords"));
+        assert!(hint.contains("id.atlassian.com"), "{hint}");
+    }
+
+    /// When the body carries the granted/required detail, the precise hint
+    /// wins over the keyword-matched generic one.
+    #[test]
+    fn a_structured_403_gets_the_specific_hint() {
+        let err = ApiError::Forbidden {
+            message: serde_json::json!({
+                "error": {"detail": {"granted": ["account"], "required": ["pullrequest"]}}
+            })
+            .to_string(),
+        };
+        let hint = err.suggestion().unwrap();
+        assert!(hint.contains("missing the pullrequest scope"), "{hint}");
+        assert!(
+            !hint.contains("auth test"),
+            "specific hint replaces the generic: {hint}"
+        );
     }
 
     #[test]
@@ -192,5 +221,131 @@ mod tests {
             message: "removed".to_string(),
         };
         assert!(!err.is_retryable());
+    }
+}
+
+/// Turn Bitbucket's 403 body into a message that names the missing scope.
+///
+/// Bitbucket says which scopes the credential has and which the endpoint
+/// wanted, and the CLI was throwing that away:
+///
+/// ```json
+/// {"type": "error", "error": {"message": "Your credentials lack one or more required privilege scopes.",
+///  "detail": {"granted": ["repository:write"], "required": ["pullrequest"]}}}
+/// ```
+///
+/// Two details matter for what the hint should say. Scopes are fixed when a
+/// token is created and cannot be widened afterwards, so telling someone to
+/// "add the scope" sends them somewhere that cannot help; they need a
+/// replacement token. And `granted` describes the *token*, not the account --
+/// so when it already covers everything required, the cause is repository
+/// permissions or an IP allowlist, and saying "missing scope" would send them
+/// down the wrong path entirely.
+fn scope_hint(message: &str) -> Option<String> {
+    let parsed: serde_json::Value = serde_json::from_str(message).ok()?;
+    let detail = parsed.get("error")?.get("detail")?;
+
+    let list = |key: &str| -> Vec<String> {
+        detail
+            .get(key)
+            .and_then(|v| v.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|i| i.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+
+    let granted = list("granted");
+    let required = list("required");
+    if required.is_empty() {
+        return None;
+    }
+
+    let missing: Vec<&String> = required.iter().filter(|r| !granted.contains(r)).collect();
+
+    if missing.is_empty() {
+        return Some(format!(
+            "The token already grants every scope this endpoint requires ({}).\n\
+             The refusal is therefore not about scopes: check the account's access to this \
+             resource, and whether an IP allowlist applies.",
+            required.join(", ")
+        ));
+    }
+
+    let missing: Vec<&str> = missing.iter().map(|s| s.as_str()).collect();
+    Some(format!(
+        "The token is missing the {} scope{}.\n\
+         Granted: {}\n\
+         A token's scopes are fixed when it is created and cannot be widened, so create a \
+         replacement at https://id.atlassian.com/manage-profile/security/api-tokens \
+         and re-run `atlassian-cli auth login --bitbucket`.",
+        missing.join(", "),
+        if missing.len() == 1 { "" } else { "s" },
+        if granted.is_empty() {
+            "(none reported)".to_string()
+        } else {
+            granted.join(", ")
+        }
+    ))
+}
+
+#[cfg(test)]
+mod scope_hint_tests {
+    use super::*;
+
+    fn body(granted: &[&str], required: &[&str]) -> String {
+        serde_json::json!({
+            "type": "error",
+            "error": {
+                "message": "Your credentials lack one or more required privilege scopes.",
+                "detail": {"granted": granted, "required": required}
+            }
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn it_names_the_missing_scope() {
+        let hint = scope_hint(&body(&["repository:write"], &["pullrequest"])).unwrap();
+        assert!(hint.contains("missing the pullrequest scope"), "{hint}");
+        assert!(hint.contains("repository:write"), "granted list: {hint}");
+    }
+
+    /// Scopes cannot be widened after creation, so "add the scope" would send
+    /// the user somewhere that cannot help them.
+    #[test]
+    fn it_tells_the_user_to_replace_the_token_not_edit_it() {
+        let hint = scope_hint(&body(&[], &["write:pipeline:bitbucket"])).unwrap();
+        assert!(hint.contains("create a replacement"), "{hint}");
+        assert!(!hint.to_lowercase().contains("add the scope"), "{hint}");
+    }
+
+    /// `granted` describes the token, not the account. When it already covers
+    /// what was required, blaming scopes sends the user down the wrong path.
+    #[test]
+    fn a_sufficient_token_points_away_from_scopes() {
+        let hint = scope_hint(&body(&["pullrequest", "account"], &["pullrequest"])).unwrap();
+        assert!(hint.contains("not about scopes"), "{hint}");
+        assert!(hint.contains("IP allowlist"), "{hint}");
+    }
+
+    #[test]
+    fn it_handles_both_scope_vocabularies() {
+        // Classic OAuth consumer scopes, and the newer scoped API-token form.
+        assert!(scope_hint(&body(&["repository"], &["pullrequest"])).is_some());
+        assert!(scope_hint(&body(
+            &["read:repository:bitbucket"],
+            &["write:pipeline:bitbucket"]
+        ))
+        .is_some());
+    }
+
+    #[test]
+    fn a_body_without_the_detail_block_yields_nothing() {
+        assert!(scope_hint("Access forbidden").is_none());
+        assert!(scope_hint(r#"{"error":{"message":"nope"}}"#).is_none());
     }
 }

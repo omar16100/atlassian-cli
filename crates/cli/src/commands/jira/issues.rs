@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, bail, Context, Result};
-use atlassian_cli_output::OutputFormat;
+use atlassian_cli_api::pagination::{fetch_paged, JiraPage, PageLimits};
+use atlassian_cli_output::{ListMeta, OutputFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -123,34 +124,41 @@ pub async fn search_issues(
         return super::field_selection::search_rows(ctx, &final_jql, limit, fields).await;
     }
 
-    #[derive(Deserialize)]
-    struct SearchResponse {
-        issues: Vec<Issue>,
-        #[allow(dead_code)]
-        #[serde(rename = "isLast")]
-        is_last: Option<bool>,
-        #[allow(dead_code)]
-        #[serde(rename = "nextPageToken")]
-        next_page_token: Option<String>,
-    }
-
-    let max_results = limit.min(1000);
+    // `isLast` and `nextPageToken` used to be parsed here and then marked
+    // `#[allow(dead_code)]`, so a search returning exactly the server's cap was
+    // indistinguishable from a complete result. Jira caps `maxResults` at 100
+    // server-side whatever is asked for, so `--limit 250` silently returned 100.
+    let page_size = if limit == 0 { 100 } else { limit.clamp(1, 100) };
     let query = format!(
-        "/rest/api/3/search/jql?jql={}&maxResults={}&fields=key,summary,status,assignee,issuetype",
+        "/rest/api/3/search/jql?jql={}&maxResults={page_size}&fields=key,summary,status,assignee,issuetype",
         urlencoding::encode(&final_jql),
-        max_results
     );
 
-    let response: SearchResponse = ctx
-        .client
-        .get(&query)
-        .await
-        .context("Failed to execute search")?;
+    let (issues, page) =
+        fetch_paged::<JiraPage<Issue>>(&ctx.client, &query, PageLimits::from_cli_limit(limit))
+            .await
+            .context("Failed to execute search")?;
 
-    if response.issues.is_empty() {
+    if issues.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No issues found");
     }
+
+    if page.truncated {
+        // stderr as well as the envelope: `--envelope` is not yet the default,
+        // and the tabular formats have no field to carry this, so a table would
+        // otherwise be silently short -- the original complaint.
+        eprintln!(
+            "warning: showing {} issues; more match this query. Raise --limit, or use --limit 0 for all.",
+            issues.len()
+        );
+    }
+
+    let meta = ListMeta::known(
+        page.total,
+        page.truncated,
+        page.next.as_ref().map(describe_cursor),
+    );
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -161,8 +169,7 @@ pub async fn search_issues(
         issue_type: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .issues
+    let rows: Vec<Row<'_>> = issues
         .iter()
         .map(|issue| Row {
             key: issue.key.as_str(),
@@ -188,7 +195,26 @@ pub async fn search_issues(
         })
         .collect();
 
-    ctx.renderer.render_list_or_empty(&rows, "No issues found")
+    if rows.is_empty()
+        && matches!(
+            ctx.renderer.format(),
+            OutputFormat::Table | OutputFormat::Markdown
+        )
+    {
+        println!("No issues found");
+        return Ok(());
+    }
+    ctx.renderer.render_list_with_meta(&rows, &meta)
+}
+
+/// Render a cursor as something a person can compare, without implying it is a
+/// URL a caller should fetch itself.
+pub(super) fn describe_cursor(cursor: &atlassian_cli_api::pagination::Continuation) -> String {
+    use atlassian_cli_api::pagination::Continuation;
+    match cursor {
+        Continuation::Token { value, .. } => value.clone(),
+        Continuation::Url(url) => url.clone(),
+    }
 }
 
 pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {

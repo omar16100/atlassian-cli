@@ -16,7 +16,9 @@ mod time_parser;
 pub mod utils;
 mod variables;
 mod webhooks;
-mod workspaces;
+// `auth whoami --bitbucket` reuses the identity reporting here rather than
+// reimplementing the bearer/basic split.
+pub(crate) mod workspaces;
 
 use utils::BitbucketContext;
 
@@ -128,6 +130,15 @@ enum BitbucketCommands {
 
     /// Show current authenticated Bitbucket user.
     Whoami,
+
+    /// Call any Bitbucket REST endpoint with the profile's credentials.
+    ///
+    /// The escape hatch for anything the typed commands do not expose. Paths
+    /// are relative to https://api.bitbucket.org, e.g. /2.0/user.
+    #[command(
+        long_about = "Call any Bitbucket REST endpoint with the profile's credentials.\n\nThe escape hatch for fields the typed commands drop. Paths are relative to https://api.bitbucket.org.\n\nExamples:\n  bb api /2.0/user\n  bb api /2.0/repositories/{workspace}/{repo}/pullrequests/1\n  bb api /2.0/repositories/{workspace}/{repo}/default-reviewers"
+    )]
+    Api(crate::commands::api::ApiArgs),
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -222,8 +233,8 @@ enum BranchCommands {
         repo: String,
         /// Branch name.
         branch: String,
-        /// Skip confirmation prompt.
-        #[arg(long)]
+        /// Skip the typed confirmation. `--yes` matches the bulk commands.
+        #[arg(long, visible_alias = "yes")]
         force: bool,
     },
     /// Add branch protection (restriction).
@@ -301,9 +312,17 @@ enum PrCommands {
         /// PR description.
         #[arg(long)]
         description: Option<String>,
-        /// Reviewer UUIDs (comma-separated).
+        /// Reviewer UUIDs (comma-separated). `bb permission list` and
+        /// `bb pr reviewers` both report the uuid to use.
         #[arg(long, value_delimiter = ',')]
         reviewers: Vec<String>,
+        /// Also add the repository's configured default reviewers.
+        ///
+        /// Atlassian apply these in the web UI only, so a pull request created
+        /// through the API gets none. Where a merge check requires a
+        /// default-reviewer approval, that leaves the pull request unmergeable.
+        #[arg(long)]
+        default_reviewers: bool,
     },
     /// Update pull request.
     Update {
@@ -927,24 +946,53 @@ enum CommitCommands {
 
 #[derive(Subcommand, Debug, Clone)]
 enum BulkCommands {
-    /// Archive stale repositories.
+    /// Disable the issue tracker and wiki on stale repositories.
+    ///
+    /// Despite the command name, this does NOT archive: Bitbucket Cloud has no
+    /// repository archive API. It sets has_issues and has_wiki to false, which
+    /// makes any existing issues and wiki pages inaccessible. Every repository
+    /// in the workspace is examined, not just the first page. Lists candidates
+    /// by default; pass --execute to apply.
     ArchiveRepos {
-        /// Days threshold for staleness.
-        #[arg(long, default_value_t = 180)]
+        /// Days threshold for staleness. Must be at least 1.
+        ///
+        /// Rejecting 0 and negatives matters: either would make every
+        /// repository "stale", which with --execute --yes in a script is a
+        /// workspace-wide change from a typo.
+        #[arg(long, default_value_t = 180, value_parser = clap::value_parser!(i64).range(1..=36_500))]
         days: i64,
-        /// Dry run mode.
+        /// Apply the change. Without this, candidates are only listed.
         #[arg(long)]
+        execute: bool,
+        /// Skip the typed confirmation required by --execute.
+        #[arg(long)]
+        yes: bool,
+        /// Deprecated: listing is now the default. Cannot be combined with
+        /// --execute, which it would otherwise silently override.
+        #[arg(long, hide = true, conflicts_with = "execute")]
         dry_run: bool,
     },
-    /// Delete merged branches.
+    /// Delete branches by name. Does NOT check merge status.
+    ///
+    /// Any branch except main, master, develop, development and --exclude
+    /// matches is a candidate, whether or not it was ever merged. EVERY branch
+    /// in the repository is considered, not just the first page. Lists
+    /// candidates by default; pass --execute to actually delete.
     DeleteBranches {
         /// Repository slug.
         repo: String,
         /// Exclude patterns (comma-separated).
         #[arg(long, value_delimiter = ',')]
         exclude: Vec<String>,
-        /// Dry run mode.
+        /// Delete the matched branches. Without this, they are only listed.
         #[arg(long)]
+        execute: bool,
+        /// Skip the typed confirmation required by --execute.
+        #[arg(long)]
+        yes: bool,
+        /// Deprecated: listing is now the default. Cannot be combined with
+        /// --execute, which it would otherwise silently override.
+        #[arg(long, hide = true, conflicts_with = "execute")]
         dry_run: bool,
     },
 }
@@ -959,7 +1007,16 @@ pub async fn execute(
 ) -> Result<()> {
     // Whoami doesn't require workspace
     if matches!(args.command, BitbucketCommands::Whoami) {
-        return workspaces::whoami(&client, is_bearer).await;
+        return workspaces::whoami(&client, is_bearer, renderer, None).await;
+    }
+
+    // Neither does the raw passthrough, and requiring one would defeat it: the
+    // command exists to reach endpoints the typed commands cannot, including
+    // workspace-less ones like /2.0/user. Wired at the bottom of the match
+    // below -- where the Jira equivalent sits -- it would have failed with
+    // "Workspace required" for anyone outside a Bitbucket checkout.
+    if let BitbucketCommands::Api(api_args) = args.command {
+        return crate::commands::api::run(&client, renderer, api_args).await;
     }
 
     // Detect git context for auto-detection
@@ -1116,6 +1173,7 @@ pub async fn execute(
                 destination,
                 description,
                 reviewers,
+                default_reviewers,
             } => {
                 pullrequests::create_pull_request(
                     &ctx,
@@ -1126,6 +1184,7 @@ pub async fn execute(
                     &destination,
                     description.as_deref(),
                     reviewers,
+                    default_reviewers,
                 )
                 .await
             }
@@ -1712,16 +1771,37 @@ pub async fn execute(
             }
         },
         BitbucketCommands::Bulk(cmd) => match cmd {
-            BulkCommands::ArchiveRepos { days, dry_run } => {
-                bulk::archive_stale_repos(&ctx, &workspace, days, dry_run).await
+            BulkCommands::ArchiveRepos {
+                days,
+                execute,
+                yes,
+                dry_run,
+            } => {
+                // See the DeleteBranches arm: clap already rejects the pair, and
+                // the `&&` keeps --dry-run a veto if that guard is ever removed.
+                let execute = execute && !dry_run;
+                bulk::disable_features_on_stale_repos(&ctx, &workspace, days, execute, yes).await
             }
             BulkCommands::DeleteBranches {
                 repo,
                 exclude,
+                execute,
+                yes,
                 dry_run,
-            } => bulk::delete_merged_branches(&ctx, &workspace, &repo, exclude, dry_run).await,
+            } => {
+                // `--dry-run` used to be the only thing standing between a bare
+                // invocation and mass deletion. Listing is now the default, so
+                // the flag is redundant. clap rejects it alongside --execute,
+                // making this `&&` redundant too; it stays as the belt to that
+                // braces, so removing the `conflicts_with` can never silently
+                // turn `--dry-run` into a no-op that deletes.
+                let execute = execute && !dry_run;
+                bulk::delete_branches(&ctx, &workspace, &repo, exclude, execute, yes).await
+            }
         },
-        BitbucketCommands::Whoami => unreachable!("handled above"),
+        BitbucketCommands::Whoami | BitbucketCommands::Api(_) => {
+            unreachable!("handled above, before the workspace gate")
+        }
     }
 }
 

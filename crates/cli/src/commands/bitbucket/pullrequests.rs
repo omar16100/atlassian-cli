@@ -1,4 +1,6 @@
 use anyhow::{Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
+use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
@@ -43,7 +45,7 @@ struct PullRequest {
     reviewers: Option<Vec<User>>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct User {
     display_name: String,
     #[serde(default)]
@@ -78,7 +80,7 @@ struct RepositoryWorkspace {
     slug: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Participant {
     #[serde(default)]
     approved: bool,
@@ -103,6 +105,11 @@ fn participant_status(approved: bool, state: Option<&str>) -> &'static str {
 #[derive(Serialize)]
 struct ReviewerRow<'a> {
     name: &'a str,
+    /// The value `pr create --reviewers` and `pr reviewers --add` expect.
+    /// Without it, listing reviewers told you who they were but not how to
+    /// name them to any other command, which is why reading a UUID meant
+    /// driving a browser.
+    uuid: &'a str,
     role: &'a str,
     status: &'a str,
     participated_on: &'a str,
@@ -116,6 +123,7 @@ fn reviewer_rows(participants: &[Participant], show_all: bool) -> Vec<ReviewerRo
         .filter(|p| show_all || p.role == "REVIEWER")
         .map(|p| ReviewerRow {
             name: p.user.display_name.as_str(),
+            uuid: p.user.uuid.as_deref().unwrap_or(""),
             role: p.role.as_str(),
             status: participant_status(p.approved, p.state.as_deref()),
             participated_on: p.participated_on.as_deref().unwrap_or(""),
@@ -338,14 +346,26 @@ pub async fn get_pull_request(
         updated: &'a str,
         comments: String,
         tasks: String,
+        /// Kept for the table, which cannot show a nested list.
         approvals: String,
+        /// Who the reviewers are and where each stands.
+        ///
+        /// The count above answered "how many approved" and nothing else: not
+        /// who they were, not their UUIDs, not whether anyone had requested
+        /// changes. Reading any of that meant leaving the CLI entirely. Only
+        /// the structured formats get it, because a nested array has nowhere
+        /// to go in a table.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        reviewers: Vec<ReviewerRow<'a>>,
     }
 
-    let approvals = pr
-        .participants
-        .as_ref()
-        .map(|p| p.iter().filter(|part| part.approved).count())
-        .unwrap_or(0);
+    let participants = pr.participants.clone().unwrap_or_default();
+    let approvals = participants.iter().filter(|part| part.approved).count();
+
+    let reviewers = match ctx.renderer.format() {
+        OutputFormat::Table | OutputFormat::Markdown => Vec::new(),
+        _ => reviewer_rows(&participants, false),
+    };
 
     let view = View {
         id: pr.id,
@@ -360,6 +380,7 @@ pub async fn get_pull_request(
         comments: pr.comment_count.map(|c| c.to_string()).unwrap_or_default(),
         tasks: pr.task_count.map(|t| t.to_string()).unwrap_or_default(),
         approvals: approvals.to_string(),
+        reviewers,
     };
 
     ctx.renderer.render(&view)
@@ -375,6 +396,7 @@ pub async fn create_pull_request(
     dest_branch: &str,
     description: Option<&str>,
     reviewers: Vec<String>,
+    include_default_reviewers: bool,
 ) -> Result<()> {
     let mut payload = serde_json::json!({
         "title": title,
@@ -394,8 +416,20 @@ pub async fn create_pull_request(
         payload["description"] = serde_json::json!(desc);
     }
 
-    if !reviewers.is_empty() {
-        let reviewer_objs: Vec<_> = merge_reviewer_uuids(&[], &reviewers)
+    // Atlassian apply default reviewers in the web UI only; a PR created through
+    // the API gets none. Where a merge check requires a default-reviewer
+    // approval, that makes every API-created PR unmergeable until someone adds
+    // them by hand. Opt-in rather than automatic, so an existing scripted
+    // `pr create` does not silently start notifying people.
+    let defaults = if include_default_reviewers {
+        fetch_default_reviewers(ctx, workspace, repo_slug).await?
+    } else {
+        Vec::new()
+    };
+
+    let merged = merge_reviewer_uuids(&defaults, &reviewers);
+    if !merged.is_empty() {
+        let reviewer_objs: Vec<_> = merged
             .iter()
             .map(|uuid| serde_json::json!({ "uuid": uuid }))
             .collect();
@@ -635,17 +669,28 @@ pub async fn list_pr_comments(
     repo_slug: &str,
     pr_id: i64,
 ) -> Result<()> {
-    #[derive(Deserialize)]
-    struct CommentList {
-        values: Vec<Comment>,
+    // Was a single unpaginated GET, and Bitbucket serves 20 comments per page by
+    // default, so any busier pull request was silently cut short.
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments?pagelen=100"
+    );
+    let (comments, comments_page) =
+        fetch_paged::<BitbucketPage<Comment>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}"
+                )
+            })?;
+
+    if comments_page.truncated {
+        eprintln!(
+            "warning: showing {} comments for pull request {pr_id}; the thread is longer.",
+            comments.len()
+        );
     }
 
-    let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}/comments");
-    let response: CommentList = ctx.client.get(&path).await.with_context(|| {
-        format!("Failed to list comments for pull request {pr_id} in {workspace}/{repo_slug}")
-    })?;
-
-    let rows: Vec<CommentRow<'_>> = response.values.iter().map(comment_row).collect();
+    let rows: Vec<CommentRow<'_>> = comments.iter().map(comment_row).collect();
 
     if rows.is_empty() {
         tracing::info!(pr_id, workspace, repo_slug, "No comments found");
@@ -779,6 +824,44 @@ fn merge_reviewer_uuids(existing: &[String], requested: &[String]) -> Vec<String
         merged.push(normalized);
     }
     merged
+}
+
+/// The repository's effective default reviewers.
+///
+/// `effective-default-reviewers`, not `default-reviewers`: the plain form
+/// returns only the repository's own list, while the effective one merges in
+/// those configured at project level and tags each with `reviewer_type`. Using
+/// the plain form would silently omit every project-level reviewer, which on a
+/// workspace that configures them centrally means omitting all of them.
+async fn fetch_default_reviewers(
+    ctx: &BitbucketContext<'_>,
+    workspace: &str,
+    repo_slug: &str,
+) -> Result<Vec<String>> {
+    #[derive(Deserialize)]
+    struct DefaultReviewer {
+        #[serde(default)]
+        user: Option<User>,
+        #[serde(default)]
+        uuid: Option<String>,
+    }
+
+    let path = format!(
+        "/2.0/repositories/{workspace}/{repo_slug}/effective-default-reviewers?pagelen=100"
+    );
+    let (entries, _) =
+        fetch_paged::<BitbucketPage<DefaultReviewer>>(&ctx.client, &path, PageLimits::new(None))
+            .await
+            .with_context(|| {
+                format!("Failed to fetch default reviewers for {workspace}/{repo_slug}")
+            })?;
+
+    // The payload nests the account under `user`; older shapes put the uuid at
+    // the top level. Accept either rather than silently returning nothing.
+    Ok(entries
+        .into_iter()
+        .filter_map(|entry| entry.user.and_then(|u| u.uuid).or(entry.uuid))
+        .collect())
 }
 
 /// Add reviewers to a pull request.

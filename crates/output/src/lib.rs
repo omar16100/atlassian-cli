@@ -27,11 +27,81 @@ pub struct OutputRenderer {
     envelope: bool,
 }
 
+/// What a list result knows about itself beyond the rows.
+///
+/// Carried separately from the rows because the tabular formats have nowhere to
+/// put it, and because a caller that never paginated should not have to invent
+/// values it does not have.
+#[derive(Debug, Clone, Default)]
+pub struct ListMeta {
+    /// The server's own count of matching items, where it reports one.
+    ///
+    /// Usually absent. Jira's `/search/jql` returns no total, and Bitbucket
+    /// omits `size` on collections it considers expensive. Absent is not zero,
+    /// and it is serialized as absent rather than as `0` for that reason.
+    pub total: Option<u64>,
+    /// Whether the rows are a complete answer, when the caller knows.
+    ///
+    /// `None` means unknown, and is serialized as absent rather than as
+    /// `false`. Most list commands are still a single request against a
+    /// server-paginated endpoint: they cannot tell whether more exists, and
+    /// asserting `truncated: false` there would be a confident false claim of
+    /// exactly the kind this field was added to prevent.
+    pub truncated: Option<bool>,
+    /// An opaque marker for where a truncated result stopped, when the source
+    /// provides one.
+    pub next: Option<String>,
+}
+
+impl ListMeta {
+    /// What a caller that did not paginate knows: nothing.
+    ///
+    /// Deliberately not called `complete()`. The callers that use it have not
+    /// established completeness, and naming it so invited the envelope to
+    /// assert it.
+    pub fn unknown() -> Self {
+        Self::default()
+    }
+
+    /// A result whose completeness has been established.
+    pub fn known(total: Option<u64>, truncated: bool, next: Option<String>) -> Self {
+        Self {
+            total,
+            truncated: Some(truncated),
+            next,
+        }
+    }
+}
+
 /// Envelope wrapper for list outputs in JSON/YAML.
+///
+/// `data` and `count` keep the names the `--envelope` flag has always emitted;
+/// renaming them would break existing users for no gain. The rest is additive,
+/// and `total`/`next` are omitted entirely when unknown so that a consumer can
+/// distinguish "no total reported" from "a total of zero".
 #[derive(Serialize)]
 struct ListEnvelope<'a, T: Serialize> {
     data: &'a [T],
     count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    total: Option<u64>,
+    /// Absent when the caller could not establish completeness.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    truncated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next: Option<&'a str>,
+}
+
+impl<'a, T: Serialize> ListEnvelope<'a, T> {
+    fn new(items: &'a [T], meta: &'a ListMeta) -> Self {
+        Self {
+            data: items,
+            count: items.len(),
+            total: meta.total,
+            truncated: meta.truncated,
+            next: meta.next.as_deref(),
+        }
+    }
 }
 
 impl OutputRenderer {
@@ -87,23 +157,27 @@ impl OutputRenderer {
     }
 
     /// Render a list/array of items. When --envelope is enabled and format is JSON/YAML,
-    /// wraps output in `{"data": [...], "count": N}`. Otherwise renders as normal.
+    /// wraps output in `{"data": [...], "count": N, ...}`. Otherwise renders as normal.
     pub fn render_list<T: Serialize>(&self, items: &[T]) -> Result<()> {
+        self.render_list_with_meta(items, &ListMeta::unknown())
+    }
+
+    /// Render a list that knows whether it is complete.
+    ///
+    /// The truncation signal only has somewhere to live in the enveloped
+    /// formats. Callers rendering a paginated result should still warn on
+    /// stderr for the tabular formats, because a table has no field to put this
+    /// in and a silently short table is the original complaint.
+    pub fn render_list_with_meta<T: Serialize>(&self, items: &[T], meta: &ListMeta) -> Result<()> {
         if self.envelope {
             match self.format {
                 OutputFormat::Json => {
-                    let envelope = ListEnvelope {
-                        data: items,
-                        count: items.len(),
-                    };
+                    let envelope = ListEnvelope::new(items, meta);
                     println!("{}", serde_json::to_string_pretty(&envelope)?);
                     return Ok(());
                 }
                 OutputFormat::Yaml => {
-                    let envelope = ListEnvelope {
-                        data: items,
-                        count: items.len(),
-                    };
+                    let envelope = ListEnvelope::new(items, meta);
                     println!("{}", serde_yaml::to_string(&envelope)?);
                     return Ok(());
                 }

@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{anyhow, Context, Result};
 use atlassian_cli_auth::{bitbucket_token_key, token_key, CredentialStore, BITBUCKET_API_URL};
 use atlassian_cli_config::{site_base_url, Config};
-use atlassian_cli_output::OutputRenderer;
+use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Args, Subcommand};
 use serde::Serialize;
 use tracing::debug;
@@ -134,6 +134,15 @@ pub enum AuthCommand {
     Whoami(WhoamiArgs),
     /// Test authentication for a profile
     Test(TestArgs),
+    /// Show the scopes a Bitbucket token actually grants
+    Scopes(ScopesArgs),
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct ScopesArgs {
+    /// Profile to inspect (defaults to default profile)
+    #[arg(long)]
+    pub profile: Option<String>,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -148,6 +157,9 @@ pub struct WhoamiArgs {
     /// Profile to use (defaults to default profile)
     #[arg(long)]
     pub profile: Option<String>,
+    /// Report the Bitbucket identity instead of Jira/Confluence.
+    #[arg(long)]
+    pub bitbucket: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -240,8 +252,9 @@ pub async fn handle(
         AuthCommand::Logout(args) => logout(args, config, config_path, store),
         AuthCommand::List(args) => list_profiles(args, config, store, renderer),
         AuthCommand::Status(args) => auth_status(args, config, store, renderer).await,
-        AuthCommand::Whoami(args) => whoami(args, config, store).await,
+        AuthCommand::Whoami(args) => whoami(args, config, store, renderer).await,
         AuthCommand::Test(args) => test_auth(args, config, store).await,
+        AuthCommand::Scopes(args) => auth_scopes(args, config, store, renderer).await,
     }
 }
 
@@ -628,10 +641,32 @@ fn read_token_from_stdin(args: &LoginArgs) -> Result<String> {
     Ok(token.trim().to_owned())
 }
 
-async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> Result<()> {
+async fn whoami(
+    args: WhoamiArgs,
+    config: &Config,
+    store: &CredentialStore,
+    renderer: &OutputRenderer,
+) -> Result<()> {
     let (profile_name, profile) = config
         .resolve_profile(args.profile.as_deref())
         .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
+
+    // `auth test` has taken `--bitbucket` since Bitbucket support landed, so
+    // "check the Bitbucket profile" was a natural thing to type here too, and
+    // it was rejected. Adding the flag alone would not have been enough: the
+    // body below hard-requires `base_url` and a Jira/Confluence token, neither
+    // of which a Bitbucket-only profile has. This dispatches the way
+    // `test_auth` does.
+    if args.bitbucket {
+        return bitbucket_whoami(
+            config,
+            store,
+            profile_name,
+            profile.email.as_deref(),
+            renderer,
+        )
+        .await;
+    }
 
     let base_url = profile
         .base_url
@@ -660,24 +695,117 @@ async fn whoami(args: WhoamiArgs, config: &Config, store: &CredentialStore) -> R
         .await
         .with_context(|| format!("Failed to fetch user information from {product} API"))?;
 
-    println!("Profile: {}", profile_name);
-    println!("Product: {}", product);
-    println!(
-        "Display Name: {}",
-        display_name(&user_data).unwrap_or("Unknown")
-    );
-    println!("Email: {}", email_address(&user_data).unwrap_or("Unknown"));
-    println!(
-        "Account ID: {}",
-        user_data["accountId"].as_str().unwrap_or("Unknown")
-    );
-    // Only Jira reports `active`. Printing a default for Confluence would claim
-    // the account is disabled when the API simply never said either way.
-    if let Some(active) = user_data["active"].as_bool() {
-        println!("Active: {}", active);
+    #[derive(Serialize)]
+    struct WhoamiView<'a> {
+        profile: &'a str,
+        product: &'a str,
+        display_name: &'a str,
+        email: &'a str,
+        account_id: &'a str,
+        /// Only Jira reports this. Omitted rather than defaulted, because
+        /// printing `false` would claim the account is disabled when the API
+        /// simply never said either way.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        active: Option<bool>,
     }
 
-    Ok(())
+    let view = WhoamiView {
+        profile: profile_name,
+        product,
+        display_name: display_name(&user_data).unwrap_or("Unknown"),
+        email: email_address(&user_data).unwrap_or("Unknown"),
+        account_id: user_data["accountId"].as_str().unwrap_or("Unknown"),
+        active: user_data["active"].as_bool(),
+    };
+
+    let mut lines = vec![
+        ("Profile", view.profile.to_string()),
+        ("Product", view.product.to_string()),
+        ("Display Name", view.display_name.to_string()),
+        ("Email", view.email.to_string()),
+        ("Account ID", view.account_id.to_string()),
+    ];
+    if let Some(active) = view.active {
+        lines.push(("Active", active.to_string()));
+    }
+
+    render_identity(renderer, &view, &lines)
+}
+
+/// Render an identity, keeping the human output people already read.
+///
+/// `-f json` was ignored here entirely: every field went out through
+/// `println!`, so a script asking for JSON got the text form and could not
+/// parse it. Only the machine formats change.
+///
+/// The readable lines are passed in explicitly rather than derived from the
+/// serialized struct. Deriving them reordered the fields alphabetically and
+/// turned "Account ID" into "Account Id", which is a regression in the output
+/// people actually read, in the name of fixing the one they parse.
+fn render_identity<T: Serialize>(
+    renderer: &OutputRenderer,
+    view: &T,
+    lines: &[(&str, String)],
+) -> Result<()> {
+    match renderer.format() {
+        // Only the structured formats change. The old code printed these lines
+        // for *every* format, so restricting the readable arm to Table and
+        // Markdown silently turned `-f quiet` and `-f csv` -- both consumed by
+        // line-oriented scripts -- into a pretty-printed JSON object.
+        OutputFormat::Json | OutputFormat::Yaml => renderer.render(view),
+        _ => {
+            for (label, value) in lines {
+                println!("{label}: {value}");
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Report the Bitbucket identity for a profile.
+///
+/// Bitbucket credentials live under their own key and their own base URL, so
+/// this shares nothing with the site path above except the profile lookup. The
+/// bearer case is delegated rather than reimplemented: access tokens cannot use
+/// `/2.0/user` at all, and `workspaces::whoami` already encodes that split.
+async fn bitbucket_whoami(
+    config: &Config,
+    store: &CredentialStore,
+    profile_name: &str,
+    email: Option<&str>,
+    renderer: &OutputRenderer,
+) -> Result<()> {
+    let is_bearer = is_bitbucket_bearer(config, profile_name);
+
+    // The same fallback `resolve_profile_for_bitbucket` uses in main.rs. Without
+    // it, a profile whose single token serves every other `bb` command would
+    // fail here alone, which is a confusing way to answer "who am I".
+    let token = get_bitbucket_token(store, profile_name)
+        .or_else(|| get_token(store, profile_name))
+        .ok_or_else(|| {
+            anyhow!(
+                "No Bitbucket token found for profile '{profile_name}'. \
+                Set BITBUCKET_TOKEN or ATLASSIAN_CLI_BITBUCKET_TOKEN_{}, \
+                or run `atlassian-cli auth login --bitbucket`",
+                profile_name.to_uppercase()
+            )
+        })?;
+
+    let client = if is_bearer {
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_bearer_token(&token)
+    } else {
+        // Basic auth needs the account email as the username. A Bitbucket-only
+        // profile can legitimately lack one, and an empty username produces a
+        // 401 whose message says nothing useful, so say it here instead.
+        let email = email.filter(|value| !value.is_empty()).context(
+            "Profile is missing an email, which Bitbucket basic auth uses as the username. \
+             Re-run `atlassian-cli auth login --bitbucket`, or use an access token.",
+        )?;
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_basic_auth(email, &token)
+    };
+
+    crate::commands::bitbucket::workspaces::whoami(&client, is_bearer, renderer, Some(profile_name))
+        .await
 }
 
 /// Display name, across both products.
@@ -1042,10 +1170,173 @@ async fn auth_status(
     renderer.render_list_or_empty(&statuses, "No services configured.")
 }
 
+/// Report the scopes a Bitbucket token grants, without blocking anything.
+///
+/// A cached scope list with a per-command preflight was considered and
+/// rejected. It fails closed: add a scope server-side and a stale cache refuses
+/// the command locally, so no request goes out, so no 403 arrives to correct
+/// the cache. A wrong entry in a hand-maintained command-to-scope map does the
+/// same thing, and refusing a command the token could actually run is worse
+/// than the mid-task 403 it was meant to replace. The server stays
+/// authoritative; this is a read-only answer to "what do I have".
+///
+/// Bitbucket exposes the granted scopes in the `x-oauth-scopes` response
+/// header, so any authenticated request reveals them.
+async fn auth_scopes(
+    args: ScopesArgs,
+    config: &Config,
+    store: &CredentialStore,
+    renderer: &OutputRenderer,
+) -> Result<()> {
+    let (profile_name, profile) = config
+        .resolve_profile(args.profile.as_deref())
+        .context("No profile found. Use `atlassian-cli auth login` to create one.")?;
+
+    let is_bearer = is_bitbucket_bearer(config, profile_name);
+    let token = get_bitbucket_token(store, profile_name)
+        .or_else(|| get_token(store, profile_name))
+        .ok_or_else(|| anyhow!("No Bitbucket token found for profile '{profile_name}'."))?;
+
+    let client = if is_bearer {
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_bearer_token(&token)
+    } else {
+        let email = profile
+            .email
+            .as_deref()
+            .filter(|value| !value.is_empty())
+            .context(
+                "Profile is missing an email, which Bitbucket basic auth uses as a username.",
+            )?;
+        atlassian_cli_api::ApiClient::new(BITBUCKET_API_URL)?.with_basic_auth(email, &token)
+    };
+
+    // Access tokens cannot reach /2.0/user; /2.0/workspaces works for both and
+    // returns the same scope header.
+    let endpoint = if is_bearer {
+        "/2.0/workspaces"
+    } else {
+        "/2.0/user"
+    };
+    let scopes = client
+        .response_header(endpoint, "x-oauth-scopes")
+        .await
+        .context("Failed to read the token's scopes from Bitbucket")?;
+
+    let scopes: Vec<String> = scopes
+        .unwrap_or_default()
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    #[derive(Serialize)]
+    struct ScopesView<'a> {
+        profile: &'a str,
+        product: &'a str,
+        auth_type: &'a str,
+        scopes: Vec<String>,
+    }
+
+    let view = ScopesView {
+        profile: profile_name,
+        product: "Bitbucket",
+        auth_type: if is_bearer { "Bearer" } else { "Basic" },
+        scopes,
+    };
+
+    match renderer.format() {
+        OutputFormat::Json | OutputFormat::Yaml => renderer.render(&view),
+        _ => {
+            println!("Profile: {}", view.profile);
+            println!("Product: {}", view.product);
+            println!("Auth type: {}", view.auth_type);
+            if view.scopes.is_empty() {
+                println!("Scopes: (none reported by the server)");
+            } else {
+                println!("Scopes:");
+                for scope in &view.scopes {
+                    println!("  {scope}");
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use atlassian_cli_config::Profile;
+
+    use clap::Parser;
+
+    /// `auth test` has always taken `--bitbucket`; `auth whoami` rejected it,
+    /// so the natural "check my Bitbucket profile" invocation failed.
+    #[test]
+    fn whoami_accepts_the_bitbucket_flag() {
+        #[derive(Parser)]
+        struct Wrapper {
+            #[command(flatten)]
+            args: WhoamiArgs,
+        }
+
+        let parsed = Wrapper::try_parse_from(["x", "--bitbucket"]).expect("--bitbucket must parse");
+        assert!(parsed.args.bitbucket);
+
+        let default = Wrapper::try_parse_from(["x"]).unwrap();
+        assert!(!default.args.bitbucket, "Jira/Confluence stays the default");
+    }
+
+    /// The flag alone would have fixed nothing: `whoami` hard-requires
+    /// `base_url` and a Jira token, neither of which a Bitbucket-only profile
+    /// has. Dispatching must therefore happen before those checks. A profile
+    /// with no `base_url` and no credentials must fail on the missing
+    /// *Bitbucket* token, not on the missing base URL.
+    #[tokio::test]
+    async fn bitbucket_whoami_dispatches_before_the_base_url_check() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let mut config = Config {
+            default_profile: Some("bbonly".to_string()),
+            ..Default::default()
+        };
+        config
+            .profiles
+            .insert("bbonly".to_string(), Profile::default());
+
+        // An empty directory, so no stored credential can satisfy the lookup.
+        let store = CredentialStore::new(dir.path());
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let err = whoami(
+            WhoamiArgs {
+                profile: None,
+                bitbucket: true,
+            },
+            &config,
+            &store,
+            &renderer,
+        )
+        .await
+        .expect_err("no Bitbucket token is configured");
+
+        // Assert on where it did NOT get to, rather than on one exact message.
+        // `get_bitbucket_token` consults ATLASSIAN_CLI_BITBUCKET_TOKEN_*,
+        // ATLASSIAN_BITBUCKET_TOKEN and BITBUCKET_TOKEN from the process
+        // environment, so a developer or CI shell exporting any of them changes
+        // which Bitbucket-side error comes back. Both are equally good evidence
+        // of the thing under test: that dispatch happened before the
+        // Jira/Confluence requirements. Scrubbing the environment instead would
+        // mean `remove_var` racing every other test in the process.
+        let message = format!("{err:#}");
+        assert!(
+            !message.contains("base_url"),
+            "must not have reached the Jira/Confluence base_url check: {message}"
+        );
+        assert!(
+            message.contains("No Bitbucket token found") || message.contains("missing an email"),
+            "expected a Bitbucket-side error, got: {message}"
+        );
+    }
 
     #[test]
     fn test_is_bitbucket_bearer_default_is_false() {
