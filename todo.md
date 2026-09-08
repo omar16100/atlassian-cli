@@ -2744,3 +2744,51 @@ Corrections to the previous entry, which over-claimed twice:
   strips. The guard still refuses, which is the conservative direction.
 
 901 tests across 32 suites, clippy clean.
+
+## 2026-09-08 — Jira transition feedback
+
+Second feedback batch, all from Jira transition work. Verified against the tree
+before planning, which again changed the priority order.
+
+**The reporter's top-ranked item was half-solved and released.** They asked for
+either "list the transitions in the error" or "add a `jira issue transitions`
+subcommand". The subcommand has existed since PR #118 and shipped in v0.7.2 and
+v0.8.0; its doc comment even cites the same complaint ("had to be driven by
+guesswork, #101"). **Their installed binary is still 0.2.8** — unchanged since
+the last batch, despite v0.8.0 being released the day before. That is now twice
+that a top-ranked finding was already fixed upstream, and it is the second most
+useful thing to tell them after the fixes themselves.
+
+Their correction about `pr create --reviewers` also describes 0.2.8: at HEAD,
+`pr reviewers --add` does a pull-request `PUT` and the only `default-reviewers`
+reference is the `effective-default-reviewers` read added for
+`--default-reviewers`.
+
+Genuinely missing, and now implemented:
+
+- **The error listed nothing.** `Transition 'Done' not found` and stop, while
+  `available` was already in scope one line above. It now prints each valid
+  transition *and the status it leads to*, plus a pointer to `--to-status`,
+  because the names are the whole problem: nobody guesses `start
+  implementation`.
+- **The success line reported the wrong thing.** It echoed the transition name,
+  so a move landing in `Done` printed "Transitioned to: Completed work".
+  `Transition.to` was already parsed; it now reports the destination, falling
+  back to re-reading the issue when the workflow does not say.
+- **`--to-status`**, which walks the workflow a hop at a time. On failure it
+  reports which hops succeeded and where the issue now sits, because a stranded
+  issue that nobody mentions is worse than one that fails loudly.
+- **`--dry-run` on the single transition**, for parity with bulk. It was
+  backwards: the ad-hoc command lacked the safety the scripted one had.
+- **`status_category` on `issue get`**, so a script can tell whether `Analysis`
+  counts as finished without knowing the workflow.
+
+**A limitation stated rather than papered over.** `--to-status` probes forward,
+because Jira reports transitions only for an issue's *current* status. So
+`--dry-run` can show the first hop with certainty and no more. The alternative —
+reading the project's workflow scheme up front — needs admin endpoints the
+reporter's token may not have and can disagree with per-issue conditions. The
+dry-run output says this explicitly instead of implying a full plan.
+
+906 tests across 33 suites, clippy clean. The two tests covering the reported
+symptoms were verified to fail against the pre-fix behaviour.
