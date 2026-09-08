@@ -258,6 +258,13 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             .unwrap_or_default();
 
         let attachments_md = attachments_markdown(&issue.fields.attachment);
+        let status_category_md = issue
+            .fields
+            .status
+            .as_ref()
+            .and_then(|s| s.category.as_ref())
+            .map(|c| format!(" ({})", c.name))
+            .unwrap_or_default();
         let sprint_md = issue
             .fields
             .sprint
@@ -270,7 +277,7 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
             "# {key}: {summary}\n\n\
              | Field | Value |\n\
              | --- | --- |\n\
-             | Status | {status} |\n\
+             | Status | {status}{status_category_md} |\n\
              | Type | {issue_type} |\n\
              | Assignee | {assignee} |\n\
              | Reporter | {reporter} |\n\
@@ -286,6 +293,13 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         key: &'a str,
         summary: &'a str,
         status: &'a str,
+        /// Jira's grouping of the status: "To Do", "In Progress" or "Done".
+        ///
+        /// Present so a script can tell whether a workflow-specific status like
+        /// `Analysis` counts as finished without knowing the workflow. Without
+        /// it, callers had to string-match on the status name.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        status_category: Option<&'a str>,
         description: String,
         assignee: &'a str,
         reporter: &'a str,
@@ -295,9 +309,17 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
         attachments: &'a Vec<JiraAttachment>,
     }
 
+    let status_category = issue
+        .fields
+        .status
+        .as_ref()
+        .and_then(|s| s.category.as_ref())
+        .map(|c| c.name.as_str());
+
     let view = IssueDetails {
         key: issue.key.as_str(),
         summary: issue.fields.summary.as_deref().unwrap_or(""),
+        status_category,
         status: issue
             .fields
             .status
@@ -618,29 +640,332 @@ pub async fn list_transitions(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
     ctx.renderer.render_list(&rows)
 }
 
-pub async fn transition_issue(ctx: &JiraContext<'_>, key: &str, transition: &str) -> Result<()> {
-    use serde_json::json;
+/// Describe a transition the way a person needs to read it: the name to pass,
+/// and the status it actually leads to.
+fn describe(t: &Transition) -> String {
+    match t.to.as_ref() {
+        Some(to) => format!("{:?} -> {}", t.name, to.name),
+        None => format!("{:?}", t.name),
+    }
+}
 
-    let available = fetch_transitions(ctx, key).await?;
+/// The error for a name that matched nothing, listing what would have worked.
+///
+/// The old message was `Transition 'Done' not found` and stopped there, which
+/// is the least useful thing it could have said: transition names are
+/// workflow-specific, rarely match the status they lead to, and nobody guesses
+/// `start implementation`. The available list is already in hand at this point,
+/// so withholding it was pure loss.
+fn unknown_transition(key: &str, wanted: &str, available: &[Transition]) -> anyhow::Error {
+    if available.is_empty() {
+        return anyhow!(
+            "Transition {wanted:?} not found, and {key} has no transitions available \
+             from its current status."
+        );
+    }
 
-    let target = available
+    let list = available
         .iter()
-        .find(|t| t.name.eq_ignore_ascii_case(transition) || t.id == transition)
-        .ok_or_else(|| anyhow::anyhow!("Transition '{}' not found", transition))?;
+        .map(|t| format!("  {}", describe(t)))
+        .collect::<Vec<_>>()
+        .join("\n");
 
-    let payload = json!({ "transition": { "id": target.id } });
+    anyhow!(
+        "Transition {wanted:?} not found on {key}.\n\nAvailable now:\n{list}\n\n\
+         Names are workflow-specific and are not status names. To move by \
+         destination instead, use --to-status."
+    )
+}
 
+/// Find a transition by name or id, case-insensitively.
+fn find_transition<'a>(available: &'a [Transition], wanted: &str) -> Option<&'a Transition> {
+    available
+        .iter()
+        .find(|t| t.name.eq_ignore_ascii_case(wanted) || t.id == wanted)
+}
+
+/// Find a transition leading to a named status.
+fn find_by_destination<'a>(available: &'a [Transition], status: &str) -> Option<&'a Transition> {
+    available.iter().find(|t| {
+        t.to.as_ref()
+            .is_some_and(|to| to.name.eq_ignore_ascii_case(status))
+    })
+}
+
+/// Transitions worth considering when no single hop reaches the target.
+///
+/// Two exclusions, both learned from a demonstrated failure. A status already
+/// visited would oscillate. And a status in Jira's **Done** category is excluded
+/// unless it is the target: "Won't Do", "Cancelled" and "Rejected" all live
+/// there, they are commonly offered from every status as global transitions,
+/// and entering one fires post-functions that set a resolution which survives
+/// reopening. A walk aiming at Done that quietly lands in Won't Do is worse than
+/// no walk at all.
+fn onward_candidates<'a>(
+    available: &'a [Transition],
+    visited: &[String],
+    target_status: &str,
+) -> Vec<&'a Transition> {
+    available
+        .iter()
+        .filter(|t| {
+            // No declared destination: cannot reason about it, so do not walk
+            // through it blindly.
+            let Some(to) = t.to.as_ref() else {
+                return false;
+            };
+            if visited
+                .iter()
+                .any(|seen| seen.eq_ignore_ascii_case(&to.name))
+            {
+                return false;
+            }
+            if to.name.eq_ignore_ascii_case(target_status) {
+                return true;
+            }
+            !to.category
+                .as_ref()
+                .is_some_and(|c| c.name.eq_ignore_ascii_case("Done"))
+        })
+        .collect()
+}
+
+/// Apply one transition and return the status the issue reports afterwards.
+async fn apply_transition(ctx: &JiraContext<'_>, key: &str, t: &Transition) -> Result<()> {
+    let payload = serde_json::json!({ "transition": { "id": t.id } });
     let _: Value = ctx
         .client
         .post(&format!("/rest/api/3/issue/{key}/transitions"), &payload)
         .await
-        .with_context(|| format!("Failed to transition issue {key}"))?;
+        .with_context(|| format!("Failed to transition issue {key} via {:?}", t.name))?;
+    Ok(())
+}
 
-    tracing::info!(%key, transition = %target.name, "Issue transitioned successfully");
+/// The issue's current status name.
+async fn current_status(ctx: &JiraContext<'_>, key: &str) -> Result<String> {
+    let issue: Issue = ctx
+        .client
+        .get(&format!("/rest/api/3/issue/{key}?fields=status"))
+        .await
+        .with_context(|| format!("Failed to read the status of {key}"))?;
+    Ok(issue
+        .fields
+        .status
+        .map(|s| s.name)
+        .unwrap_or_else(|| "(unknown)".to_string()))
+}
+
+pub async fn transition_issue(
+    ctx: &JiraContext<'_>,
+    key: &str,
+    transition: Option<&str>,
+    to_status: Option<&str>,
+    dry_run: bool,
+    max_hops: usize,
+) -> Result<()> {
+    match (transition, to_status) {
+        (Some(name), None) => transition_by_name(ctx, key, name, dry_run).await,
+        (None, Some(status)) => transition_to_status(ctx, key, status, dry_run, max_hops).await,
+        _ => bail!("Pass either --transition <NAME> or --to-status <STATUS>."),
+    }
+}
+
+/// Move by naming the transition.
+async fn transition_by_name(
+    ctx: &JiraContext<'_>,
+    key: &str,
+    wanted: &str,
+    dry_run: bool,
+) -> Result<()> {
+    let available = fetch_transitions(ctx, key).await?;
+    let target = find_transition(&available, wanted)
+        .ok_or_else(|| unknown_transition(key, wanted, &available))?;
+
+    // The status the issue lands in, which is what the user actually cares
+    // about. The old success line echoed the transition name -- reporting
+    // "Transitioned to: Completed work" for a move that lands in "Done".
+    let destination = target.to.as_ref().map(|to| to.name.clone());
+
+    if dry_run {
+        let shown = destination
+            .as_deref()
+            .unwrap_or("(destination not reported)");
+        println!("Would transition {key} via {:?} -> {shown}", target.name);
+        println!("(nothing sent)");
+        return Ok(());
+    }
+
+    apply_transition(ctx, key, target).await?;
+
+    let landed = match destination {
+        Some(name) => name,
+        // The workflow did not say where it leads, so ask rather than guess.
+        // A failed read here must still make clear the transition happened.
+        None => match current_status(ctx, key).await {
+            Ok(name) => name,
+            Err(err) => {
+                return Err(err.context(format!(
+                    "{key} was transitioned via {:?}, but its new status could not be read. \
+                     The transition did take effect; do not re-run it.",
+                    target.name
+                )));
+            }
+        },
+    };
+
+    tracing::info!(%key, transition = %target.name, status = %landed, "Issue transitioned");
     render_success(
         ctx.renderer,
-        &format!("✅ Transitioned {key} to: {}", target.name),
-        &MutationResult::with_id(format!("Transitioned to: {}", target.name), key),
+        &format!("✅ Transitioned {key} to: {landed}"),
+        &MutationResult::with_id(format!("Transitioned to: {landed}"), key),
+    )
+}
+
+/// Move by naming the destination, walking the workflow a hop at a time.
+///
+/// Jira only reports the transitions available from an issue's *current*
+/// status, so the path cannot be known in advance without the workflow-scheme
+/// endpoints, which need admin rights and can disagree with per-issue
+/// conditions. This probes forward instead: transition, re-read, repeat.
+///
+/// The consequence for `--dry-run` is stated rather than papered over -- only
+/// the first hop is knowable without moving.
+async fn transition_to_status(
+    ctx: &JiraContext<'_>,
+    key: &str,
+    target_status: &str,
+    dry_run: bool,
+    max_hops: usize,
+) -> Result<()> {
+    let mut visited: Vec<String> = vec![current_status(ctx, key).await?];
+
+    if visited[0].eq_ignore_ascii_case(target_status) {
+        println!("{key} is already in {}.", visited[0]);
+        return Ok(());
+    }
+
+    if dry_run {
+        let available = fetch_transitions(ctx, key).await?;
+        match find_by_destination(&available, target_status) {
+            Some(direct) => {
+                println!("{} -> {}  via {:?}", visited[0], target_status, direct.name);
+                println!("(1 transition, nothing sent)");
+            }
+            None => {
+                println!(
+                    "From {}, {key} cannot reach {target_status} in one step.",
+                    visited[0]
+                );
+                println!("Available now:");
+                for t in &available {
+                    println!("  {}", describe(t));
+                }
+                println!(
+                    "\nFurther hops cannot be shown without moving: Jira reports transitions \
+                     only for an issue's current status, so the path past the first step is \
+                     unknowable in advance."
+                );
+            }
+        }
+        return Ok(());
+    }
+
+    for hop in 0..max_hops {
+        let available = fetch_transitions(ctx, key).await?;
+
+        let here = visited.last().cloned().unwrap_or_default();
+
+        // A transition landing directly on the target is never a guess.
+        let candidates = onward_candidates(&available, &visited, target_status);
+        let next =
+            match find_by_destination(&available, target_status) {
+                Some(direct) => direct,
+                None => {
+                    match candidates.as_slice() {
+                        // Exactly one way onward: forced, not chosen.
+                        [only] => only,
+                        [] => {
+                            bail!(
+                        "{key} is in {here} and nothing leads onward toward {target_status}.\n\
+                         Path so far: {}\n\
+                         Available now: {}\n\n\
+                         Transitions into a Done-category status are not taken automatically \
+                         unless they are the target, because they are usually terminal.",
+                        visited.join(" -> "),
+                        if available.is_empty() {
+                            "(none)".to_string()
+                        } else {
+                            available.iter().map(describe).collect::<Vec<_>>().join(", ")
+                        }
+                    )
+                        }
+                        // A real fork. The Jira API promises no ordering, so
+                        // "the first one" would be arbitrary. Hand the choice back.
+                        many => bail!(
+                            "{key} is in {here} and the route to {target_status} is ambiguous.\n\
+                         Path so far: {}\n\n\
+                         More than one transition leads onward:\n{}\n\n\
+                         Pick one with --transition, then re-run --to-status.",
+                            visited.join(" -> "),
+                            many.iter()
+                                .map(|t| format!("  {}", describe(t)))
+                                .collect::<Vec<_>>()
+                                .join("\n")
+                        ),
+                    }
+                }
+            };
+
+        let landing = next.to.as_ref().map(|to| to.name.clone());
+
+        if let Err(err) = apply_transition(ctx, key, next).await {
+            // Say where the issue actually is. A partial walk that reports only
+            // the failure leaves the caller not knowing what moved.
+            let now = current_status(ctx, key)
+                .await
+                .unwrap_or_else(|_| "(unknown)".into());
+            return Err(err.context(format!(
+                "Stopped after {hop} transition(s). {key} is now in {now}. Path: {}",
+                visited.join(" -> ")
+            )));
+        }
+
+        // The transition has already been applied. If we cannot learn where it
+        // landed, that must not erase the record of what moved: reporting only
+        // "failed to read status" would leave the caller unaware the issue had
+        // been transitioned at all.
+        let landed = match landing {
+            Some(name) => name,
+            None => match current_status(ctx, key).await {
+                Ok(name) => name,
+                Err(err) => {
+                    return Err(err.context(format!(
+                        "{key} was transitioned via {:?} but its new status could not be read. \
+                         Completed {} transition(s). Path so far: {}",
+                        next.name,
+                        hop + 1,
+                        visited.join(" -> ")
+                    )));
+                }
+            },
+        };
+        visited.push(landed.clone());
+
+        if landed.eq_ignore_ascii_case(target_status) {
+            tracing::info!(%key, status = %landed, hops = hop + 1, "Issue walked to status");
+            return render_success(
+                ctx.renderer,
+                &format!("✅ {key}  {}", visited.join(" -> ")),
+                &MutationResult::with_id(format!("Transitioned to: {landed}"), key),
+            );
+        }
+    }
+
+    bail!(
+        "{key} did not reach {target_status} within {max_hops} transitions.\n\
+         Path: {}\n\
+         Raise --max-hops if the workflow is genuinely this long.",
+        visited.join(" -> ")
     )
 }
 
@@ -979,8 +1304,21 @@ struct IssueFields {
     sprint: Option<Value>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct StatusField {
+    name: String,
+    /// Jira's own grouping of the status: "To Do", "In Progress" or "Done".
+    ///
+    /// Without it a caller cannot tell whether `Analysis` counts as finished
+    /// without already knowing the workflow, which forced scripts to
+    /// string-match on the status name. Optional because the field is absent
+    /// on the transitions endpoint's `to` object.
+    #[serde(rename = "statusCategory", default)]
+    category: Option<StatusCategory>,
+}
+
+#[derive(Deserialize, Clone)]
+struct StatusCategory {
     name: String,
 }
 

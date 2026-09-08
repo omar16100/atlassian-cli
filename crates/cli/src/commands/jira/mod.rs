@@ -265,13 +265,27 @@ enum IssueCommands {
         force: bool,
     },
 
-    /// Transition an issue to a new status
+    /// Transition an issue, by transition name or by destination status.
+    ///
+    /// `jira issue transitions <KEY>` lists what is available right now.
+    #[command(group = clap::ArgGroup::new("target").required(true).args(["transition", "to_status"]))]
     Transition {
         /// Issue key
         key: String,
-        /// Transition name or ID
+        /// Transition name or ID. Names are workflow-specific and rarely match
+        /// the status they lead to.
+        #[arg(long, conflicts_with = "to_status")]
+        transition: Option<String>,
+        /// Destination status. Walks the workflow one transition at a time
+        /// until the issue reaches it.
+        #[arg(long, conflicts_with = "transition")]
+        to_status: Option<String>,
+        /// Show what would happen without sending anything.
         #[arg(long)]
-        transition: String,
+        dry_run: bool,
+        /// Maximum transitions to walk for --to-status. Ignored otherwise.
+        #[arg(long, default_value_t = 10, requires = "to_status")]
+        max_hops: usize,
     },
 
     /// Assign issue to user
@@ -1056,8 +1070,22 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 .await
             }
             IssueCommands::Delete { key, force } => issues::delete_issue(&ctx, &key, force).await,
-            IssueCommands::Transition { key, transition } => {
-                issues::transition_issue(&ctx, &key, &transition).await
+            IssueCommands::Transition {
+                key,
+                transition,
+                to_status,
+                dry_run,
+                max_hops,
+            } => {
+                issues::transition_issue(
+                    &ctx,
+                    &key,
+                    transition.as_deref(),
+                    to_status.as_deref(),
+                    dry_run,
+                    max_hops,
+                )
+                .await
             }
             IssueCommands::Assign { key, assignee } => {
                 issues::assign_issue(&ctx, &key, &assignee).await

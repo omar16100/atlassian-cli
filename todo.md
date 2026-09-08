@@ -2744,3 +2744,98 @@ Corrections to the previous entry, which over-claimed twice:
   strips. The guard still refuses, which is the conservative direction.
 
 901 tests across 32 suites, clippy clean.
+
+## 2026-09-08 — Jira transition feedback
+
+Second feedback batch, all from Jira transition work. Verified against the tree
+before planning, which again changed the priority order.
+
+**The reporter's top-ranked item was half-solved and released.** They asked for
+either "list the transitions in the error" or "add a `jira issue transitions`
+subcommand". The subcommand has existed since PR #118 and shipped in v0.7.2 and
+v0.8.0; its doc comment even cites the same complaint ("had to be driven by
+guesswork, #101"). **Their installed binary is still 0.2.8** — unchanged since
+the last batch, despite v0.8.0 being released the day before. That is now twice
+that a top-ranked finding was already fixed upstream, and it is the second most
+useful thing to tell them after the fixes themselves.
+
+Their correction about `pr create --reviewers` also describes 0.2.8: at HEAD,
+`pr reviewers --add` does a pull-request `PUT` and the only `default-reviewers`
+reference is the `effective-default-reviewers` read added for
+`--default-reviewers`.
+
+Genuinely missing, and now implemented:
+
+- **The error listed nothing.** `Transition 'Done' not found` and stop, while
+  `available` was already in scope one line above. It now prints each valid
+  transition *and the status it leads to*, plus a pointer to `--to-status`,
+  because the names are the whole problem: nobody guesses `start
+  implementation`.
+- **The success line reported the wrong thing.** It echoed the transition name,
+  so a move landing in `Done` printed "Transitioned to: Completed work".
+  `Transition.to` was already parsed; it now reports the destination, falling
+  back to re-reading the issue when the workflow does not say.
+- **`--to-status`**, which walks the workflow a hop at a time. On failure it
+  reports which hops succeeded and where the issue now sits, because a stranded
+  issue that nobody mentions is worse than one that fails loudly.
+- **`--dry-run` on the single transition**, for parity with bulk. It was
+  backwards: the ad-hoc command lacked the safety the scripted one had.
+- **`status_category` on `issue get`**, so a script can tell whether `Analysis`
+  counts as finished without knowing the workflow.
+
+**A limitation stated rather than papered over.** `--to-status` probes forward,
+because Jira reports transitions only for an issue's *current* status. So
+`--dry-run` can show the first hop with certainty and no more. The alternative —
+reading the project's workflow scheme up front — needs admin endpoints the
+reporter's token may not have and can disagree with per-issue conditions. The
+dry-run output says this explicitly instead of implying a full plan.
+
+906 tests across 33 suites, clippy clean. The two tests covering the reported
+symptoms were verified to fail against the pre-fix behaviour.
+
+### Review: `--to-status` stranded issues in terminal states
+
+The reviewer reproduced it live rather than arguing it. Against a workflow where
+Backlog offers `Abandon -> Won't Do` **first**, `--to-status Done` POSTed the
+issue into Won't Do and then died there, leaving a valid two-hop route untaken.
+
+Three facts made the heuristic indefensible, not merely unlucky:
+
+- Jira guarantees **no ordering** of the `transitions` array, so "the first
+  unvisited one" was arbitrary.
+- Global transitions like Cancel and Close are offered from *every* status and
+  always point somewhere unvisited, so they were permanently eligible.
+- Entering a Done-category status fires post-functions that set a resolution,
+  which survives reopening. The damage is not undone by transitioning back.
+
+And the detail that stings: `Transition.to` already carried `statusCategory`.
+The information needed to avoid this was parsed and ignored.
+
+**The fix is to stop guessing.** A transition landing directly on the target is
+taken, because that is not a guess. Otherwise the candidates are filtered to
+unvisited, non-Done-category destinations, and then:
+
+- exactly one candidate: taken, because it is forced rather than chosen;
+- none: refuse, reporting where the issue is and what it offers;
+- more than one: refuse as **ambiguous**, list them, and hand the choice back.
+
+A real fork is a decision the user has to make; picking for them was the bug.
+
+Also fixed from that review:
+
+- **A failed status re-read after a successful POST erased the progress
+  report.** The command would say only "failed to read status", leaving the
+  caller unaware the issue had moved — and liable to re-run it. Both walk and
+  by-name paths now report what was applied first.
+- **Passing neither flag** produced a runtime `bail!` with no usage. Now a clap
+  `ArgGroup`, so it exits 2 with usage like any other argument error.
+- **`--max-hops` was silently ignored** with `--transition`; now `requires`.
+- **My own mocks returned `204` with a body**, which HTTP forbids. The client
+  retried, making the suite intermittently ~40x slower (36-42s against ~1s) and
+  leaving the test's pass dependent on retry configuration.
+
+Four paths that had no coverage now do: the Done-category detour, an ambiguous
+fork, a dead end, and `--to-status --dry-run`. The detour test was verified to
+fail against the original heuristic.
+
+910 tests across 33 suites, clippy clean.
