@@ -2839,3 +2839,33 @@ fork, a dead end, and `--to-status --dry-run`. The detour test was verified to
 fail against the original heuristic.
 
 910 tests across 33 suites, clippy clean.
+
+## 2026-09-08 — 0.9.0
+
+Ships everything remediated since v0.8.0: the 17 reported findings, the two
+follow-up branches, and the Jira transition work.
+
+**Breaking, and the reason this is 0.9.0 rather than 0.8.1:**
+
+- `bb bulk delete-branches` and `bb bulk archive-repos` **list by default**. An
+  invocation that previously omitted `--dry-run` used to act; it now lists and
+  exits 0. Scripts relying on the old behaviour become silent no-ops until
+  `--execute` is added. That direction is deliberate: the command deleted
+  unmerged branches while advertising the opposite.
+- `bb branch delete` and `bb repo delete` require the resource name typed back,
+  or `--yes`. `echo y |` no longer satisfies them, and with no terminal they
+  refuse rather than cancelling with exit 0.
+- `--dry-run` conflicts with `--execute` instead of being ignored.
+- `bb pipeline status` and both `whoami` commands honour `-f`; `whoami`'s
+  machine formats changed shape.
+- The list envelope's `truncated` is tri-state: absent when a command cannot
+  establish completeness, rather than asserting `false`.
+- `bb pipeline steps` drops `logs_url` from the table only; every other format
+  keeps it.
+- `--days` on `archive-repos` rejects 0 and negatives.
+
+**Not verified against a live Atlassian instance.** Both available profiles had
+expired tokens throughout. `permissions-config`, `effective-default-reviewers`,
+the 403 `detail` block and the `x-oauth-scopes` header are implemented from
+Atlassian's documentation and have never been exercised against a real response.
+Recorded here because it is the single most important caveat on this release.
