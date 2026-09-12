@@ -15,31 +15,69 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      # Publish in dependency order with delays for index propagation
-      - name: Publish atlassian-cli-config
-        run: cargo publish -p atlassian-cli-config --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      - name: Wait for index
-        run: sleep 30
+      # Publishes the workspace in dependency order.
+      #
+      # This step is idempotent: a crate already present on crates.io at the
+      # current version is skipped. Previously each crate was published by its
+      # own step with a blind `sleep 30` between them, so if crate 4 of 6 failed
+      # (a flaky upload, a slow index, an expired token) the rerun died
+      # immediately on crate 1 with "crate version already uploaded" and the
+      # release could never be completed without hand-editing the workflow.
+      #
+      # The fixed sleeps are also replaced with polling the crates.io API for the
+      # exact version, so a slow index waits as long as it needs to (up to five
+      # minutes) and a fast one does not cost 30 seconds per crate.
+      - name: Publish workspace crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          # crates.io rejects API requests that do not identify themselves.
+          UA: 'atlassian-cli release workflow (https://github.com/omar16100/atlassian-cli)'
+        run: |
+          set -euo pipefail
 
-      - name: Publish atlassian-cli-output
-        run: cargo publish -p atlassian-cli-output --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      - name: Wait for index
-        run: sleep 30
+          is_published() {
+            local code
+            code=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "User-Agent: $UA" \
+              "https://crates.io/api/v1/crates/$1/$2")
+            [ "$code" = "200" ]
+          }
 
-      - name: Publish atlassian-cli-auth
-        run: cargo publish -p atlassian-cli-auth --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      - name: Wait for index
-        run: sleep 30
+          wait_for_index() {
+            local i
+            for i in $(seq 1 30); do
+              if is_published "$1" "$2"; then
+                echo "  $1 $2 is visible in the index"
+                return 0
+              fi
+              sleep 10
+            done
+            echo "::error::$1 $2 did not appear on crates.io within 5 minutes"
+            return 1
+          }
 
-      - name: Publish atlassian-cli-api
-        run: cargo publish -p atlassian-cli-api --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      - name: Wait for index
-        run: sleep 30
+          for pkg in atlassian-cli-config \
+                     atlassian-cli-output \
+                     atlassian-cli-auth \
+                     atlassian-cli-api \
+                     atlassian-cli-bulk \
+                     atlassian-cli; do
+            version=$(cargo metadata --no-deps --format-version 1 \
+              | jq -r --arg p "$pkg" '.packages[] | select(.name==$p) | .version')
 
-      - name: Publish atlassian-cli-bulk
-        run: cargo publish -p atlassian-cli-bulk --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      - name: Wait for index
-        run: sleep 30
+            if [ -z "$version" ] || [ "$version" = "null" ]; then
+              echo "::error::could not resolve a version for $pkg"
+              exit 1
+            fi
 
-      - name: Publish atlassian-cli
-        run: cargo publish -p atlassian-cli --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+            if is_published "$pkg" "$version"; then
+              echo "$pkg $version is already on crates.io, skipping"
+              continue
+            fi
+
+            echo "publishing $pkg $version"
+            cargo publish -p "$pkg" --token "$CARGO_REGISTRY_TOKEN"
+            wait_for_index "$pkg" "$version"
+          done
+
+          echo "all six crates are published at their workspace version"
