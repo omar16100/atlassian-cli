@@ -1,6 +1,6 @@
 # Project site moved to a new URL — 12 September 2026
 
-Status: in progress on `fix/site-url-move`, releases in 0.9.1.
+Status: shipped in v0.9.1 (PR #139).
 
 ## Problem
 
@@ -43,8 +43,8 @@ is polled rather than slept, so a rerun after a partial release resumes where it
 
 ## Limitations
 
-- Publishing 0.9.1 is what actually fixes crates.io. Until the `v0.9.1` tag is pushed, the live
-  listing still shows the old address.
+- ~~Publishing 0.9.1 is what actually fixes crates.io.~~ Done. Verified through the crates.io API:
+  all six crates report `max_version 0.9.1` and `homepage https://atlassian-cli.pages.dev`.
 - `*.pages.dev` carries no domain-level search authority and cannot host email. It is a working
   home, not a strong one. Moving off it later would be another migration, though redirects from it
   would be under this project's control and could be held indefinitely.
