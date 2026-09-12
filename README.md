@@ -20,12 +20,12 @@ multi-instance support.
 
 Full documentation, command references, and how-to guides live on the project site:
 
-- [Jira guide](https://atlassiancli.com/jira/) — issues, projects, bulk operations, workflows
-- [Confluence guide](https://atlassiancli.com/confluence/) — spaces, pages, blog posts, attachments
-- [Bitbucket guide](https://atlassiancli.com/bitbucket/) — repos, branches, pull requests, pipelines
-- [Jira Service Management guide](https://atlassiancli.com/jsm/) — service desks and requests
-- [Installation guide](https://atlassiancli.com/install/) — Homebrew, Cargo, and pre-built binaries
-- [Blog](https://atlassiancli.com/blog/) — release notes, tips, and workflow recipes
+- [Jira guide](https://atlassian-cli.pages.dev/jira/) — issues, projects, bulk operations, workflows
+- [Confluence guide](https://atlassian-cli.pages.dev/confluence/) — spaces, pages, blog posts, attachments
+- [Bitbucket guide](https://atlassian-cli.pages.dev/bitbucket/) — repos, branches, pull requests, pipelines
+- [Jira Service Management guide](https://atlassian-cli.pages.dev/jsm/) — service desks and requests
+- [Installation guide](https://atlassian-cli.pages.dev/install/) — Homebrew, Cargo, and pre-built binaries
+- [Blog](https://atlassian-cli.pages.dev/blog/) — release notes, tips, and workflow recipes
 
 ## Installation
 

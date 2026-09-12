@@ -10,8 +10,8 @@ locally with AES-256-GCM encryption, in `credentials.enc` inside the config
 directory (`~/.config/atlassian-cli` by default; see the README for how that is
 chosen). On Unix the directory is `0700` and the files `0600`. Windows has no
 equivalent mode, and relies on `%LOCALAPPDATA%` being user-only. The
-project and the `atlassiancli.com` website never receive, transmit, or process
-user Atlassian credentials.
+project and the `atlassian-cli.pages.dev` website never receive, transmit, or
+process user Atlassian credentials.
 
 ## Supported versions
 
