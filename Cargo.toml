@@ -32,7 +32,7 @@ serde_yaml = "0.9"
 # default-features disabled to drop the `derive` feature (tabled_derive ->
 # proc-macro-error2, which is unmaintained per RUSTSEC-2026-0173). We only use
 # tabled's Builder + Style, not #[derive(Tabled)].
-tabled = { version = "0.21", default-features = false, features = ["std"] }
+tabled = { version = "0.22", default-features = false, features = ["std"] }
 colored = "3.1"
 indicatif = "0.18"
 
@@ -50,7 +50,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 url = "2.5"
-dirs = "6.0"
+dirs = "7.0"
 futures = "0.3"
 backoff = { version = "0.4", features = ["tokio"] }
 async-trait = "0.1"
