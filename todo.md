@@ -2897,6 +2897,12 @@ hand-written notes. Checked with `gh release view` across all 41 entries.
 - The five internal path-dependency pins in `crates/cli/Cargo.toml` were still
   on 0.9.0 after the 0.9.1 bump. Fixed, and named as step 2 of the runbook so it
   stops happening.
+- CI's Security Audit job was already failing on main when this branch opened:
+  RUSTSEC-2026-0285 against rustls 0.23.35. Not caused by this work, but a
+  release should not ship a known TLS advisory, so rustls went to 0.23.45.
+  `cargo update -p rustls` alone only reached 0.23.43, which is still affected;
+  `--precise 0.23.45` was needed and pulled aws-lc-rs, aws-lc-sys and
+  rustls-webpki with it. `cargo deny check advisories` is clean, 910 tests pass.
 
 Not done: the existing release bodies were not rewritten, and the release-please
 era leftovers were left alone. `gh release list` shows 41 entries against 37

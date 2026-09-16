@@ -31,6 +31,13 @@ resolve. `git log` remains the complete record.
   repository. It points at `AGENTS.md` now, and gained changelog and release
   sections (#142).
 
+### Security
+
+- rustls bumped to 0.23.45 for RUSTSEC-2026-0285, which let a peer send handshake
+  messages in plaintext that should have been encrypted without rustls rejecting
+  the connection. aws-lc-rs, aws-lc-sys and rustls-webpki came along with it
+  (#142).
+
 ## [0.9.1] - 2026-09-12
 
 ### Changed
