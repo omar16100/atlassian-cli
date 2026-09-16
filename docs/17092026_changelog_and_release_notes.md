@@ -1,6 +1,6 @@
 # Changelog and release notes
 
-shipped in v0.9.2 (PR #140)
+shipped in v0.9.2 (PR #142)
 
 ## Problem
 

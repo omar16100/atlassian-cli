@@ -16,20 +16,20 @@ resolve. `git log` remains the complete record.
 ### Added
 
 - This changelog, covering every release from 0.1.0 onwards. GitHub Releases now
-  carry the matching section as their release notes: cargo-dist reads the version's
-  section out of this file and passes it to `gh release create`, so no workflow
-  change was needed (#138).
+  carry the matching section as their release notes: cargo-dist reads the
+  version's section out of this file and passes it to `gh release create`, so no
+  workflow change was needed (#142, closes #138).
 - `AGENTS.md` at the repository root: workspace layout, the commands to run before
   committing, documentation conventions, and the release runbook, which was
-  previously undocumented.
+  previously undocumented (#142).
 
 ### Fixed
 
 - The internal path dependencies in `crates/cli/Cargo.toml` were still pinned to
-  `0.9.0` after the 0.9.1 bump. They now track the workspace version.
+  `0.9.0` after the 0.9.1 bump. They now track the workspace version (#142).
 - `CONTRIBUTING.md` pointed at a `CLAUDE.md` that does not exist in this
   repository. It points at `AGENTS.md` now, and gained changelog and release
-  sections.
+  sections (#142).
 
 ## [0.9.1] - 2026-09-12
 
