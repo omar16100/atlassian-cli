@@ -2869,3 +2869,36 @@ expired tokens throughout. `permissions-config`, `effective-default-reviewers`,
 the 403 `detail` block and the `x-oauth-scopes` header are implemented from
 Atlassian's documentation and have never been exercised against a real response.
 Recorded here because it is the single most important caveat on this release.
+
+## 2026-09-17 - 0.9.2
+
+Closes #138: releases had no notes and there was no changelog. The last release
+with notes was 0.4.2 in June 2026; 0.4.3 through 0.9.1 shipped with nothing but
+cargo-dist's install instructions and the asset table. What came before was
+inconsistent: 0.1.8 through 0.2.6 had generated commit lists from the
+release-please changelog that was removed in 0.3.3, and 0.4.0 through 0.4.2 had
+hand-written notes. Checked with `gh release view` across all 41 entries.
+
+- `CHANGELOG.md` at the root, Keep a Changelog 1.1.0, all 37 tags backfilled.
+  Itemised from 0.5.0; summarised before that, because the early history was
+  rewritten during 0.5.0 and some commits no longer resolve.
+- Release notes needed no workflow change. cargo-dist already looks for a
+  workspace-root changelog, extracts the section matching the version, and hands
+  it to `gh release create --notes-file`. Verified before tagging with
+  `dist plan --output-format=json`: `announcement_github_body` opens with the
+  0.9.2 section, then the install instructions.
+- Skipped `.github/release.yml`. GitHub's generated notes never run, because
+  cargo-dist always passes `--notes-file`. Skipped `cargo-release`
+  `pre-release-replacements` for the same reason: the tag is pushed by hand, so
+  the hook would never fire.
+- `AGENTS.md` at the root. The release procedure was previously undocumented
+  outside a December 2025 log entry here. `CONTRIBUTING.md` gained Changelog and
+  Releasing sections and no longer points at a `CLAUDE.md` that does not exist.
+- The five internal path-dependency pins in `crates/cli/Cargo.toml` were still
+  on 0.9.0 after the 0.9.1 bump. Fixed, and named as step 2 of the runbook so it
+  stops happening.
+
+Not done: the existing release bodies were not rewritten, and the release-please
+era leftovers were left alone. `gh release list` shows 41 entries against 37
+tags: four abandoned drafts (0.1.9, 0.2.4, 0.2.5, 0.2.6), each duplicating a
+published release for the same tag.

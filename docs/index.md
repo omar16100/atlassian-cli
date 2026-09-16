@@ -45,6 +45,7 @@ changes made, newest last; `docs/todo.md` is the forward-looking roadmap.
 
 | Document | Date | What it covers |
 | --- | --- | --- |
+| [17092026_changelog_and_release_notes.md](17092026_changelog_and_release_notes.md) | 2026-09-17 | Root `CHANGELOG.md` in Keep a Changelog format with all 37 releases backfilled, release notes drawn from it by cargo-dist, and a root `AGENTS.md` carrying the release runbook; shipped in 0.9.2 |
 | [12092026_site_url_move.md](12092026_site_url_move.md) | 2026-09-12 | Project site moved to `atlassian-cli.pages.dev`: `Cargo.toml` homepage, README, SECURITY and docs links retargeted, plus an idempotent crates.io publish; shipped in 0.9.1 |
 | [07092026_bulk_delete_branches_safety.md](07092026_bulk_delete_branches_safety.md) | 2026-09-07 | `bb bulk` deleted unmerged branches and mislabelled a feature-disable as archiving: honest naming, listing by default, `--execute` plus typed confirmation, and ref-name path encoding |
 | [28082026_wiki_base_url_normalisation.md](28082026_wiki_base_url_normalisation.md) | 2026-08-28 | A `/wiki` base URL no longer doubles the segment: site-root normalisation for Jira, Confluence and JSM clients |
@@ -86,3 +87,7 @@ Command reference and how-to guides live on the project site
 (atlassian-cli.pages.dev), which is maintained in a separate repository.
 `README.md` in this repository carries the installation instructions and a
 command overview.
+
+The repository root also holds `CHANGELOG.md`, the per-version record of
+user-facing change and the source of every GitHub Release body, and `AGENTS.md`,
+which carries the release runbook and the conventions an agent needs.

@@ -1,4 +1,4 @@
-# Project site moved to a new URL — 12 September 2026
+# Project site moved to a new URL: 12 September 2026
 
 Status: shipped in v0.9.1 (PR #139).
 
