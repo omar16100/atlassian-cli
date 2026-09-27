@@ -2998,3 +2998,7 @@ Plan: `docs/27092026_bulk_export_format_fix_plan.md`.
   this entry added.
 - `cargo test --workspace`: 927 passed, 0 failed, 1 ignored (912 before, plus
   15 new). fmt and clippy (`-D warnings`) clean.
+
+## 27 Sep 2026: openssl security bump
+
+- [x] `openssl` 0.10.81, `openssl-sys` 0.9.117, vendored `openssl-src` 300.6.1 (OpenSSL 3.6.3), closing 8 Dependabot advisories. Supersedes Dependabot #147 (which left `openssl-src` at 3.5.4). CHANGELOG Security entry per AGENTS.md. 927 tests pass.
