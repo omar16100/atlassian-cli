@@ -3019,3 +3019,11 @@ Plan: `docs/27092026_bulk_export_format_fix_plan.md`.
 - [x] Codex review: added a Changed entry for the system OpenSSL floor (`OPENSSL_NO_VENDOR=1` builds need 1.1.0+, from #148) and listed the `--format` values that fall back to JSON. Rejected a Fixed entry for >48-byte machine ids (#144): valid Linux and macOS machine ids are 32 and 36 characters (codex withdrew it in round 2).
 - [x] `make pre-commit`: 927 passed, 0 failed, 1 ignored.
 - Plan: `docs/27092026_release_0_9_3_plan.md`.
+
+## 27 Sep 2026: 0.9.3 released
+
+- [x] PR #150 squash merged as `6cbefab`; annotated tag `v0.9.3` pushed. `release.yml` and `publish-crates.yml` both succeeded.
+- [x] GitHub Release `v0.9.3` carries the 0.9.3 changelog section, four target archives with checksums and `sha256.sum`.
+- [x] crates.io: all six crates at 0.9.3. Homebrew tap formula at 0.9.3; URLs return 200 and sha256 values match the archives.
+- [x] `cargo install atlassian-cli --version 0.9.3 --locked` into a scratch root; the installed binary's `--version` printed `atlassian-cli 0.9.3`, and `jira bulk export --help` lists `--export-format`.
+- Plan doc status set to shipped: `docs/27092026_release_0_9_3_plan.md`.
