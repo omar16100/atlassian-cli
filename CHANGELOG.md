@@ -37,7 +37,7 @@ resolve. `git log` remains the complete record.
   GHSA-ghm9-cr32-g9qj and GHSA-hppc-g8h3-xhp3. The vendored OpenSSL used by
   Linux builds moves from 3.5.4 to 3.6.3 (`openssl-src` 300.6.1), the newest
   release `openssl-src` packages. macOS builds use the system Security framework
-  and are unaffected (#PR).
+  and are unaffected (#148).
 
 ## [0.9.2] - 2026-09-17
 
