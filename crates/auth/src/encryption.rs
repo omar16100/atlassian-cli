@@ -46,7 +46,12 @@ impl Default for EncryptedCredentials {
 pub fn derive_key() -> Result<[u8; 32]> {
     let machine_id = machine_uid::get().map_err(|e| anyhow!("Failed to get machine ID: {}", e))?;
     let username = whoami::username().unwrap_or_else(|_| "unknown".to_string());
+    derive_key_from(&machine_id, &username)
+}
 
+/// The key derivation itself, separated from the machine lookups so a
+/// known-answer test can pin it with synthetic inputs.
+fn derive_key_from(machine_id: &str, username: &str) -> Result<[u8; 32]> {
     // Combine machine ID and username as the password
     let password = format!("{}:{}", machine_id, username);
 
@@ -146,6 +151,28 @@ mod tests {
         let plaintext = decrypt(ciphertext_b64, nonce_b64, &key)
             .expect("aes-gcm 0.11 must decrypt ciphertext written by 0.10");
         assert_eq!(plaintext, "hunter2-atlassian-token");
+    }
+
+    /// Known-answer test for key derivation. Every existing `credentials.enc` is
+    /// encrypted under this derivation, so any change to the output orphans them
+    /// all. `test_derive_key_deterministic` cannot catch that: it compares two
+    /// calls in the same build.
+    ///
+    /// The inputs are synthetic (a UUID-shaped id like macOS's IOPlatformUUID and
+    /// a made-up user name). The expected key was produced by the argon2 0.5.3
+    /// build via `hash_password(password, SaltString::encode_b64(machine_id))`,
+    /// the code that wrote users' files, and cross-checked against the reference
+    /// C implementation (argon2-cffi `hash_secret_raw`, Argon2id v19, m=19456,
+    /// t=2, p=1, 32 bytes, salt = the raw machine-id bytes).
+    #[test]
+    fn derive_key_known_answer() {
+        let key = derive_key_from("00000000-1111-2222-3333-444444444444", "synthetic-user")
+            .expect("key derivation must succeed for a UUID-shaped machine id");
+        let hex: String = key.iter().map(|b| format!("{:02x}", b)).collect();
+        assert_eq!(
+            hex, "add8654d98e33b867373ecac2765c95fda969e03b12af6620399f41395994255",
+            "derive_key output changed: existing credentials.enc files would no longer decrypt"
+        );
     }
 
     #[test]

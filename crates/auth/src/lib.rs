@@ -451,4 +451,64 @@ mod tests {
             Some("token2")
         );
     }
+
+    /// Manual upgrade check: decrypt a real `credentials.enc` with this build.
+    ///
+    /// The known-answer test in `encryption` pins the key derivation with
+    /// synthetic inputs; this confirms the same thing against a file written by
+    /// an installed release, on the machine and account that wrote it. Run it on
+    /// a COPY, in a directory holding nothing else:
+    ///
+    /// ```text
+    /// ATLASSIAN_CLI_DECRYPT_CHECK_DIR=/path/to/copy \
+    ///   cargo test -p atlassian-cli-auth --lib -- --ignored --nocapture decrypts_real
+    /// ```
+    ///
+    /// It calls `get_encrypted` directly, so neither the token environment
+    /// variables nor the plaintext `credentials` fallback that `get_token` tries
+    /// can make it pass. It prints counts only, never an account name or token.
+    #[test]
+    #[ignore = "needs ATLASSIAN_CLI_DECRYPT_CHECK_DIR pointing at a copy of a real credentials.enc"]
+    fn decrypts_real_credentials_file_copy() {
+        let dir = std::env::var("ATLASSIAN_CLI_DECRYPT_CHECK_DIR").expect(
+            "set ATLASSIAN_CLI_DECRYPT_CHECK_DIR to a directory holding a copy of credentials.enc",
+        );
+        let store = CredentialStore::new(&dir);
+        assert!(
+            store.encrypted_path().exists(),
+            "no credentials.enc in ATLASSIAN_CLI_DECRYPT_CHECK_DIR"
+        );
+        assert!(
+            !store.credentials_path().exists(),
+            "remove the plaintext credentials file from the check directory"
+        );
+
+        let accounts: Vec<String> = store
+            .load_encrypted()
+            .expect("credentials.enc must parse")
+            .credentials
+            .into_keys()
+            .collect();
+        assert!(!accounts.is_empty(), "credentials.enc holds no entries");
+
+        let mut failures = 0usize;
+        for account in &accounts {
+            match store.get_encrypted(account) {
+                Ok(Some(_)) => {}
+                Ok(None) => failures += 1,
+                Err(e) => {
+                    failures += 1;
+                    // The error chain carries no plaintext: decryption failed.
+                    println!("decrypt error: {}", e.root_cause());
+                }
+            }
+        }
+        assert_eq!(
+            failures,
+            0,
+            "{failures} of {} entries failed to decrypt",
+            accounts.len()
+        );
+        println!("decrypt ok, {} entries", accounts.len());
+    }
 }
