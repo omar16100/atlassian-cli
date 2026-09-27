@@ -1,6 +1,6 @@
 # Export commands' `--format` clash, and the orphaned `uv.lock` (plan)
 
-Status: in progress on `fix/bulk-export-format-clash` (PR #146).
+Status: merged in PR #146; ships in the next release (CHANGELOG Unreleased).
 
 ## Context
 
