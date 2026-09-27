@@ -11,6 +11,8 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-09-27
+
 ### Changed
 
 - `jira bulk export`, `jira audit export` and `confluence bulk export` take the
@@ -18,9 +20,14 @@ resolve. `git log` remains the complete record.
   `--format` option has not worked since 0.2.5 (see Fixed). Without
   `--export-format`, a global `--format json` or `--format csv` picks the file
   format, so command lines such as `--output issues.json --format json` behave
-  as they did before 0.2.5; any other `--format` value writes JSON, the previous
-  default. Where the command renders its summary through the global `--format`
-  (`confluence bulk export`), it still does (#146).
+  as they did before 0.2.5; any other `--format` value (`table`, `yaml`,
+  `markdown`, `quiet`) writes JSON, the previous default. Where the command
+  renders its summary through the global `--format` (`confluence bulk export`),
+  it still does (#146).
+- Building from source with `OPENSSL_NO_VENDOR=1`, which links the system
+  OpenSSL instead of the vendored copy, now needs OpenSSL 1.1.0 or newer; 1.0.2
+  was accepted before. Release binaries and default builds are unaffected
+  (#148).
 
 ### Fixed
 
@@ -441,7 +448,8 @@ in scripts.
 First release: a Rust CLI for Jira, Confluence and Bitbucket, distributed through
 cargo-dist with a Homebrew tap and a shell installer.
 
-[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/omar16100/atlassian-cli/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/omar16100/atlassian-cli/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/omar16100/atlassian-cli/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/omar16100/atlassian-cli/compare/v0.8.0...v0.9.0

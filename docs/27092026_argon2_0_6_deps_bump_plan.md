@@ -1,6 +1,6 @@
 # Production dependency bump with argon2 0.6 (plan)
 
-Status: merged in PR #144 (not yet in a release), supersedes Dependabot PR #143.
+Status: shipped in v0.9.3 (PR #144), supersedes Dependabot PR #143.
 
 ## Context
 

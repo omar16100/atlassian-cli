@@ -3008,3 +3008,14 @@ Plan: `docs/27092026_bulk_export_format_fix_plan.md`.
 - [x] `bitbucket/git.rs` `parse_git_remote` HTTPS and SSH tests use `acmeteam/web_app` instead of an employer-linked workspace and repository (same shape: underscore in the repo name, `.git` suffix). The earlier live-verification note no longer names the two stored profiles.
 - [x] README Test Coverage re-measured: `cargo test --workspace` at `e3dc5b1` on macOS, 927 passed, 0 failed, 1 ignored (unit 430, integration 260 across 23 files). No CHANGELOG entry: nothing user-visible.
 - Plan: `docs/27092026_neutral_fixtures_plan.md`.
+
+## 27 Sep 2026: release 0.9.3 (branch `release/0.9.3`)
+
+- [x] CHANGELOG Unreleased promoted to `[0.9.3] - 2026-09-27`: `--export-format` (Changed), the export panic (Fixed), openssl 0.10.81 and vendored OpenSSL 3.6.3 (Security). Compare links added.
+- [x] Workspace version and the five internal pins in `crates/cli/Cargo.toml` to 0.9.3; `Cargo.lock` via `cargo check --workspace`.
+- [x] 0.9.3 rather than 0.10.0: patch releases have carried new flags before (0.3.3, 0.4.2), no CLI command line that worked in 0.9.2 stops working (the one exception is a source build against system OpenSSL 1.0.2 with `OPENSSL_NO_VENDOR=1`), and the library crates have no public API change. Reasoning in the plan doc.
+- [x] `dist plan`: `announcement_github_body` opens with the 0.9.3 section. Pipeline deploys no website: `release.yml` targets GitHub Releases and the Homebrew tap only, `publish-crates.yml` crates.io only.
+- [x] Plan docs for #144 and #146 marked shipped in v0.9.3.
+- [x] Codex review: added a Changed entry for the system OpenSSL floor (`OPENSSL_NO_VENDOR=1` builds need 1.1.0+, from #148) and listed the `--format` values that fall back to JSON. Rejected a Fixed entry for >48-byte machine ids (#144): valid Linux and macOS machine ids are 32 and 36 characters (codex withdrew it in round 2).
+- [x] `make pre-commit`: 927 passed, 0 failed, 1 ignored.
+- Plan: `docs/27092026_release_0_9_3_plan.md`.

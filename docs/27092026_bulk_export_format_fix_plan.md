@@ -1,6 +1,6 @@
 # Export commands' `--format` clash, and the orphaned `uv.lock` (plan)
 
-Status: merged in PR #146; ships in the next release (CHANGELOG Unreleased).
+Status: shipped in v0.9.3 (PR #146).
 
 ## Context
 
