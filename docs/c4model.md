@@ -412,7 +412,10 @@ ListMeta → OutputRenderer envelope.**
 #### Security Features
 
 - **AES-256-GCM** encryption for tokens at rest
-- **Argon2** key derivation from user passphrase
+- **Argon2id** key derivation from the machine id and OS user name (salt: the
+  machine id bytes). Parameters are pinned in `crates/auth/src/encryption.rs`
+  (v0x13, m=19456 KiB, t=2, p=1, 32-byte key) and held by a known-answer test,
+  because every stored `credentials.enc` depends on them
 - **SecretString** wrapper prevents accidental logging
 - **0600 permissions** on credential files (Unix)
 - Secure file deletion with zero-overwrite
@@ -788,13 +791,13 @@ Error Handling:
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| CLI Framework | Clap 4.5 | Argument parsing with derive macros |
-| Async Runtime | Tokio 1.40 | Non-blocking I/O |
-| HTTP Client | Reqwest 0.12 | REST API communication |
+| CLI Framework | Clap 4.6 | Argument parsing with derive macros |
+| Async Runtime | Tokio 1.51 | Non-blocking I/O |
+| HTTP Client | Reqwest 0.13 | REST API communication |
 | Serialization | Serde | JSON/YAML/XML conversion |
 | Output | Tabled, Colored | Terminal tables & colors |
 | Progress | Indicatif | Progress bars |
-| Security | AES-GCM, Argon2 | Credential encryption |
+| Security | AES-GCM 0.11, Argon2 0.6 | Credential encryption |
 | Error Handling | Anyhow, Thiserror | Error propagation |
 | Logging | Tracing | Structured logging |
 

@@ -1261,4 +1261,31 @@ mod tests {
         assert!(matches!(outcome, DirMigration::NotNeeded));
         assert_eq!(paths.dir(), dir);
     }
+
+    /// Regression check for the `dirs` crate, the one place resolution reads
+    /// the machine. dirs 7 changed only Windows `preference_dir`, which we do
+    /// not use; this pins what we do use so a later bump that moves
+    /// `home_dir` would fail here instead of silently relocating everyone's
+    /// credentials. It only reads the environment, so it is safe in parallel.
+    #[cfg(unix)]
+    #[test]
+    fn process_home_comes_from_home_and_the_default_is_dot_config() {
+        let Some(home) = std::env::var_os("HOME").filter(|h| !h.is_empty()) else {
+            return; // nothing to compare against
+        };
+        let from_process = PathEnv::from_process();
+        assert_eq!(from_process.home.as_deref(), Some(Path::new(&home)));
+
+        let paths = resolve(
+            PathEnv {
+                explicit_dir: None,
+                xdg_config_home: None,
+                ..from_process
+            },
+            &[],
+        )
+        .unwrap();
+        assert_eq!(paths.dir(), Path::new(&home).join(".config").join(APP_DIR));
+        assert_eq!(paths.source(), ConfigDirSource::Default);
+    }
 }

@@ -2908,3 +2908,30 @@ Not done: the existing release bodies were not rewritten, and the release-please
 era leftovers were left alone. `gh release list` shows 41 entries against 37
 tags: four abandoned drafts (0.1.9, 0.2.4, 0.2.5, 0.2.6), each duplicating a
 published release for the same tag.
+
+## 2026-09-27 - Production dependency bump, argon2 0.6 (branch `deps/production-bump-argon2-0.6`)
+
+Supersedes Dependabot #143 (clap 4.6.7, reqwest 0.13.5, serde 1.0.229, tabled
+0.22, dirs 7, futures 0.3.34, aes-gcm 0.11.1, argon2 0.6.0, indexmap 2.14.2),
+which failed Clippy and Tests on `SaltString` and the new one-argument
+`hash_password`. Plan and verification: `docs/27092026_argon2_0_6_deps_bump_plan.md`.
+
+- Did not take the compiler's suggestion. password-hash 0.6's one-argument
+  `hash_password` generates a random salt, which would orphan every stored
+  `credentials.enc`.
+- `derive_key` now calls `hash_password_into` with the raw machine-id bytes as
+  the salt and pinned params (Argon2id, v0x13, m=19456, t=2, p=1, 32 bytes).
+  argon2 0.5.3 base64-decoded the `SaltString` before hashing, so this is the
+  same key.
+- `derive_key_known_answer`: synthetic inputs, expected key from the 0.5.3 code
+  path, cross-checked with the reference C implementation (argon2-cffi). Passes
+  on 0.5.3 and 0.6.0.
+- `decrypts_real_credentials_file_copy` (ignored): decrypts a copy of a real
+  `credentials.enc` via `get_encrypted` only, no env or plaintext fallback,
+  prints counts only. 5 of 5 entries decrypted on both versions.
+- dirs 7 changes only Windows `preference_dir`; no migration. Added
+  `process_home_comes_from_home_and_the_default_is_dot_config`.
+- `docs/c4model.md`: key derivation described correctly (machine id and user
+  name, not a passphrase) and the stack table versions updated.
+- No CHANGELOG entry: nothing a user can observe, and no advisory closed.
+- 911 tests pass, 1 ignored; fmt and clippy (`-D warnings`) clean.
