@@ -483,26 +483,18 @@ mod tests {
             "remove the plaintext credentials file from the check directory"
         );
 
-        let accounts: Vec<String> = store
-            .load_encrypted()
-            .expect("credentials.enc must parse")
-            .credentials
-            .into_keys()
-            .collect();
+        // Fixed messages only: a serde or decrypt error can quote file content,
+        // so none is ever formatted into the output.
+        let accounts: Vec<String> = match store.load_encrypted() {
+            Ok(creds) => creds.credentials.into_keys().collect(),
+            Err(_) => panic!("credentials.enc did not parse (details suppressed)"),
+        };
         assert!(!accounts.is_empty(), "credentials.enc holds no entries");
 
-        let mut failures = 0usize;
-        for account in &accounts {
-            match store.get_encrypted(account) {
-                Ok(Some(_)) => {}
-                Ok(None) => failures += 1,
-                Err(e) => {
-                    failures += 1;
-                    // The error chain carries no plaintext: decryption failed.
-                    println!("decrypt error: {}", e.root_cause());
-                }
-            }
-        }
+        let failures = accounts
+            .iter()
+            .filter(|account| !matches!(store.get_encrypted(account), Ok(Some(_))))
+            .count();
         assert_eq!(
             failures,
             0,

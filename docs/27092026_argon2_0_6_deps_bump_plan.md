@@ -53,7 +53,13 @@ salt was always the raw machine-id bytes, never the base64 text.
   `get_token` cannot make it pass. It prints counts, never account names or
   tokens. Run on the maintainer's macOS machine against a file written by an
   installed release: 5 of 5 entries decrypted on 0.5.3 and 5 of 5 on 0.6.0.
-  The copy was deleted afterwards.
+  Negative control: with one ciphertext byte flipped in the copy, the check
+  fails with "1 of 5 entries failed to decrypt". Error details are never
+  formatted into the output, because a serde error can quote file content.
+  The copies were deleted afterwards.
+- Codex review (no blocker or major): one minor, applied. The first version of
+  the manual check printed the root cause of a decrypt error and the serde
+  error of an unparseable file; both are now fixed messages.
 - `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets
   --all-features -- -D warnings` and `cargo test --all --no-fail-fast`: 911
   passed, 0 failed, 1 ignored (the manual decrypt check).
