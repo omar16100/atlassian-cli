@@ -29,6 +29,16 @@ resolve. `git log` remains the complete record.
   sending a request, ever since 0.2.5 made `--format` a global option. Their
   local `format` argument shared the global's id with a different type (#146).
 
+### Security
+
+- Bumped `openssl` 0.10.75 to 0.10.81 and `openssl-sys` 0.9.111 to 0.9.117,
+  closing GHSA-phqj-4mhp-q6mq, GHSA-xv59-967r-8726, GHSA-xp3w-r5p5-63rr,
+  GHSA-pqf5-4pqq-29f5, GHSA-xmgf-hq76-4vx2, GHSA-8c75-8mhr-p7r9,
+  GHSA-ghm9-cr32-g9qj and GHSA-hppc-g8h3-xhp3. The vendored OpenSSL used by
+  Linux builds moves from 3.5.4 to 3.6.3 (`openssl-src` 300.6.1), the newest
+  release `openssl-src` packages. macOS builds use the system Security framework
+  and are unaffected (#148).
+
 ## [0.9.2] - 2026-09-17
 
 ### Added
