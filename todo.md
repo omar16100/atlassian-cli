@@ -278,7 +278,7 @@ early-2026 baseline of 51 clicks/3mo), avg pos ~8.5, but 0 top-10 rankings and a
 ### Research & planning (moved to the private repo 18 Aug 2026; was NOT unpublished before then)
 - DataForSEO: ranked keywords, Jira/Confluence/Bitbucket/JSM keyword universes, SERP competitors, backlinks, AI/LLM demand.
 - Reddit: 59 threads mined (top pain: "no gh-style Bitbucket CLI"; cross-product CLI; Confluence->markdown export).
-- CONTENT_AND_FIX_PLAN.md + BING_RECOVERY_AND_BACKLINKS.md. Codex reviews in /Users/macmini/projects/codex/.
+- CONTENT_AND_FIX_PLAN.md + BING_RECOVERY_AND_BACKLINKS.md. Codex reviews in `<codex-reviews>/` (kept locally, not in the repo).
 
 ### 50 new blog posts (docs/blog/*.html)
 - One DISTINCT primary keyword each (dev/CLI/API/automation intent), clustered jira/confluence/bitbucket/jsm/cross,
@@ -575,8 +575,8 @@ Prior codex review flagged "biggest skipped item is first-party docs on atlassia
 - Zero `auth set-default`, zero `jsm servicedesk` (no-hyphen), zero `--verbose`, zero base-url missing-scheme
 - Exactly one `<main>` landmark per docs page
 - Codex reviews archived:
-  * `/Users/macmini/projects/codex/atlassiancli_seo_week3_review_18apr2026.txt`
-  * `/Users/macmini/projects/codex/atlassiancli_seo_week3_verify_18apr2026.txt`
+  * `<codex-reviews>/atlassiancli_seo_week3_review_18apr2026.txt`
+  * `<codex-reviews>/atlassiancli_seo_week3_verify_18apr2026.txt`
 
 ### Next priority (per codex)
 Hub page content depth — `/jira/`, `/confluence/`, `/bitbucket/` currently rank pos 30-70 for canonical terms. Need more content weight to outrank Appfire, marketplace.atlassian.com, github.com. After that: backlinks (awesome-* lists, Show HN, crates.io polish). Defer blog modifier content and breadcrumbs on old content.
@@ -609,7 +609,7 @@ After week-1 homepage rewrite, focus shifts to product hubs + install funnel. GS
 - Local server: `/`, `/jira/`, `/confluence/`, `/bitbucket/`, `/jsm/`, `/install/`, `/blog/`, `/sitemap.xml` all return 200
 - All 6 main pages have valid JSON-LD blocks
 - All 4 hub pages' nav-btn Install button resolves to `/install/`
-- Codex review: `/Users/macmini/projects/codex/atlassiancli_seo_week2_review_18apr2026.txt`
+- Codex review: `<codex-reviews>/atlassiancli_seo_week2_review_18apr2026.txt`
 
 ### Explicitly deferred (per codex)
 - BreadcrumbList on blog/runbook pages (would be Home > Blog > Post; real hierarchy)
@@ -638,8 +638,8 @@ GSC data: 51 clicks / 5,960 impressions / 0.9% CTR / pos 14.5 over 3 months. Hom
 - HTML parses cleanly (only false-positive `</link>` which is HTML5 self-closing)
 - Both JSON-LD blocks valid JSON; @type=WebSite and @type=SoftwareApplication
 - Local server: `/`, `/jira/`, `/confluence/`, `/bitbucket/`, `/jsm/` all return 200
-- Raw research data: `/Users/macmini/projects/codex/atlassiancli_seo_18apr2026/`
-- Codex review: `/Users/macmini/projects/codex/atlassiancli_seo_week1_review_18apr2026.txt`
+- Raw research data: `<codex-reviews>/atlassiancli_seo_18apr2026/`
+- Codex review: `<codex-reviews>/atlassiancli_seo_week1_review_18apr2026.txt`
 
 ### Explicitly not done (per codex review)
 - Misspelling hint copy (spammy)
@@ -1517,7 +1517,7 @@ current → draft: error (cannot unpublish)
 
 ## 2026-05-16 — SEO overhaul + OSS-unaffiliated positioning (branch `seo/oss-positioning-overhaul`)
 
-Driven by GA4 (`520368061`) + GSC (`sc-domain:atlassiancli.com`) review. Plan: `/Users/macmini/.claude/plans/check-google-analytics-and-imperative-comet.md`. Codex review: `/Users/macmini/projects/codex/atlassiancli_oss_unaffiliated_positioning_review.txt`.
+Driven by GA4 (`520368061`) + GSC (`sc-domain:atlassiancli.com`) review. Plan: `<local-plans>/check-google-analytics-and-imperative-comet.md`. Codex review: `<codex-reviews>/atlassiancli_oss_unaffiliated_positioning_review.txt`.
 
 - Phase 1: ship untracked `docs/install/` + `docs/docs/` (index/auth/commands); refresh all `docs/sitemap.xml` `lastmod` → 2026-05-16; add `/about/`.
 - Phase 2: `docs/index.html` — codex-recommended `<title>`/meta/OG/Twitter (no "Unofficial" in title), de-brand hero copy, JSON-LD `name`=`atlassian-cli` + `disambiguatingDescription` + `isAccessibleForFree` + `SoftwareSourceCode`, on-page FAQ, hero unaffiliated line.
@@ -1528,7 +1528,7 @@ Driven by GA4 (`520368061`) + GSC (`sc-domain:atlassiancli.com`) review. Plan: `
 
 ## 2026-08-10 — Jira attachments (issue #93, branch `feat/jira-attachments`)
 
-Plan: `/Users/macmini/.claude/plans/https-github-com-omar16100-atlassian-cli-binary-rossum.md`. Reviewed by kimi before implementation.
+Plan: `<local-plans>/https-github-com-omar16100-atlassian-cli-binary-rossum.md`. Reviewed by kimi before implementation.
 
 - New `jira attachment` group: `list`, `get`, `download` (single, `--output -` to stdout, bulk via `--issue`/`--dir`), `upload` (multi-file), `delete`.
 - Fixed pre-existing bug: `init_tracing` had no `.with_writer`, so tracing-subscriber logged to stdout and could corrupt piped binary output. Now stderr.
@@ -1690,7 +1690,7 @@ Verified against the published 0.7.1 binary, not only a local build. `env = "` a
 
 ## 2026-08-23 — XDG config paths (issue #127, branch `feat/xdg-config-paths`)
 
-Plan: `/Users/macmini/.claude/plans/https-github-com-omar16100-atlassian-cli-binary-rossum.md`.
+Plan: `<local-plans>/https-github-com-omar16100-atlassian-cli-binary-rossum.md`.
 
 ### Step 1: hermetic tests
 
@@ -2935,3 +2935,30 @@ which failed Clippy and Tests on `SaltString` and the new one-argument
   name, not a passphrase) and the stack table versions updated.
 - No CHANGELOG entry: nothing a user can observe, and no advisory closed.
 - 911 tests pass, 1 ignored; fmt and clippy (`-D warnings`) clean.
+
+## 2026-09-27 - README accuracy pass (branch `docs/readme-accuracy-27092026`)
+
+Plan: `docs/27092026_readme_accuracy_plan.md`.
+
+- Test Coverage: the undated counts (99 total, 44 unit, 3 auth, ...) replaced
+  by one dated run, `cargo test --workspace` on 27 Sep 2026 at `50bef34`:
+  912 passed, 0 failed, 1 ignored, with a per-target table.
+- CI/CD: described from `.github/workflows/`. Tests run on Ubuntu and macOS;
+  releases build macOS and Linux only. The Windows claim is gone, and "Pre-built
+  Binaries" lists the four release targets.
+- Opsgenie and Bamboo were marked "Placeholder" but are implemented with
+  mocked-API tests; JSM already has organizations and SLAs. Status and next
+  steps now match the code, with remaining items pointed at `docs/todo.md`.
+- Homebrew dropped from next steps: it ships through
+  `omar16100/homebrew-atlassian-cli`.
+- Bitbucket bulk (codex review): the checklist said "archive stale repos,
+  delete merged branches". `archive-repos` disables issues and wiki and
+  `delete-branches` ignores merge status; README now says so, and its examples
+  drop the deprecated `--dry-run` since listing is the default.
+- 8 em dashes removed from README.md.
+- Personal paths removed: `docs/14012026.md` and nine lines in this file now
+  use `<codex-reviews>/`, `<local-plans>/` or a repository-relative path.
+- `docs/27092026_argon2_0_6_deps_bump_plan.md` status: merged in #144.
+- Found, not fixed (code, not docs): `jira bulk export` and `confluence bulk
+  export` panic on a `format` argument clash with the global `--format`. Details
+  in the plan doc.
