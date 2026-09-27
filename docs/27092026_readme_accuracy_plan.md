@@ -1,6 +1,6 @@
 # README accuracy pass (plan)
 
-Status: in progress on `docs/readme-accuracy-27092026`.
+Status: merged in PR #145 (docs only, no release needed).
 
 ## Context
 
