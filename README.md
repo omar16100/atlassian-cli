@@ -20,12 +20,12 @@ multi-instance support.
 
 Full documentation, command references, and how-to guides live on the project site:
 
-- [Jira guide](https://atlassian-cli.pages.dev/jira/) — issues, projects, bulk operations, workflows
-- [Confluence guide](https://atlassian-cli.pages.dev/confluence/) — spaces, pages, blog posts, attachments
-- [Bitbucket guide](https://atlassian-cli.pages.dev/bitbucket/) — repos, branches, pull requests, pipelines
-- [Jira Service Management guide](https://atlassian-cli.pages.dev/jsm/) — service desks and requests
-- [Installation guide](https://atlassian-cli.pages.dev/install/) — Homebrew, Cargo, and pre-built binaries
-- [Blog](https://atlassian-cli.pages.dev/blog/) — release notes, tips, and workflow recipes
+- [Jira guide](https://atlassian-cli.pages.dev/jira/): issues, projects, bulk operations, workflows
+- [Confluence guide](https://atlassian-cli.pages.dev/confluence/): spaces, pages, blog posts, attachments
+- [Bitbucket guide](https://atlassian-cli.pages.dev/bitbucket/): repos, branches, pull requests, pipelines
+- [Jira Service Management guide](https://atlassian-cli.pages.dev/jsm/): service desks and requests
+- [Installation guide](https://atlassian-cli.pages.dev/install/): Homebrew, Cargo, and pre-built binaries
+- [Blog](https://atlassian-cli.pages.dev/blog/): release notes, tips, and workflow recipes
 
 ## Installation
 
@@ -59,6 +59,8 @@ cargo install --path crates/cli
 ### Pre-built Binaries
 
 Download the latest release for your platform from the [Releases page](https://github.com/omar16100/atlassian-cli/releases).
+Binaries are built for macOS (Apple Silicon and Intel) and Linux x86_64 (glibc and
+musl); see `targets` in `dist-workspace.toml`. There are no Windows binaries.
 
 ## Project Layout
 ```
@@ -115,7 +117,7 @@ crates/
    atlassian-cli jira issue get DEV-123 --fields all --format json
    atlassian-cli jira issue search --project DEV --fields status,"Story Points" --format csv
    atlassian-cli jira issue create --project DEV --issue-type Task --summary "Test task"
-   # Custom fields — discover IDs via `jira fields list`:
+   # Custom fields: discover IDs via `jira fields list`:
    atlassian-cli jira issue create --project DEV --issue-type Task --summary "cf test" \
      --field 'customfield_10010={"value":"Internal"}' \
      --field 'customfield_10020={"formula":"a=b"}'
@@ -289,9 +291,11 @@ crates/
    atlassian-cli bitbucket --workspace myteam commit diff api-service abc123
    atlassian-cli bitbucket --workspace myteam commit browse api-service --commit main --path src/
 
-   # Bitbucket - Bulk Operations
-   atlassian-cli bitbucket --workspace myteam bulk archive-repos --days 180 --dry-run
-   atlassian-cli bitbucket --workspace myteam bulk delete-branches api-service --exclude feature/keep --dry-run
+   # Bitbucket - Bulk Operations (list candidates only; --execute applies)
+   # archive-repos disables issues and wiki, it does not archive.
+   # delete-branches does not check whether a branch was merged.
+   atlassian-cli bitbucket --workspace myteam bulk archive-repos --days 180
+   atlassian-cli bitbucket --workspace myteam bulk delete-branches api-service --exclude feature/keep
 
    # JSM
    atlassian-cli jsm service-desk list --limit 10
@@ -331,7 +335,7 @@ a fixed working directory.
 An existing install is moved the first time you run any command: the files are
 copied to the new location and the old directory is renamed to
 `~/.atlassian-cli.migrated`. Nothing is deleted, and you are told where things
-went. The rename is deliberate — a lingering copy that is silently ignored is a
+went. The rename is deliberate: a lingering copy that is silently ignored is a
 trap, because anything you edit there later has no effect.
 
 Setting `$ATLASSIAN_CLI_CONFIG_DIR` skips the move entirely: an explicit choice
@@ -420,7 +424,9 @@ If no Bitbucket-specific token is found, commands fall back to the regular `ATLA
 
 ## Testing
 
-The project includes comprehensive unit and integration tests.
+Unit tests live beside the code in each crate. Integration tests in
+`crates/cli/tests/` exercise the API client and the built CLI, most of them
+against mocked Atlassian APIs (wiremock).
 
 ### Running Tests
 
@@ -445,23 +451,36 @@ cargo test -- --nocapture
 
 ### Test Coverage
 
-- **Config crate**: 12 tests covering profile management, YAML parsing, and error handling
-- **Output crate**: 22 tests for all output formats (table/JSON/CSV/YAML/quiet)
-- **Bulk crate**: 10 tests for concurrency, dry-run, error handling, and progress tracking
-- **Auth crate**: 3 tests for credential helpers
-- **CLI integration tests**: 17 tests validating CLI commands and help output
-- **Jira integration tests**: 9 tests with wiremock for issues, projects, audit, webhooks, and error handling
-- **Bitbucket integration tests**: 15 tests for repos, branches, PRs, approvals, and branch protection
-- **Confluence integration tests**: 11 tests for spaces, pages, search, and bulk operations
-- **Total**: 99 passing tests
+`cargo test --workspace` on 27 Sep 2026 (commit `50bef34`, macOS): **912 passed,
+0 failed, 1 ignored**. The ignored test is a manual check that decrypts a copy of
+a real `credentials.enc`.
+
+| Test target | Tests |
+| --- | ---: |
+| `atlassian-cli` unit tests (`crates/cli/src`) | 424 |
+| CLI integration and end-to-end tests (22 files in `crates/cli/tests/`) | 251 |
+| `atlassian-cli-api` | 84 |
+| `atlassian-cli-config` | 65 |
+| `atlassian-cli-output` | 56 |
+| `atlassian-cli-auth` | 22 (+1 ignored) |
+| `atlassian-cli-bulk` | 10 |
+
+The integration files include per-product suites for Jira (24), Bitbucket (23),
+Bamboo (22), Confluence (20), Opsgenie (14) and JSM (11).
 
 ### CI/CD
 
-GitHub Actions workflow runs on every push/PR:
-- `cargo fmt --check` - Code formatting
-- `cargo clippy -- -D warnings` - Linting
-- `cargo test --workspace` - Full test suite
-- Multi-platform builds (Linux, macOS, Windows)
+GitHub Actions runs on every pull request and on pushes to `main`
+(`.github/workflows/`):
+- `ci.yml`: `cargo fmt --all -- --check` and `cargo clippy --all-targets
+  --all-features -- -D warnings` on Ubuntu, and `cargo test --all
+  --no-fail-fast` on Ubuntu and macOS
+- `security.yml`: `cargo audit` (advisory warnings do not fail the job) and
+  `cargo deny` checks for licenses, bans, sources and advisories, also weekly
+- `release.yml`: cargo-dist builds the release binaries (macOS and Linux) when a
+  version tag is pushed, and updates the Homebrew tap
+
+Windows is neither built nor tested in CI.
 
 ## Current Status
 
@@ -474,7 +493,7 @@ GitHub Actions workflow runs on every push/PR:
 - ✅ HTTP client with retry, rate limiting, and pagination
 - ✅ Multi-format output (table/JSON/CSV/YAML/quiet)
 - ✅ Bulk operation executor with concurrency control
-- ✅ Comprehensive unit tests (44 tests)
+- ✅ Unit tests for every crate
 - ✅ CI/CD with GitHub Actions
 
 **Phase 2 - Jira CLI** (100% complete)
@@ -489,7 +508,7 @@ GitHub Actions workflow runs on every push/PR:
 - ✅ Webhooks (full CRUD + test)
 - ✅ Audit log access (list/export)
 - ✅ Role management (list/get/actors/add-actor/remove-actor)
-- ✅ Integration tests with API mocking (9 tests)
+- ✅ Integration tests with API mocking
 
 **Phase 4 - Bitbucket CLI** (100% complete)
 - ✅ Repository CRUD operations (list/get/create/update/delete)
@@ -504,9 +523,12 @@ GitHub Actions workflow runs on every push/PR:
 - ✅ SSH deploy keys (list/add/delete)
 - ✅ Repository permissions (list/grant/revoke)
 - ✅ Commit operations (list/get/diff/browse)
-- ✅ Bulk operations (archive stale repos, delete merged branches)
+- ✅ Bulk operations: `archive-repos` disables the issue tracker and wiki on
+  stale repos (Bitbucket Cloud has no archive API), `delete-branches` deletes
+  branches by name without checking merge status. Both only list candidates
+  unless given `--execute`
 - ✅ User info (whoami)
-- ✅ Integration tests with API mocking (15 tests)
+- ✅ Integration tests with API mocking
 
 **Phase 3 - Confluence CLI** (100% complete)
 - ✅ Space operations (list/get/create/update/delete/permissions)
@@ -516,16 +538,24 @@ GitHub Actions workflow runs on every push/PR:
 - ✅ Search (CQL, text, in-space)
 - ✅ Bulk operations (delete, add-labels, export)
 - ✅ Analytics (page-views, space-stats)
-- ✅ Integration tests with API mocking (11 tests)
+- ✅ Integration tests with API mocking
 
 **Additional Products** (Partial)
-- ✅ JSM CLI: Service desk and request operations
-- ⏳ Opsgenie CLI: Placeholder
-- ⏳ Bamboo CLI: Placeholder
+- ✅ JSM CLI: service desks, requests, queues, approvals, SLAs, customers,
+  organizations, request types, knowledge base and feedback
+- ✅ Opsgenie CLI: alerts, incidents, schedules and on-call, teams, escalations,
+  services and heartbeats, US and EU regions
+- ✅ Bamboo CLI: projects, plans, plan branches, builds (run, stop, logs,
+  comments, labels), deployments, agents, artifacts, server info and queue
+- Opsgenie and Bamboo are covered by mocked-API integration tests
+  (`crates/cli/tests/opsgenie_integration.rs`, `bamboo_integration.rs`).
+  Remaining roadmap items for all three are in [docs/todo.md](docs/todo.md)
+  (Phases 5 to 7).
 
 ### Next Steps
-- Complete Phase 5: JSM CLI (organizations, SLA, Insight assets)
-- Complete Phase 6: Opsgenie CLI
-- Complete Phase 7: Bamboo CLI
+- JSM: Insight / Assets commands
+- Remaining Opsgenie and Bamboo roadmap items (Phases 6 and 7 in
+  [docs/todo.md](docs/todo.md))
 - Add recipe documentation for common workflows
-- Package releases (binaries, Docker, Homebrew)
+- Docker image (release binaries ship on GitHub Releases, and Homebrew via the
+  [omar16100/homebrew-atlassian-cli](https://github.com/omar16100/homebrew-atlassian-cli) tap)

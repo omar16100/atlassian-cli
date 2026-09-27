@@ -1,6 +1,6 @@
 # Production dependency bump with argon2 0.6 (plan)
 
-Status: in progress on `deps/production-bump-argon2-0.6`, supersedes Dependabot PR #143.
+Status: merged in PR #144 (not yet in a release), supersedes Dependabot PR #143.
 
 ## Context
 
@@ -51,8 +51,9 @@ salt was always the raw machine-id bytes, never the base64 text.
   a real `credentials.enc` through `CredentialStore::get_encrypted` only, so the
   token environment variables and the plaintext `credentials` fallback in
   `get_token` cannot make it pass. It prints counts, never account names or
-  tokens. Run on the maintainer's macOS machine against a file written by an
-  installed release: 5 of 5 entries decrypted on 0.5.3 and 5 of 5 on 0.6.0.
+  tokens. Run on the maintainer's macOS machine against the `credentials.enc`
+  in use there (last written 26 Aug 2026, before this change): 5 of 5 entries
+  decrypted on 0.5.3 and 5 of 5 on 0.6.0.
   Negative control: with one ciphertext byte flipped in the copy, the check
   fails with "1 of 5 entries failed to decrypt". Error details are never
   formatted into the output, because a serde error can quote file content.
