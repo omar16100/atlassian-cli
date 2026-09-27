@@ -61,7 +61,7 @@ export_pages() {
     atlassian-cli --profile "$PROFILE" confluence bulk export \
         --cql "$cql" \
         --output "$BACKUP_DIR/pages.json" \
-        --format json
+        --export-format json
 
     local page_count
     page_count=$(jq '. | length' "$BACKUP_DIR/pages.json")
@@ -77,7 +77,7 @@ export_blogs() {
     atlassian-cli --profile "$PROFILE" confluence bulk export \
         --cql "$cql" \
         --output "$BACKUP_DIR/blogposts.json" \
-        --format json
+        --export-format json
 
     local blog_count
     blog_count=$(jq '. | length' "$BACKUP_DIR/blogposts.json")

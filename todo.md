@@ -2962,3 +2962,39 @@ Plan: `docs/27092026_readme_accuracy_plan.md`.
 - Found, not fixed (code, not docs): `jira bulk export` and `confluence bulk
   export` panic on a `format` argument clash with the global `--format`. Details
   in the plan doc.
+
+## 2026-09-27 - Export commands' `--format` panic, orphaned `uv.lock` (branch `fix/bulk-export-format-clash`)
+
+Plan: `docs/27092026_bulk_export_format_fix_plan.md`.
+
+- `jira bulk export`, `jira audit export` and `confluence bulk export` panicked
+  on every run since 0.2.5: a local `format: String` shared the id of the global
+  `--format` (`OutputFormat`). Reproduced on a debug build of `e468dff` and the
+  0.2.8 Homebrew binary. `jira audit export` was not in the original report; the
+  new definition test found it.
+- Local flag renamed to `--export-format json|csv` (case-insensitive). Without
+  it, a global `--format json|csv` picks the file format, anything else writes
+  JSON. One `ExportFormat` in `commands/common.rs` replaces three copies.
+- `main.rs` `cli_definition_tests`: `Cli::command().debug_assert()`, a walk that
+  fails when a subcommand redeclares a global's id with another value type, and
+  a parse test of the three commands. `debug_assert` alone does not catch the
+  id clash (clap skips the propagation silently); it does catch a reused long
+  flag, checked by temporarily declaring `long = "format"`.
+- `docs_examples.rs` and `docs_examples_scripts.rs` fail on exit 101 (panic) as
+  well as 2; before the fix they flagged the two README export lines and the two
+  `backup-space.sh` invocations.
+- New `crates/cli/tests/bulk_export_e2e.rs` (9 tests, wiremock).
+- README and `backup-space.sh` examples use `--export-format`. `docs/c4model.md`
+  documents `common.rs` and the global-argument rule, fixes `--output` to
+  `--format` in the output-crate diagram, and loses two em dashes.
+- Removed the root `uv.lock`: from the initial commit, no `pyproject.toml` or
+  Python code ever tracked. Behind 13 open pip Dependabot alerts and a failing
+  "uv in /." Dependabot job per alert on every push. `dependabot.yml` had no
+  `uv` or `pip` entry.
+- CHANGELOG Unreleased: flag change under Changed, the panic under Fixed.
+- Codex review: no blocker or major. Applied: narrowed the stdout claim (the
+  Jira export commands print with `println!` whatever `--format` says), "never
+  worked" corrected to "not since 0.2.5", test details dropped from CHANGELOG,
+  this entry added.
+- `cargo test --workspace`: 927 passed, 0 failed, 1 ignored (912 before, plus
+  15 new). fmt and clippy (`-D warnings`) clean.

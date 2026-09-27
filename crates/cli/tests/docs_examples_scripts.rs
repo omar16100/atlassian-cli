@@ -130,7 +130,7 @@ fn preprocess(text: &str, source: &str) -> (String, HashMap<String, Vec<String>>
 /// True if `token` is nothing but a bare shell variable reference, e.g.
 /// `$WORKSPACE` or `${WORKSPACE}` (quotes are already stripped by
 /// [`tokenize`]). Variables embedded inside a longer string (e.g. a CQL
-/// query) are left untouched — their content doesn't affect parseability.
+/// query) are left untouched: their content doesn't affect parseability.
 fn is_bare_variable(token: &str) -> bool {
     let Some(rest) = token.strip_prefix('$') else {
         return false;
@@ -320,19 +320,21 @@ fn every_example_script_command_parses() {
                 .output()
                 .expect("failed to run the CLI");
 
-            // Exit code 2 == clap rejected the argv. This is the only kind of
+            // Exit code 2 == clap rejected the argv; 101 == the CLI panicked
+            // after parsing (a clap definition clash, as `confluence bulk
+            // export --format` once was). These are the only kinds of
             // regression we catch here: structure/spelling of flags and
-            // positionals. We do NOT validate semantic correctness — e.g.
+            // positionals. We do NOT validate semantic correctness, e.g.
             // free-form `String` args (`--strategy`, `--state`, `--action`)
             // accept any value, and `jq`/JSON-shape assumptions in the scripts
             // are not exercised because the CLI never reaches the network.
             // If you change a response shape or an accepted enum value, add
             // an integration test that hits a mock server; this one won't
             // notice.
-            if output.status.code() == Some(2) {
+            if matches!(output.status.code(), Some(2) | Some(101)) {
                 let reason = String::from_utf8_lossy(&output.stderr)
                     .lines()
-                    .next()
+                    .find(|l| !l.trim().is_empty())
                     .unwrap_or("")
                     .to_string();
                 failures.push(format!(

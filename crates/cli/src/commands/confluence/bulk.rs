@@ -6,7 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::utils::ConfluenceContext;
-use crate::commands::common::{render_success, MutationResult};
+use crate::commands::common::{render_success, ExportFormat, MutationResult};
 
 // Bulk delete pages
 pub async fn bulk_delete_pages(
@@ -232,10 +232,4 @@ async fn search_page_ids(ctx: &ConfluenceContext<'_>, cql: &str) -> Result<Vec<S
     }
 
     Ok(response.results.into_iter().map(|r| r.content.id).collect())
-}
-
-#[derive(Debug, Clone)]
-pub enum ExportFormat {
-    Json,
-    Csv,
 }

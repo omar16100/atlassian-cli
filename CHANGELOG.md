@@ -11,6 +11,24 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Changed
+
+- `jira bulk export`, `jira audit export` and `confluence bulk export` take the
+  file format as `--export-format json|csv` (case-insensitive). Their own
+  `--format` option has not worked since 0.2.5 (see Fixed). Without
+  `--export-format`, a global `--format json` or `--format csv` picks the file
+  format, so command lines such as `--output issues.json --format json` behave
+  as they did before 0.2.5; any other `--format` value writes JSON, the previous
+  default. Where the command renders its summary through the global `--format`
+  (`confluence bulk export`), it still does (#146).
+
+### Fixed
+
+- `jira bulk export`, `jira audit export` and `confluence bulk export` panicked
+  on every run ("Mismatch between definition and access of `format`") before
+  sending a request, ever since 0.2.5 made `--format` a global option. Their
+  local `format` argument shared the global's id with a different type (#146).
+
 ## [0.9.2] - 2026-09-17
 
 ### Added

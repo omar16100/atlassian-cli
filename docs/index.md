@@ -72,6 +72,7 @@ once its work ships and the change is written up under "Features and changes".
 
 | Document | Date | What it covers |
 | --- | --- | --- |
+| [27092026_bulk_export_format_fix_plan.md](27092026_bulk_export_format_fix_plan.md) | 2026-09-27 | `jira bulk export`, `jira audit export` and `confluence bulk export` panicked on a clash with the global `--format`: `--export-format`, a CLI-wide clap definition guard, panic-aware docs example tests; and the orphaned root `uv.lock` behind the failing Dependabot `uv` jobs removed |
 | [27092026_readme_accuracy_plan.md](27092026_readme_accuracy_plan.md) | 2026-09-27 | README accuracy pass: dated test counts, CI and release platforms as they are (no Windows), Opsgenie, Bamboo and JSM described from the code, em dashes and personal paths removed |
 | [27092026_argon2_0_6_deps_bump_plan.md](27092026_argon2_0_6_deps_bump_plan.md) | 2026-09-27 | Production dependency bump (supersedes Dependabot #143): argon2 0.6 without changing the credential key, a known-answer test for `derive_key`, a manual real-file decrypt check, and a dirs 7 path regression test |
 | [08092026_remaining_hardening.md](08092026_remaining_hardening.md) | 2026-09-08 | Open follow-up work found while remediating the 17 reported findings: path building by interpolation, unconfirmed deletes, pagination gaps outside Bitbucket, `-f json` holdouts, misdescriptive naming |

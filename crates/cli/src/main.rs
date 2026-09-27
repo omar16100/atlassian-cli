@@ -553,3 +553,136 @@ fn build_bamboo_client(profile: &BambooProfile) -> Result<ApiClient> {
     Ok(ApiClient::new(&profile.base_url)?
         .with_basic_auth(profile.email.clone(), profile.token.clone()))
 }
+
+#[cfg(test)]
+mod cli_definition_tests {
+    //! Guards on the clap definition as a whole.
+    //!
+    //! `jira bulk export`, `jira audit export` and `confluence bulk export` once
+    //! declared their own `format: String` argument. clap keys arguments by id,
+    //! so the subcommand's `format` silently replaced the global `--format`
+    //! (`OutputFormat`) there, and reading `Cli::format` panicked with
+    //! "Mismatch between definition and access of `format`" on every run,
+    //! before any request was made. `debug_assert` alone does not catch that:
+    //! global propagation skips a subcommand that already has an argument with
+    //! the same id, without complaint. Hence the explicit shadowing check.
+
+    use super::*;
+    use clap::CommandFactory;
+
+    fn parse(args: &[&str]) -> Result<Cli, clap::Error> {
+        Cli::try_parse_from(std::iter::once("atlassian-cli").chain(args.iter().copied()))
+    }
+
+    /// Every argument, anywhere in the tree, that reuses the id of a global
+    /// argument declared by an ancestor but parses to a different type.
+    ///
+    /// Reusing an id with the same value type is harmless and deliberate in
+    /// places: `bb branch list <repo>` and `auth logout --profile` both hand
+    /// their value up to the global of the same name. A different type is what
+    /// panics, because the parent then reads the global back as its own type.
+    fn mistyped_global_shadows(
+        cmd: &clap::Command,
+        inherited: &[(String, clap::builder::ValueParser)],
+        path: &str,
+        found: &mut Vec<String>,
+    ) {
+        let mut globals = inherited.to_vec();
+        for arg in cmd.get_arguments() {
+            let id = arg.get_id().as_str();
+            let local = arg.get_value_parser().type_id();
+            if let Some((_, global)) = inherited.iter().find(|(g, _)| g == id) {
+                if global.type_id() != local {
+                    found.push(format!(
+                        "{path}: `{id}` is {local:?} here but {:?} as a global",
+                        global.type_id()
+                    ));
+                }
+            }
+            if arg.is_global_set() {
+                globals.push((id.to_string(), arg.get_value_parser().clone()));
+            }
+        }
+        for sub in cmd.get_subcommands() {
+            mistyped_global_shadows(sub, &globals, &format!("{path} {}", sub.get_name()), found);
+        }
+    }
+
+    #[test]
+    fn the_command_tree_passes_clap_debug_asserts() {
+        Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn no_subcommand_redefines_a_global_argument_with_another_type() {
+        // `Cli::command()` is unbuilt, so globals have not been copied into the
+        // subcommands yet and every argument seen here was declared locally.
+        let mut found = Vec::new();
+        mistyped_global_shadows(&Cli::command(), &[], "atlassian-cli", &mut found);
+        assert!(
+            found.is_empty(),
+            "subcommand arguments reuse the id of a global argument with a different \
+             type, which makes clap panic when the global is read:\n  {}",
+            found.join("\n  ")
+        );
+    }
+
+    #[test]
+    fn export_commands_parse_alongside_the_global_format() {
+        let cases: [&[&str]; 6] = [
+            &[
+                "jira",
+                "bulk",
+                "export",
+                "--jql",
+                "project = X",
+                "--output",
+                "x.json",
+            ],
+            &[
+                "jira",
+                "bulk",
+                "export",
+                "--jql",
+                "project = X",
+                "--output",
+                "x.csv",
+                "--format",
+                "csv",
+            ],
+            &["jira", "audit", "export", "--output", "x.json"],
+            &["jira", "audit", "export", "--output", "x.csv", "-f", "csv"],
+            &[
+                "confluence",
+                "bulk",
+                "export",
+                "--cql",
+                "space = X",
+                "--output",
+                "x.json",
+            ],
+            &[
+                "confluence",
+                "bulk",
+                "export",
+                "--cql",
+                "space = X",
+                "--output",
+                "x.json",
+                "--format",
+                "json",
+            ],
+        ];
+        for argv in cases {
+            let cli = parse(argv).unwrap_or_else(|e| panic!("{argv:?} failed to parse: {e}"));
+            let expected = if argv.contains(&"csv") {
+                OutputFormat::Csv
+            } else if argv.contains(&"json") {
+                OutputFormat::Json
+            } else {
+                OutputFormat::Table
+            };
+            assert_eq!(cli.format, expected, "global --format for {argv:?}");
+        }
+    }
+}

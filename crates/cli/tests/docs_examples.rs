@@ -8,7 +8,10 @@
 //!
 //! Only the argument parse is exercised. Commands are pointed at an unroutable
 //! localhost port, so nothing reaches the network: clap rejects a malformed
-//! command line with exit code 2 before any request is attempted.
+//! command line with exit code 2 before any request is attempted. A panic
+//! (exit code 101) also fails the test: `jira bulk export` once parsed cleanly
+//! and then panicked reading the global `--format`, before any request, and a
+//! check for exit code 2 alone let the broken README example through.
 
 use std::path::Path;
 use std::process::Command;
@@ -131,12 +134,13 @@ fn every_readme_command_parses() {
         let output = child
             .wait_with_output()
             .expect("failed to wait for the CLI");
-        // clap exits 2 on a usage error. Anything else means the command line
-        // was accepted, which is all this test cares about.
-        if output.status.code() == Some(2) {
+        // clap exits 2 on a usage error, and a Rust panic exits 101. Anything
+        // else means the command line was accepted and the command got as far
+        // as the network, which is all this test cares about.
+        if matches!(output.status.code(), Some(2) | Some(101)) {
             let reason = String::from_utf8_lossy(&output.stderr)
                 .lines()
-                .next()
+                .find(|l| !l.trim().is_empty())
                 .unwrap_or("")
                 .to_string();
             failures.push(format!("  {line}\n      -> {reason}"));
