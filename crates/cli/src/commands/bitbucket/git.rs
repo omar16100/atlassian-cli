@@ -250,8 +250,8 @@ mod tests {
     #[test]
     fn test_parse_https_git_remote() {
         assert_eq!(
-            parse_git_remote("https://bitbucket.org/ntuclink/blueparrot_ai.git"),
-            Some(("ntuclink".to_string(), "blueparrot_ai".to_string()))
+            parse_git_remote("https://bitbucket.org/acmeteam/web_app.git"),
+            Some(("acmeteam".to_string(), "web_app".to_string()))
         );
     }
 
@@ -266,8 +266,8 @@ mod tests {
     #[test]
     fn test_parse_ssh_git_remote() {
         assert_eq!(
-            parse_git_remote("git@bitbucket.org:ntuclink/blueparrot_ai.git"),
-            Some(("ntuclink".to_string(), "blueparrot_ai".to_string()))
+            parse_git_remote("git@bitbucket.org:acmeteam/web_app.git"),
+            Some(("acmeteam".to_string(), "web_app".to_string()))
         );
     }
 

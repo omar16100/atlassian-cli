@@ -451,14 +451,14 @@ cargo test -- --nocapture
 
 ### Test Coverage
 
-`cargo test --workspace` on 27 Sep 2026 (commit `50bef34`, macOS): **912 passed,
+`cargo test --workspace` on 27 Sep 2026 (commit `e3dc5b1`, macOS): **927 passed,
 0 failed, 1 ignored**. The ignored test is a manual check that decrypts a copy of
 a real `credentials.enc`.
 
 | Test target | Tests |
 | --- | ---: |
-| `atlassian-cli` unit tests (`crates/cli/src`) | 424 |
-| CLI integration and end-to-end tests (22 files in `crates/cli/tests/`) | 251 |
+| `atlassian-cli` unit tests (`crates/cli/src`) | 430 |
+| CLI integration and end-to-end tests (23 files in `crates/cli/tests/`) | 260 |
 | `atlassian-cli-api` | 84 |
 | `atlassian-cli-config` | 65 |
 | `atlassian-cli-output` | 56 |
