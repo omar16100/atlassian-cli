@@ -52,6 +52,37 @@ pub fn render_success(
     }
 }
 
+/// File format written by the `export` commands (`jira bulk export`,
+/// `jira audit export`, `confluence bulk export`).
+///
+/// Chosen with `--export-format`. It used to be a `--format` of their own,
+/// which reused the id of the global `--format` (`OutputFormat`) and made clap
+/// panic on every run of those commands, so it has to have a different name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum ExportFormat {
+    Json,
+    Csv,
+}
+
+/// Pick the file format for an export.
+///
+/// `--export-format` wins. Without it, the global `--format` decides when it
+/// names a format an export can write (json or csv), so the documented
+/// `--output issues.csv --format csv` writes CSV rather than silently writing
+/// JSON into a `.csv` file. Anything else there (the default table, yaml,
+/// markdown, quiet) only shapes what is printed to stdout, and the file is
+/// JSON, as it always defaulted to.
+pub fn resolve_export_format(explicit: Option<ExportFormat>, global: OutputFormat) -> ExportFormat {
+    let (chosen, source) = match (explicit, global) {
+        (Some(format), _) => (format, "--export-format"),
+        (None, OutputFormat::Csv) => (ExportFormat::Csv, "--format"),
+        (None, OutputFormat::Json) => (ExportFormat::Json, "--format"),
+        (None, _) => (ExportFormat::Json, "default"),
+    };
+    tracing::debug!(?chosen, source, ?global, "resolved export file format");
+    chosen
+}
+
 /// Decide whether a typed confirmation matches what the command demanded.
 ///
 /// Split out from the prompting so the comparison is testable without a
@@ -118,6 +149,50 @@ pub(crate) fn confirm_destructive_on(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn export_format_flag_wins_over_the_global_format() {
+        assert_eq!(
+            resolve_export_format(Some(ExportFormat::Csv), OutputFormat::Json),
+            ExportFormat::Csv
+        );
+        assert_eq!(
+            resolve_export_format(Some(ExportFormat::Json), OutputFormat::Csv),
+            ExportFormat::Json
+        );
+    }
+
+    /// `--format csv` and `--format json` are what the README and the example
+    /// scripts have always written, so without `--export-format` they pick the
+    /// file format.
+    #[test]
+    fn global_json_or_csv_picks_the_file_format_when_not_overridden() {
+        assert_eq!(
+            resolve_export_format(None, OutputFormat::Csv),
+            ExportFormat::Csv
+        );
+        assert_eq!(
+            resolve_export_format(None, OutputFormat::Json),
+            ExportFormat::Json
+        );
+    }
+
+    /// Output formats with no file equivalent keep the old JSON default.
+    #[test]
+    fn other_global_formats_fall_back_to_json() {
+        for global in [
+            OutputFormat::Table,
+            OutputFormat::Yaml,
+            OutputFormat::Markdown,
+            OutputFormat::Quiet,
+        ] {
+            assert_eq!(
+                resolve_export_format(None, global),
+                ExportFormat::Json,
+                "{global:?}"
+            );
+        }
+    }
 
     /// Without a terminal the prompt must refuse, not proceed and not hang. A
     /// scheduled job that never had a chance to answer must not delete.

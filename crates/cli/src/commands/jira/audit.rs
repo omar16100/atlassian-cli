@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 
 use super::utils::JiraContext;
+use crate::commands::common::ExportFormat;
 use crate::query::UrlParamsBuilder;
 
 // List audit records
@@ -192,10 +193,4 @@ pub async fn export_audit_records(
         output.display()
     );
     Ok(())
-}
-
-#[derive(Debug, Clone)]
-pub enum ExportFormat {
-    Json,
-    Csv,
 }

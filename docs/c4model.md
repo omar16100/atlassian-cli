@@ -201,6 +201,21 @@ one atomic rename, then the original is renamed to `.migrated`.
 - `api.rs` - Raw authenticated REST passthrough (`jira api`), product-agnostic;
   built on `ApiClient::request_raw`, which returns status/headers/body with no
   status-to-error mapping
+- `common.rs` - `render_success`/`MutationResult`, the typed confirmation for
+  destructive commands, and `ExportFormat`/`resolve_export_format`: the file
+  format of `jira bulk export`, `jira audit export` and `confluence bulk export`
+  (`--export-format`, else a global `--format` of json or csv, else JSON)
+
+**Global arguments.** `main.rs` declares `--profile`, `--config`, `--config-dir`,
+`--format` and `--envelope` as clap globals, and `BitbucketArgs` adds
+`--workspace` and `--repo`. clap keys arguments by id and skips propagating a
+global into a subcommand that already has an argument with that id, so a
+subcommand that redeclares a global's id with another type makes clap panic when
+the global is read (the export commands' `format: String` did this until the fix
+in #146). The unit tests in `main.rs` fail on any such redefinition and run
+clap's `debug_assert` over the whole tree, which catches reused long or short
+flag names. Redeclaring a global's id with the same type is allowed: the value
+flows up to the global (`auth logout --profile`, positional `repo` under `bb`).
 
 **Jira (`commands/jira/`):**
 - `issues.rs` - CRUD, search, transitions, assignments
@@ -338,7 +353,7 @@ three times inside the Bitbucket command modules, in three forms with three
 different levels of care about the URL the server handed back. List commands
 therefore issued a single request and rendered whatever came back, so a
 Bitbucket collection returned 10 of 11 items and a Jira search returned the
-server's cap of 100 — in both cases with nothing in the output to distinguish
+server's cap of 100, in both cases with nothing in the output to distinguish
 that from a complete answer.
 
 ```rust
@@ -361,7 +376,7 @@ round-trip that costs a second parse and discards type errors.
 `Continuation` is an enum because the products differ substantively: Bitbucket
 returns an absolute URL (resolved through `safe_join`, so a cursor pointing at
 another origin is refused), Jira an opaque token that the driver places back on
-the *original* path, replacing any previous one — appending would put two
+the *original* path, replacing any previous one; appending would put two
 `nextPageToken` values on the third page.
 
 `PageInfo.truncated` is the contract with `crates/output`: `ListMeta` carries it
@@ -490,7 +505,7 @@ profiles:
 │  │   Table     │ │  JSON   │ │  YAML   │ │   CSV   │ │  Quiet  │         │
 │  │  Formatter  │ │Formatter│ │Formatter│ │Formatter│ │Formatter│         │
 │  │             │ │         │ │         │ │         │ │         │         │
-│  │  (default)  │ │--output │ │--output │ │--output │ │--output │         │
+│  │  (default)  │ │--format │ │--format │ │--format │ │--format │         │
 │  │  tabled     │ │  json   │ │  yaml   │ │  csv    │ │  quiet  │         │
 │  └─────────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘         │
 │                                                                            │

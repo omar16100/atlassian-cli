@@ -3,6 +3,8 @@ use atlassian_cli_api::ApiClient;
 use atlassian_cli_output::OutputRenderer;
 use clap::{Args, Subcommand};
 
+use crate::commands::common::{resolve_export_format, ExportFormat};
+
 // Submodules
 mod analytics;
 mod attachments;
@@ -587,9 +589,10 @@ enum BulkCommands {
         /// Output file path
         #[arg(long)]
         output: std::path::PathBuf,
-        /// Export format: json or csv
-        #[arg(long, default_value = "json")]
-        format: String,
+        /// File format written to --output [default: the global --format when
+        /// that is json or csv, otherwise json]
+        #[arg(long, value_enum, ignore_case = true)]
+        export_format: Option<ExportFormat>,
     },
 }
 
@@ -869,18 +872,9 @@ pub async fn execute(
             BulkCommands::Export {
                 cql,
                 output,
-                format,
+                export_format,
             } => {
-                let export_format = match format.to_lowercase().as_str() {
-                    "json" => bulk::ExportFormat::Json,
-                    "csv" => bulk::ExportFormat::Csv,
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "Invalid format '{}'. Must be one of: json, csv",
-                            format
-                        ))
-                    }
-                };
+                let export_format = resolve_export_format(export_format, ctx.renderer.format());
                 bulk::bulk_export_pages(&ctx, &cql, &output, export_format).await
             }
         },

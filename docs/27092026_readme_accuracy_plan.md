@@ -69,3 +69,5 @@ matched the repository:
   it because it only fails on exit code 2 (clap usage errors), and a panic
   exits 101. This is a code fix, out of scope for a docs-only change; the README
   examples at the Jira and Confluence bulk sections are unchanged.
+  Fixed in #146 (`27092026_bulk_export_format_fix_plan.md`), which also
+  changed those two README examples to `--export-format`.

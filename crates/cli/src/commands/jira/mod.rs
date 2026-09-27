@@ -5,6 +5,8 @@ use atlassian_cli_api::ApiClient;
 use atlassian_cli_output::OutputRenderer;
 use clap::{ArgGroup, Args, Subcommand};
 
+use crate::commands::common::{resolve_export_format, ExportFormat};
+
 // Submodules
 mod adf;
 mod attachments;
@@ -793,9 +795,10 @@ enum BulkCommands {
         /// Output file path
         #[arg(long)]
         output: std::path::PathBuf,
-        /// Export format: json or csv
-        #[arg(long, default_value = "json")]
-        format: String,
+        /// File format written to --output [default: the global --format when
+        /// that is json or csv, otherwise json]
+        #[arg(long, value_enum, ignore_case = true)]
+        export_format: Option<ExportFormat>,
         /// Fields to include (comma-separated)
         #[arg(long, value_delimiter = ',')]
         fields: Vec<String>,
@@ -977,9 +980,10 @@ enum AuditCommands {
         /// Output file path
         #[arg(long)]
         output: std::path::PathBuf,
-        /// Export format: json or csv
-        #[arg(long, default_value = "json")]
-        format: String,
+        /// File format written to --output [default: the global --format when
+        /// that is json or csv, otherwise json]
+        #[arg(long, value_enum, ignore_case = true)]
+        export_format: Option<ExportFormat>,
     },
 }
 
@@ -1338,19 +1342,10 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
             BulkCommands::Export {
                 jql,
                 output,
-                format,
+                export_format,
                 fields,
             } => {
-                let export_format = match format.to_lowercase().as_str() {
-                    "json" => bulk::ExportFormat::Json,
-                    "csv" => bulk::ExportFormat::Csv,
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "Invalid format '{}'. Must be one of: json, csv",
-                            format
-                        ))
-                    }
-                };
+                let export_format = resolve_export_format(export_format, ctx.renderer.format());
                 bulk::bulk_export(&ctx, &jql, &output, export_format, fields).await
             }
             BulkCommands::Import {
@@ -1449,18 +1444,9 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 to,
                 filter,
                 output,
-                format,
+                export_format,
             } => {
-                let export_format = match format.to_lowercase().as_str() {
-                    "json" => audit::ExportFormat::Json,
-                    "csv" => audit::ExportFormat::Csv,
-                    _ => {
-                        return Err(anyhow::anyhow!(
-                            "Invalid format '{}'. Must be one of: json, csv",
-                            format
-                        ))
-                    }
-                };
+                let export_format = resolve_export_format(export_format, ctx.renderer.format());
                 audit::export_audit_records(
                     &ctx,
                     from.as_deref(),

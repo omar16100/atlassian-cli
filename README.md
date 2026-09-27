@@ -166,7 +166,7 @@ crates/
    # Jira - Bulk Operations
    atlassian-cli jira bulk transition --jql "project = DEV AND status = Open" --transition "In Progress" --dry-run
    atlassian-cli jira bulk assign --jql "project = DEV AND assignee is EMPTY" --assignee admin@example.com
-   atlassian-cli jira bulk export --jql "project = DEV" --output issues.json --format json
+   atlassian-cli jira bulk export --jql "project = DEV" --output issues.csv --export-format csv
 
    # Jira - Automation & Webhooks
    atlassian-cli jira automation list
@@ -221,7 +221,7 @@ crates/
    # Confluence - Bulk Operations
    atlassian-cli confluence bulk delete --cql "space = OLD AND type = page" --dry-run
    atlassian-cli confluence bulk add-labels --cql "space = DEV" --labels docs,reviewed --dry-run
-   atlassian-cli confluence bulk export --cql "space = DEV" --output backup.json --format json
+   atlassian-cli confluence bulk export --cql "space = DEV" --output backup.json --export-format json
 
    # Confluence - Analytics
    atlassian-cli confluence analytics page-views 12345 --from 2025-01-01

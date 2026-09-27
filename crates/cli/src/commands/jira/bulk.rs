@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use super::adf::markdown_to_adf;
 use super::issues::check_field_collisions;
 use super::utils::JiraContext;
-use crate::commands::common::{render_success, MutationResult};
+use crate::commands::common::{render_success, ExportFormat, MutationResult};
 
 /// Build the POST body for a single bulk-import row. Pure, testable.
 pub(crate) fn build_bulk_payload(project: &str, issue: &ImportIssue) -> Result<Value> {
@@ -464,12 +464,6 @@ pub enum LabelAction {
     Add,
     Remove,
     Set,
-}
-
-#[derive(Debug, Clone)]
-pub enum ExportFormat {
-    Json,
-    Csv,
 }
 
 #[derive(Deserialize)]
