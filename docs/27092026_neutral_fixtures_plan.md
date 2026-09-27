@@ -1,6 +1,6 @@
 # Neutral test fixtures and current test counts (plan)
 
-Status: in review (docs and test fixtures only, no release needed).
+Status: merged in PR #149 (docs and test fixtures only, no release needed).
 
 ## Context
 
