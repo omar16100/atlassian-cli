@@ -2450,7 +2450,7 @@ pseudo-TTY.
 
 ## Live verification: attempted, not possible — all testing is mock-based
 
-Both stored profiles (`ntuclink`, `ntuclink-bb`) have expired tokens: Jira
+Both stored profiles have expired tokens: Jira
 returns "Client must be authenticated to access this resource", Bitbucket
 "Token is invalid, expired, or not supported for this endpoint". So **no part of
 this work has been exercised against a real Atlassian instance.** Every test is
@@ -3002,3 +3002,9 @@ Plan: `docs/27092026_bulk_export_format_fix_plan.md`.
 ## 27 Sep 2026: openssl security bump
 
 - [x] `openssl` 0.10.81, `openssl-sys` 0.9.117, vendored `openssl-src` 300.6.1 (OpenSSL 3.6.3), closing 8 Dependabot advisories. Supersedes Dependabot #147 (which left `openssl-src` at 3.5.4). CHANGELOG Security entry per AGENTS.md. 927 tests pass.
+
+## 27 Sep 2026: neutral test fixtures, current README test counts
+
+- [x] `bitbucket/git.rs` `parse_git_remote` HTTPS and SSH tests use `acmeteam/web_app` instead of an employer-linked workspace and repository (same shape: underscore in the repo name, `.git` suffix). The earlier live-verification note no longer names the two stored profiles.
+- [x] README Test Coverage re-measured: `cargo test --workspace` at `e3dc5b1` on macOS, 927 passed, 0 failed, 1 ignored (unit 430, integration 260 across 23 files). No CHANGELOG entry: nothing user-visible.
+- Plan: `docs/27092026_neutral_fixtures_plan.md`.
