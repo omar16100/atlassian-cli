@@ -3,7 +3,7 @@ use aes_gcm::{
     Aes256Gcm,
 };
 use anyhow::{anyhow, Context, Result};
-use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
+use argon2::{Algorithm, Argon2, Params, Version};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -49,29 +49,39 @@ pub fn derive_key() -> Result<[u8; 32]> {
     derive_key_from(&machine_id, &username)
 }
 
+/// Argon2 parameters for key derivation, pinned rather than taken from
+/// `Argon2::default()`. They equal argon2's defaults as of 0.5 and 0.6
+/// (Argon2id, version 0x13, 19 MiB, 2 passes, 1 lane, 32-byte output), but
+/// every existing `credentials.enc` depends on them, so a future change of
+/// library default must not be able to change the key silently.
+const KDF_M_COST_KIB: u32 = 19 * 1024;
+const KDF_T_COST: u32 = 2;
+const KDF_P_COST: u32 = 1;
+const KEY_LEN: usize = 32;
+
 /// The key derivation itself, separated from the machine lookups so a
 /// known-answer test can pin it with synthetic inputs.
+///
+/// The salt is the raw machine-id bytes. Up to argon2 0.5 this code went
+/// through `PasswordHasher::hash_password` with
+/// `SaltString::encode_b64(machine_id)`, which base64-decodes the salt again
+/// before hashing, so the effective salt was always the raw bytes. argon2 0.6
+/// removed `SaltString`, and its one-argument `hash_password` draws a random
+/// salt, which would make every stored file undecryptable. Calling
+/// `hash_password_into` with the raw bytes derives the identical key;
+/// `derive_key_known_answer` holds it to the value 0.5.3 produced.
 fn derive_key_from(machine_id: &str, username: &str) -> Result<[u8; 32]> {
     // Combine machine ID and username as the password
     let password = format!("{}:{}", machine_id, username);
 
-    // Use a fixed salt derived from machine ID for deterministic key generation
-    // This allows the same key to be derived across runs
-    let salt_string = SaltString::encode_b64(machine_id.as_bytes())
-        .map_err(|e| anyhow!("Failed to encode salt: {}", e))?;
+    let params = Params::new(KDF_M_COST_KIB, KDF_T_COST, KDF_P_COST, Some(KEY_LEN))
+        .map_err(|e| anyhow!("Invalid Argon2 parameters: {}", e))?;
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
-    let argon2 = Argon2::default();
-
-    // Hash the password to get a 32-byte key
-    let hash = argon2
-        .hash_password(password.as_bytes(), &salt_string)
-        .map_err(|e| anyhow!("Failed to hash password: {}", e))?;
-
-    // Extract the 32-byte hash
-    let hash_bytes = hash.hash.ok_or_else(|| anyhow!("Hash output is missing"))?;
-
-    let mut key = [0u8; 32];
-    key.copy_from_slice(&hash_bytes.as_bytes()[..32]);
+    let mut key = [0u8; KEY_LEN];
+    argon2
+        .hash_password_into(password.as_bytes(), machine_id.as_bytes(), &mut key)
+        .map_err(|e| anyhow!("Failed to derive key: {}", e))?;
 
     Ok(key)
 }
