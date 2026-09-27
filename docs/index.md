@@ -72,6 +72,7 @@ once its work ships and the change is written up under "Features and changes".
 
 | Document | Date | What it covers |
 | --- | --- | --- |
+| [27092026_release_0_9_3_plan.md](27092026_release_0_9_3_plan.md) | 2026-09-27 | Release 0.9.3: `--export-format` and the export panic fix (#146), the openssl security bump (#148); version choice against past releases, runbook steps, and post-release checks of the GitHub Release, crates.io and the Homebrew formula |
 | [27092026_neutral_fixtures_plan.md](27092026_neutral_fixtures_plan.md) | 2026-09-27 | Employer-linked names replaced with neutral `parse_git_remote` fixtures and dropped from `todo.md`; README test counts re-measured at `e3dc5b1` (927 passed, 1 ignored) |
 | [27092026_bulk_export_format_fix_plan.md](27092026_bulk_export_format_fix_plan.md) | 2026-09-27 | `jira bulk export`, `jira audit export` and `confluence bulk export` panicked on a clash with the global `--format`: `--export-format`, a CLI-wide clap definition guard, panic-aware docs example tests; and the orphaned root `uv.lock` behind the failing Dependabot `uv` jobs removed |
 | [27092026_readme_accuracy_plan.md](27092026_readme_accuracy_plan.md) | 2026-09-27 | README accuracy pass: dated test counts, CI and release platforms as they are (no Windows), Opsgenie, Bamboo and JSM described from the code, em dashes and personal paths removed |
