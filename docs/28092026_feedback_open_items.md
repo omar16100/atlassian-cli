@@ -1,6 +1,6 @@
 # Paused pipelines, plain JSON, single-object tables, positional repo, `--debug`, `pr update --reviewers`
 
-Status: in progress on `fix/feedback-open-items`.
+Status: in progress on `fix/feedback-open-items` (PR #153).
 
 Plan and triage: [28092026_feedback_open_items_plan.md](28092026_feedback_open_items_plan.md).
 

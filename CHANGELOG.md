@@ -17,11 +17,11 @@ resolve. `git log` remains the complete record.
   <repo>`, `pipeline get <repo> <build>`, `pipeline logs <repo> <build> [<step>]`,
   and likewise for `latest`, `trigger`, `stop`, `watch`, `steps`, `status` and
   `rerun`. `--repo` and the git remote still work; a repository argument that
-  disagrees with `--repo` is an error (#PRNUM).
+  disagrees with `--repo` is an error (#153).
 - `bb pr update --reviewers` replaces a pull request's reviewers (account UUIDs,
-  comma-separated; an empty value removes them all) (#PRNUM).
+  comma-separated; an empty value removes them all) (#153).
 - `bb pipeline get` on a paused build, and `pipeline list --steps`, report
-  `pending_manual_steps` (#PRNUM).
+  `pending_manual_steps` (#153).
 
 ### Changed
 
@@ -29,25 +29,25 @@ resolve. `git log` remains the complete record.
   `pipeline watch` and `pipeline status --wait` stop there and exit 3, where they
   used to poll until `--timeout` or forever; `watch --on-complete` runs with
   `PIPELINE_STATUS=PAUSED`. An unrecognised pipeline status exits 1 instead of 0
-  (#PRNUM).
+  (#153).
 - Pipeline output in JSON, YAML, CSV and quiet carries plain values: `state`
   without an icon, `build_number` as a number (also from `pipeline trigger` and
   `rerun`), and `null` instead of `""` for a missing `completed`, `created`,
   `commit`, `ref_name` or `target_type`. Step triggers read `MANUAL` and
   `AUTOMATIC` instead of `pipeline_step_trigger_manual`. Markdown output no
-  longer carries ANSI colour (#PRNUM).
+  longer carries ANSI colour (#153).
 - In table mode, the default, a command that returns a single object prints a
   `field | value` table instead of JSON, with lists such as a pull request's
   reviewers as a table below; `bb pr get` shows its reviewers as a result. This
   covers the `get`, `create` and `update` commands across products. `jira
   workflow export` without `--output` and `confluence folder get` still print
-  JSON. Scripts that parsed the default output should pass `-f json` (#PRNUM).
+  JSON. Scripts that parsed the default output should pass `-f json` (#153).
 - `bb pr update` and `bb pr reviewers --add` send the title, description and
   reviewers together, each from the change or the current pull request, so an
   edit no longer risks resetting a field it did not name. Typed reviewers must be
   account UUIDs: a name is rejected before any request instead of being sent as
   `{name}`, and the pull request's author is refused. `pr update` with nothing to
-  change is an error (#PRNUM).
+  change is an error (#153).
 
 ### Fixed
 
@@ -56,16 +56,16 @@ resolve. `git log` remains the complete record.
   discarded). It is accepted after the subcommand, and wins over `RUST_LOG`. It
   previously printed nothing extra. Tokens, headers and request bodies are never
   logged, and secret-named query parameters and JSON fields in error bodies are
-  redacted (#PRNUM).
+  redacted (#153).
 - `bb pipeline logs --failed-only` and `pipeline rerun --pr --failed-only`
   recognise failed steps. They read a step's `state.name`, which is `COMPLETED`
   for every finished step, so the first never matched and the second never
-  reran (#PRNUM).
+  reran (#153).
 - `bb pr reviewers --add` no longer drops the pull request's description from the
-  update it sends (#PRNUM).
+  update it sends (#153).
 - `bb pipeline logs` with filters that match no step printed a sentence on
   stdout in every format; `-f json` and `-f yaml` now get an empty list, and
-  quiet and CSV print nothing (#PRNUM).
+  quiet and CSV print nothing (#153).
 
 ## [0.9.3] - 2026-09-27
 
