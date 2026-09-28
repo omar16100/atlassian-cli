@@ -3,13 +3,12 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use atlassian_cli_output::OutputFormat;
 
 use super::super::utils::BitbucketContext;
 use super::list::{fetch_pipeline, resolve_pipeline_id};
-use super::model::PipelineView;
+use super::rows::{build_pipeline_view, pending_manual_steps};
 use super::state::{
-    format_elapsed, format_steps_summary, get_commit_hash, get_pipeline_status, get_status_icon,
+    format_elapsed, format_steps_summary, get_pipeline_status, get_status_icon, is_awaiting_action,
     is_terminal_state,
 };
 use super::steps::fetch_steps;
@@ -34,10 +33,7 @@ pub async fn watch_pipeline(
     let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
 
     let start = Instant::now();
-    let is_table = matches!(
-        ctx.renderer.format(),
-        OutputFormat::Table | OutputFormat::Markdown
-    );
+    let is_table = ctx.renderer.format().is_human();
 
     // Log mode: explicit --log flag OR table format piped to non-TTY
     let use_log_mode = log_mode || (is_table && !std::io::stdout().is_terminal());
@@ -118,40 +114,43 @@ pub async fn watch_pipeline(
         }
         // else: structured format (JSON/YAML/CSV) — no per-poll output
 
-        // Check if pipeline reached terminal state
+        // Check if pipeline reached terminal state, or stopped to wait for a
+        // person: a paused build does not finish on its own, so it ends the
+        // watch (exit code 3) instead of polling until --timeout.
         if is_terminal_state(&status) {
+            let paused = is_awaiting_action(&status);
+            let steps = if paused && steps.is_none() {
+                fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false)
+                    .await
+                    .map_err(
+                        |e| tracing::warn!(error = %e, "Could not fetch steps of paused pipeline"),
+                    )
+                    .ok()
+            } else {
+                steps
+            };
+            let pending = pending_manual_steps(&status, steps.as_deref());
+            tracing::info!(status = %status, pending_manual_steps = ?pending, "Watch finished");
+
             if is_table && !use_log_mode {
                 println!();
                 let icon = get_status_icon(&status);
-                println!("\n{icon} Pipeline completed with status: {status}");
+                if paused {
+                    println!("\n{icon} {}", paused_message(&status, pending));
+                } else {
+                    println!("\n{icon} Pipeline completed with status: {status}");
+                }
             } else if use_log_mode {
                 let now = chrono::Local::now().format("%H:%M:%S");
                 let icon = get_status_icon(&status);
-                println!("[{now}] {icon} Pipeline completed: {status}");
+                if paused {
+                    println!("[{now}] {icon} {}", paused_message(&status, pending));
+                } else {
+                    println!("[{now}] {icon} Pipeline completed: {status}");
+                }
             } else {
                 // Structured output: render final state
-                let steps_summary = steps
-                    .as_ref()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| format_steps_summary(s, false));
-                let view = PipelineView {
-                    uuid: pipeline.uuid.clone(),
-                    build_number: pipeline
-                        .build_number
-                        .map(|n| n.to_string())
-                        .unwrap_or_default(),
-                    state: status.clone(),
-                    ref_name: pipeline
-                        .target
-                        .as_ref()
-                        .and_then(|t| t.ref_name.clone())
-                        .unwrap_or_default(),
-                    commit: get_commit_hash(&pipeline),
-                    created: pipeline.created_on.unwrap_or_default(),
-                    completed: pipeline.completed_on.unwrap_or_default(),
-                    steps,
-                    steps_summary,
-                };
+                let view = build_pipeline_view(&pipeline, steps, show_steps, ctx.renderer.format());
                 ctx.renderer.render(&view)?;
             }
 
@@ -204,28 +203,8 @@ pub async fn watch_pipeline(
                     eprintln!("\nTimeout: pipeline did not complete within {timeout_secs}s");
                 } else {
                     // Structured output on timeout: render current state
-                    let steps_summary = steps
-                        .as_ref()
-                        .filter(|s| !s.is_empty())
-                        .map(|s| format_steps_summary(s, false));
-                    let view = PipelineView {
-                        uuid: pipeline.uuid.clone(),
-                        build_number: pipeline
-                            .build_number
-                            .map(|n| n.to_string())
-                            .unwrap_or_default(),
-                        state: status.clone(),
-                        ref_name: pipeline
-                            .target
-                            .as_ref()
-                            .and_then(|t| t.ref_name.clone())
-                            .unwrap_or_default(),
-                        commit: get_commit_hash(&pipeline),
-                        created: pipeline.created_on.unwrap_or_default(),
-                        completed: pipeline.completed_on.unwrap_or_default(),
-                        steps,
-                        steps_summary,
-                    };
+                    let view =
+                        build_pipeline_view(&pipeline, steps, show_steps, ctx.renderer.format());
                     ctx.renderer.render(&view)?;
                 }
 
@@ -238,4 +217,34 @@ pub async fn watch_pipeline(
     }
 
     Ok(final_status)
+}
+
+/// The line `watch` ends on when the build is waiting for someone.
+fn paused_message(status: &str, pending: Option<usize>) -> String {
+    match pending {
+        Some(1) => format!("Pipeline {status}: waiting on 1 manual step"),
+        Some(n) if n > 0 => format!("Pipeline {status}: waiting on {n} manual steps"),
+        _ => format!("Pipeline {status}: waiting on manual action"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_paused_message_counts_manual_steps() {
+        assert_eq!(
+            paused_message("PAUSED", Some(2)),
+            "Pipeline PAUSED: waiting on 2 manual steps"
+        );
+        assert_eq!(
+            paused_message("PAUSED", Some(1)),
+            "Pipeline PAUSED: waiting on 1 manual step"
+        );
+        assert_eq!(
+            paused_message("HALTED", None),
+            "Pipeline HALTED: waiting on manual action"
+        );
+    }
 }

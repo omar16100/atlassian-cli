@@ -1,14 +1,12 @@
 //! `pipeline list`, `get` and `latest`, plus pipeline lookup shared by the other commands.
 
 use anyhow::{Context, Result};
-use atlassian_cli_output::OutputFormat;
 use url::{self, form_urlencoded};
 
 use super::super::utils::{accept_safe_identifier, BitbucketContext};
-use super::model::{Pipeline, PipelineList, PipelineRow, PipelineView};
-use super::state::{
-    format_status_for_display, format_steps_summary, get_commit_hash, get_pipeline_status,
-};
+use super::model::{Pipeline, PipelineList, PipelineRow};
+use super::rows::{build_pipeline_row, build_pipeline_view};
+use super::state::{get_pipeline_status, is_awaiting_action};
 use super::steps::fetch_steps;
 use crate::query::FilterBuilder;
 
@@ -271,52 +269,21 @@ pub async fn list_pipelines(
         }
     }
 
-    // Fetch steps for each pipeline if requested
-    let use_colors = matches!(
-        ctx.renderer.format(),
-        OutputFormat::Table | OutputFormat::Markdown
-    );
-    let step_summaries: Vec<Option<String>> = if show_steps {
-        let mut summaries = Vec::with_capacity(all_pipelines.len());
-        for pipeline in &all_pipelines {
-            let steps = fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false).await;
-            let summary = steps
+    // Fetch steps for each pipeline if requested. A failed fetch leaves that
+    // row without a summary rather than failing the listing.
+    let format = ctx.renderer.format();
+    let mut rows: Vec<PipelineRow> = Vec::with_capacity(all_pipelines.len());
+    for pipeline in &all_pipelines {
+        let steps = if show_steps {
+            fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false)
+                .await
+                .map_err(|e| tracing::warn!(pipeline = %pipeline.uuid, error = %e, "Could not fetch steps"))
                 .ok()
-                .filter(|s| !s.is_empty())
-                .map(|s| format_steps_summary(&s, use_colors));
-            summaries.push(summary);
-        }
-        summaries
-    } else {
-        vec![None; all_pipelines.len()]
-    };
-    let rows: Vec<PipelineRow> = all_pipelines
-        .iter()
-        .zip(step_summaries)
-        .map(|(pipeline, steps_summary)| {
-            let status = get_pipeline_status(pipeline);
-            PipelineRow {
-                build_number: pipeline
-                    .build_number
-                    .map(|n| n.to_string())
-                    .unwrap_or_default(),
-                state: format_status_for_display(&status, use_colors),
-                ref_name: pipeline
-                    .target
-                    .as_ref()
-                    .and_then(|t| t.ref_name.clone())
-                    .unwrap_or_default(),
-                commit: get_commit_hash(pipeline),
-                target_type: pipeline
-                    .target
-                    .as_ref()
-                    .and_then(|t| t.target_type.clone())
-                    .unwrap_or_default(),
-                created: pipeline.created_on.clone().unwrap_or_default(),
-                steps_summary,
-            }
-        })
-        .collect();
+        } else {
+            None
+        };
+        rows.push(build_pipeline_row(pipeline, steps.as_deref(), format));
+    }
 
     if rows.is_empty() {
         tracing::info!(workspace, repo_slug, "No pipelines found");
@@ -339,42 +306,24 @@ pub async fn get_pipeline(
     let pipeline_uuid = resolve_pipeline_id(ctx, workspace, repo_slug, pipeline_id).await?;
     let pipeline = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
 
-    let steps = if show_steps {
-        Some(fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, true).await?)
+    // A paused build also needs its steps, to count the manual ones it is
+    // waiting on; they are only listed when --steps asked for them.
+    let paused = is_awaiting_action(&get_pipeline_status(&pipeline));
+    let steps = if show_steps || paused {
+        Some(fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, show_steps).await?)
     } else {
         None
     };
 
-    // Only include steps_summary if steps is non-empty
-    let use_colors = matches!(
-        ctx.renderer.format(),
-        OutputFormat::Table | OutputFormat::Markdown
+    let view = build_pipeline_view(&pipeline, steps, show_steps, ctx.renderer.format());
+    tracing::debug!(
+        workspace,
+        repo_slug,
+        pipeline_uuid = %pipeline.uuid,
+        state = %view.state,
+        pending_manual_steps = ?view.pending_manual_steps,
+        "Fetched pipeline"
     );
-    let steps_summary = steps
-        .as_ref()
-        .filter(|s| !s.is_empty())
-        .map(|s| format_steps_summary(s, use_colors));
-    let status = get_pipeline_status(&pipeline);
-    let state = format_status_for_display(&status, use_colors);
-
-    let view = PipelineView {
-        uuid: pipeline.uuid.clone(),
-        build_number: pipeline
-            .build_number
-            .map(|n| n.to_string())
-            .unwrap_or_default(),
-        state,
-        ref_name: pipeline
-            .target
-            .as_ref()
-            .and_then(|t| t.ref_name.clone())
-            .unwrap_or_default(),
-        commit: get_commit_hash(&pipeline),
-        created: pipeline.created_on.unwrap_or_default(),
-        completed: pipeline.completed_on.unwrap_or_default(),
-        steps,
-        steps_summary,
-    };
 
     ctx.renderer.render(&view)
 }

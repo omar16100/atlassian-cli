@@ -22,6 +22,17 @@ pub enum OutputFormat {
     Markdown,
 }
 
+impl OutputFormat {
+    /// Formats read by people: tables and markdown.
+    ///
+    /// Decoration (status icons, colour, prose for empty results) belongs only
+    /// here. The machine formats carry plain values a script can compare, so
+    /// `"IN_PROGRESS 🔄"` in `-f json` is a bug, not a style.
+    pub fn is_human(self) -> bool {
+        matches!(self, OutputFormat::Table | OutputFormat::Markdown)
+    }
+}
+
 pub struct OutputRenderer {
     format: OutputFormat,
     envelope: bool,

@@ -6,7 +6,10 @@
 
 mod list;
 mod logs;
+#[cfg(test)]
+mod mock_tests;
 mod model;
+mod rows;
 mod state;
 mod status;
 mod steps;

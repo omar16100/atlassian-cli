@@ -38,6 +38,16 @@ pub(super) struct PipelineState {
     pub(super) name: String,
     #[serde(default)]
     pub(super) result: Option<StateResult>,
+    /// Present while `name` is `IN_PROGRESS`: `RUNNING`, or `PAUSED` when the
+    /// build is waiting on a manual step. Without it a paused build reads as
+    /// running for as long as nobody triggers the step.
+    #[serde(default)]
+    pub(super) stage: Option<StateStage>,
+}
+
+#[derive(Deserialize, Clone)]
+pub(super) struct StateStage {
+    pub(super) name: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -100,31 +110,43 @@ pub(super) struct StepResult {
 // Output Structs
 // ============================================================================
 
+/// One row of `pipeline list`. Built by `rows::build_pipeline_row`, which
+/// decides the decoration per format.
+///
+/// Fields the API may leave out are `Option` so the machine formats say `null`
+/// rather than `""`; a table shows them as an empty cell either way.
 #[derive(Serialize)]
 pub(super) struct PipelineRow {
-    pub(super) build_number: String,
+    pub(super) build_number: Option<i64>,
     pub(super) state: String,
-    pub(super) ref_name: String,
-    pub(super) commit: String,
-    pub(super) target_type: String,
-    pub(super) created: String,
+    pub(super) ref_name: Option<String>,
+    pub(super) commit: Option<String>,
+    pub(super) target_type: Option<String>,
+    pub(super) created: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) steps_summary: Option<String>,
+    /// Manual steps not yet started, reported only for a paused build.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) pending_manual_steps: Option<usize>,
 }
 
+/// `pipeline get`, and the final state `watch` prints in the machine formats.
 #[derive(Serialize)]
 pub(super) struct PipelineView {
     pub(super) uuid: String,
-    pub(super) build_number: String,
+    pub(super) build_number: Option<i64>,
     pub(super) state: String,
-    pub(super) ref_name: String,
-    pub(super) commit: String,
-    pub(super) created: String,
-    pub(super) completed: String,
+    pub(super) ref_name: Option<String>,
+    pub(super) commit: Option<String>,
+    pub(super) created: Option<String>,
+    pub(super) completed: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) steps: Option<Vec<StepInfo>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) steps_summary: Option<String>,
+    /// Manual steps not yet started, reported only for a paused build.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) pending_manual_steps: Option<usize>,
 }
 
 #[derive(Serialize, Clone)]

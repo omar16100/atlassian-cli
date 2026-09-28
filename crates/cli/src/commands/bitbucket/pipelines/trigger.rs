@@ -105,7 +105,7 @@ pub async fn trigger_pipeline(
     #[derive(Serialize)]
     struct Triggered {
         uuid: String,
-        build_number: String,
+        build_number: Option<i64>,
         state: String,
         ref_name: String,
     }
@@ -113,10 +113,7 @@ pub async fn trigger_pipeline(
     let state = get_pipeline_status(&pipeline);
     let triggered = Triggered {
         uuid: pipeline.uuid,
-        build_number: pipeline
-            .build_number
-            .map(|n| n.to_string())
-            .unwrap_or_default(),
+        build_number: pipeline.build_number,
         state,
         ref_name: pipeline
             .target
@@ -241,7 +238,7 @@ pub async fn rerun_pipeline(
     #[derive(Serialize)]
     struct Triggered {
         uuid: String,
-        build_number: String,
+        build_number: Option<i64>,
         state: String,
         ref_name: String,
         rerun_from: String,
@@ -250,10 +247,7 @@ pub async fn rerun_pipeline(
     let state = get_pipeline_status(&new_pipeline);
     let triggered = Triggered {
         uuid: new_pipeline.uuid,
-        build_number: new_pipeline
-            .build_number
-            .map(|n| n.to_string())
-            .unwrap_or_default(),
+        build_number: new_pipeline.build_number,
         state,
         ref_name: new_pipeline
             .target

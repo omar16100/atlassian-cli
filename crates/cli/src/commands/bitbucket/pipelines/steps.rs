@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use super::super::utils::BitbucketContext;
 use super::list::resolve_pipeline_id;
 use super::model::{PipelineStep, StepInfo};
-use super::state::{format_duration_secs, get_step_status};
+use super::state::{format_duration_secs, get_step_status, normalize_trigger};
 
 pub(super) async fn fetch_steps(
     ctx: &BitbucketContext<'_>,
@@ -84,7 +84,8 @@ pub(super) async fn fetch_steps(
                 trigger: step
                     .trigger
                     .as_ref()
-                    .and_then(|t| t.trigger_type.clone()),
+                    .and_then(|t| t.trigger_type.as_deref())
+                    .map(normalize_trigger),
             }
         })
         .collect())
@@ -172,10 +173,13 @@ pub async fn pipeline_has_failed_steps(
             .await
             .with_context(|| format!("Failed to fetch steps for pipeline {pipeline_uuid}"))?;
 
+    // The outcome, not `state.name`: a failed step is `COMPLETED` there, which
+    // is why `rerun --pr --failed-only` used to skip every failed build.
     let found_failure = steps.iter().any(|step| {
-        step.state
-            .as_ref()
-            .is_some_and(|state| matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR"))
+        matches!(
+            get_step_status(step).to_uppercase().as_str(),
+            "FAILED" | "ERROR"
+        )
     });
 
     // This decides an exit code. "I did not see a failure" is not the same as

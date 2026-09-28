@@ -622,7 +622,10 @@ enum PipelineCommands {
         #[arg(long)]
         failed_only: bool,
     },
-    /// Watch a running pipeline until completion.
+    /// Watch a running pipeline until it finishes or pauses for a manual step.
+    ///
+    /// Exit codes: 0 successful, 1 failed, stopped or unknown, 2 timed out,
+    /// 3 paused waiting on a manual step.
     Watch {
         /// Pipeline UUID or build number.
         pipeline_id: Option<String>,
@@ -654,11 +657,14 @@ enum PipelineCommands {
         pipeline_flag: Option<String>,
     },
     /// Get latest pipeline status (JSON output, smart exit codes).
+    ///
+    /// Exit codes: 0 successful, 1 failed, stopped or unknown, 2 in progress or
+    /// pending, 3 paused waiting on a manual step. `--wait` stops at a pause.
     Status {
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
-        /// Wait for pipeline to reach terminal state before exiting.
+        /// Wait until the pipeline finishes, or pauses for a manual step.
         #[arg(long)]
         wait: bool,
         /// Poll interval in seconds (used with --wait).

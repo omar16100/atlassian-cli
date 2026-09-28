@@ -68,7 +68,7 @@ pub async fn pipeline_status(
                     .as_ref()
                     .and_then(|t| t.ref_name.clone())
                     .unwrap_or_default(),
-                commit: get_commit_hash(&pipeline),
+                commit: get_commit_hash(&pipeline).unwrap_or_default(),
                 created: pipeline.created_on.clone().unwrap_or_default(),
                 steps: steps_data,
             };

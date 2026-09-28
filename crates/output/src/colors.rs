@@ -67,7 +67,7 @@ impl StatusFormatter {
             "PENDING" | "NOT_RUN" => {
                 format!("{} {}", status.cyan(), icon)
             }
-            "PAUSED" => {
+            "PAUSED" | "HALTED" => {
                 format!("{} {}", status.magenta(), icon)
             }
             _ => {

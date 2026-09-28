@@ -6,6 +6,7 @@ use atlassian_cli_output::OutputFormat;
 
 use super::super::utils::BitbucketContext;
 use super::model::PipelineStep;
+use super::state::get_step_status;
 
 #[allow(clippy::too_many_arguments)]
 pub async fn get_pipeline_logs(
@@ -63,11 +64,14 @@ pub async fn get_pipeline_logs(
     }
 
     // Filter by failed steps only if specified
+    // By outcome: a failed step's `state.name` is `COMPLETED`, so testing it
+    // matched nothing and `--failed-only` always printed "No steps matched".
     if failed_only {
         steps_to_show.retain(|s| {
-            s.state.as_ref().is_some_and(|state| {
-                matches!(state.name.to_uppercase().as_str(), "FAILED" | "ERROR")
-            })
+            matches!(
+                get_step_status(s).to_uppercase().as_str(),
+                "FAILED" | "ERROR"
+            )
         });
     }
 
@@ -82,19 +86,17 @@ pub async fn get_pipeline_logs(
     // Process each step
     for step in steps_to_show {
         let step_name = step.name.as_deref().unwrap_or("unnamed");
-        let step_state = step.state.as_ref();
+        let state_name = get_step_status(step);
 
         // Check if step was skipped
-        if let Some(state) = step_state {
-            if matches!(state.name.to_uppercase().as_str(), "NOT_RUN" | "SKIPPED") {
-                if matches!(
-                    ctx.renderer.format(),
-                    OutputFormat::Table | OutputFormat::Markdown
-                ) {
-                    println!("⏭  Step '{}' was skipped - no logs available", step_name);
-                }
-                continue;
+        if matches!(state_name.to_uppercase().as_str(), "NOT_RUN" | "SKIPPED") {
+            if matches!(
+                ctx.renderer.format(),
+                OutputFormat::Table | OutputFormat::Markdown
+            ) {
+                println!("⏭  Step '{}' was skipped - no logs available", step_name);
             }
+            continue;
         }
 
         // Fetch logs for this step
@@ -149,8 +151,6 @@ pub async fn get_pipeline_logs(
         } else {
             log_content.lines().collect()
         };
-
-        let state_name = step_state.map(|s| s.name.as_str()).unwrap_or("UNKNOWN");
 
         // Output based on format
         match ctx.renderer.format() {
