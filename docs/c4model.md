@@ -179,6 +179,45 @@ Shows the internal structure of atlassian-cli as a Rust workspace with 6 crates.
 
 #### Command Modules
 
+**Bitbucket pipelines** (`commands/bitbucket/pipelines/`), split by command
+(the single file had passed 2000 lines):
+
+| Module | Owns |
+| --- | --- |
+| `model` | API response types, `PipelineRow`/`PipelineView`/`StepInfo` |
+| `state` | status derivation, icons, exit codes, step outcome, trigger normalisation |
+| `rows` | building rows per output format |
+| `list` | `list`, `get`, `latest`, build-number resolution |
+| `steps`, `logs` | step listing, the failed-step check, log retrieval |
+| `trigger`, `status`, `watch` | the remaining commands |
+
+Status derivation (`state::get_pipeline_status`): `state.result.name` once
+finished; while `IN_PROGRESS`, `state.stage.name` when it is not `RUNNING`
+(Bitbucket reports a build waiting on a manual step as stage `PAUSED`);
+otherwise `state.name`. A step's outcome is likewise `result` before `name`,
+since a finished step's `name` is always `COMPLETED`. Exit codes for `status`
+and `watch`: 0 successful, 1 failed or unrecognised, 2 in progress, pending or
+timed out, 3 paused on a manual step; `watch` and `status --wait` stop at a
+pause.
+
+Rows (`rows.rs`) are built per format: status icons, and colour in a table,
+only where `OutputFormat::is_human()` (table, markdown); the machine formats
+get the bare status, numbers as numbers, and `null` for anything the API did
+not report.
+
+**Positional repository** (`commands/bitbucket/positional.rs`). Pipeline
+commands take `[REPO]` ahead of their identifiers. `split_leading_repo` decides
+by count (a value beyond the identifier slots no flag filled is the
+repository), then by shape (a first value that is neither digits nor a UUID is
+the repository). `choose_repo` resolves argument, then `--repo`, then the git
+remote; an argument that disagrees with `--repo` is an error. The argument's
+clap id is not `repo`, so it does not shadow the global `--repo`.
+
+**Pull request edits** (`commands/bitbucket/pullrequests.rs`). Bitbucket edits
+a pull request with a PUT of the pull request, so `pr update` and
+`pr reviewers --add` GET it first and PUT title, description and reviewers
+together (`build_pr_put_body`), each from the change or the current value.
+
 #### Configuration directory
 
 `config.yaml`, `credentials` and `credentials.enc` all live in one directory,
@@ -340,9 +379,25 @@ pub struct ApiClient {
     rate_limiter: RateLimiter,
 }
 
-// Methods: get<T>, post<T>, put<T>, delete<T>, get_text, response_header
+// Methods: get<T>, post<T>, put<T>, delete<T>, delete_no_content, get_text,
+//          get_bytes, response_header, request_raw
 // Features: HTTPS enforcement, SSRF protection, automatic retry
 ```
+
+**Response handling** (`crates/api/src/response.rs`). Every request path sends
+its response through the same two functions: `log_response` (method, URL,
+status, elapsed time, at debug) and, for a non-2xx, `error_for_status`, which
+reads the body once, logs it (credential-scrubbed by `scrub_credentials`, cut
+to 2 KB) and maps the status to an `ApiError`. Before this each path carried
+its own copy of the mapping and none logged a status or an error body. URLs are
+logged through `redact_url`, which blanks credential-like query values. Request
+bodies and headers are never logged; only whether a body was sent, or its size
+for `request_raw`.
+
+Debug data flow: **`--debug` (global) → `main::tracing_directives` →
+`EnvFilter` `info,atlassian_cli=debug` (prefix match, so every workspace crate)
+→ `ApiClient` request/response events → stderr.** `RUST_LOG` directives are
+appended as refinements; stdout carries only command output.
 
 **Pagination** (`crates/api/src/pagination.rs`).
 
@@ -511,6 +566,16 @@ profiles:
 │                                                                            │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
+
+Table mode (`OutputRenderer::table_output`): a list of objects is a table with
+a column per key; a single object is a `field | value` table in the order its
+fields are declared (the value is serialised and read back into an `IndexMap`,
+because `serde_json::Value` sorts keys), with lists of objects inside it
+rendered below as titled tables and values wrapped at 100 columns. Anything
+else falls back to JSON. `render_document` keeps JSON in table mode for the
+commands whose output is a raw API document (`jira workflow export`,
+`confluence folder get`). `OutputFormat::is_human()` names the table and
+markdown formats, where decoration belongs.
 
 ---
 
