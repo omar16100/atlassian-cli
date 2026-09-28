@@ -1,6 +1,6 @@
 # Feedback: the six items still open on 0.9.3 (plan)
 
-Status: in progress on `fix/feedback-open-items` (PR #153).
+Status: shipped in v0.10.0 (PR #153).
 
 ## Context
 
