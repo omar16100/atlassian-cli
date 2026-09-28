@@ -3044,3 +3044,13 @@ The reporter re-tested 14 items on 0.9.3; eight were already fixed (they had bee
 - [x] `cargo test --workspace`: 992 passed, 0 failed, 1 ignored. fmt and clippy (`-D warnings`) clean.
 - [ ] Live verification: blocked, both stored tokens return 401.
 - Docs: `docs/28092026_feedback_open_items.md`, `docs/28092026_feedback_open_items_plan.md`.
+
+## 28 Sep 2026: release 0.10.0 (branch `release/0.10.0`)
+
+- [x] PR #153 squash merged to `main` as `e1fc080`.
+- [x] CHANGELOG Unreleased promoted to `[0.10.0] - 2026-09-28` with a paragraph naming the script-visible changes; compare links added.
+- [x] Workspace version and the five internal pins in `crates/cli/Cargo.toml` to 0.10.0; `Cargo.lock` via `cargo check --workspace`.
+- [x] 0.10.0 rather than 0.9.4: default single-object output, pipeline JSON values and pipeline exit codes all change in ways scripts can see.
+- [x] `dist plan`: tag `v0.10.0`, `announcement_github_body` opens with the 0.10.0 section.
+- [x] Feature and plan docs for #153 marked shipped in v0.10.0.
+- Plan: `docs/28092026_release_0_10_0_plan.md`.

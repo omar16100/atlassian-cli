@@ -11,6 +11,14 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-28
+
+Fixes the six items from a user report that were still open on 0.9.3. Several
+defaults change in ways scripts can see: commands that return a single object
+print a table rather than JSON in table mode, pipeline JSON carries plain values,
+and pipeline status exit codes gain 3 and exit 1 for an unknown status. See
+Changed.
+
 ### Added
 
 - Pipeline commands take the repository as an argument: `bb pipeline list
@@ -504,7 +512,8 @@ in scripts.
 First release: a Rust CLI for Jira, Confluence and Bitbucket, distributed through
 cargo-dist with a Homebrew tap and a shell installer.
 
-[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/omar16100/atlassian-cli/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/omar16100/atlassian-cli/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/omar16100/atlassian-cli/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/omar16100/atlassian-cli/compare/v0.9.0...v0.9.1
