@@ -3054,3 +3054,11 @@ The reporter re-tested 14 items on 0.9.3; eight were already fixed (they had bee
 - [x] `dist plan`: tag `v0.10.0`, `announcement_github_body` opens with the 0.10.0 section.
 - [x] Feature and plan docs for #153 marked shipped in v0.10.0.
 - Plan: `docs/28092026_release_0_10_0_plan.md`.
+
+## 28 Sep 2026: 0.10.0 released
+
+- [x] PR #154 squash merged as `140ecd6`; annotated tag `v0.10.0` pushed. `release.yml` and `publish-crates.yml` both succeeded; `main` CI green.
+- [x] GitHub Release `v0.10.0`: 14 assets, body is the 0.10.0 changelog section.
+- [x] crates.io: all six crates at 0.10.0. Homebrew tap formula at 0.10.0; archive URLs return 200, aarch64 macOS sha256 matches.
+- [x] Released aarch64 macOS binary: `--version` 0.10.0, `[REPO] [PIPELINE]` on `pipeline get`, `--reviewers` on `pr update`, `--debug` accepted after a subcommand.
+- Plan doc status set to shipped: `docs/28092026_release_0_10_0_plan.md`.
