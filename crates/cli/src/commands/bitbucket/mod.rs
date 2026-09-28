@@ -340,6 +340,11 @@ enum PrCommands {
         /// New description.
         #[arg(long)]
         description: Option<String>,
+        /// Replace the reviewers with these account UUIDs (comma-separated).
+        /// An empty value removes every reviewer. `pr reviewers --add` adds
+        /// to the current set instead.
+        #[arg(long, value_delimiter = ',')]
+        reviewers: Option<Vec<String>>,
     },
     /// Merge pull request.
     Merge {
@@ -1242,6 +1247,7 @@ pub async fn execute(
                 pr_id,
                 title,
                 description,
+                reviewers,
             } => {
                 pullrequests::update_pull_request(
                     &ctx,
@@ -1250,6 +1256,7 @@ pub async fn execute(
                     pr_id,
                     title.as_deref(),
                     description.as_deref(),
+                    reviewers,
                 )
                 .await
             }

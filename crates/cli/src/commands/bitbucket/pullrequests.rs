@@ -467,6 +467,114 @@ pub async fn create_pull_request(
     ctx.renderer.render(&created)
 }
 
+/// What a pull request edit changes. `None` keeps the current value.
+struct PrChanges<'a> {
+    title: Option<&'a str>,
+    description: Option<&'a str>,
+    /// The complete reviewer set to send, as `{uuid}` strings.
+    reviewers: Option<Vec<String>>,
+}
+
+/// The PUT body for a pull request edit.
+///
+/// Bitbucket edits a pull request with a PUT of the pull request itself, so a
+/// field left out risks being reset. Title, description and reviewers are
+/// therefore always sent, each taken from `changes` or else from `current`:
+/// `pr update --title` no longer risks the reviewers, and `pr reviewers --add`
+/// no longer sends the title alone and drops the description.
+///
+/// Reviewers the API reported without a UUID cannot be resent. Rather than
+/// drop them silently, the field is left out when nothing changes it, and an
+/// edit that has to rebuild the list refuses.
+fn build_pr_put_body(current: &PullRequest, changes: &PrChanges<'_>) -> serde_json::Value {
+    let mut body = serde_json::json!({
+        "title": changes.title.unwrap_or(&current.title),
+    });
+    if let Some(description) = changes.description.or(current.description.as_deref()) {
+        body["description"] = serde_json::json!(description);
+    }
+
+    let reviewers = match &changes.reviewers {
+        Some(requested) => Some(requested.clone()),
+        None => match &current.reviewers {
+            Some(list) if list.iter().all(|u| u.uuid.is_some()) => {
+                Some(list.iter().filter_map(|u| u.uuid.clone()).collect())
+            }
+            // Present but not resendable, or absent: leave the field out.
+            _ => None,
+        },
+    };
+    if let Some(uuids) = reviewers {
+        body["reviewers"] = serde_json::json!(uuids
+            .iter()
+            .map(|uuid| serde_json::json!({ "uuid": uuid }))
+            .collect::<Vec<_>>());
+    }
+    body
+}
+
+/// The UUIDs of the current reviewers, for an edit that rebuilds the list.
+fn current_reviewer_uuids(pr: &PullRequest) -> Result<Vec<String>> {
+    let Some(list) = &pr.reviewers else {
+        return Ok(Vec::new());
+    };
+    list.iter()
+        .map(|user| {
+            user.uuid.clone().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Reviewer '{}' has no UUID in the API response, so the reviewer list cannot \
+                     be rewritten without dropping them.",
+                    user.display_name
+                )
+            })
+        })
+        .collect()
+}
+
+/// A reviewer typed on the command line, as the `{uuid}` Bitbucket expects.
+///
+/// Only UUIDs, braced or bare. Anything else used to be wrapped in braces and
+/// sent, so `--add jane` became `{jane}` and came back as an opaque 400.
+fn parse_reviewer_uuid(raw: &str) -> Result<String> {
+    let trimmed = raw.trim();
+    let bare = trimmed
+        .strip_prefix('{')
+        .and_then(|v| v.strip_suffix('}'))
+        .unwrap_or(trimmed);
+    let groups: Vec<&str> = bare.split('-').collect();
+    let is_uuid = groups.len() == 5
+        && groups
+            .iter()
+            .zip([8, 4, 4, 4, 12])
+            .all(|(g, len)| g.len() == len && g.chars().all(|c| c.is_ascii_hexdigit()));
+    if !is_uuid {
+        anyhow::bail!(
+            "'{trimmed}' is not a Bitbucket account UUID. Reviewers are named by UUID: \
+             `bb pr reviewers <repo> <id>` lists a pull request's, and \
+             `bb permission list <repo>` lists the repository's members."
+        );
+    }
+    Ok(format!("{{{bare}}}"))
+}
+
+/// Parse the requested reviewers, dropping empty entries and duplicates, and
+/// refuse the pull request's author, whom Bitbucket does not accept as a
+/// reviewer of their own pull request.
+fn requested_reviewers(raw: &[String], author_uuid: Option<&str>) -> Result<Vec<String>> {
+    let mut uuids: Vec<String> = Vec::new();
+    for value in raw.iter().filter(|v| !v.trim().is_empty()) {
+        let uuid = parse_reviewer_uuid(value)?;
+        if author_uuid.is_some_and(|author| author.eq_ignore_ascii_case(&uuid)) {
+            anyhow::bail!("{uuid} is the pull request's author, who cannot also be a reviewer.");
+        }
+        if !uuids.iter().any(|u| u.eq_ignore_ascii_case(&uuid)) {
+            uuids.push(uuid);
+        }
+    }
+    Ok(uuids)
+}
+
+#[allow(clippy::too_many_arguments)]
 pub async fn update_pull_request(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -474,19 +582,42 @@ pub async fn update_pull_request(
     pr_id: i64,
     title: Option<&str>,
     description: Option<&str>,
+    reviewers: Option<Vec<String>>,
 ) -> Result<()> {
-    let mut payload = serde_json::json!({});
-
-    if let Some(t) = title {
-        payload["title"] = serde_json::json!(t);
-    }
-
-    if let Some(d) = description {
-        payload["description"] = serde_json::json!(d);
+    if title.is_none() && description.is_none() && reviewers.is_none() {
+        anyhow::bail!("Nothing to update: pass --title, --description or --reviewers.");
     }
 
     let path = format!("/2.0/repositories/{workspace}/{repo_slug}/pullrequests/{pr_id}");
-    let pr: PullRequest = ctx.client.put(&path, &payload).await.with_context(|| {
+    let current: PullRequest = ctx.client.get(&path).await.with_context(|| {
+        format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
+    })?;
+
+    let reviewers = reviewers
+        .map(|raw| requested_reviewers(&raw, current.author.uuid.as_deref()))
+        .transpose()?;
+    let body = build_pr_put_body(
+        &current,
+        &PrChanges {
+            title,
+            description,
+            reviewers,
+        },
+    );
+    tracing::debug!(
+        pr_id,
+        workspace,
+        repo_slug,
+        title_changed = title.is_some(),
+        description_changed = description.is_some(),
+        reviewers_sent = body
+            .get("reviewers")
+            .and_then(|r| r.as_array())
+            .map(Vec::len),
+        "Updating pull request"
+    );
+
+    let pr: PullRequest = ctx.client.put(&path, &body).await.with_context(|| {
         format!("Failed to update pull request {pr_id} in {workspace}/{repo_slug}")
     })?;
 
@@ -503,13 +634,19 @@ pub async fn update_pull_request(
         title: String,
         description: String,
         state: String,
+        reviewers: Vec<String>,
     }
 
     let updated = Updated {
         id: pr.id,
         title: pr.title.clone(),
-        description: pr.description.unwrap_or_default(),
+        description: pr.description.clone().unwrap_or_default(),
         state: pr.state.clone(),
+        reviewers: pr
+            .reviewers
+            .as_ref()
+            .map(|list| list.iter().map(|u| u.display_name.clone()).collect())
+            .unwrap_or_default(),
     };
 
     ctx.renderer.render(&updated)
@@ -886,17 +1023,9 @@ pub async fn add_pr_reviewers(
         format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
     })?;
 
-    let existing: Vec<String> = pr
-        .reviewers
-        .as_ref()
-        .map(|list| {
-            list.iter()
-                .filter_map(|user| user.uuid.clone())
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-
-    let merged = merge_reviewer_uuids(&existing, &reviewers);
+    let existing = current_reviewer_uuids(&pr)?;
+    let requested = requested_reviewers(&reviewers, pr.author.uuid.as_deref())?;
+    let merged = merge_reviewer_uuids(&existing, &requested);
     tracing::info!(
         pr_id,
         workspace,
@@ -907,13 +1036,14 @@ pub async fn add_pr_reviewers(
         "Updating pull request reviewers"
     );
 
-    let payload = serde_json::json!({
-        "title": pr.title,
-        "reviewers": merged
-            .iter()
-            .map(|uuid| serde_json::json!({ "uuid": uuid }))
-            .collect::<Vec<_>>(),
-    });
+    let payload = build_pr_put_body(
+        &pr,
+        &PrChanges {
+            title: None,
+            description: None,
+            reviewers: Some(merged.clone()),
+        },
+    );
 
     let _: serde_json::Value = ctx
         .client
@@ -1026,8 +1156,267 @@ mod tests {
     use super::*;
     use atlassian_cli_api::ApiClient;
     use atlassian_cli_output::{OutputFormat, OutputRenderer};
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{body_json, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    const AUTHOR: &str = "{aaaaaaaa-0000-0000-0000-000000000001}";
+    const REVIEWER_A: &str = "{bbbbbbbb-0000-0000-0000-000000000002}";
+    const REVIEWER_B: &str = "{cccccccc-0000-0000-0000-000000000003}";
+    const PR_PATH: &str = "/2.0/repositories/ws/web_app/pullrequests/54";
+
+    fn pr_json(reviewers: &[&str]) -> serde_json::Value {
+        serde_json::json!({
+            "id": 54,
+            "title": "Add image resizing",
+            "description": "Resizes uploads before storage.",
+            "state": "OPEN",
+            "author": {"display_name": "Author", "uuid": AUTHOR},
+            "source": {"branch": {"name": "feature/resize"}},
+            "destination": {"branch": {"name": "main"}},
+            "reviewers": reviewers
+                .iter()
+                .map(|u| serde_json::json!({"display_name": "Someone", "uuid": u}))
+                .collect::<Vec<_>>()
+        })
+    }
+
+    fn pr(reviewers: &[&str]) -> PullRequest {
+        serde_json::from_value(pr_json(reviewers)).unwrap()
+    }
+
+    /// GET the pull request, and expect exactly one PUT with `expected` as its body.
+    async fn server_expecting_put(
+        current: serde_json::Value,
+        expected: serde_json::Value,
+    ) -> MockServer {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(PR_PATH))
+            .respond_with(ResponseTemplate::new(200).set_body_json(current.clone()))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path(PR_PATH))
+            .and(body_json(expected))
+            .respond_with(ResponseTemplate::new(200).set_body_json(current))
+            .expect(1)
+            .mount(&server)
+            .await;
+        server
+    }
+
+    fn json_ctx<'a>(server: &MockServer, renderer: &'a OutputRenderer) -> BitbucketContext<'a> {
+        BitbucketContext {
+            client: ApiClient::new(server.uri()).unwrap(),
+            renderer,
+            is_bearer: false,
+        }
+    }
+
+    #[test]
+    fn a_title_edit_resends_the_description_and_reviewers() {
+        let body = build_pr_put_body(
+            &pr(&[REVIEWER_A]),
+            &PrChanges {
+                title: Some("Resize images"),
+                description: None,
+                reviewers: None,
+            },
+        );
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "title": "Resize images",
+                "description": "Resizes uploads before storage.",
+                "reviewers": [{"uuid": REVIEWER_A}]
+            })
+        );
+    }
+
+    /// A reviewer the API reported without a UUID cannot be resent. Leaving
+    /// the field out keeps them; sending a partial list would remove them.
+    #[test]
+    fn reviewers_without_uuids_are_left_alone_rather_than_dropped() {
+        let mut current = pr(&[]);
+        current.reviewers = Some(vec![User {
+            display_name: "No Uuid".to_string(),
+            uuid: None,
+        }]);
+        let changes = PrChanges {
+            title: Some("x"),
+            description: None,
+            reviewers: None,
+        };
+        assert!(build_pr_put_body(&current, &changes)
+            .get("reviewers")
+            .is_none());
+        assert!(current_reviewer_uuids(&current).is_err());
+    }
+
+    #[test]
+    fn reviewers_must_be_account_uuids() {
+        assert_eq!(
+            parse_reviewer_uuid("bbbbbbbb-0000-0000-0000-000000000002").unwrap(),
+            REVIEWER_A
+        );
+        assert_eq!(parse_reviewer_uuid(REVIEWER_A).unwrap(), REVIEWER_A);
+        let err = parse_reviewer_uuid("jane").unwrap_err().to_string();
+        assert!(err.contains("bb pr reviewers"), "{err}");
+        assert!(parse_reviewer_uuid("{abc-123}").is_err());
+    }
+
+    #[test]
+    fn the_author_cannot_be_requested_as_a_reviewer() {
+        let err = requested_reviewers(&[AUTHOR.to_string()], Some(AUTHOR))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("author"), "{err}");
+    }
+
+    #[test]
+    fn requested_reviewers_drop_blanks_and_duplicates() {
+        let raw = vec![
+            REVIEWER_A.to_string(),
+            " ".to_string(),
+            REVIEWER_A
+                .trim_matches(|c| c == '{' || c == '}')
+                .to_string(),
+            REVIEWER_B.to_string(),
+        ];
+        assert_eq!(
+            requested_reviewers(&raw, Some(AUTHOR)).unwrap(),
+            vec![REVIEWER_A.to_string(), REVIEWER_B.to_string()]
+        );
+        assert!(requested_reviewers(&[String::new()], None)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// Item 12: `pr update --reviewers` replaces the set, keeping title and description.
+    #[tokio::test]
+    async fn update_reviewers_replaces_the_set_and_keeps_the_rest() {
+        let server = server_expecting_put(
+            pr_json(&[REVIEWER_A]),
+            serde_json::json!({
+                "title": "Add image resizing",
+                "description": "Resizes uploads before storage.",
+                "reviewers": [{"uuid": REVIEWER_B}]
+            }),
+        )
+        .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        update_pull_request(
+            &json_ctx(&server, &renderer),
+            "ws",
+            "web_app",
+            54,
+            None,
+            None,
+            Some(vec![REVIEWER_B.to_string()]),
+        )
+        .await
+        .unwrap();
+    }
+
+    /// A title edit used to PUT `{title}` alone.
+    #[tokio::test]
+    async fn update_title_resends_description_and_reviewers() {
+        let server = server_expecting_put(
+            pr_json(&[REVIEWER_A]),
+            serde_json::json!({
+                "title": "Resize images",
+                "description": "Resizes uploads before storage.",
+                "reviewers": [{"uuid": REVIEWER_A}]
+            }),
+        )
+        .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        update_pull_request(
+            &json_ctx(&server, &renderer),
+            "ws",
+            "web_app",
+            54,
+            Some("Resize images"),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// `--add` used to PUT `{title, reviewers}` and drop the description.
+    #[tokio::test]
+    async fn add_reviewers_keeps_the_description() {
+        let server = server_expecting_put(
+            pr_json(&[REVIEWER_A]),
+            serde_json::json!({
+                "title": "Add image resizing",
+                "description": "Resizes uploads before storage.",
+                "reviewers": [{"uuid": REVIEWER_A}, {"uuid": REVIEWER_B}]
+            }),
+        )
+        .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        add_pr_reviewers(
+            &json_ctx(&server, &renderer),
+            "ws",
+            "web_app",
+            54,
+            vec![REVIEWER_B.to_string()],
+        )
+        .await
+        .unwrap();
+    }
+
+    /// A name where a UUID belongs fails before anything is written.
+    #[tokio::test]
+    async fn a_bad_reviewer_value_sends_no_put() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(PR_PATH))
+            .respond_with(ResponseTemplate::new(200).set_body_json(pr_json(&[])))
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let err = update_pull_request(
+            &json_ctx(&server, &renderer),
+            "ws",
+            "web_app",
+            54,
+            None,
+            None,
+            Some(vec!["jane".to_string()]),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("not a Bitbucket account UUID"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_update_with_nothing_to_change_is_refused() {
+        let server = MockServer::start().await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let err = update_pull_request(
+            &json_ctx(&server, &renderer),
+            "ws",
+            "web_app",
+            54,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("Nothing to update"), "{err}");
+    }
 
     #[test]
     fn test_participant_status_approved_state() {
