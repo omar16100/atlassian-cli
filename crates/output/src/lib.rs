@@ -2,10 +2,12 @@ use std::collections::BTreeSet;
 
 use anyhow::Result;
 use clap::ValueEnum;
+use indexmap::IndexMap;
 use serde::Serialize;
 use serde_json::Value;
 use tabled::builder::Builder;
-use tabled::settings::Style;
+use tabled::settings::object::Columns;
+use tabled::settings::{Style, Width};
 
 pub mod colors;
 
@@ -32,6 +34,11 @@ impl OutputFormat {
         matches!(self, OutputFormat::Table | OutputFormat::Markdown)
     }
 }
+
+/// Width at which a single object's values wrap in table mode. Wide enough
+/// for a UUID, a URL or a sentence; narrow enough that a pull request
+/// description does not push the table off the screen.
+const RECORD_VALUE_WIDTH: usize = 100;
 
 pub struct OutputRenderer {
     format: OutputFormat,
@@ -137,9 +144,7 @@ impl OutputRenderer {
 
         match self.format {
             OutputFormat::Table => {
-                if !self.render_table(&json_value)? {
-                    println!("{}", serde_json::to_string_pretty(&json_value)?);
-                }
+                println!("{}", Self::table_output(value, &json_value)?);
             }
             OutputFormat::Json => {
                 println!("{}", serde_json::to_string_pretty(&json_value)?);
@@ -165,6 +170,102 @@ impl OutputRenderer {
         }
 
         Ok(())
+    }
+
+    /// Render a whole API document, where the JSON is the product.
+    ///
+    /// Table mode prints it as pretty JSON, as every single object used to be:
+    /// `jira workflow export` without `--output`, or a raw `folder get`, has no
+    /// useful two-column form. Every other format renders as `render` does.
+    pub fn render_document<T: Serialize>(&self, value: &T) -> Result<()> {
+        match self.format {
+            OutputFormat::Table => {
+                println!("{}", serde_json::to_string_pretty(value)?);
+                Ok(())
+            }
+            _ => self.render(value),
+        }
+    }
+
+    /// What table mode prints for `value`.
+    ///
+    /// A list becomes a table with a column per key. A single object becomes a
+    /// `field | value` table in the order its fields were declared. Anything
+    /// else (an empty list, a bare string) falls back to JSON.
+    ///
+    /// Single objects used to fall back to JSON too, so `bb pr get` and every
+    /// other `get` printed JSON with no `-f` while the lists printed tables.
+    fn table_output<T: Serialize>(value: &T, json_value: &Value) -> Result<String> {
+        if json_value.is_object() {
+            return Ok(Self::format_record(&Self::ordered_fields(
+                value, json_value,
+            )));
+        }
+        match Self::table_string(json_value, None) {
+            Some(table) => Ok(table),
+            None => Ok(serde_json::to_string_pretty(json_value)?),
+        }
+    }
+
+    /// An object's fields in declaration order.
+    ///
+    /// `serde_json::Value` keeps object keys sorted, which would list a pull
+    /// request's `approvals` before its `id` and `title`. Serializing to a
+    /// string keeps the struct's own order, and reading that back into an
+    /// `IndexMap` preserves it.
+    fn ordered_fields<T: Serialize>(value: &T, json_value: &Value) -> Vec<(String, Value)> {
+        serde_json::to_string(value)
+            .ok()
+            .and_then(|text| serde_json::from_str::<IndexMap<String, Value>>(&text).ok())
+            .map(|fields| fields.into_iter().collect())
+            .unwrap_or_else(|| {
+                json_value
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                    .unwrap_or_default()
+            })
+    }
+
+    /// One object as a `field | value` table.
+    ///
+    /// Scalars print as themselves and `null` as an empty cell, lists of
+    /// scalars comma-joined, nested objects as compact JSON. A list of objects
+    /// (a pull request's reviewers, a pipeline's steps) gets its own titled
+    /// table below, because squeezing it into one cell is how it ended up as
+    /// unreadable JSON. Long values wrap at word boundaries.
+    fn format_record(fields: &[(String, Value)]) -> String {
+        let mut builder = Builder::default();
+        builder.push_record(["field".to_string(), "value".to_string()]);
+        let mut sections = Vec::new();
+        for (key, value) in fields {
+            match value {
+                Value::Array(items) if !items.is_empty() && items.iter().all(Value::is_object) => {
+                    sections.push((key, value));
+                }
+                Value::Array(items) if items.iter().all(|v| !v.is_object() && !v.is_array()) => {
+                    let joined = items
+                        .iter()
+                        .map(Self::value_to_string)
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    builder.push_record([key.clone(), joined]);
+                }
+                other => builder.push_record([key.clone(), Self::value_to_string(other)]),
+            }
+        }
+
+        let mut table = builder.build();
+        table.with(Style::rounded()).modify(
+            Columns::one(1),
+            Width::wrap(RECORD_VALUE_WIDTH).keep_words(true),
+        );
+        let mut out = table.to_string();
+        for (key, value) in sections {
+            if let Some(sub) = Self::table_string(value, None) {
+                out.push_str(&format!("\n\n{key}:\n{sub}"));
+            }
+        }
+        out
     }
 
     /// Render a list/array of items. When --envelope is enabled and format is JSON/YAML,
@@ -265,15 +366,19 @@ impl OutputRenderer {
         Ok(())
     }
 
-    fn render_table(&self, value: &Value) -> Result<bool> {
-        self.render_table_with(value, None)
+    fn render_table_with(&self, value: &Value, columns: Option<&[String]>) -> Result<bool> {
+        match Self::table_string(value, columns) {
+            Some(table) => {
+                println!("{}", table);
+                Ok(true)
+            }
+            None => Ok(false),
+        }
     }
 
-    fn render_table_with(&self, value: &Value, columns: Option<&[String]>) -> Result<bool> {
-        let (headers, rows) = match Self::coerce_rows_with(value, columns) {
-            Some(data) => data,
-            None => return Ok(false),
-        };
+    /// A list of objects as a table, or `None` when `value` is not one.
+    fn table_string(value: &Value, columns: Option<&[String]>) -> Option<String> {
+        let (headers, rows) = Self::coerce_rows_with(value, columns)?;
 
         let mut builder = Builder::default();
         builder.push_record(headers);
@@ -281,9 +386,7 @@ impl OutputRenderer {
             builder.push_record(row);
         }
 
-        let table = builder.build().with(Style::rounded()).to_string();
-        println!("{}", table);
-        Ok(true)
+        Some(builder.build().with(Style::rounded()).to_string())
     }
 
     fn render_csv(&self, value: &Value) -> Result<bool> {
@@ -566,6 +669,121 @@ mod tests {
             rows[0][headers.iter().position(|h| h == "email").unwrap()],
             ""
         );
+    }
+
+    #[derive(Serialize)]
+    struct PullRequestView {
+        id: i64,
+        title: &'static str,
+        approvals: String,
+        description: Option<&'static str>,
+        labels: Vec<&'static str>,
+        reviewers: Vec<serde_json::Value>,
+    }
+
+    fn pull_request() -> PullRequestView {
+        PullRequestView {
+            id: 54,
+            title: "Add image resizing",
+            approvals: "1".to_string(),
+            description: None,
+            labels: vec!["infra", "urgent"],
+            reviewers: vec![json!({"name": "Reviewer One", "status": "Approved", "uuid": "{r-1}"})],
+        }
+    }
+
+    fn table_of<T: Serialize>(value: &T) -> String {
+        let json_value = serde_json::to_value(value).unwrap();
+        OutputRenderer::table_output(value, &json_value).unwrap()
+    }
+
+    /// The reported symptom: `bb pr get` printed JSON with no `-f`.
+    #[test]
+    fn a_single_object_renders_as_a_field_value_table() {
+        let out = table_of(&pull_request());
+        assert!(!out.trim_start().starts_with('{'), "not JSON: {out}");
+        assert!(out.contains("field") && out.contains("value"), "{out}");
+        assert!(out.contains("Add image resizing"), "{out}");
+    }
+
+    /// Declaration order, not alphabetical: `id` and `title` come first.
+    #[test]
+    fn fields_keep_their_declaration_order() {
+        let out = table_of(&pull_request());
+        let id = out.find("│ id").unwrap();
+        let title = out.find("│ title").unwrap();
+        let approvals = out.find("│ approvals").unwrap();
+        assert!(id < title && title < approvals, "{out}");
+    }
+
+    #[test]
+    fn a_list_of_objects_inside_becomes_a_titled_table_below() {
+        let out = table_of(&pull_request());
+        let main_end = out.find("reviewers:").expect("titled section");
+        let section = &out[main_end..];
+        for cell in [
+            "name",
+            "status",
+            "uuid",
+            "Reviewer One",
+            "Approved",
+            "{r-1}",
+        ] {
+            assert!(section.contains(cell), "{cell} missing from: {section}");
+        }
+        assert!(
+            !out[..main_end].contains("Reviewer One"),
+            "not squeezed into a cell"
+        );
+    }
+
+    #[test]
+    fn scalars_lists_and_nulls_render_plainly() {
+        let out = table_of(&pull_request());
+        assert!(out.contains("infra, urgent"), "{out}");
+        let description_line = out.lines().find(|l| l.contains("description")).unwrap();
+        assert!(!description_line.contains("null"), "{description_line}");
+    }
+
+    #[test]
+    fn a_nested_object_is_compact_json() {
+        let out = table_of(&json!({"id": 1, "author": {"name": "A"}}));
+        assert!(out.contains(r#"{"name":"A"}"#), "{out}");
+    }
+
+    #[test]
+    fn long_values_wrap_instead_of_widening_the_table() {
+        let long = "word ".repeat(80);
+        let out = table_of(&json!({"description": long}));
+        let widest = out.lines().map(|l| l.chars().count()).max().unwrap();
+        assert!(
+            widest < RECORD_VALUE_WIDTH + 30,
+            "widest line {widest}: {out}"
+        );
+        assert!(out.lines().count() > 4, "{out}");
+    }
+
+    /// Lists keep their existing shape, and non-tabular values still fall back.
+    #[test]
+    fn lists_and_bare_values_are_unchanged() {
+        let out = table_of(&json!([{"id": "1", "name": "Alice"}]));
+        assert!(out.contains("Alice") && !out.contains("field"), "{out}");
+        assert_eq!(table_of(&json!([])), "[]");
+        assert_eq!(table_of(&json!("text")), "\"text\"");
+    }
+
+    #[test]
+    fn human_formats_are_table_and_markdown_only() {
+        assert!(OutputFormat::Table.is_human());
+        assert!(OutputFormat::Markdown.is_human());
+        for f in [
+            OutputFormat::Json,
+            OutputFormat::Yaml,
+            OutputFormat::Csv,
+            OutputFormat::Quiet,
+        ] {
+            assert!(!f.is_human(), "{f:?}");
+        }
     }
 
     #[test]

@@ -349,9 +349,9 @@ pub async fn get_pull_request(
         ///
         /// The count above answered "how many approved" and nothing else: not
         /// who they were, not their UUIDs, not whether anyone had requested
-        /// changes. Reading any of that meant leaving the CLI entirely. Only
-        /// the structured formats get it, because a nested array has nowhere
-        /// to go in a table.
+        /// changes. Reading any of that meant leaving the CLI entirely. The
+        /// table shows them as a second table below the fields; only markdown,
+        /// which would flatten them into one cell, leaves them out.
         #[serde(skip_serializing_if = "Vec::is_empty")]
         reviewers: Vec<ReviewerRow<'a>>,
     }
@@ -360,7 +360,7 @@ pub async fn get_pull_request(
     let approvals = participants.iter().filter(|part| part.approved).count();
 
     let reviewers = match ctx.renderer.format() {
-        OutputFormat::Table | OutputFormat::Markdown => Vec::new(),
+        OutputFormat::Markdown => Vec::new(),
         _ => reviewer_rows(&participants, false),
     };
 
