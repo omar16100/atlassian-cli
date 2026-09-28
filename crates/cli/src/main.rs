@@ -52,8 +52,12 @@ struct Cli {
     #[arg(long, global = true)]
     envelope: bool,
 
-    /// Enable verbose logging
-    #[arg(long)]
+    /// Log each request and response to stderr: method, URL, status, timing,
+    /// and the body of any error. Credentials and request bodies are never logged
+    //
+    // global: rejected after a subcommand before, so `bb pr list --debug`
+    // failed to parse and the flag was only usable in one position.
+    #[arg(long, global = true)]
     debug: bool,
 
     #[command(subcommand)]
@@ -183,13 +187,34 @@ async fn run() -> Result<()> {
     Ok(())
 }
 
+/// The `EnvFilter` directives for this run.
+///
+/// With `--debug`, every workspace crate logs at debug. Targets are module
+/// paths (`atlassian_cli::commands::...`, `atlassian_cli_api`), and a
+/// directive matches by prefix, so `atlassian_cli` covers all six crates. The
+/// directive used to be `atlassian-cli`, with a hyphen, which matched almost
+/// nothing and left `--debug` printing no more than a normal run. The hyphenated
+/// form stays for the events that name that target explicitly.
+///
+/// `--debug` wins over `RUST_LOG`, whose directives are still appended so a
+/// more specific one (`atlassian_cli_api=trace`) can refine it.
+fn tracing_directives(debug: bool, rust_log: Option<&str>) -> String {
+    let rust_log = rust_log.map(str::trim).filter(|v| !v.is_empty());
+    match (debug, rust_log) {
+        (true, None) => "info,atlassian_cli=debug,atlassian-cli=debug".to_string(),
+        (true, Some(extra)) => format!("info,atlassian_cli=debug,atlassian-cli=debug,{extra}"),
+        (false, Some(extra)) => extra.to_string(),
+        (false, None) => "info".to_string(),
+    }
+}
+
 fn init_tracing(debug: bool) -> Result<()> {
-    let default = if debug {
-        "info,atlassian-cli=debug"
-    } else {
-        "info"
-    };
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
+    let rust_log = std::env::var("RUST_LOG").ok();
+    let directives = tracing_directives(debug, rust_log.as_deref());
+    // An unparseable RUST_LOG falls back to the defaults rather than failing
+    // the command.
+    let filter = EnvFilter::try_new(&directives)
+        .unwrap_or_else(|_| EnvFilter::new(tracing_directives(debug, None)));
 
     // Logs go to stderr, never stdout: commands that stream raw bytes to stdout
     // (e.g. `jira attachment download <ID> --output -`) must stay byte-exact for
@@ -605,6 +630,46 @@ mod cli_definition_tests {
         }
         for sub in cmd.get_subcommands() {
             mistyped_global_shadows(sub, &globals, &format!("{path} {}", sub.get_name()), found);
+        }
+    }
+
+    #[test]
+    fn debug_logs_every_workspace_crate() {
+        let directives = tracing_directives(true, None);
+        assert!(directives.contains("atlassian_cli=debug"), "{directives}");
+        // The filter the flag once used, which matched nothing.
+        assert!(
+            !directives.starts_with("info,atlassian-cli=debug"),
+            "{directives}"
+        );
+        assert_eq!(tracing_directives(false, None), "info");
+    }
+
+    #[test]
+    fn debug_wins_over_rust_log_but_keeps_its_refinements() {
+        let directives = tracing_directives(true, Some("warn,atlassian_cli_api=trace"));
+        assert!(
+            directives.starts_with("info,atlassian_cli=debug"),
+            "{directives}"
+        );
+        assert!(
+            directives.ends_with("warn,atlassian_cli_api=trace"),
+            "{directives}"
+        );
+        assert_eq!(tracing_directives(false, Some("warn")), "warn");
+        assert_eq!(tracing_directives(false, Some("  ")), "info");
+    }
+
+    /// `bb pr list --debug` was rejected: the flag was not global.
+    #[test]
+    fn debug_is_accepted_after_the_subcommand() {
+        for argv in [
+            &["bitbucket", "pr", "list", "web_app", "--debug"][..],
+            &["jira", "issue", "get", "PROJ-1", "--debug"],
+            &["--debug", "jira", "issue", "get", "PROJ-1"],
+        ] {
+            let cli = parse(argv).unwrap_or_else(|e| panic!("{argv:?}: {e}"));
+            assert!(cli.debug, "{argv:?}");
         }
     }
 
