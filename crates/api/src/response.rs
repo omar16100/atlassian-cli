@@ -7,11 +7,11 @@
 //! entirely). Each path also carried its own copy of the status-to-error
 //! match. Both now live here, so every path logs the same way.
 //!
-//! What is logged, at `debug`: method, URL with credential-like query values
-//! redacted, status, elapsed time, and for a non-2xx the response body,
-//! scrubbed of credential-shaped values and truncated. Never logged: request
-//! headers, tokens, or request bodies, which can carry secrets (secured
-//! pipeline variables travel in them).
+//! What is logged, at `debug`: method, URL with secret-named query values
+//! redacted, status, elapsed time, and for a non-2xx the response body with
+//! secret-named JSON fields redacted, credential-shaped values scrubbed, and
+//! the whole truncated. Never logged: request headers, tokens, or request
+//! bodies, which can carry secrets (secured pipeline variables travel in them).
 
 use std::time::Duration;
 
@@ -25,18 +25,29 @@ use crate::{scrub_credentials, unauthorized_message};
 /// Longest error body logged, in characters.
 const MAX_LOGGED_BODY: usize = 2048;
 
-/// Query parameters whose values are never logged.
-const SECRET_PARAMS: [&str; 9] = [
+/// Fragments that mark a query parameter or JSON field as a secret, matched
+/// case-insensitively anywhere in the name: `access_token`, `client_secret`,
+/// `apikey`, `oauth_signature`. Plain `key` is not on the list: Jira's
+/// `issueKey` and a pipeline variable's `key` are names, and hiding them would
+/// make the trace useless for the requests it exists for.
+const SECRET_NAME_PARTS: [&str; 10] = [
     "token",
-    "access_token",
-    "refresh_token",
-    "jwt",
+    "secret",
+    "password",
+    "passwd",
+    "credential",
+    "authorization",
+    "signature",
+    "private_key",
     "api_key",
     "apikey",
-    "password",
-    "secret",
-    "signature",
 ];
+
+/// Whether a parameter or field name marks its value as a secret.
+fn is_secret_name(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    name == "jwt" || SECRET_NAME_PARTS.iter().any(|part| name.contains(part))
+}
 
 /// The URL as it may appear in a log: query values that look like credentials
 /// replaced. `bb api` passes paths through as typed, so a token in a query
@@ -49,7 +60,7 @@ pub(crate) fn redact_url(url: &Url) -> String {
     let pairs: Vec<(String, String)> = url
         .query_pairs()
         .map(|(key, value)| {
-            let secret = SECRET_PARAMS.iter().any(|p| key.eq_ignore_ascii_case(p));
+            let secret = is_secret_name(&key);
             let value = if secret {
                 "<redacted>".to_string()
             } else {
@@ -62,10 +73,40 @@ pub(crate) fn redact_url(url: &Url) -> String {
     redacted.to_string()
 }
 
-/// An error body as it may appear in a log: credential-shaped values scrubbed,
-/// cut to [`MAX_LOGGED_BODY`] characters on a char boundary.
+/// Replace the values of secret-named fields, at any depth, and the `value` of
+/// anything marked `"secured": true` (a pipeline variable echoed back in a
+/// validation error carries its secret there under a plain name).
+fn redact_json(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            let secured = map.get("secured").and_then(serde_json::Value::as_bool) == Some(true);
+            for (name, field) in map.iter_mut() {
+                let hide = is_secret_name(name) || (secured && name == "value");
+                if hide && !field.is_null() {
+                    *field = serde_json::Value::String("<redacted>".to_string());
+                } else {
+                    redact_json(field);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(redact_json),
+        _ => {}
+    }
+}
+
+/// An error body as it may appear in a log: secret-named JSON fields redacted,
+/// credential-shaped values scrubbed, cut to [`MAX_LOGGED_BODY`] characters on a
+/// char boundary.
 pub(crate) fn body_for_log(body: &str) -> String {
-    let scrubbed = scrub_credentials(body.trim());
+    let body = body.trim();
+    let text = match serde_json::from_str::<serde_json::Value>(body) {
+        Ok(mut value) => {
+            redact_json(&mut value);
+            value.to_string()
+        }
+        Err(_) => body.to_string(),
+    };
+    let scrubbed = scrub_credentials(&text);
     if scrubbed.chars().count() <= MAX_LOGGED_BODY {
         return scrubbed;
     }
@@ -160,6 +201,42 @@ mod tests {
         assert!(!shown.contains("eyJ.x.y"), "{shown}");
         assert!(shown.contains("expand=groups"), "{shown}");
         assert!(shown.contains("access_token=%3Credacted%3E"), "{shown}");
+    }
+
+    /// Names beyond an exact list: `bb api --query` passes whatever it is given.
+    #[test]
+    fn any_secret_like_query_name_is_redacted() {
+        let url = Url::parse(
+            "https://api.bitbucket.org/2.0/x?client_secret=s1&oauth_token=s2&private_token=s3&issueKey=PROJ-1",
+        )
+        .unwrap();
+        let shown = redact_url(&url);
+        for secret in ["s1", "s2", "s3"] {
+            assert!(
+                !shown.contains(&format!("={secret}")),
+                "{secret} in {shown}"
+            );
+        }
+        assert!(shown.contains("issueKey=PROJ-1"), "{shown}");
+    }
+
+    #[test]
+    fn secret_fields_in_a_json_error_body_are_redacted() {
+        let body = r#"{
+            "error": {"message": "invalid", "detail": {"access_token": "t0k3n", "password": "hunter2"}},
+            "client_secret": "cs-123",
+            "variables": [
+                {"key": "DEPLOY_KEY", "value": "super-secret", "secured": true},
+                {"key": "REGION", "value": "eu-west-1", "secured": false}
+            ]
+        }"#;
+        let shown = body_for_log(body);
+        for secret in ["t0k3n", "hunter2", "cs-123", "super-secret"] {
+            assert!(!shown.contains(secret), "{secret} in {shown}");
+        }
+        for kept in ["invalid", "DEPLOY_KEY", "REGION", "eu-west-1"] {
+            assert!(shown.contains(kept), "{kept} missing from {shown}");
+        }
     }
 
     #[test]

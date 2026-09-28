@@ -115,6 +115,29 @@ pub(super) fn is_terminal_state(status: &str) -> bool {
         )
 }
 
+/// A status this module knows how to classify. Anything else exits 1, but a
+/// wait keeps polling through it: it may be a new transitional state, and
+/// stopping a wait on it would fail builds that go on to pass.
+pub(super) fn is_recognised_state(status: &str) -> bool {
+    is_terminal_state(status)
+        || matches!(
+            status.to_uppercase().as_str(),
+            "PENDING" | "IN_PROGRESS" | "RUNNING" | "READY"
+        )
+}
+
+/// Say once, per wait, that the status is one this CLI does not know, so a
+/// wait that never ends is not silent about why.
+pub(super) fn warn_if_unrecognised(status: &str, warned: &mut bool) {
+    if !*warned && !is_recognised_state(status) {
+        tracing::warn!(state = %status, "Unrecognised pipeline state; still waiting");
+        eprintln!(
+            "warning: pipeline state '{status}' is not one this CLI recognises; still waiting"
+        );
+        *warned = true;
+    }
+}
+
 /// Map pipeline status to process exit code.
 ///
 /// 0 = success, 1 = failed/stopped/error, 2 = in progress, pending or timed out,
@@ -362,6 +385,22 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(get_step_status(&waiting), "PENDING");
+    }
+
+    #[test]
+    fn known_states_are_recognised_and_others_are_not() {
+        for status in [
+            "SUCCESSFUL",
+            "FAILED",
+            "PAUSED",
+            "IN_PROGRESS",
+            "PENDING",
+            "stopped",
+        ] {
+            assert!(is_recognised_state(status), "{status}");
+        }
+        assert!(!is_recognised_state("SOMETHING_NEW"));
+        assert!(!is_recognised_state("UNKNOWN"));
     }
 
     #[test]

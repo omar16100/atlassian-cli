@@ -7,7 +7,10 @@ use anyhow::{Context, Result};
 use super::super::utils::BitbucketContext;
 use super::list::{build_request_path, fetch_pipeline, PipelineFilters};
 use super::model::{PipelineList, PipelineStatusOutput};
-use super::state::{get_commit_hash, get_pipeline_status, is_terminal_state, status_to_exit_code};
+use super::state::{
+    get_commit_hash, get_pipeline_status, is_terminal_state, status_to_exit_code,
+    warn_if_unrecognised,
+};
 use super::steps::fetch_steps;
 
 pub async fn pipeline_status(
@@ -46,9 +49,13 @@ pub async fn pipeline_status(
     // Pin the pipeline UUID so --wait doesn't drift to newer pipelines
     let pinned_uuid = initial_response.values[0].uuid.clone();
 
+    let mut warned = false;
     loop {
         let pipeline = fetch_pipeline(ctx, workspace, repo_slug, &pinned_uuid).await?;
         let status = get_pipeline_status(&pipeline);
+        if wait {
+            warn_if_unrecognised(&status, &mut warned);
+        }
 
         if !wait || is_terminal_state(&status) {
             // Build status output

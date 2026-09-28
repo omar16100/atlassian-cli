@@ -9,7 +9,7 @@ use super::list::{fetch_pipeline, resolve_pipeline_id};
 use super::rows::{build_pipeline_view, pending_manual_steps};
 use super::state::{
     format_elapsed, format_steps_summary, get_pipeline_status, get_status_icon, is_awaiting_action,
-    is_terminal_state,
+    is_terminal_state, warn_if_unrecognised,
 };
 use super::steps::fetch_steps;
 
@@ -45,10 +45,12 @@ pub async fn watch_pipeline(
     }
 
     let final_status;
+    let mut warned = false;
 
     loop {
         let pipeline = fetch_pipeline(ctx, workspace, repo_slug, &pipeline_uuid).await?;
         let status = get_pipeline_status(&pipeline);
+        warn_if_unrecognised(&status, &mut warned);
 
         let steps = if show_steps {
             Some(fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false).await?)
@@ -112,7 +114,7 @@ pub async fn watch_pipeline(
                 println!("[{now}] {build_num} {status} {icon} ({ref_name}) [{elapsed}]");
             }
         }
-        // else: structured format (JSON/YAML/CSV) — no per-poll output
+        // else: structured format (JSON/YAML/CSV), no per-poll output
 
         // Check if pipeline reached terminal state, or stopped to wait for a
         // person: a paused build does not finish on its own, so it ends the

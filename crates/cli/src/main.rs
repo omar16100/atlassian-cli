@@ -196,14 +196,18 @@ async fn run() -> Result<()> {
 /// nothing and left `--debug` printing no more than a normal run. The hyphenated
 /// form stays for the events that name that target explicitly.
 ///
-/// `--debug` wins over `RUST_LOG`, whose directives are still appended so a
-/// more specific one (`atlassian_cli_api=trace`) can refine it.
+/// `--debug` wins over `RUST_LOG`. Its directives come after the user's, and a
+/// later directive for the same target replaces an earlier one, so
+/// `RUST_LOG=atlassian_cli=off` cannot silence the flag; a more specific one
+/// (`atlassian_cli_api=trace`) still refines it, and `RUST_LOG`'s level for
+/// other crates is kept.
 fn tracing_directives(debug: bool, rust_log: Option<&str>) -> String {
+    const DEBUG: &str = "atlassian_cli=debug,atlassian-cli=debug";
     let rust_log = rust_log.map(str::trim).filter(|v| !v.is_empty());
     match (debug, rust_log) {
-        (true, None) => "info,atlassian_cli=debug,atlassian-cli=debug".to_string(),
-        (true, Some(extra)) => format!("info,atlassian_cli=debug,atlassian-cli=debug,{extra}"),
-        (false, Some(extra)) => extra.to_string(),
+        (true, None) => format!("info,{DEBUG}"),
+        (true, Some(user)) => format!("{user},{DEBUG}"),
+        (false, Some(user)) => user.to_string(),
         (false, None) => "info".to_string(),
     }
 }
@@ -633,28 +637,65 @@ mod cli_definition_tests {
         }
     }
 
+    /// Which of three debug events a filter built from `directives` lets
+    /// through: the API client's, a command's, and a dependency's.
+    fn debug_events_logged(directives: &str) -> Vec<&'static str> {
+        use std::io::Write;
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone, Default)]
+        struct Buffer(Arc<Mutex<Vec<u8>>>);
+        impl Write for Buffer {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let buffer = Buffer::default();
+        let writer = buffer.clone();
+        let subscriber = fmt()
+            .with_env_filter(EnvFilter::new(directives))
+            .with_writer(move || writer.clone())
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::debug!(target: "atlassian_cli_api", "api-event");
+            tracing::debug!(target: "atlassian_cli::commands::bitbucket", "command-event");
+            tracing::debug!(target: "hyper::client", "dependency-event");
+        });
+        let text = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
+        ["api-event", "command-event", "dependency-event"]
+            .into_iter()
+            .filter(|event| text.contains(event))
+            .collect()
+    }
+
+    /// The filter the flag used to set, `atlassian-cli=debug`, let neither of
+    /// the CLI's own debug events through.
     #[test]
-    fn debug_logs_every_workspace_crate() {
-        let directives = tracing_directives(true, None);
-        assert!(directives.contains("atlassian_cli=debug"), "{directives}");
-        // The filter the flag once used, which matched nothing.
-        assert!(
-            !directives.starts_with("info,atlassian-cli=debug"),
-            "{directives}"
+    fn debug_logs_the_cli_and_its_api_client_but_not_dependencies() {
+        assert_eq!(
+            debug_events_logged(&tracing_directives(true, None)),
+            vec!["api-event", "command-event"]
         );
-        assert_eq!(tracing_directives(false, None), "info");
+        assert!(debug_events_logged("info,atlassian-cli=debug").is_empty());
+        assert!(debug_events_logged(&tracing_directives(false, None)).is_empty());
     }
 
     #[test]
     fn debug_wins_over_rust_log_but_keeps_its_refinements() {
-        let directives = tracing_directives(true, Some("warn,atlassian_cli_api=trace"));
-        assert!(
-            directives.starts_with("info,atlassian_cli=debug"),
-            "{directives}"
+        // RUST_LOG trying to switch the CLI's logging off does not beat --debug.
+        assert_eq!(
+            debug_events_logged(&tracing_directives(true, Some("atlassian_cli=off"))),
+            vec!["api-event", "command-event"]
         );
-        assert!(
-            directives.ends_with("warn,atlassian_cli_api=trace"),
-            "{directives}"
+        // A more specific directive still applies.
+        assert_eq!(
+            debug_events_logged(&tracing_directives(true, Some("atlassian_cli_api=off"))),
+            vec!["command-event"]
         );
         assert_eq!(tracing_directives(false, Some("warn")), "warn");
         assert_eq!(tracing_directives(false, Some("  ")), "info");
