@@ -276,6 +276,6 @@ pub async fn export_workflow(
             &MutationResult::new(format!("Exported workflow {name} to {path}")),
         )
     } else {
-        ctx.renderer.render(&workflow)
+        ctx.renderer.render_document(&workflow)
     }
 }

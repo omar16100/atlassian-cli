@@ -52,8 +52,12 @@ struct Cli {
     #[arg(long, global = true)]
     envelope: bool,
 
-    /// Enable verbose logging
-    #[arg(long)]
+    /// Log each request and response to stderr: method, URL, status, timing,
+    /// and the body of any error. Credentials and request bodies are never logged
+    //
+    // global: rejected after a subcommand before, so `bb pr list --debug`
+    // failed to parse and the flag was only usable in one position.
+    #[arg(long, global = true)]
     debug: bool,
 
     #[command(subcommand)]
@@ -183,13 +187,38 @@ async fn run() -> Result<()> {
     Ok(())
 }
 
+/// The `EnvFilter` directives for this run.
+///
+/// With `--debug`, every workspace crate logs at debug. Targets are module
+/// paths (`atlassian_cli::commands::...`, `atlassian_cli_api`), and a
+/// directive matches by prefix, so `atlassian_cli` covers all six crates. The
+/// directive used to be `atlassian-cli`, with a hyphen, which matched almost
+/// nothing and left `--debug` printing no more than a normal run. The hyphenated
+/// form stays for the events that name that target explicitly.
+///
+/// `--debug` wins over `RUST_LOG`. Its directives come after the user's, and a
+/// later directive for the same target replaces an earlier one, so
+/// `RUST_LOG=atlassian_cli=off` cannot silence the flag; a more specific one
+/// (`atlassian_cli_api=trace`) still refines it, and `RUST_LOG`'s level for
+/// other crates is kept.
+fn tracing_directives(debug: bool, rust_log: Option<&str>) -> String {
+    const DEBUG: &str = "atlassian_cli=debug,atlassian-cli=debug";
+    let rust_log = rust_log.map(str::trim).filter(|v| !v.is_empty());
+    match (debug, rust_log) {
+        (true, None) => format!("info,{DEBUG}"),
+        (true, Some(user)) => format!("{user},{DEBUG}"),
+        (false, Some(user)) => user.to_string(),
+        (false, None) => "info".to_string(),
+    }
+}
+
 fn init_tracing(debug: bool) -> Result<()> {
-    let default = if debug {
-        "info,atlassian-cli=debug"
-    } else {
-        "info"
-    };
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(default));
+    let rust_log = std::env::var("RUST_LOG").ok();
+    let directives = tracing_directives(debug, rust_log.as_deref());
+    // An unparseable RUST_LOG falls back to the defaults rather than failing
+    // the command.
+    let filter = EnvFilter::try_new(&directives)
+        .unwrap_or_else(|_| EnvFilter::new(tracing_directives(debug, None)));
 
     // Logs go to stderr, never stdout: commands that stream raw bytes to stdout
     // (e.g. `jira attachment download <ID> --output -`) must stay byte-exact for
@@ -605,6 +634,83 @@ mod cli_definition_tests {
         }
         for sub in cmd.get_subcommands() {
             mistyped_global_shadows(sub, &globals, &format!("{path} {}", sub.get_name()), found);
+        }
+    }
+
+    /// Which of three debug events a filter built from `directives` lets
+    /// through: the API client's, a command's, and a dependency's.
+    fn debug_events_logged(directives: &str) -> Vec<&'static str> {
+        use std::io::Write;
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone, Default)]
+        struct Buffer(Arc<Mutex<Vec<u8>>>);
+        impl Write for Buffer {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let buffer = Buffer::default();
+        let writer = buffer.clone();
+        let subscriber = fmt()
+            .with_env_filter(EnvFilter::new(directives))
+            .with_writer(move || writer.clone())
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::debug!(target: "atlassian_cli_api", "api-event");
+            tracing::debug!(target: "atlassian_cli::commands::bitbucket", "command-event");
+            tracing::debug!(target: "hyper::client", "dependency-event");
+        });
+        let text = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
+        ["api-event", "command-event", "dependency-event"]
+            .into_iter()
+            .filter(|event| text.contains(event))
+            .collect()
+    }
+
+    /// The filter the flag used to set, `atlassian-cli=debug`, let neither of
+    /// the CLI's own debug events through.
+    #[test]
+    fn debug_logs_the_cli_and_its_api_client_but_not_dependencies() {
+        assert_eq!(
+            debug_events_logged(&tracing_directives(true, None)),
+            vec!["api-event", "command-event"]
+        );
+        assert!(debug_events_logged("info,atlassian-cli=debug").is_empty());
+        assert!(debug_events_logged(&tracing_directives(false, None)).is_empty());
+    }
+
+    #[test]
+    fn debug_wins_over_rust_log_but_keeps_its_refinements() {
+        // RUST_LOG trying to switch the CLI's logging off does not beat --debug.
+        assert_eq!(
+            debug_events_logged(&tracing_directives(true, Some("atlassian_cli=off"))),
+            vec!["api-event", "command-event"]
+        );
+        // A more specific directive still applies.
+        assert_eq!(
+            debug_events_logged(&tracing_directives(true, Some("atlassian_cli_api=off"))),
+            vec!["command-event"]
+        );
+        assert_eq!(tracing_directives(false, Some("warn")), "warn");
+        assert_eq!(tracing_directives(false, Some("  ")), "info");
+    }
+
+    /// `bb pr list --debug` was rejected: the flag was not global.
+    #[test]
+    fn debug_is_accepted_after_the_subcommand() {
+        for argv in [
+            &["bitbucket", "pr", "list", "web_app", "--debug"][..],
+            &["jira", "issue", "get", "PROJ-1", "--debug"],
+            &["--debug", "jira", "issue", "get", "PROJ-1"],
+        ] {
+            let cli = parse(argv).unwrap_or_else(|e| panic!("{argv:?}: {e}"));
+            assert!(cli.debug, "{argv:?}");
         }
     }
 

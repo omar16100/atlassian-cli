@@ -13,6 +13,7 @@ tabled.workspace = true
 colored.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+indexmap = { version = "2.14", features = ["serde"] }
 serde_yaml.workspace = true
 anyhow.workspace = true
 clap.workspace = true

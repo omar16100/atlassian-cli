@@ -42,6 +42,15 @@ brew install atlassian-cli
 atlassian-cli --version
 ```
 
+Recent Homebrew releases refuse to load a formula from a third-party tap until
+the tap is trusted. If Homebrew reports "Refusing to load formula ... from
+untrusted tap", trust the tap, then install or upgrade:
+
+```bash
+brew trust omar16100/atlassian-cli
+brew upgrade atlassian-cli
+```
+
 ### Cargo (from crates.io)
 
 ```bash
@@ -265,6 +274,11 @@ crates/
    atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "See README" --path README.md
    atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123
    atlassian-cli bitbucket --workspace myteam pr reviewers api-service 123 --all
+   # Replace the reviewers (account UUIDs); title and description are kept
+   atlassian-cli bitbucket --workspace myteam pr update api-service 123 --reviewers {uuid-1},{uuid-2}
+
+   # Trace every request and response on stderr (tokens and request bodies are never logged)
+   atlassian-cli --debug jira issue get PROJ-123
 
    # Bitbucket - Workspaces & Projects
    atlassian-cli bitbucket workspace list --limit 10
@@ -273,10 +287,14 @@ crates/
    atlassian-cli bitbucket --workspace myteam project create PROJ --name "My Project" --private
    atlassian-cli bitbucket --workspace myteam project delete PROJ --force
 
-   # Bitbucket - Pipelines
-   atlassian-cli bitbucket --workspace myteam pipeline list --repo api-service
-   atlassian-cli bitbucket --workspace myteam pipeline trigger --repo api-service --ref-name main
+   # Bitbucket - Pipelines (the repository is an argument, --repo, or the git remote)
+   atlassian-cli bitbucket --workspace myteam pipeline list api-service
+   atlassian-cli bitbucket --workspace myteam pipeline get api-service 42 --steps
+   atlassian-cli bitbucket --workspace myteam pipeline steps api-service 42
+   atlassian-cli bitbucket --workspace myteam pipeline trigger api-service --ref-name main
    atlassian-cli bitbucket --workspace myteam pipeline stop --repo api-service 42
+   # status and watch exit 0 successful, 1 failed, 2 in progress or timed out, 3 paused on a manual step
+   atlassian-cli bitbucket --workspace myteam pipeline status api-service --wait
 
    # Bitbucket - Webhooks & SSH Keys
    atlassian-cli bitbucket --workspace myteam webhook list api-service

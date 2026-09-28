@@ -507,7 +507,8 @@ async fn test_bitbucket_get_pull_request_with_reviewer_participants() {
 
 /// Pins the request contract `add_pr_reviewers` is written against: reviewers are set by
 /// PUTting the pull request itself with the full reviewer list, since Bitbucket Cloud has no
-/// per-reviewer endpoint on a PR.
+/// per-reviewer endpoint on a PR. Title and description travel with it so the edit cannot
+/// reset them.
 ///
 /// Like the rest of this file, this drives `ApiClient` directly rather than the command, so
 /// it documents and exercises the wire format but would not catch the command regressing to
@@ -521,6 +522,7 @@ async fn test_bitbucket_add_pull_request_reviewers() {
         .and(path("/2.0/repositories/myworkspace/myrepo/pullrequests/1"))
         .and(body_json(serde_json::json!({
             "title": "Add new feature",
+            "description": "Adds the feature",
             "reviewers": [
                 {"uuid": "{existing-uuid}"},
                 {"uuid": "{new-uuid}"}
@@ -551,6 +553,7 @@ async fn test_bitbucket_add_pull_request_reviewers() {
             "/2.0/repositories/myworkspace/myrepo/pullrequests/1",
             &serde_json::json!({
                 "title": "Add new feature",
+                "description": "Adds the feature",
                 "reviewers": [
                     {"uuid": "{existing-uuid}"},
                     {"uuid": "{new-uuid}"}

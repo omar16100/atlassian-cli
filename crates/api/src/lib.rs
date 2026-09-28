@@ -1,6 +1,7 @@
 pub mod error;
 pub mod pagination;
 pub mod ratelimit;
+mod response;
 pub mod retry;
 
 use backoff::backoff::Backoff;
@@ -8,12 +9,13 @@ use error::{ApiError, Result};
 use ratelimit::RateLimiter;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Method, RequestBuilder, StatusCode};
+use response::{error_for_status, log_error_body, log_response, redact_url};
 use retry::{retry_with_backoff, RetryConfig};
 use secrecy::{ExposeSecret, SecretString};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{debug, error, warn};
 use url::Url;
 
@@ -84,22 +86,14 @@ const UNAUTHORIZED_FALLBACK: &str = "Invalid or expired credentials";
 /// Keep a quoted server message short enough to stay readable on one screen.
 const MAX_DETAIL_LEN: usize = 200;
 
-/// Build the error for a 401, keeping whatever reason the server gave.
+/// Combine the generic 401 wording with the server's own message, if any.
 ///
 /// Atlassian's gateway explains *why* it rejected the call, for example
 /// `{"code":401,"message":"Unauthorized; scope does not match"}`. Reporting
 /// every 401 as "Invalid or expired credentials" hid that, so a token missing
 /// one scope looked identical to an expired one and sent people re-issuing
 /// credentials that were fine all along.
-async fn unauthorized_error(response: reqwest::Response) -> ApiError {
-    let body = response.text().await.unwrap_or_default();
-    ApiError::AuthenticationFailed {
-        message: unauthorized_message(&body),
-    }
-}
-
-/// Combine the generic 401 wording with the server's own message, if any.
-fn unauthorized_message(body: &str) -> String {
+pub(crate) fn unauthorized_message(body: &str) -> String {
     match unauthorized_detail(body) {
         Some(detail) => format!("{UNAUTHORIZED_FALLBACK} ({detail})"),
         None => UNAUTHORIZED_FALLBACK.to_string(),
@@ -176,7 +170,7 @@ fn json_error_detail(value: &serde_json::Value) -> Option<String> {
 /// is not allowed" is a sentence a server really sends, and mangling it into
 /// "Basic <redacted> is not allowed" would destroy the message to protect
 /// nothing. See `is_credential_shaped`.
-fn scrub_credentials(detail: &str) -> String {
+pub(crate) fn scrub_credentials(detail: &str) -> String {
     const SCHEMES: [&str; 2] = ["bearer ", "basic "];
 
     // ASCII-lowercase, so byte offsets stay valid in the original. A full
@@ -593,76 +587,23 @@ impl ApiClient {
 
         let joined = self.safe_join(path)?;
 
-        debug!(method = "DELETE", url = %joined, "Sending delete (no content) request");
+        debug!(method = "DELETE", url = %redact_url(&joined), "Sending delete (no content) request");
 
         retry_with_backoff(&self.retry_config, || async {
             let mut req = self.client.request(Method::DELETE, joined.clone());
             req = self.apply_auth(req);
 
+            let started = Instant::now();
             let response = req.send().await.map_err(ApiError::RequestFailed)?;
 
             self.rate_limiter.update_from_response(&response).await;
 
             let status = response.status();
-
-            match status {
-                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
-                StatusCode::FORBIDDEN => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Access forbidden".to_string());
-                    Err(ApiError::Forbidden { message })
-                }
-                StatusCode::NOT_FOUND => {
-                    let resource = joined.path().to_string();
-                    Err(ApiError::NotFound { resource })
-                }
-                StatusCode::BAD_REQUEST => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Bad request".to_string());
-                    Err(ApiError::BadRequest { message })
-                }
-                StatusCode::GONE => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
-                    Err(ApiError::EndpointGone { message })
-                }
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after = response
-                        .headers()
-                        .get("retry-after")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(60);
-                    Err(ApiError::RateLimitExceeded { retry_after })
-                }
-                status if status.is_server_error() => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Server error".to_string());
-                    Err(ApiError::ServerError {
-                        status: status.as_u16(),
-                        message,
-                    })
-                }
-                status if status.is_success() => Ok(()),
-                _ => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| format!("Unexpected status: {}", status));
-                    Err(ApiError::ServerError {
-                        status: status.as_u16(),
-                        message,
-                    })
-                }
+            log_response(&Method::DELETE, &joined, status, started.elapsed());
+            if !status.is_success() {
+                return Err(error_for_status(response, &joined).await);
             }
+            Ok(())
         })
         .await
     }
@@ -686,24 +627,19 @@ impl ApiClient {
         }
 
         let joined = self.safe_join(path)?;
-        debug!(method = "GET", url = %joined, header, "Reading response header");
+        debug!(method = "GET", url = %redact_url(&joined), header, "Reading response header");
 
         let mut req = self.client.request(Method::GET, joined.clone());
         req = self.apply_auth(req);
+        let started = Instant::now();
         let response = req.send().await.map_err(ApiError::RequestFailed)?;
 
         self.rate_limiter.update_from_response(&response).await;
 
         let status = response.status();
-        if status == StatusCode::UNAUTHORIZED {
-            return Err(unauthorized_error(response).await);
-        }
-        if status == StatusCode::FORBIDDEN {
-            let message = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "Access forbidden".to_string());
-            return Err(ApiError::Forbidden { message });
+        log_response(&Method::GET, &joined, status, started.elapsed());
+        if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+            return Err(error_for_status(response, &joined).await);
         }
 
         Ok(response
@@ -721,90 +657,27 @@ impl ApiClient {
 
         let joined = self.safe_join(path)?;
 
-        debug!(method = "GET", url = %joined, "Sending text request");
+        debug!(method = "GET", url = %redact_url(&joined), "Sending text request");
 
         let result = retry_with_backoff(&self.retry_config, || async {
             let mut req = self.client.request(Method::GET, joined.clone());
             req = self.apply_auth(req);
             req = req.header("Accept", "text/plain, */*;q=0.1");
 
+            let started = Instant::now();
             let response = req.send().await.map_err(ApiError::RequestFailed)?;
 
             self.rate_limiter.update_from_response(&response).await;
 
             let status = response.status();
-
-            match status {
-                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
-                StatusCode::FORBIDDEN => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Access forbidden".to_string());
-                    Err(ApiError::Forbidden { message })
-                }
-                StatusCode::NOT_FOUND => {
-                    let resource = joined.path().to_string();
-                    Err(ApiError::NotFound { resource })
-                }
-                StatusCode::BAD_REQUEST => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Bad request".to_string());
-                    Err(ApiError::BadRequest { message })
-                }
-                StatusCode::NOT_ACCEPTABLE => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Content not acceptable".to_string());
-                    Err(ApiError::ServerError {
-                        status: 406,
-                        message,
-                    })
-                }
-                StatusCode::GONE => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
-                    Err(ApiError::EndpointGone { message })
-                }
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after = response
-                        .headers()
-                        .get("retry-after")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(60);
-                    Err(ApiError::RateLimitExceeded { retry_after })
-                }
-                status if status.is_server_error() => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Server error".to_string());
-                    Err(ApiError::ServerError {
-                        status: status.as_u16(),
-                        message,
-                    })
-                }
-                status if status.is_success() => response.text().await.map_err(|e| {
-                    error!("Failed to read text response: {}", e);
-                    ApiError::InvalidResponse(e.to_string())
-                }),
-                _ => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| format!("Unexpected status: {}", status));
-                    Err(ApiError::ServerError {
-                        status: status.as_u16(),
-                        message,
-                    })
-                }
+            log_response(&Method::GET, &joined, status, started.elapsed());
+            if !status.is_success() {
+                return Err(error_for_status(response, &joined).await);
             }
+            response.text().await.map_err(|e| {
+                error!("Failed to read text response: {}", e);
+                ApiError::InvalidResponse(e.to_string())
+            })
         })
         .await?;
 
@@ -835,7 +708,13 @@ impl ApiClient {
         }
 
         let joined = self.safe_join(req.path)?;
-        debug!(method = %req.method, url = %joined, "Sending raw request");
+        // The body's size only: a raw request body can carry anything.
+        debug!(
+            method = %req.method,
+            url = %redact_url(&joined),
+            body_bytes = req.body.map(<[u8]>::len),
+            "Sending raw request"
+        );
 
         let idempotent = matches!(
             req.method,
@@ -860,9 +739,11 @@ impl ApiClient {
                 builder = builder.timeout(timeout);
             }
 
+            let started = Instant::now();
             let response = builder.send().await.map_err(ApiError::RequestFailed)?;
             self.rate_limiter.update_from_response(&response).await;
             let status = response.status();
+            log_response(&req.method, &joined, status, started.elapsed());
 
             let retryable = status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error();
             if idempotent && retryable && attempts < self.retry_config.max_retries {
@@ -896,6 +777,9 @@ impl ApiClient {
                 .await
                 .map_err(|err| ApiError::InvalidResponse(err.to_string()))?
                 .to_vec();
+            if !status.is_success() {
+                log_error_body(status, &joined, &String::from_utf8_lossy(&body));
+            }
 
             return Ok(RawResponse {
                 status: status.as_u16(),
@@ -915,64 +799,26 @@ impl ApiClient {
 
         let joined = self.safe_join(path)?;
 
-        debug!(method = "GET", url = %joined, "Sending bytes request");
+        debug!(method = "GET", url = %redact_url(&joined), "Sending bytes request");
 
         let result = retry_with_backoff(&self.retry_config, || async {
             let mut req = self.client.request(Method::GET, joined.clone());
             req = self.apply_auth(req);
 
+            let started = Instant::now();
             let response = req.send().await.map_err(ApiError::RequestFailed)?;
 
             self.rate_limiter.update_from_response(&response).await;
 
             let status = response.status();
-
-            match status {
-                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
-                StatusCode::FORBIDDEN => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Access forbidden".to_string());
-                    Err(ApiError::Forbidden { message })
-                }
-                StatusCode::NOT_FOUND => {
-                    let resource = joined.path().to_string();
-                    Err(ApiError::NotFound { resource })
-                }
-                StatusCode::GONE => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
-                    Err(ApiError::EndpointGone { message })
-                }
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after = response
-                        .headers()
-                        .get("retry-after")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(60);
-                    Err(ApiError::RateLimitExceeded { retry_after })
-                }
-                status if status.is_success() => {
-                    response.bytes().await.map(|b| b.to_vec()).map_err(|e| {
-                        error!("Failed to read bytes response: {}", e);
-                        ApiError::InvalidResponse(e.to_string())
-                    })
-                }
-                _ => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| format!("Unexpected status: {}", status));
-                    Err(ApiError::ServerError {
-                        status: status.as_u16(),
-                        message,
-                    })
-                }
+            log_response(&Method::GET, &joined, status, started.elapsed());
+            if !status.is_success() {
+                return Err(error_for_status(response, &joined).await);
             }
+            response.bytes().await.map(|b| b.to_vec()).map_err(|e| {
+                error!("Failed to read bytes response: {}", e);
+                ApiError::InvalidResponse(e.to_string())
+            })
         })
         .await?;
 
@@ -992,7 +838,14 @@ impl ApiClient {
 
         let joined = self.safe_join(path)?;
 
-        debug!(method = %method, url = %joined, "Sending request");
+        // Whether there is a body, never its content: request bodies carry
+        // secured pipeline variables, issue text and the like.
+        debug!(
+            method = %method,
+            url = %redact_url(&joined),
+            has_body = body.is_some(),
+            "Sending request"
+        );
 
         let result = retry_with_backoff(&self.retry_config, || async {
             let mut req = self.client.request(method.clone(), joined.clone());
@@ -1002,89 +855,35 @@ impl ApiClient {
                 req = req.json(body);
             }
 
+            let started = Instant::now();
             let response = req.send().await.map_err(ApiError::RequestFailed)?;
 
             self.rate_limiter.update_from_response(&response).await;
 
             let status = response.status();
-
-            match status {
-                StatusCode::UNAUTHORIZED => Err(unauthorized_error(response).await),
-                StatusCode::FORBIDDEN => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Access forbidden".to_string());
-                    Err(ApiError::Forbidden { message })
-                }
-                StatusCode::NOT_FOUND => {
-                    let resource = joined.path().to_string();
-                    Err(ApiError::NotFound { resource })
-                }
-                StatusCode::BAD_REQUEST => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Bad request".to_string());
-                    Err(ApiError::BadRequest { message })
-                }
-                StatusCode::GONE => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "API endpoint has been removed".to_string());
-                    Err(ApiError::EndpointGone { message })
-                }
-                StatusCode::TOO_MANY_REQUESTS => {
-                    let retry_after = response
-                        .headers()
-                        .get("retry-after")
-                        .and_then(|v| v.to_str().ok())
-                        .and_then(|s| s.parse().ok())
-                        .unwrap_or(60);
-                    Err(ApiError::RateLimitExceeded { retry_after })
-                }
-                status if status.is_server_error() => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| "Server error".to_string());
-                    Err(ApiError::ServerError {
-                        status: status.as_u16(),
-                        message,
-                    })
-                }
-                status if status.is_success() => {
-                    let bytes = response
-                        .bytes()
-                        .await
-                        .map_err(|e| ApiError::InvalidResponse(e.to_string()))?;
-                    // Successful responses with an empty (or whitespace-only) body,
-                    // e.g. HTTP 204 No Content from Jira update/transition/assign and
-                    // most DELETEs, are treated as JSON `null`. Callers that discard
-                    // the body (`let _: Value`) then succeed instead of failing to
-                    // parse an empty body as JSON.
-                    let slice: &[u8] = if bytes.iter().all(|b| b.is_ascii_whitespace()) {
-                        b"null"
-                    } else {
-                        &bytes
-                    };
-                    serde_json::from_slice::<T>(slice).map_err(|e| {
-                        error!("Failed to parse JSON response: {}", e);
-                        ApiError::InvalidResponse(e.to_string())
-                    })
-                }
-                _ => {
-                    let message = response
-                        .text()
-                        .await
-                        .unwrap_or_else(|_| format!("Unexpected status: {}", status));
-                    Err(ApiError::ServerError {
-                        status: status.as_u16(),
-                        message,
-                    })
-                }
+            log_response(&method, &joined, status, started.elapsed());
+            if !status.is_success() {
+                return Err(error_for_status(response, &joined).await);
             }
+
+            let bytes = response
+                .bytes()
+                .await
+                .map_err(|e| ApiError::InvalidResponse(e.to_string()))?;
+            // Successful responses with an empty (or whitespace-only) body,
+            // e.g. HTTP 204 No Content from Jira update/transition/assign and
+            // most DELETEs, are treated as JSON `null`. Callers that discard
+            // the body (`let _: Value`) then succeed instead of failing to
+            // parse an empty body as JSON.
+            let slice: &[u8] = if bytes.iter().all(|b| b.is_ascii_whitespace()) {
+                b"null"
+            } else {
+                &bytes
+            };
+            serde_json::from_slice::<T>(slice).map_err(|e| {
+                error!("Failed to parse JSON response: {}", e);
+                ApiError::InvalidResponse(e.to_string())
+            })
         })
         .await?;
 

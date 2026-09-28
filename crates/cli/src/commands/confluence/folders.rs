@@ -35,7 +35,7 @@ pub async fn get_folder(ctx: &ConfluenceContext<'_>, folder_id: &str) -> Result<
         .await
         .with_context(|| format!("Failed to get folder {folder_id}"))?;
 
-    ctx.renderer.render(&folder)
+    ctx.renderer.render_document(&folder)
 }
 
 /// `confluence folder create --space <KEY> --title <TITLE> [--parent <ID>]`

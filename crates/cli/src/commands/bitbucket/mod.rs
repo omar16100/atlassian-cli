@@ -10,6 +10,7 @@ mod commits;
 mod git;
 mod permissions;
 mod pipelines;
+mod positional;
 mod pullrequests;
 mod repos;
 mod time_parser;
@@ -339,6 +340,11 @@ enum PrCommands {
         /// New description.
         #[arg(long)]
         description: Option<String>,
+        /// Replace the reviewers with these account UUIDs (comma-separated).
+        /// An empty value removes every reviewer. `pr reviewers --add` adds
+        /// to the current set instead.
+        #[arg(long, value_delimiter = ',')]
+        reviewers: Option<Vec<String>>,
     },
     /// Merge pull request.
     Merge {
@@ -523,6 +529,9 @@ enum ProjectCommands {
 enum PipelineCommands {
     /// List pipelines.
     List {
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
@@ -553,10 +562,12 @@ enum PipelineCommands {
     },
     /// Get pipeline details.
     Get {
-        /// Pipeline UUID or build number.
-        pipeline_id: Option<String>,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pipeline UUID or build number.
+        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
+        targets: Vec<String>,
         /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        #[arg(long = "pipeline")]
         pipeline_flag: Option<String>,
         /// Show pipeline steps with status.
         #[arg(long)]
@@ -564,6 +575,9 @@ enum PipelineCommands {
     },
     /// Get latest pipeline for current or specified branch.
     Latest {
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Branch name (auto-detected from current branch if not specified).
         #[arg(long)]
         branch: Option<String>,
@@ -573,6 +587,9 @@ enum PipelineCommands {
     },
     /// Trigger a new pipeline.
     Trigger {
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Branch or tag name.
         #[arg(long)]
         ref_name: String,
@@ -591,23 +608,25 @@ enum PipelineCommands {
     },
     /// Stop a running pipeline.
     Stop {
-        /// Pipeline UUID or build number.
-        pipeline_id: Option<String>,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pipeline UUID or build number.
+        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
+        targets: Vec<String>,
         /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        #[arg(long = "pipeline")]
         pipeline_flag: Option<String>,
     },
     /// Get pipeline logs.
     Logs {
-        /// Pipeline UUID or build number.
-        pipeline_id: Option<String>,
+        /// Repository slug (defaults to --repo, then the git remote), pipeline
+        /// UUID or build number, step UUID.
+        #[arg(value_names = ["REPO", "PIPELINE", "STEP_UUID"], num_args = 0..=3)]
+        targets: Vec<String>,
         /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        #[arg(long = "pipeline")]
         pipeline_flag: Option<String>,
-        /// Step UUID (positional or --step-uuid flag).
-        step_uuid: Option<String>,
         /// Step UUID (alternative to positional).
-        #[arg(long = "step-uuid", conflicts_with = "step_uuid")]
+        #[arg(long = "step-uuid")]
         step_uuid_flag: Option<String>,
         /// Filter by step name pattern.
         #[arg(long)]
@@ -622,12 +641,17 @@ enum PipelineCommands {
         #[arg(long)]
         failed_only: bool,
     },
-    /// Watch a running pipeline until completion.
+    /// Watch a running pipeline until it finishes or pauses for a manual step.
+    ///
+    /// Exit codes: 0 successful, 1 failed, stopped or unknown, 2 timed out,
+    /// 3 paused waiting on a manual step.
     Watch {
-        /// Pipeline UUID or build number.
-        pipeline_id: Option<String>,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pipeline UUID or build number.
+        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
+        targets: Vec<String>,
         /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        #[arg(long = "pipeline")]
         pipeline_flag: Option<String>,
         /// Poll interval in seconds.
         #[arg(long, default_value_t = 5)]
@@ -647,18 +671,26 @@ enum PipelineCommands {
     },
     /// List steps for a pipeline.
     Steps {
-        /// Pipeline UUID or build number.
-        pipeline_id: Option<String>,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pipeline UUID or build number.
+        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
+        targets: Vec<String>,
         /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline", conflicts_with = "pipeline_id")]
+        #[arg(long = "pipeline")]
         pipeline_flag: Option<String>,
     },
     /// Get latest pipeline status (JSON output, smart exit codes).
+    ///
+    /// Exit codes: 0 successful, 1 failed, stopped or unknown, 2 in progress or
+    /// pending, 3 paused waiting on a manual step. `--wait` stops at a pause.
     Status {
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Show pipeline steps with status.
         #[arg(long)]
         steps: bool,
-        /// Wait for pipeline to reach terminal state before exiting.
+        /// Wait until the pipeline finishes, or pauses for a manual step.
         #[arg(long)]
         wait: bool,
         /// Poll interval in seconds (used with --wait).
@@ -667,8 +699,10 @@ enum PipelineCommands {
     },
     /// Re-run a pipeline with the same commit.
     Rerun {
-        /// Pipeline UUID or build number (optional when using --pr).
-        pipeline_id: Option<String>,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pipeline UUID or build number (omit with --pr).
+        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
+        targets: Vec<String>,
         /// Re-run from pull request (uses PR's source branch).
         #[arg(long)]
         pr: Option<i64>,
@@ -1079,6 +1113,20 @@ pub async fn execute(
         })?
         .to_string();
 
+    // Kept apart for pipeline commands, which also take the repository as an
+    // argument: an argument that disagrees with --repo is an error, while one
+    // that differs from the git remote simply wins.
+    let repo_flag = args.repo.clone();
+    let git_repo = git_ctx.repo_slug.clone();
+    let pipeline_repo = |positional: Option<String>, cmd: &str| -> anyhow::Result<String> {
+        let chosen = positional::choose_repo(
+            positional.as_deref(),
+            repo_flag.as_deref(),
+            git_repo.as_deref(),
+        )?;
+        require_repo(chosen.as_deref(), None, cmd)
+    };
+
     // Global repo slug resolution
     let global_repo = args
         .repo
@@ -1199,6 +1247,7 @@ pub async fn execute(
                 pr_id,
                 title,
                 description,
+                reviewers,
             } => {
                 pullrequests::update_pull_request(
                     &ctx,
@@ -1207,6 +1256,7 @@ pub async fn execute(
                     pr_id,
                     title.as_deref(),
                     description.as_deref(),
+                    reviewers,
                 )
                 .await
             }
@@ -1331,6 +1381,7 @@ pub async fn execute(
         },
         BitbucketCommands::Pipeline(cmd) => match cmd {
             PipelineCommands::List {
+                repo_arg,
                 limit,
                 sort,
                 recent,
@@ -1341,7 +1392,7 @@ pub async fn execute(
                 all,
                 steps,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline list")?;
+                let repo_slug = pipeline_repo(repo_arg, "pipeline list")?;
 
                 // Handle --pr flag
                 let effective_branch = if let Some(pr_id) = pr {
@@ -1407,16 +1458,25 @@ pub async fn execute(
                 .await
             }
             PipelineCommands::Get {
-                pipeline_id,
+                targets,
                 pipeline_flag,
                 steps,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline get")?;
-                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                let given = positional::split_leading_repo(
+                    targets,
+                    &["PIPELINE"],
+                    &[pipeline_flag.is_some()],
+                )?;
+                let repo_slug = pipeline_repo(given.repo, "pipeline get")?;
+                let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 pipelines::get_pipeline(&ctx, &workspace, &repo_slug, &id, steps).await
             }
-            PipelineCommands::Latest { branch, steps } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline latest")?;
+            PipelineCommands::Latest {
+                repo_arg,
+                branch,
+                steps,
+            } => {
+                let repo_slug = pipeline_repo(repo_arg, "pipeline latest")?;
 
                 // Prefer explicit --branch over auto-detected
                 let effective_branch = if let Some(b) = branch {
@@ -1460,13 +1520,14 @@ pub async fn execute(
                 .await
             }
             PipelineCommands::Trigger {
+                repo_arg,
                 ref_name,
                 ref_type,
                 variables,
                 secured,
                 custom_pipeline,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline trigger")?;
+                let repo_slug = pipeline_repo(repo_arg, "pipeline trigger")?;
                 pipelines::trigger_pipeline(
                     &ctx,
                     &workspace,
@@ -1480,30 +1541,51 @@ pub async fn execute(
                 .await
             }
             PipelineCommands::Stop {
-                pipeline_id,
+                targets,
                 pipeline_flag,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline stop")?;
-                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                let given = positional::split_leading_repo(
+                    targets,
+                    &["PIPELINE"],
+                    &[pipeline_flag.is_some()],
+                )?;
+                let repo_slug = pipeline_repo(given.repo, "pipeline stop")?;
+                let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 let pipeline_uuid =
                     pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &id).await?;
                 pipelines::stop_pipeline(&ctx, &workspace, &repo_slug, &pipeline_uuid).await
             }
             PipelineCommands::Logs {
-                pipeline_id,
+                targets,
                 pipeline_flag,
-                step_uuid,
                 step_uuid_flag,
                 step,
                 grep,
                 ignore_case,
                 failed_only,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline logs")?;
-                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                let given = positional::split_leading_repo(
+                    targets,
+                    &["PIPELINE", "STEP_UUID"],
+                    &[pipeline_flag.is_some(), step_uuid_flag.is_some()],
+                )?;
+                let repo_slug = pipeline_repo(given.repo, "pipeline logs")?;
+                // Positional identifiers fill the slots no flag supplied, in order.
+                let mut ids = given.ids.into_iter();
+                let pipeline_positional = if pipeline_flag.is_none() {
+                    ids.next()
+                } else {
+                    None
+                };
+                let step_positional = if step_uuid_flag.is_none() {
+                    ids.next()
+                } else {
+                    None
+                };
+                let id = resolve_pipeline_arg(pipeline_positional, pipeline_flag)?;
                 let pipeline_uuid =
                     pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &id).await?;
-                let effective_step_uuid = step_uuid.or(step_uuid_flag);
+                let effective_step_uuid = step_positional.or(step_uuid_flag);
                 pipelines::get_pipeline_logs(
                     &ctx,
                     &workspace,
@@ -1518,7 +1600,7 @@ pub async fn execute(
                 .await
             }
             PipelineCommands::Watch {
-                pipeline_id,
+                targets,
                 pipeline_flag,
                 interval,
                 steps,
@@ -1526,8 +1608,13 @@ pub async fn execute(
                 timeout,
                 log,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline watch")?;
-                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                let given = positional::split_leading_repo(
+                    targets,
+                    &["PIPELINE"],
+                    &[pipeline_flag.is_some()],
+                )?;
+                let repo_slug = pipeline_repo(given.repo, "pipeline watch")?;
+                let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 let final_status = pipelines::watch_pipeline(
                     &ctx,
                     &workspace,
@@ -1547,30 +1634,39 @@ pub async fn execute(
                 Ok(())
             }
             PipelineCommands::Steps {
-                pipeline_id,
+                targets,
                 pipeline_flag,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline steps")?;
-                let id = resolve_pipeline_arg(pipeline_id, pipeline_flag)?;
+                let given = positional::split_leading_repo(
+                    targets,
+                    &["PIPELINE"],
+                    &[pipeline_flag.is_some()],
+                )?;
+                let repo_slug = pipeline_repo(given.repo, "pipeline steps")?;
+                let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 pipelines::list_steps(&ctx, &workspace, &repo_slug, &id).await
             }
             PipelineCommands::Status {
+                repo_arg,
                 steps,
                 wait,
                 interval,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline status")?;
+                let repo_slug = pipeline_repo(repo_arg, "pipeline status")?;
                 pipelines::pipeline_status(&ctx, &workspace, &repo_slug, steps, wait, interval)
                     .await
             }
             PipelineCommands::Rerun {
-                pipeline_id,
+                targets,
                 pr,
                 failed_only,
                 variables,
                 secured,
             } => {
-                let repo_slug = require_repo(None, global_repo.as_deref(), "pipeline rerun")?;
+                let given =
+                    positional::split_leading_repo(targets, &["PIPELINE"], &[pr.is_some()])?;
+                let repo_slug = pipeline_repo(given.repo, "pipeline rerun")?;
+                let pipeline_id = given.ids.into_iter().next();
 
                 // Determine which pipeline to rerun
                 let effective_pipeline_id = if let Some(pr_id) = pr {

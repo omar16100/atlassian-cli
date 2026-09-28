@@ -3027,3 +3027,20 @@ Plan: `docs/27092026_bulk_export_format_fix_plan.md`.
 - [x] crates.io: all six crates at 0.9.3. Homebrew tap formula at 0.9.3; URLs return 200 and sha256 values match the archives.
 - [x] `cargo install atlassian-cli --version 0.9.3 --locked` into a scratch root; the installed binary's `--version` printed `atlassian-cli 0.9.3`, and `jira bulk export --help` lists `--export-format`.
 - Plan doc status set to shipped: `docs/27092026_release_0_9_3_plan.md`.
+
+## 28 Sep 2026: the six reported items still open on 0.9.3 (branch `fix/feedback-open-items`)
+
+The reporter re-tested 14 items on 0.9.3; eight were already fixed (they had been on the 0.2.8 Homebrew build, which Homebrew 7 will not load from an untrusted tap). The six still open:
+
+- [x] Split `bitbucket/pipelines.rs` (2052 lines) into `pipelines/{model,state,rows,list,steps,logs,trigger,status,watch}.rs`; 30 moved tests unchanged.
+- [x] #2 Paused builds report `PAUSED` (from `state.stage`); `watch` and `status --wait` stop there with exit code 3; unknown status exits 1, not 0; `pending_manual_steps` on `pipeline get` (and `list --steps`). Step outcome now read from `result`, which fixes `logs --failed-only` and `rerun --pr --failed-only`, both of which never matched a failure.
+- [x] #3 Pipeline rows built per format (`rows.rs`): no icons, numeric `build_number`, `null` for missing values in machine formats. `OutputFormat::is_human()`.
+- [x] #4 Single objects render as a `field | value` table in declaration order, nested object lists as titled tables; `render_document` keeps JSON for `jira workflow export` and `confluence folder get`.
+- [x] #5 `[REPO]` positional on pipeline commands (`bitbucket/positional.rs`): count first, then shape; conflicts with `--repo` are errors.
+- [x] #9 `--debug` global, directive `atlassian_cli=debug`, after `RUST_LOG`; one `error_for_status` and response logging in `crates/api/src/response.rs`; secret-named fields and query values redacted; request bodies never logged.
+- [x] #12 `pr update --reviewers`; PR edits PUT title, description and reviewers together; UUID-only reviewers; author refused.
+- [x] Codex: plan review (positional parsing as a vector, raw-document exclusions, keep absent reviewers absent) and two code review rounds (log redaction by name across case and separators, RUST_LOG precedence, finished builds with unknown results end a wait, `pipeline logs` no-match output in machine formats).
+- [x] README: pipeline positional examples, exit code 3, `pr update --reviewers`, `--debug`, `brew trust` note. CHANGELOG `[Unreleased]`, `docs/c4model.md`, feature doc and plan doc.
+- [x] `cargo test --workspace`: 992 passed, 0 failed, 1 ignored. fmt and clippy (`-D warnings`) clean.
+- [ ] Live verification: blocked, both stored tokens return 401.
+- Docs: `docs/28092026_feedback_open_items.md`, `docs/28092026_feedback_open_items_plan.md`.
