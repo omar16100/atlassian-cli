@@ -26,11 +26,12 @@ use crate::{scrub_credentials, unauthorized_message};
 const MAX_LOGGED_BODY: usize = 2048;
 
 /// Fragments that mark a query parameter or JSON field as a secret, matched
-/// case-insensitively anywhere in the name: `access_token`, `client_secret`,
-/// `apikey`, `oauth_signature`. Plain `key` is not on the list: Jira's
-/// `issueKey` and a pipeline variable's `key` are names, and hiding them would
-/// make the trace useless for the requests it exists for.
-const SECRET_NAME_PARTS: [&str; 10] = [
+/// anywhere in the name once case and `-`/`_` separators are dropped, so
+/// `access_token`, `clientSecret`, `x-api-key` and `privateKey` all match.
+/// Plain `key` is not on the list: Jira's `issueKey` and a pipeline variable's
+/// `key` are names, and hiding them would make the trace useless for the
+/// requests it exists for.
+const SECRET_NAME_PARTS: [&str; 9] = [
     "token",
     "secret",
     "password",
@@ -38,14 +39,17 @@ const SECRET_NAME_PARTS: [&str; 10] = [
     "credential",
     "authorization",
     "signature",
-    "private_key",
-    "api_key",
+    "privatekey",
     "apikey",
 ];
 
 /// Whether a parameter or field name marks its value as a secret.
 fn is_secret_name(name: &str) -> bool {
-    let name = name.to_ascii_lowercase();
+    let name: String = name
+        .chars()
+        .filter(|c| !matches!(c, '-' | '_' | '.'))
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
     name == "jwt" || SECRET_NAME_PARTS.iter().any(|part| name.contains(part))
 }
 
@@ -218,6 +222,35 @@ mod tests {
             );
         }
         assert!(shown.contains("issueKey=PROJ-1"), "{shown}");
+    }
+
+    #[test]
+    fn secret_names_match_across_case_and_separators() {
+        for name in [
+            "access_token",
+            "clientSecret",
+            "x-api-key",
+            "api-key",
+            "API_KEY",
+            "privateKey",
+            "private-key",
+            "Authorization",
+            "oauth_signature",
+            "JWT",
+            "refreshToken",
+        ] {
+            assert!(is_secret_name(name), "{name}");
+        }
+        for name in [
+            "issueKey",
+            "key",
+            "projectKey",
+            "authorId",
+            "expand",
+            "value",
+        ] {
+            assert!(!is_secret_name(name), "{name}");
+        }
     }
 
     #[test]

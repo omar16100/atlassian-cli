@@ -8,7 +8,7 @@ use super::super::utils::BitbucketContext;
 use super::list::{build_request_path, fetch_pipeline, PipelineFilters};
 use super::model::{PipelineList, PipelineStatusOutput};
 use super::state::{
-    get_commit_hash, get_pipeline_status, is_terminal_state, status_to_exit_code,
+    get_commit_hash, get_pipeline_status, is_finished, is_terminal_state, status_to_exit_code,
     warn_if_unrecognised,
 };
 use super::steps::fetch_steps;
@@ -57,7 +57,7 @@ pub async fn pipeline_status(
             warn_if_unrecognised(&status, &mut warned);
         }
 
-        if !wait || is_terminal_state(&status) {
+        if !wait || is_terminal_state(&status) || is_finished(&pipeline) {
             // Build status output
             let steps_data = if show_steps {
                 fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, true)

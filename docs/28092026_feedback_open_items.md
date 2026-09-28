@@ -92,7 +92,8 @@ a 400 from `get_bytes` is now `BadRequest` rather than `ServerError(400)`; neith
 retries. Request bodies are never logged: secured pipeline variables travel in
 them. In a logged error body, any JSON field whose name contains `token`,
 `secret`, `password`, `credential`, `authorization`, `signature` or `api_key` is
-redacted at any depth, as is the `value` of an object marked `"secured": true`;
+redacted at any depth (case and `-`/`_` separators ignored, so `x-api-key` and
+`privateKey` match), as is the `value` of an object marked `"secured": true`;
 query parameters with such names are redacted in logged URLs. Plain `key` is
 not treated as secret, so `issueKey` and a variable's name stay readable.
 `--debug`'s directives come after `RUST_LOG`'s: a later directive for the same
@@ -114,12 +115,13 @@ and sent), and the author is refused as a reviewer.
   remote only.
 - A repository whose slug is all digits or UUID-shaped needs `--repo` unless every
   identifier is given positionally.
-- A pipeline state this CLI does not recognise exits 1 from `pipeline status`,
-  but `watch` and `status --wait` keep polling through it (it may be
-  transitional) after one warning on stderr.
-- Log redaction is by field and parameter name plus the credential-shape
-  scrub; a secret under an unremarkable name in a non-JSON error body could
-  still be logged under `--debug`.
+- A pipeline state this CLI does not recognise exits 1 from `pipeline status`.
+  `watch` and `status --wait` stop on any finished build (exit 1 for an unknown
+  result), but keep polling through an unrecognised in-progress state, which may
+  be transitional, after one warning on stderr.
+- Log redaction is by field and parameter name (case and `-`/`_` ignored) plus
+  the credential-shape scrub; a secret under an unremarkable name in a non-JSON
+  error body could still be logged under `--debug`.
 - CSV of a single object still falls back to JSON; quiet mode still prints only
   string `id`s.
 - Whether a PUT that omits `reviewers` or `description` clears them has not been
@@ -141,7 +143,8 @@ and sent), and the author is refused as a reviewer.
   the count are not listed.
 - `pipelines/mock_tests.rs` (wiremock): `get` fetches steps once for a paused
   build and not for a running one; `watch` stops on a paused build with status
-  `PAUSED`; a `COMPLETED`/`FAILED` step counts as a failure; `logs --failed-only`
+  `PAUSED`; a finished build with an unknown result ends a wait with exit 1; a
+  `COMPLETED`/`FAILED` step counts as a failure; `logs --failed-only`
   fetches only the failed step's log.
 - `crates/output`: single object renders as a `field | value` table in
   declaration order; nested list of objects as a titled table; scalars, lists and

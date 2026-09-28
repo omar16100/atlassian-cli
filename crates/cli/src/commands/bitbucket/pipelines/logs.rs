@@ -75,9 +75,13 @@ pub async fn get_pipeline_logs(
         });
     }
 
+    // Prose for people; an empty result for scripts, which could not parse
+    // the sentence this used to print in every format.
     if steps_to_show.is_empty() {
-        println!("No steps matched the filter criteria");
-        return Ok(());
+        return ctx.renderer.render_list_or_empty(
+            &Vec::<serde_json::Value>::new(),
+            "No steps matched the filter criteria",
+        );
     }
 
     // Prepare output for structured formats

@@ -9,7 +9,7 @@ use super::list::{fetch_pipeline, resolve_pipeline_id};
 use super::rows::{build_pipeline_view, pending_manual_steps};
 use super::state::{
     format_elapsed, format_steps_summary, get_pipeline_status, get_status_icon, is_awaiting_action,
-    is_terminal_state, warn_if_unrecognised,
+    is_finished, is_terminal_state, warn_if_unrecognised,
 };
 use super::steps::fetch_steps;
 
@@ -119,7 +119,7 @@ pub async fn watch_pipeline(
         // Check if pipeline reached terminal state, or stopped to wait for a
         // person: a paused build does not finish on its own, so it ends the
         // watch (exit code 3) instead of polling until --timeout.
-        if is_terminal_state(&status) {
+        if is_terminal_state(&status) || is_finished(&pipeline) {
             let paused = is_awaiting_action(&status);
             let steps = if paused && steps.is_none() {
                 fetch_steps(ctx, workspace, repo_slug, &pipeline.uuid, false)

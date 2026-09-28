@@ -3039,8 +3039,8 @@ The reporter re-tested 14 items on 0.9.3; eight were already fixed (they had bee
 - [x] #5 `[REPO]` positional on pipeline commands (`bitbucket/positional.rs`): count first, then shape; conflicts with `--repo` are errors.
 - [x] #9 `--debug` global, directive `atlassian_cli=debug`, after `RUST_LOG`; one `error_for_status` and response logging in `crates/api/src/response.rs`; secret-named fields and query values redacted; request bodies never logged.
 - [x] #12 `pr update --reviewers`; PR edits PUT title, description and reviewers together; UUID-only reviewers; author refused.
-- [x] Codex: plan review (positional parsing as a vector, raw-document exclusions, keep absent reviewers absent) and two code review rounds (log redaction, RUST_LOG precedence, unknown states while waiting).
+- [x] Codex: plan review (positional parsing as a vector, raw-document exclusions, keep absent reviewers absent) and two code review rounds (log redaction by name across case and separators, RUST_LOG precedence, finished builds with unknown results end a wait, `pipeline logs` no-match output in machine formats).
 - [x] README: pipeline positional examples, exit code 3, `pr update --reviewers`, `--debug`, `brew trust` note. CHANGELOG `[Unreleased]`, `docs/c4model.md`, feature doc and plan doc.
-- [x] `cargo test --workspace`: 990 passed, 0 failed, 1 ignored. fmt and clippy (`-D warnings`) clean.
+- [x] `cargo test --workspace`: 992 passed, 0 failed, 1 ignored. fmt and clippy (`-D warnings`) clean.
 - [ ] Live verification: blocked, both stored tokens return 401.
 - Docs: `docs/28092026_feedback_open_items.md`, `docs/28092026_feedback_open_items_plan.md`.

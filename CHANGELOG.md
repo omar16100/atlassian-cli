@@ -63,6 +63,9 @@ resolve. `git log` remains the complete record.
   reran (#PRNUM).
 - `bb pr reviewers --add` no longer drops the pull request's description from the
   update it sends (#PRNUM).
+- `bb pipeline logs` with filters that match no step printed a sentence on
+  stdout in every format; `-f json` and `-f yaml` now get an empty list, and
+  quiet and CSV print nothing (#PRNUM).
 
 ## [0.9.3] - 2026-09-27
 

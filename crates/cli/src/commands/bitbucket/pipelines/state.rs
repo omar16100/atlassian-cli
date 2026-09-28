@@ -68,6 +68,18 @@ pub(super) fn get_pipeline_status(pipeline: &Pipeline) -> String {
     state.name.clone()
 }
 
+/// Whether the pipeline has finished, whatever its result is called.
+///
+/// A wait stops here even when the result is one this CLI does not know, and
+/// then exits 1 for it; only an unrecognised in-progress state is polled
+/// through.
+pub(super) fn is_finished(pipeline: &Pipeline) -> bool {
+    pipeline
+        .state
+        .as_ref()
+        .is_some_and(|state| state.result.is_some() || state.name.eq_ignore_ascii_case("COMPLETED"))
+}
+
 /// A build that will not move until someone acts on it.
 pub(super) fn is_awaiting_action(status: &str) -> bool {
     matches!(status.to_uppercase().as_str(), "PAUSED" | "HALTED")
@@ -385,6 +397,21 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(get_step_status(&waiting), "PENDING");
+    }
+
+    /// A finished build with a result name this CLI does not know stops a
+    /// wait and exits 1, rather than being polled forever.
+    #[test]
+    fn a_finished_build_with_an_unknown_result_ends_a_wait_as_a_failure() {
+        let odd =
+            pipeline(serde_json::json!({"name": "COMPLETED", "result": {"name": "SOMETHING_NEW"}}));
+        let status = get_pipeline_status(&odd);
+        assert!(is_finished(&odd));
+        assert!(!is_terminal_state(&status));
+        assert_eq!(status_to_exit_code(&status), 1);
+        let running =
+            pipeline(serde_json::json!({"name": "IN_PROGRESS", "stage": {"name": "RUNNING"}}));
+        assert!(!is_finished(&running));
     }
 
     #[test]

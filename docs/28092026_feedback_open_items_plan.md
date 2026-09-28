@@ -103,6 +103,9 @@ single object; `bb api --paginate`; positional repo on `pipeline var`/`env`.
 - [x] 7 `pr update --reviewers` (`2ac9d08`)
 - [x] codex review round 1 (`e535c87`): secret-named fields redacted in logs,
   `--debug` after `RUST_LOG`, warning on unrecognised states during waits
+- [x] codex review round 2: secret names matched across case and separators, a
+  finished build with an unknown result ends a wait, `pipeline logs` no-match
+  output structured in machine formats
 - [x] 8 docs: CHANGELOG, c4model, feature doc, README, root `todo.md`
 - [ ] live verification (blocked: both stored tokens on the build machine return
   401; needs a working Bitbucket token and the reporter's workspace)
@@ -113,8 +116,8 @@ single object; `bb api --paginate`; positional repo on `pipeline var`/`env`.
   non-RUNNING stage instead, and only PAUSED/HALTED map to exit code 3.
 - `pending_manual_steps` on `pipeline list` needs `--steps` (no extra requests
   otherwise); `pipeline get` fetches steps for a paused build on its own.
-- Unknown states exit 1 (was 0), but waits keep polling through them with a
-  warning rather than stopping.
+- Unknown states exit 1 (was 0). Waits stop on any finished build, and keep
+  polling through an unrecognised in-progress state with a warning.
 - The API client's five status-to-error matches became one `error_for_status`
   in `crates/api/src/response.rs`, to log error bodies in one place; this kept
   `lib.rs` well under 2000 lines.
