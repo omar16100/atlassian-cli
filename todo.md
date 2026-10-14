@@ -1,5 +1,34 @@
 # Changes Made
 
+## 2026-10-14 — Comment visibility (branch `feat/jira-comment-visibility`)
+
+### The gap
+`jira issue comments add` built its payload as `json!({ "body": markdown_to_adf(body) })` — body
+and nothing else. Jira treats a comment with no `visibility` property as unrestricted, so every
+comment the CLI wrote was readable by everyone who could see the issue. On a customer-facing or
+service-desk project that includes the customer, and the Jira web UI offers the restriction right
+next to the Save button, so a user moving a workflow into the CLI silently loses it. There was no
+flag to set it and no way to reach it short of hand-building the payload and posting it through
+`jira api`.
+
+### The change
+`crates/cli/src/commands/jira/issues.rs` gains a `CommentVisibility` enum (`Role` or `Group`) and
+two pure helpers, `visibility_value()` and `comment_payload()`. `add_comment()` and
+`update_comment()` take `Option<&CommentVisibility>` and share `comment_payload()`. When the
+option is `None` the property is omitted rather than sent as `null`, which Jira rejects — so the
+unrestricted path produces a byte-identical payload to before.
+
+`crates/cli/src/commands/jira/mod.rs` exposes `--visibility-role` and `--visibility-group` on both
+`comments add` and `comments update`, mutually exclusive through clap's `conflicts_with`, and maps
+them with a `comment_visibility()` helper.
+
+`update` carries the flag too because Jira replaces visibility on every update: editing a
+restricted comment without it would republish the comment. The flag documentation says so.
+
+### Tests
+Five unit tests over `comment_payload()` and `visibility_value()` in `issues.rs`, three over
+`comment_visibility()` in `mod.rs`. All are pure — no live Jira needed.
+
 ## 2026-08-24 — Product-aware auth endpoint (branch `fix/auth-confluence-product-dispatch`)
 
 ### The bug

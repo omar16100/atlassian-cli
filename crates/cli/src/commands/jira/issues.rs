@@ -1206,10 +1206,53 @@ pub async fn list_comments(ctx: &JiraContext<'_>, key: &str, full: bool) -> Resu
     ctx.renderer.render(&rows)
 }
 
-pub async fn add_comment(ctx: &JiraContext<'_>, key: &str, body: &str) -> Result<()> {
+/// Who may read a comment.
+///
+/// Jira applies no restriction when the `visibility` property is absent, which
+/// publishes the comment to everyone who can see the issue — on a public or
+/// customer-facing project that includes the customer. The property is accepted
+/// on create and on update, and dropping it from an update republishes a
+/// restricted comment, so both paths carry it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommentVisibility {
+    /// Visible only to members of a project role, by role name.
+    Role(String),
+    /// Visible only to members of a group, by group name.
+    Group(String),
+}
+
+/// Builds the `visibility` property of a comment payload.
+///
+/// Returns `None` when the comment is unrestricted, which omits the property
+/// rather than sending `null`: Jira rejects an explicit null.
+fn visibility_value(visibility: Option<&CommentVisibility>) -> Option<Value> {
     use serde_json::json;
 
-    let payload = json!({ "body": markdown_to_adf(body) });
+    visibility.map(|v| match v {
+        CommentVisibility::Role(role) => json!({ "type": "role", "value": role }),
+        CommentVisibility::Group(group) => json!({ "type": "group", "value": group }),
+    })
+}
+
+/// Assembles a comment payload, with the `visibility` property only when the
+/// comment is restricted.
+fn comment_payload(body: &str, visibility: Option<&CommentVisibility>) -> Value {
+    use serde_json::json;
+
+    let mut payload = json!({ "body": markdown_to_adf(body) });
+    if let Some(value) = visibility_value(visibility) {
+        payload["visibility"] = value;
+    }
+    payload
+}
+
+pub async fn add_comment(
+    ctx: &JiraContext<'_>,
+    key: &str,
+    body: &str,
+    visibility: Option<&CommentVisibility>,
+) -> Result<()> {
+    let payload = comment_payload(body, visibility);
 
     let _: Value = ctx
         .client
@@ -1236,10 +1279,9 @@ pub async fn update_comment(
     key: &str,
     comment_id: &str,
     body: &str,
+    visibility: Option<&CommentVisibility>,
 ) -> Result<()> {
-    use serde_json::json;
-
-    let payload = json!({ "body": markdown_to_adf(body) });
+    let payload = comment_payload(body, visibility);
 
     let _: Value = ctx
         .client
@@ -1668,6 +1710,48 @@ fn apply_marks(text: &str, marks: Option<&Value>) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_comment_payload_omits_visibility_when_unrestricted() {
+        let payload = comment_payload("hello", None);
+        assert!(
+            payload.get("visibility").is_none(),
+            "an unrestricted comment must not carry a visibility property"
+        );
+        assert!(payload.get("body").is_some());
+    }
+
+    #[test]
+    fn test_comment_payload_restricts_to_a_role() {
+        let visibility = CommentVisibility::Role("Developer".to_string());
+        let payload = comment_payload("hello", Some(&visibility));
+        assert_eq!(
+            payload["visibility"],
+            json!({ "type": "role", "value": "Developer" })
+        );
+    }
+
+    #[test]
+    fn test_comment_payload_restricts_to_a_group() {
+        let visibility = CommentVisibility::Group("jira-developers".to_string());
+        let payload = comment_payload("hello", Some(&visibility));
+        assert_eq!(
+            payload["visibility"],
+            json!({ "type": "group", "value": "jira-developers" })
+        );
+    }
+
+    #[test]
+    fn test_comment_payload_keeps_the_body_alongside_visibility() {
+        let visibility = CommentVisibility::Role("Developer".to_string());
+        let payload = comment_payload("hello", Some(&visibility));
+        assert_eq!(extract_adf_text(&payload["body"]), "hello");
+    }
+
+    #[test]
+    fn test_visibility_value_is_none_when_unrestricted() {
+        assert!(visibility_value(None).is_none());
+    }
 
     #[test]
     fn test_extract_adf_text_simple() {

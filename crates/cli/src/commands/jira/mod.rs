@@ -20,7 +20,24 @@ mod projects;
 pub mod utils;
 mod webhooks;
 
+use issues::CommentVisibility;
 use utils::JiraContext;
+
+/// Turns the two mutually exclusive visibility flags into one restriction.
+///
+/// Clap guarantees they are not both set, so the role is checked first and the
+/// group is the only remaining case. Neither flag leaves the comment
+/// unrestricted, which is Jira's own default.
+fn comment_visibility(
+    visibility_role: Option<String>,
+    visibility_group: Option<String>,
+) -> Option<CommentVisibility> {
+    match (visibility_role, visibility_group) {
+        (Some(role), _) => Some(CommentVisibility::Role(role)),
+        (None, Some(group)) => Some(CommentVisibility::Group(group)),
+        (None, None) => None,
+    }
+}
 
 #[derive(Args, Debug, Clone)]
 pub struct JiraArgs {
@@ -454,6 +471,14 @@ enum CommentCommands {
         /// Comment body
         #[arg(long)]
         body: String,
+        /// Restrict the comment to a project role, by role name (e.g. Developer).
+        /// Without this or --visibility-group, the comment is visible to everyone
+        /// who can see the issue.
+        #[arg(long, conflicts_with = "visibility_group")]
+        visibility_role: Option<String>,
+        /// Restrict the comment to a group, by group name
+        #[arg(long, conflicts_with = "visibility_role")]
+        visibility_group: Option<String>,
     },
     /// Update a comment
     //
@@ -467,6 +492,14 @@ enum CommentCommands {
         /// New comment body
         #[arg(long)]
         body: String,
+        /// Restrict the comment to a project role, by role name (e.g. Developer).
+        /// Visibility is replaced on every update, so omitting this and
+        /// --visibility-group republishes a previously restricted comment.
+        #[arg(long, conflicts_with = "visibility_group")]
+        visibility_role: Option<String>,
+        /// Restrict the comment to a group, by group name
+        #[arg(long, conflicts_with = "visibility_role")]
+        visibility_group: Option<String>,
     },
     /// Delete a comment
     Delete {
@@ -1115,12 +1148,25 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 CommentCommands::List { key, full } => {
                     issues::list_comments(&ctx, &key, full).await
                 }
-                CommentCommands::Add { key, body } => issues::add_comment(&ctx, &key, &body).await,
+                CommentCommands::Add {
+                    key,
+                    body,
+                    visibility_role,
+                    visibility_group,
+                } => {
+                    let visibility = comment_visibility(visibility_role, visibility_group);
+                    issues::add_comment(&ctx, &key, &body, visibility.as_ref()).await
+                }
                 CommentCommands::Update {
                     key,
                     comment_id,
                     body,
-                } => issues::update_comment(&ctx, &key, &comment_id, &body).await,
+                    visibility_role,
+                    visibility_group,
+                } => {
+                    let visibility = comment_visibility(visibility_role, visibility_group);
+                    issues::update_comment(&ctx, &key, &comment_id, &body, visibility.as_ref()).await
+                }
                 CommentCommands::Delete { key, comment_id } => {
                     issues::delete_comment(&ctx, &key, &comment_id).await
                 }
@@ -1459,5 +1505,31 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
             }
         },
         JiraCommands::Api(args) => crate::commands::api::run(&ctx.client, ctx.renderer, args).await,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn comment_visibility_is_none_without_flags() {
+        assert_eq!(comment_visibility(None, None), None);
+    }
+
+    #[test]
+    fn comment_visibility_reads_the_role_flag() {
+        assert_eq!(
+            comment_visibility(Some("Developer".to_string()), None),
+            Some(CommentVisibility::Role("Developer".to_string()))
+        );
+    }
+
+    #[test]
+    fn comment_visibility_reads_the_group_flag() {
+        assert_eq!(
+            comment_visibility(None, Some("jira-developers".to_string())),
+            Some(CommentVisibility::Group("jira-developers".to_string()))
+        );
     }
 }
