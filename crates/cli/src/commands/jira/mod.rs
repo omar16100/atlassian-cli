@@ -1165,7 +1165,8 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                     visibility_group,
                 } => {
                     let visibility = comment_visibility(visibility_role, visibility_group);
-                    issues::update_comment(&ctx, &key, &comment_id, &body, visibility.as_ref()).await
+                    issues::update_comment(&ctx, &key, &comment_id, &body, visibility.as_ref())
+                        .await
                 }
                 CommentCommands::Delete { key, comment_id } => {
                     issues::delete_comment(&ctx, &key, &comment_id).await
