@@ -1,5 +1,6 @@
 pub mod error;
 pub mod pagination;
+pub mod query;
 pub mod ratelimit;
 mod response;
 pub mod retry;

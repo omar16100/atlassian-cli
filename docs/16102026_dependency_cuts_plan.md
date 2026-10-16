@@ -1,6 +1,6 @@
 # Dependency cuts, 16 Oct 2026
 
-Status: PR 1 (findings 2, 4, 6 and the `backoff` feature) is PR #162. PR 2 (finding 1, option A) is PR #164. PR 3 (finding 3, `backoff`: internal swap and deprecation only, removal deferred to a breaking release) is on branch `chore/dependency-cuts-3-backoff`, 16 Oct 2026. PRs 4 and 5 not started. Measured on `main` at `1301e23` plus the rustls 0.23.46 bump
+Status: PR 1 is #162 (merged). PR 2 (finding 1, option A) is #164 (merged). PR 3 (finding 3, internal swap and deprecation only, removal deferred to a breaking release) is #165 (merged). PR 4 (finding 5, `urlencoding`) is on branch `chore/dependency-cuts-4-urlencoding`, 16 Oct 2026. PR 5 not started.
 from PR #160. Reviewed by Codex on 16 Oct 2026
 (`/Users/macmini/projects/codex/atlassian_cli_dependency_cuts_16oct2026.txt`); its
 corrections are folded in and marked **[codex]**.
@@ -252,6 +252,15 @@ Tests added: jitter bounds and the rounded upper endpoint, growth and cap, overf
 growth, an initial interval above the cap, attempt limit, `max_retries` 0 and 1, first success,
 non-retryable stop, the deprecated constructor's settings, and a wiremock test for a 429 with
 `Retry-After` followed by 503s that checks the final body and headers survive.
+## PR 4 result (16 Oct 2026)
+
+`atlassian_cli_api::query::encode_query_component` (new module `crates/api/src/query.rs`)
+replaces the 11 `urlencoding::encode` calls in the cli crate. It uses `percent-encoding 2.3`,
+already in the graph through `url`, with the `NON_ALPHANUMERIC` set minus `-._~`, which is the
+set `urlencoding` used (Codex compared all 256 byte values). Five tests compare against outputs
+produced by `urlencoding 2.1.3` on 16 Oct 2026 (JQL and CQL samples, delimiters, UTF-8, double
+encoding). Path validation stays separate, as planned. `urlencoding` left the lock file: 349 to
+348 packages, macOS release graph 218 to 217.
 
 ## Verification
 

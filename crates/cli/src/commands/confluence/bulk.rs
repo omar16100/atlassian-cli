@@ -132,7 +132,10 @@ pub async fn bulk_export_pages(
         content: Value,
     }
 
-    let query_string = format!("cql={}", urlencoding::encode(cql));
+    let query_string = format!(
+        "cql={}",
+        atlassian_cli_api::query::encode_query_component(cql)
+    );
 
     let response: SearchResponse = ctx
         .client
@@ -212,7 +215,11 @@ async fn search_page_ids(ctx: &ConfluenceContext<'_>, cql: &str) -> Result<Vec<S
         id: String,
     }
 
-    let query_string = format!("cql={}&limit={}", urlencoding::encode(cql), MAX_RESULTS);
+    let query_string = format!(
+        "cql={}&limit={}",
+        atlassian_cli_api::query::encode_query_component(cql),
+        MAX_RESULTS
+    );
 
     let response: SearchResponse = ctx
         .client

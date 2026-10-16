@@ -131,7 +131,7 @@ pub async fn search_issues(
     let page_size = if limit == 0 { 100 } else { limit.clamp(1, 100) };
     let query = format!(
         "/rest/api/3/search/jql?jql={}&maxResults={page_size}&fields=key,summary,status,assignee,issuetype",
-        urlencoding::encode(&final_jql),
+        atlassian_cli_api::query::encode_query_component(&final_jql),
     );
 
     let (issues, page) =

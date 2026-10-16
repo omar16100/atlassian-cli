@@ -398,7 +398,7 @@ pub(crate) async fn view_issue_fields(
         .client
         .get(&format!(
             "/rest/api/3/issue/{key}?fields={}",
-            urlencoding::encode(&selection.query_value())
+            atlassian_cli_api::query::encode_query_component(&selection.query_value())
         ))
         .await
         .with_context(|| format!("Failed to fetch issue {key}"))?;
@@ -453,8 +453,8 @@ pub(crate) async fn search_rows(
     let page_size = if limit == 0 { 100 } else { limit.clamp(1, 100) };
     let query = format!(
         "/rest/api/3/search/jql?jql={}&maxResults={page_size}&fields={}",
-        urlencoding::encode(jql),
-        urlencoding::encode(&selection.query_value())
+        atlassian_cli_api::query::encode_query_component(jql),
+        atlassian_cli_api::query::encode_query_component(&selection.query_value())
     );
 
     let (issues, page) =

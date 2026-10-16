@@ -71,7 +71,7 @@ pub async fn get_space_analytics(ctx: &ConfluenceContext<'_>, space_key: &str) -
         .client
         .get(&format!(
             "/wiki/rest/api/content/search?cql={}",
-            urlencoding::encode(&pages_cql)
+            atlassian_cli_api::query::encode_query_component(&pages_cql)
         ))
         .await
         .context("Failed to get page count")?;
@@ -80,7 +80,7 @@ pub async fn get_space_analytics(ctx: &ConfluenceContext<'_>, space_key: &str) -
         .client
         .get(&format!(
             "/wiki/rest/api/content/search?cql={}",
-            urlencoding::encode(&blogs_cql)
+            atlassian_cli_api::query::encode_query_component(&blogs_cql)
         ))
         .await
         .context("Failed to get blog count")?;

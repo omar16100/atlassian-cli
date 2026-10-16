@@ -26,7 +26,10 @@ pub async fn search_cql(
         content_type: Option<String>,
     }
 
-    let mut query_params = vec![format!("cql={}", urlencoding::encode(cql))];
+    let mut query_params = vec![format!(
+        "cql={}",
+        atlassian_cli_api::query::encode_query_component(cql)
+    )];
 
     if let Some(l) = limit {
         query_params.push(format!("limit={}", l));

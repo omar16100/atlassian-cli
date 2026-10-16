@@ -198,9 +198,9 @@ fn append_queries(path: &str, queries: &[String]) -> Result<String> {
             '&'
         };
         out.push(separator);
-        out.push_str(&urlencoding::encode(key));
+        out.push_str(&atlassian_cli_api::query::encode_query_component(key));
         out.push('=');
-        out.push_str(&urlencoding::encode(value));
+        out.push_str(&atlassian_cli_api::query::encode_query_component(value));
     }
     Ok(out)
 }

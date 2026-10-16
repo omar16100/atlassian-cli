@@ -3119,3 +3119,12 @@ default feature, which Codex flagged as a semver break for `default-features = f
 so the gate was removed. The `backoff` dependency, the deprecated method and the two `deny.toml`
 ignores go together in the next breaking release. Thirteen unit tests cover the generator and the
 retry loop, plus one wiremock test for the raw path's final response.
+
+## 2026-10-16: dependency cuts, PR 4, urlencoding replaced (branch `chore/dependency-cuts-4-urlencoding`)
+
+Finding 5 of `docs/16102026_dependency_cuts_plan.md`. New module `crates/api/src/query.rs` with
+`encode_query_component`, built on `percent-encoding` (already in the graph through `url`) and the
+same character set `urlencoding` used. The 11 call sites in the cli crate (JQL, CQL and the
+`api` passthrough query builder) now call it. Five tests check the output against strings produced
+by `urlencoding 2.1.3`. `urlencoding` is out of the lock file (349 to 348). No URL changes, so no
+CHANGELOG entry.
