@@ -518,7 +518,7 @@ enum CommentCommands {
         visibility_group: Option<String>,
         /// Remove the role or group restriction, so everyone who can see the
         /// issue can read the comment. The JSM internal/public status is a
-        /// separate control (see `jsm requests`).
+        /// separate control (see `jsm request`).
         #[arg(long, conflicts_with_all = ["visibility_role", "visibility_group"])]
         visibility_public: bool,
     },
