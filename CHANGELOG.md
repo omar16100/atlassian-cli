@@ -11,6 +11,15 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Deprecated
+
+- `RetryConfig::backoff()` in `atlassian-cli-api` is deprecated. Use
+  `RetryConfig::delays()`, which the client now uses internally: the same
+  retry policy (first interval, growth, cap, plus or minus 10% jitter) with
+  its own arithmetic, so individual delays can differ by a nanosecond. The
+  method and the unmaintained `backoff` dependency are removed in the next
+  breaking release. (#PRNUM)
+
 ### Security
 
 - Bumped `rustls` from 0.23.45 to 0.23.46, which closes RUSTSEC-2026-0346,

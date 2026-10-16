@@ -186,6 +186,7 @@ dependencies = [
  "backoff",
  "chrono",
  "criterion",
+ "fastrand",
  "reqwest",
  "secrecy",
  "serde",

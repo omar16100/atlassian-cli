@@ -17,6 +17,7 @@ tokio.workspace = true
 url.workspace = true
 tracing.workspace = true
 backoff.workspace = true
+fastrand = "2"
 chrono.workspace = true
 secrecy = "0.10"
 

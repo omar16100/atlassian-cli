@@ -1,6 +1,6 @@
 # Dependency cuts, 16 Oct 2026
 
-Status: PR 1 (findings 2, 4, 6 and the `backoff` feature) is PR #162. PR 2 (finding 1, option A) is on branch `chore/dependency-cuts-2-tls`, stacked on PR 1, 16 Oct 2026. PRs 3 to 5 not started. Measured on `main` at `1301e23` plus the rustls 0.23.46 bump
+Status: PR 1 (findings 2, 4, 6 and the `backoff` feature) is PR #162. PR 2 (finding 1, option A) is PR #164. PR 3 (finding 3, `backoff`: internal swap and deprecation only, removal deferred to a breaking release) is on branch `chore/dependency-cuts-3-backoff`, 16 Oct 2026. PRs 4 and 5 not started. Measured on `main` at `1301e23` plus the rustls 0.23.46 bump
 from PR #160. Reviewed by Codex on 16 Oct 2026
 (`/Users/macmini/projects/codex/atlassian_cli_dependency_cuts_16oct2026.txt`); its
 corrections are folded in and marked **[codex]**.
@@ -226,6 +226,32 @@ on any target. `rustls-pki-types` stays, as predicted. The four release targets 
 `pr-run-mode = "upload"` plus `cache-builds = false` in `dist-workspace.toml` (Release run
 38847415620: all four `build-local-artifacts` jobs green, `host`, `announce` and
 `publish-homebrew-formula` skipped). Both settings were removed again before merge. Live tenant test on macOS (aarch64) with the release binary: `jira api /rest/api/3/serverInfo` returned the tenant's server info over HTTPS, so the native-tls handshake and system trust store work; `auth test` returned 401 because the stored token is expired (a pre-existing blocker on this Mac, 28 Sep 2026). Linux live test: the `x86_64-unknown-linux-musl` artifact from that run, executed in an `alpine:3.20` container (amd64), returned the same server info over HTTPS, and `auth test` returned the same 401. Vendored OpenSSL with the container's CA bundle works.
+
+## PR 3 result (16 Oct 2026, no public API break)
+
+The owner asked for no breaking change. The first draft gated `RetryConfig::backoff()` behind a
+default feature; Codex pointed out that Cargo's semver rules count that as a break for a
+consumer with `default-features = false`, so the gate was dropped. Result:
+
+- `RetryConfig::backoff()` stays, unconditional, marked `#[deprecated]`. The `backoff`
+  dependency therefore stays too, and the release graph does not shrink in this PR
+  (218 packages before and after). The removal of both is scheduled for the next breaking
+  release, together with the two `deny.toml` ignores.
+- The client itself no longer uses `backoff`. `RetryDelays` in `crates/api/src/retry.rs`
+  implements the same policy: first interval, multiplier, cap before jitter, plus or minus
+  10% jitter from `fastrand` (already in the graph through `phf_generator`), no elapsed-time
+  cutoff. The arithmetic is not bit-identical (`f64` seconds rounded to the nearest
+  nanosecond, where `backoff` truncated nanoseconds), so single delays can differ by a
+  nanosecond. The raw request loop advances the generator on every retry and still prefers a
+  numeric `Retry-After`.
+- Measured with the gate in place, the binary graph would drop to 210 (`backoff`, `instant`,
+  `rand 0.8`, `rand_chacha 0.3`, `rand_core 0.6`, `getrandom 0.2`), the release binary grew
+  by 15 KB (21916672 to 21932032 bytes). That is the expected outcome of the breaking release.
+
+Tests added: jitter bounds and the rounded upper endpoint, growth and cap, overflow, fractional
+growth, an initial interval above the cap, attempt limit, `max_retries` 0 and 1, first success,
+non-retryable stop, the deprecated constructor's settings, and a wiremock test for a 429 with
+`Retry-After` followed by 503s that checks the final body and headers survive.
 
 ## Verification
 

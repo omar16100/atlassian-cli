@@ -4,7 +4,6 @@ pub mod ratelimit;
 mod response;
 pub mod retry;
 
-use backoff::backoff::Backoff;
 use error::{ApiError, Result};
 use ratelimit::RateLimiter;
 use reqwest::header::HeaderMap;
@@ -723,7 +722,7 @@ impl ApiClient {
         // retry_with_backoff cannot be used here: its closure must signal a
         // retryable outcome as Err, which would discard the RawResponse we have
         // to return on the final attempt.
-        let mut backoff = self.retry_config.backoff();
+        let mut delays = self.retry_config.delays();
         let mut attempts = 0usize;
 
         loop {
@@ -747,19 +746,20 @@ impl ApiClient {
 
             let retryable = status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error();
             if idempotent && retryable && attempts < self.retry_config.max_retries {
-                if let Some(wait) = backoff.next_backoff() {
-                    // A 429 says how long to wait; obey it rather than racing
-                    // back in after a short exponential sleep.
-                    let wait = retry_after(&response).unwrap_or(wait);
-                    warn!(
-                        status = status.as_u16(),
-                        attempt = attempts,
-                        wait_ms = wait.as_millis(),
-                        "Raw request failed, retrying"
-                    );
-                    tokio::time::sleep(wait).await;
-                    continue;
-                }
+                // Advance the exponential delay on every retry, so a later
+                // attempt without a Retry-After header does not restart from the
+                // initial interval. A 429 says how long to wait; obey it rather
+                // than racing back in after a short exponential sleep.
+                let fallback = delays.next_delay();
+                let wait = retry_after(&response).unwrap_or(fallback);
+                warn!(
+                    status = status.as_u16(),
+                    attempt = attempts,
+                    wait_ms = wait.as_millis(),
+                    "Raw request failed, retrying"
+                );
+                tokio::time::sleep(wait).await;
+                continue;
             }
 
             let headers = response
@@ -1409,6 +1409,56 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status, 500);
+    }
+
+    /// A 429 with Retry-After, then a 503 without it: the loop keeps retrying
+    /// until the attempt limit and hands back the final response untouched,
+    /// body and headers included.
+    #[tokio::test]
+    async fn test_request_raw_keeps_the_final_response_after_retry_after_and_5xx() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/throttled"))
+            .respond_with(ResponseTemplate::new(429).insert_header("Retry-After", "0"))
+            .up_to_n_times(1)
+            .expect(1)
+            .mount(&server)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/throttled"))
+            .respond_with(
+                ResponseTemplate::new(503)
+                    .insert_header("x-trace", "abc")
+                    .set_body_string("still down"),
+            )
+            .expect(2)
+            .mount(&server)
+            .await;
+
+        let client = ApiClient::new(server.uri())
+            .unwrap()
+            .with_retry_config(RetryConfig {
+                initial_interval: Duration::from_millis(1),
+                ..RetryConfig::default()
+            });
+        let response = client
+            .request_raw(RawRequest {
+                method: Method::GET,
+                path: "/throttled",
+                headers: HeaderMap::new(),
+                body: None,
+                timeout: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.status, 503);
+        assert_eq!(String::from_utf8_lossy(&response.body), "still down");
+        assert!(response
+            .headers
+            .iter()
+            .any(|(name, value)| name == "x-trace" && value == "abc"));
+        assert_eq!(server.received_requests().await.unwrap().len(), 3);
     }
 
     /// Replaying a POST can double-create. `request` does retry POSTs; the raw

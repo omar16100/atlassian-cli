@@ -3106,3 +3106,16 @@ CDLA-Permissive-2.0, which existed only for the rustls subtree. Lock 386 to 349,
 227 to 218. The four release targets were built on the PR (Release run 38847415620) through a temporary
 `pr-run-mode = "upload"`, removed again before merge. The musl artifact ran in an Alpine container
 against the real tenant over HTTPS.
+
+## 2026-10-16: dependency cuts, PR 3, backoff swap without an API break (branch `chore/dependency-cuts-3-backoff`)
+
+Finding 3 of `docs/16102026_dependency_cuts_plan.md`, under the owner's "do not break" rule.
+`RetryDelays` in `crates/api/src/retry.rs` replaces `backoff::ExponentialBackoff` inside the
+client: same policy (first interval, multiplier, cap before jitter, plus or minus 10% jitter from
+`fastrand`, no elapsed-time cutoff), own arithmetic (delays can differ by a nanosecond). The raw
+request loop advances the generator on every retry, also when `Retry-After` sets the wait.
+`RetryConfig::backoff()` stays, unconditional and deprecated: a first draft gated it behind a
+default feature, which Codex flagged as a semver break for `default-features = false` consumers,
+so the gate was removed. The `backoff` dependency, the deprecated method and the two `deny.toml`
+ignores go together in the next breaking release. Thirteen unit tests cover the generator, the
+retry loop and the raw path's final response.
