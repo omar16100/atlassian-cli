@@ -18,7 +18,7 @@ resolve. `git log` remains the complete record.
   retry policy (first interval, growth, cap, plus or minus 10% jitter) with
   its own arithmetic, so individual delays can differ by a nanosecond. The
   method and the unmaintained `backoff` dependency are removed in the next
-  breaking release. (#PRNUM)
+  breaking release. (#165)
 
 ### Security
 
