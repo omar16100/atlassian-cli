@@ -210,12 +210,12 @@ mod tests {
         let mut delays = config(500, 2_000, 2.0).delays();
         let expected_bases = [500u64, 1000, 2000, 2000, 2000];
         for base in expected_bases {
-            let delay = delays.next_delay().as_millis() as u64;
-            let low = base * 9 / 10;
-            let high = base * 11 / 10;
+            let delay = delays.next_delay();
+            let low = Duration::from_millis(base * 9 / 10);
+            let high = Duration::from_millis(base * 11 / 10);
             assert!(
                 (low..=high).contains(&delay),
-                "delay {delay} ms, base {base} ms"
+                "delay {delay:?}, base {base} ms"
             );
         }
     }
@@ -284,8 +284,9 @@ mod tests {
 
     #[test]
     fn jitter_upper_endpoint_is_reached_by_rounding_only() {
-        // The ideal range is [0.9 * base, 1.1 * base); the largest f64 below 1
-        // rounds to the endpoint in nanoseconds.
+        // The ideal range is [0.9 * base, 1.1 * base). `1.0 - f64::EPSILON` is
+        // the largest value fastrand::f64() can return (not the largest f64
+        // below 1), and it rounds to the endpoint in nanoseconds.
         let base = Duration::from_millis(500);
         let top = jittered(base, 0.1, 1.0 - f64::EPSILON);
         assert_eq!(top, Duration::from_millis(550));

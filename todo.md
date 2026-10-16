@@ -3117,5 +3117,5 @@ request loop advances the generator on every retry, also when `Retry-After` sets
 `RetryConfig::backoff()` stays, unconditional and deprecated: a first draft gated it behind a
 default feature, which Codex flagged as a semver break for `default-features = false` consumers,
 so the gate was removed. The `backoff` dependency, the deprecated method and the two `deny.toml`
-ignores go together in the next breaking release. Thirteen unit tests cover the generator, the
-retry loop and the raw path's final response.
+ignores go together in the next breaking release. Thirteen unit tests cover the generator and the
+retry loop, plus one wiremock test for the raw path's final response.
