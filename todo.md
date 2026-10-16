@@ -3172,3 +3172,10 @@ wiremock tests for the POST and PUT bodies: unrestricted, role, group, restricti
 public comment stays public, `--visibility-public` removes, set without reading, and no PUT when
 the read fails. `issues.rs` is over the 2000 line guideline (it was before this change); moving the
 comment operations to `jira/comments.rs` is a follow-up.
+
+## 2026-10-16: release 0.12.0 (branch `chore/release-0.12.0`)
+
+Changelog promoted to `## [0.12.0] - 2026-10-16` (one entry, the comment visibility feature from
+#170), version bumped in the root manifest and the five internal pins. Minor bump: new flags and
+an observable change (`comments update` reads before it writes). Plan and verification record:
+`docs/16102026_release_0_12_0_plan.md`.

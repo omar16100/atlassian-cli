@@ -11,6 +11,11 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-16
+
+One feature, from a user report: Jira comments can be restricted to a project
+role or a group, and editing a restricted comment no longer republishes it.
+
 ### Added
 
 - `jira issue comments add` and `jira issue comments update` take
@@ -565,7 +570,8 @@ in scripts.
 First release: a Rust CLI for Jira, Confluence and Bitbucket, distributed through
 cargo-dist with a Homebrew tap and a shell installer.
 
-[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/omar16100/atlassian-cli/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/omar16100/atlassian-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/omar16100/atlassian-cli/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/omar16100/atlassian-cli/compare/v0.9.2...v0.9.3
