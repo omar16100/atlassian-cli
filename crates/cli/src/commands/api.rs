@@ -232,7 +232,7 @@ pub(crate) fn format_body(bytes: &[u8], format: OutputFormat) -> Result<Rendered
     };
     match serde_json::from_str::<serde_json::Value>(text) {
         Ok(value) if format == OutputFormat::Yaml => Ok(Rendered::Text(
-            serde_yaml::to_string(&value).context("Failed to convert response to YAML")?,
+            yaml_serde::to_string(&value).context("Failed to convert response to YAML")?,
         )),
         Ok(value) => Ok(Rendered::Text(
             serde_json::to_string_pretty(&value).context("Failed to format response as JSON")?,

@@ -29,7 +29,10 @@ tokio = { version = "1.51", features = ["rt-multi-thread", "macros", "time", "sy
 reqwest = { version = "0.13", default-features = false, features = ["charset", "http2", "system-proxy", "json", "multipart", "native-tls-vendored"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_yaml = "0.9"
+# yaml_serde is serde_yaml continued by the YAML organization (same API, same serializer
+# and emitter code), on libyaml-rs instead of the unmaintained unsafe-libyaml
+# (RUSTSEC-2024-0449).
+yaml_serde = "0.10"
 
 # Output formatting
 # default-features disabled to drop the `derive` feature (tabled_derive ->

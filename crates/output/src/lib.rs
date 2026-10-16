@@ -150,7 +150,7 @@ impl OutputRenderer {
                 println!("{}", serde_json::to_string_pretty(&json_value)?);
             }
             OutputFormat::Yaml => {
-                println!("{}", serde_yaml::to_string(&json_value)?);
+                println!("{}", yaml_serde::to_string(&json_value)?);
             }
             OutputFormat::Csv => {
                 if !self.render_csv(&json_value)? {
@@ -290,7 +290,7 @@ impl OutputRenderer {
                 }
                 OutputFormat::Yaml => {
                     let envelope = ListEnvelope::new(items, meta);
-                    println!("{}", serde_yaml::to_string(&envelope)?);
+                    println!("{}", yaml_serde::to_string(&envelope)?);
                     return Ok(());
                 }
                 _ => {}
@@ -943,6 +943,74 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Json);
         let result = renderer.render(&test_data);
         assert!(result.is_ok());
+    }
+
+    /// YAML text is script-visible output. The expected string was produced by
+    /// serde_yaml 0.9.34 before the swap to yaml_serde; the swap must not
+    /// change a byte of it.
+    #[test]
+    fn yaml_output_text_is_unchanged_by_the_yaml_crate() {
+        let value = serde_json::json!({
+            "key": "DEV-1", "summary": "Fix: the thing", "count": 3, "ratio": 1.5,
+            "done": false, "none": null,
+            "labels": ["a", "b c", "yes", "123", ""],
+            "nested": {
+                "url": "https://x.y/z?a=1&b=2", "multi": "line one\nline two\n",
+                "quote": "it's \"q\"", "colon": "a: b", "hash": "a #b",
+                "date": "2026-10-16", "empty_list": [], "empty_map": {}
+            }
+        });
+        let expected = "\
+count: 3
+done: false
+key: DEV-1
+labels:
+- a
+- b c
+- yes
+- '123'
+- ''
+nested:
+  colon: 'a: b'
+  date: 2026-10-16
+  empty_list: []
+  empty_map: {}
+  hash: 'a #b'
+  multi: |
+    line one
+    line two
+  quote: it's \"q\"
+  url: https://x.y/z?a=1&b=2
+none: null
+ratio: 1.5
+summary: 'Fix: the thing'
+";
+        assert_eq!(yaml_serde::to_string(&value).unwrap(), expected);
+
+        let envelope = serde_json::json!({
+            "items": [{"id": 1, "name": "x"}, {"id": 2, "name": "y"}],
+            "total": 2, "truncated": false
+        });
+        assert_eq!(
+            yaml_serde::to_string(&envelope).unwrap(),
+            "items:\n- id: 1\n  name: x\n- id: 2\n  name: y\ntotal: 2\ntruncated: false\n"
+        );
+
+        // The real --envelope shape: field order, and absent optional fields
+        // stay absent rather than becoming null.
+        let rows = vec![
+            serde_json::json!({"id": 1, "name": "x"}),
+            serde_json::json!({"id": 2, "name": "y"}),
+        ];
+        let meta = ListMeta {
+            truncated: Some(false),
+            ..ListMeta::default()
+        };
+        let real = ListEnvelope::new(&rows, &meta);
+        assert_eq!(
+            yaml_serde::to_string(&real).unwrap(),
+            "data:\n- id: 1\n  name: x\n- id: 2\n  name: y\ncount: 2\ntruncated: false\n"
+        );
     }
 
     #[test]

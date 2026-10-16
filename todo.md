@@ -3128,3 +3128,12 @@ same character set `urlencoding` used. The 11 call sites in the cli crate (JQL, 
 `api` passthrough query builder) now call it. Five tests check the output against strings produced
 by `urlencoding 2.1.3`. `urlencoding` is out of the lock file (349 to 348). No URL changes, so no
 CHANGELOG entry.
+
+## 2026-10-16: dependency cuts, PR 5, serde_yaml to yaml_serde (branch `chore/dependency-cuts-5-yaml`)
+
+Finding 7 of `docs/16102026_dependency_cuts_plan.md`. `yaml_serde` 0.10 is serde_yaml continued
+by the YAML organization on `libyaml-rs`; same API, byte-identical output on the workspace's shapes
+(checked in a scratch project against serde_yaml 0.9.34 and serde-saphyr 2.0.0). `serde_yaml` and
+`unsafe-libyaml` left the lock file; the RUSTSEC-2024-0449 ignore left `deny.toml`. New tests:
+the example config file parses, and a golden test pins the YAML output text. CHANGELOG has a
+Security bullet.

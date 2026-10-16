@@ -876,7 +876,7 @@ Error Handling:
 | Streams | futures-util 0.3 (`std` only) | Bounded concurrency in the bulk executor |
 | Retry delays | `RetryDelays` in `crates/api/src/retry.rs`, jitter from fastrand 2 | Exponential delays between attempts; `backoff` stays a dependency only for the deprecated `RetryConfig::backoff()` until the next breaking release |
 | HTTP Client | Reqwest 0.13, native-tls only (`default-features = false`; vendored OpenSSL on Linux GNU and musl, Security.framework on macOS) | REST API communication |
-| Serialization | Serde | JSON/YAML/XML conversion |
+| Serialization | Serde, serde_json, yaml_serde 0.10 (serde_yaml continued by the YAML organization, on libyaml-rs) | JSON/YAML/XML conversion |
 | Output | Tabled, Colored | Terminal tables & colors |
 | Progress | Indicatif | Progress bars |
 | Security | AES-GCM 0.11, Argon2 0.6 | Credential encryption |

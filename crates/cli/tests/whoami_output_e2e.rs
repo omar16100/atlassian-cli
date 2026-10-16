@@ -141,7 +141,7 @@ async fn whoami_yaml_is_parseable() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success(), "{stdout}");
 
-    let parsed: serde_yaml::Value = serde_yaml::from_str(&stdout)
+    let parsed: yaml_serde::Value = yaml_serde::from_str(&stdout)
         .unwrap_or_else(|e| panic!("-f yaml did not produce YAML ({e}): {stdout}"));
     assert_eq!(parsed["account_id"].as_str(), Some("acc-123"));
 }

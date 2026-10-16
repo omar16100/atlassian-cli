@@ -1,6 +1,6 @@
 # Dependency cuts, 16 Oct 2026
 
-Status: PR 1 is #162 (merged). PR 2 (finding 1, option A) is #164 (merged). PR 3 (finding 3, internal swap and deprecation only, removal deferred to a breaking release) is #165 (merged). PR 4 (finding 5, `urlencoding`) is on branch `chore/dependency-cuts-4-urlencoding`, 16 Oct 2026. PR 5 not started.
+Status: PR 1 is #162 (merged). PR 2 (finding 1, option A) is #164 (merged). PR 3 (finding 3, internal swap and deprecation only, removal deferred to a breaking release) is #165 (merged). PR 4 (finding 5, `urlencoding`) is #166 (merged). PR 5 (`serde_yaml` to `yaml_serde`) is on branch `chore/dependency-cuts-5-yaml`, 16 Oct 2026.
 from PR #160. Reviewed by Codex on 16 Oct 2026
 (`/Users/macmini/projects/codex/atlassian_cli_dependency_cuts_16oct2026.txt`); its
 corrections are folded in and marked **[codex]**.
@@ -261,6 +261,33 @@ set `urlencoding` used (Codex compared all 256 byte values). Five tests compare 
 produced by `urlencoding 2.1.3` on 16 Oct 2026 (JQL and CQL samples, delimiters, UTF-8, double
 encoding). Path validation stays separate, as planned. `urlencoding` left the lock file: 349 to
 348 packages, macOS release graph 218 to 217.
+
+## PR 5 result (16 Oct 2026, `serde_yaml` to `yaml_serde`)
+
+Candidates checked on crates.io on 16 Oct 2026 and compared in a scratch project on the
+workspace's own shapes (config struct, a JSON value with quoting edge cases, a list envelope):
+
+| Crate | Latest | State | Verdict |
+| --- | --- | --- | --- |
+| `serde_yaml_ng` 0.10.0 | May 2024 | still on `unsafe-libyaml` | no |
+| `serde_yml` 0.0.13 | May 2026 | deprecated shim, RUSTSEC-2025-0068 | no |
+| `serde_norway` 0.9.42 | Dec 2024 | fork on `unsafe-libyaml-norway`, stale | no |
+| `serde-saphyr` 2.0.0 | Oct 2026 | pure Rust, active, but double quotes strings, quotes `yes` and dates, and a JSON value does not round trip through serde_yaml text (YAML 1.2 typing) | not drop-in; the long-term pure-Rust option if an output change is ever acceptable |
+| `yaml_serde` 0.10.7 | Aug 2026 | serde_yaml continued by the YAML organization (`github.com/yaml/yaml-serde`, owner ingydotnet), `libyaml-rs` 0.3.0 instead of `unsafe-libyaml`; same API, byte-identical output on all three shapes, parses the hand-written example config | **chosen** |
+
+`libyaml-rs` is the YAML organization's fork of `unsafe-libyaml`: still a c2rust translation
+of libyaml, one release so far (Mar 2026). **[codex]** The scanner, parser, reader, emitter,
+writer, loader and dumper modules are identical to `unsafe-libyaml` 0.2.11; the differences
+are documentation, lint allowances and crate-name references (the raw `unsafe` text count
+drops from 241 to 237 for that reason only). `yaml_serde`'s `ser.rs`, `de.rs` and `value/`
+match `serde_yaml` 0.9.34 apart from `no_std` plumbing; one difference outside them:
+`Error::source()` now returns the underlying I/O or UTF-8 error instead of that error's
+source, which the CLI never reaches through `from_str` and `to_string`. MSRV moves to Rust
+1.82 (no workspace crate declares `rust-version`; CI uses stable). The swap trades an archived
+crate for a maintained one with the same risk profile, not for a safe parser. Result: `serde_yaml` and `unsafe-libyaml` left the lock file, the RUSTSEC-2024-0449
+ignore left `deny.toml`, `cargo deny check` is clean. New tests: the shipped
+`configs/config.example.yaml` parses, and a golden test pins the YAML output text recorded
+from serde_yaml 0.9.34.
 
 ## Verification
 

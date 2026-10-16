@@ -10,7 +10,7 @@ description = "Configuration management for Atlassian CLI"
 
 [dependencies]
 serde.workspace = true
-serde_yaml.workspace = true
+yaml_serde.workspace = true
 anyhow.workspace = true
 dirs.workspace = true
 indexmap = { version = "2.14", features = ["serde"] }

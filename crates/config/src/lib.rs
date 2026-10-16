@@ -40,7 +40,7 @@ impl Config {
         let raw = fs::read_to_string(path)
             .with_context(|| format!("Unable to read config file at {}", path.display()))?;
 
-        serde_yaml::from_str(&raw)
+        yaml_serde::from_str(&raw)
             .with_context(|| format!("Malformed YAML in config file {}", path.display()))
     }
 
@@ -53,7 +53,7 @@ impl Config {
             paths::create_private_dir(parent)?;
         }
 
-        let serialized = serde_yaml::to_string(self)?;
+        let serialized = yaml_serde::to_string(self)?;
         paths::write_private(path, serialized.as_bytes())
     }
 
@@ -171,6 +171,25 @@ impl Profile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The shipped example config parses with the YAML crate in use. Guards the
+    /// serde_yaml to yaml_serde swap and any later one: comments, blank lines,
+    /// unquoted URLs and emails, nested maps.
+    #[test]
+    fn example_config_file_parses() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../configs/config.example.yaml"
+        );
+        let raw = std::fs::read_to_string(path).expect("configs/config.example.yaml exists");
+        let config: Config = yaml_serde::from_str(&raw).expect("example config parses");
+        assert_eq!(config.default_profile.as_deref(), Some("personal"));
+        let personal = config.profiles.get("personal").expect("personal profile");
+        assert_eq!(
+            personal.base_url.as_deref(),
+            Some("https://example.atlassian.net")
+        );
+    }
     use std::io::Write;
     use tempfile::NamedTempFile;
 
@@ -446,14 +465,14 @@ mod tests {
 
         config.profiles.insert("prod".to_string(), profile);
 
-        let yaml = serde_yaml::to_string(&config).unwrap();
+        let yaml = yaml_serde::to_string(&config).unwrap();
 
         assert!(yaml.contains("default_profile: prod"));
         assert!(yaml.contains("https://prod.atlassian.net"));
         assert!(yaml.contains("admin@example.com"));
         assert!(yaml.contains("secret-token-123"));
 
-        let deserialized: Config = serde_yaml::from_str(&yaml).unwrap();
+        let deserialized: Config = yaml_serde::from_str(&yaml).unwrap();
         assert_eq!(deserialized.default_profile, config.default_profile);
         assert_eq!(deserialized.profiles.len(), 1);
     }
@@ -480,7 +499,7 @@ mod tests {
             email: Some("test@example.com".to_string()),
             ..Default::default()
         };
-        let yaml = serde_yaml::to_string(&profile).unwrap();
+        let yaml = yaml_serde::to_string(&profile).unwrap();
         assert!(!yaml.contains("bitbucket_token_type"));
     }
 
@@ -491,7 +510,7 @@ mod tests {
             bitbucket_token_type: Some("bearer".to_string()),
             ..Default::default()
         };
-        let yaml = serde_yaml::to_string(&profile).unwrap();
+        let yaml = yaml_serde::to_string(&profile).unwrap();
         assert!(yaml.contains("bitbucket_token_type: bearer"));
     }
 
@@ -499,7 +518,7 @@ mod tests {
     fn test_profile_backwards_compat_missing_token_type() {
         // Old config files without bitbucket_token_type should deserialize fine
         let yaml = "email: test@example.com\nworkspace: myteam\n";
-        let profile: Profile = serde_yaml::from_str(yaml).unwrap();
+        let profile: Profile = yaml_serde::from_str(yaml).unwrap();
         assert!(profile.bitbucket_token_type.is_none());
         assert_eq!(profile.email.as_deref(), Some("test@example.com"));
         assert_eq!(profile.workspace.as_deref(), Some("myteam"));
