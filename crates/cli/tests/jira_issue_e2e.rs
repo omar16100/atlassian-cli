@@ -62,6 +62,15 @@ async fn comment_update_targets_the_issue_scoped_endpoint() {
         .mount(&server)
         .await;
 
+    // An update without a visibility flag reads the comment first, to keep
+    // its current restriction.
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/TEST-1/comment/10100"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"id": "10100"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
     Mock::given(method("PUT"))
         .and(path_matcher("/rest/api/3/issue/TEST-1/comment/10100"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"id": "10100"})))
@@ -128,6 +137,15 @@ async fn comment_delete_targets_the_issue_scoped_endpoint() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn comment_update_sends_adf() {
     let server = MockServer::start().await;
+    // An update without a visibility flag reads the comment first, to keep
+    // its current restriction.
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/issue/TEST-1/comment/10100"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"id": "10100"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
     Mock::given(method("PUT"))
         .and(path_matcher("/rest/api/3/issue/TEST-1/comment/10100"))
         .and(body_json_string(

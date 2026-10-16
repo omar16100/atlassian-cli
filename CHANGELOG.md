@@ -15,11 +15,54 @@ resolve. `git log` remains the complete record.
 
 - `jira issue comments add` and `jira issue comments update` take
   `--visibility-role <ROLE>` or `--visibility-group <GROUP>`, which restrict the
-  comment to a project role or a group. Without either flag the behaviour is
-  unchanged: Jira publishes the comment to everyone who can see the issue. The
-  two flags are mutually exclusive. Note that `update` replaces visibility on
-  every call, so omitting the flag when editing a restricted comment
-  republishes it. (#158)
+  comment to a project role or a group. `add` without a flag is unchanged: Jira
+  publishes the comment to everyone who can see the issue. `update` without a
+  flag now reads the comment first and keeps its current restriction, because
+  Jira replaces visibility on every update; before, editing a restricted comment
+  through the CLI republished it. `update --visibility-public` removes a
+  restriction. The flags are mutually exclusive. Reported and first implemented
+  by Kim Kennof. (#157, #PRNUM)
+
+## [0.11.0] - 2026-10-16
+
+A dependency release. Commands, output formats and the TLS backend are
+unchanged. Retry delays now come from the crate's own generator: the same
+policy, with arithmetic that can differ from the old `backoff` crate by a
+nanosecond. The `atlassian-cli-api` library gains `RetryConfig::delays()` and
+the `query` module and deprecates `RetryConfig::backoff()`. The workspace sheds
+the unused rustls stack, the deprecated `serde_yaml`, `urlencoding` and nine
+unused declarations. The `aarch64-apple-darwin` release binary measured 25.2 MB
+before this work and 21.9 MB after the TLS change.
+
+### Added
+
+- `RetryConfig::delays()` and `RetryDelays` in `atlassian-cli-api`: the
+  exponential delay generator the client uses between attempts. (#165)
+- `query::encode_query_component` in `atlassian-cli-api`: percent-encodes a
+  query string key or value with the RFC 3986 unreserved set, the same output
+  the removed `urlencoding` crate produced. (#166)
+
+### Deprecated
+
+- `RetryConfig::backoff()` in `atlassian-cli-api` is deprecated. Use
+  `RetryConfig::delays()`, which the client now uses internally: the same
+  retry policy (first interval, growth, cap, plus or minus 10% jitter) with
+  its own arithmetic, so individual delays can differ by a nanosecond. The
+  method and the unmaintained `backoff` dependency are removed in the next
+  breaking release. (#165)
+
+### Security
+
+- Replaced `serde_yaml` (deprecated, on the unmaintained `unsafe-libyaml`,
+  RUSTSEC-2024-0449) with `yaml_serde`, the same code base continued by the
+  YAML organization on `libyaml-rs`. The serializer and the emitter are the
+  same code, so YAML output does not change; golden tests pin the output text
+  for the tested values, and the shipped example config parses. (#167)
+
+- Bumped `rustls` from 0.23.45 to 0.23.46, which closes RUSTSEC-2026-0346,
+  RUSTSEC-2026-0347, RUSTSEC-2026-0348 and RUSTSEC-2026-0349 (TLS secret
+  exposure through `Debug`, ECH rejection data leak, unbounded Brotli
+  certificate decompression, and a key exchange downgrade). (#160)
 
 ## [0.10.0] - 2026-09-28
 

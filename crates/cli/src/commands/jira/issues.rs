@@ -1209,16 +1209,68 @@ pub async fn list_comments(ctx: &JiraContext<'_>, key: &str, full: bool) -> Resu
 /// Who may read a comment.
 ///
 /// Jira applies no restriction when the `visibility` property is absent, which
-/// publishes the comment to everyone who can see the issue — on a public or
+/// publishes the comment to everyone who can see the issue; on a public or
 /// customer-facing project that includes the customer. The property is accepted
 /// on create and on update, and dropping it from an update republishes a
-/// restricted comment, so both paths carry it.
+/// restricted comment, so an update reads the current restriction first and
+/// keeps it unless told otherwise (see [`VisibilityChange`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommentVisibility {
     /// Visible only to members of a project role, by role name.
     Role(String),
     /// Visible only to members of a group, by group name.
     Group(String),
+}
+
+/// What an update does to the restriction of an existing comment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VisibilityChange {
+    /// Keep the restriction the comment has now. This is the default: the
+    /// comment is read first and its restriction is sent back with the new
+    /// body, because Jira replaces visibility on every update.
+    Keep,
+    /// Restrict the comment to the given role or group.
+    Set(CommentVisibility),
+    /// Remove the role or group restriction. The comment becomes visible to
+    /// everyone who can see the issue. Only `--visibility-public` produces
+    /// this. The JSM internal/public status of a comment is a separate,
+    /// read-only property here (`jsdPublic`), controlled through `jsm`.
+    Public,
+}
+
+/// The restriction an existing comment carries, ready to send back, or `None`
+/// when the comment is unrestricted.
+///
+/// Jira returns `type`, `value` and, for groups, an `identifier` (the group
+/// id). Group names can change, so the identifier is kept when present. A
+/// `visibility` object that cannot be restated is an error, not "public": the
+/// caller must not fall through to an unrestricted update.
+fn existing_visibility(comment: &Value) -> Result<Option<Value>> {
+    use serde_json::json;
+
+    let Some(visibility) = comment.get("visibility") else {
+        return Ok(None);
+    };
+    if visibility.is_null() {
+        return Ok(None);
+    }
+    let kind = visibility
+        .get("type")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow!("Comment visibility has no type: {visibility}"))?;
+    let value = visibility.get("value").and_then(Value::as_str);
+    let identifier = visibility.get("identifier").and_then(Value::as_str);
+    if value.is_none() && identifier.is_none() {
+        bail!("Comment visibility has neither value nor identifier: {visibility}");
+    }
+    let mut restated = json!({ "type": kind });
+    if let Some(value) = value {
+        restated["value"] = Value::String(value.to_string());
+    }
+    if let Some(identifier) = identifier {
+        restated["identifier"] = Value::String(identifier.to_string());
+    }
+    Ok(Some(restated))
 }
 
 /// Builds the `visibility` property of a comment payload.
@@ -1236,11 +1288,11 @@ fn visibility_value(visibility: Option<&CommentVisibility>) -> Option<Value> {
 
 /// Assembles a comment payload, with the `visibility` property only when the
 /// comment is restricted.
-fn comment_payload(body: &str, visibility: Option<&CommentVisibility>) -> Value {
+fn comment_payload(body: &str, visibility: Option<Value>) -> Value {
     use serde_json::json;
 
     let mut payload = json!({ "body": markdown_to_adf(body) });
-    if let Some(value) = visibility_value(visibility) {
+    if let Some(value) = visibility {
         payload["visibility"] = value;
     }
     payload
@@ -1252,7 +1304,7 @@ pub async fn add_comment(
     body: &str,
     visibility: Option<&CommentVisibility>,
 ) -> Result<()> {
-    let payload = comment_payload(body, visibility);
+    let payload = comment_payload(body, visibility_value(visibility));
 
     let _: Value = ctx
         .client
@@ -1279,8 +1331,26 @@ pub async fn update_comment(
     key: &str,
     comment_id: &str,
     body: &str,
-    visibility: Option<&CommentVisibility>,
+    change: &VisibilityChange,
 ) -> Result<()> {
+    let visibility = match change {
+        VisibilityChange::Keep => {
+            // Jira replaces visibility on every update. Read the comment and
+            // restate its restriction, so an edit never republishes it.
+            let current: Value = ctx
+                .client
+                .get(&format!("/rest/api/3/issue/{key}/comment/{comment_id}"))
+                .await
+                .with_context(|| {
+                    format!("Failed to read comment {comment_id} before updating it")
+                })?;
+            existing_visibility(&current).with_context(|| {
+                format!("Failed to keep the restriction of comment {comment_id}")
+            })?
+        }
+        VisibilityChange::Set(restriction) => visibility_value(Some(restriction)),
+        VisibilityChange::Public => None,
+    };
     let payload = comment_payload(body, visibility);
 
     let _: Value = ctx
@@ -1724,7 +1794,7 @@ mod tests {
     #[test]
     fn test_comment_payload_restricts_to_a_role() {
         let visibility = CommentVisibility::Role("Developer".to_string());
-        let payload = comment_payload("hello", Some(&visibility));
+        let payload = comment_payload("hello", visibility_value(Some(&visibility)));
         assert_eq!(
             payload["visibility"],
             json!({ "type": "role", "value": "Developer" })
@@ -1734,7 +1804,7 @@ mod tests {
     #[test]
     fn test_comment_payload_restricts_to_a_group() {
         let visibility = CommentVisibility::Group("jira-developers".to_string());
-        let payload = comment_payload("hello", Some(&visibility));
+        let payload = comment_payload("hello", visibility_value(Some(&visibility)));
         assert_eq!(
             payload["visibility"],
             json!({ "type": "group", "value": "jira-developers" })
@@ -1744,8 +1814,53 @@ mod tests {
     #[test]
     fn test_comment_payload_keeps_the_body_alongside_visibility() {
         let visibility = CommentVisibility::Role("Developer".to_string());
-        let payload = comment_payload("hello", Some(&visibility));
+        let payload = comment_payload("hello", visibility_value(Some(&visibility)));
         assert_eq!(extract_adf_text(&payload["body"]), "hello");
+    }
+
+    #[test]
+    fn existing_visibility_restates_type_value_and_identifier() {
+        let role = json!({
+            "id": "10500",
+            "visibility": { "type": "role", "value": "Developer", "identifier": "Developer" }
+        });
+        assert_eq!(
+            existing_visibility(&role).unwrap(),
+            Some(json!({ "type": "role", "value": "Developer", "identifier": "Developer" }))
+        );
+        let group = json!({ "visibility": {
+            "type": "group", "value": "jira-developers",
+            "identifier": "276f955c-63d7-42c8-9520-92d01dca0625"
+        } });
+        assert_eq!(
+            existing_visibility(&group).unwrap(),
+            Some(json!({
+                "type": "group", "value": "jira-developers",
+                "identifier": "276f955c-63d7-42c8-9520-92d01dca0625"
+            }))
+        );
+        let id_only = json!({ "visibility": { "type": "group", "identifier": "abc" } });
+        assert_eq!(
+            existing_visibility(&id_only).unwrap(),
+            Some(json!({ "type": "group", "identifier": "abc" }))
+        );
+    }
+
+    #[test]
+    fn existing_visibility_is_none_only_for_public_comments() {
+        assert_eq!(existing_visibility(&json!({ "id": "1" })).unwrap(), None);
+        assert_eq!(
+            existing_visibility(&json!({ "visibility": null })).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn existing_visibility_rejects_a_restriction_it_cannot_restate() {
+        assert!(existing_visibility(&json!({ "visibility": { "type": "role" } })).is_err());
+        assert!(existing_visibility(&json!({ "visibility": { "value": "Developer" } })).is_err());
+        assert!(existing_visibility(&json!({ "visibility": { "type": 1, "value": 2 } })).is_err());
+        assert!(existing_visibility(&json!({ "visibility": "Developer" })).is_err());
     }
 
     #[test]
@@ -2490,5 +2605,279 @@ mod tests {
         let custom = cf(&[("priority", json!({"name": "Low"}))]);
         let payload = build_update_payload(None, None, None, &custom).unwrap();
         assert_eq!(payload["fields"]["priority"], json!({"name": "Low"}));
+    }
+}
+
+/// Request bodies on the wire for comment create and update, against a mock
+/// Jira. These are the tests that prove the visibility rules, not the helpers.
+#[cfg(test)]
+mod comment_mock_tests {
+    use super::*;
+    use atlassian_cli_api::ApiClient;
+    use atlassian_cli_output::{OutputFormat, OutputRenderer};
+    use serde_json::json;
+    use wiremock::matchers::{body_json, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    const COMMENTS: &str = "/rest/api/3/issue/DEV-1/comment";
+    const COMMENT: &str = "/rest/api/3/issue/DEV-1/comment/10500";
+
+    fn ctx<'a>(server: &MockServer, renderer: &'a OutputRenderer) -> JiraContext<'a> {
+        JiraContext {
+            client: ApiClient::new(server.uri()).unwrap(),
+            renderer,
+        }
+    }
+
+    fn body_only(text: &str) -> Value {
+        json!({ "body": markdown_to_adf(text) })
+    }
+
+    fn with_visibility(text: &str, kind: &str, value: &str) -> Value {
+        json!({ "body": markdown_to_adf(text), "visibility": { "type": kind, "value": value } })
+    }
+
+    async fn expect_post(server: &MockServer, expected: Value) {
+        Mock::given(method("POST"))
+            .and(path(COMMENTS))
+            .and(body_json(expected))
+            .respond_with(ResponseTemplate::new(201).set_body_json(json!({ "id": "1" })))
+            .expect(1)
+            .mount(server)
+            .await;
+    }
+
+    async fn expect_put(server: &MockServer, expected: Value) {
+        Mock::given(method("PUT"))
+            .and(path(COMMENT))
+            .and(body_json(expected))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "id": "10500" })))
+            .expect(1)
+            .mount(server)
+            .await;
+    }
+
+    async fn current_comment(server: &MockServer, comment: Value, times: u64) {
+        Mock::given(method("GET"))
+            .and(path(COMMENT))
+            .respond_with(ResponseTemplate::new(200).set_body_json(comment))
+            .expect(times)
+            .mount(server)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn add_without_a_flag_sends_the_body_and_nothing_else() {
+        let server = MockServer::start().await;
+        expect_post(&server, body_only("note")).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        add_comment(&ctx(&server, &renderer), "DEV-1", "note", None)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn add_with_a_role_sends_the_visibility_property() {
+        let server = MockServer::start().await;
+        expect_post(&server, with_visibility("note", "role", "Developer")).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let restriction = CommentVisibility::Role("Developer".into());
+        add_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "note",
+            Some(&restriction),
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn add_with_a_group_sends_the_visibility_property() {
+        let server = MockServer::start().await;
+        expect_post(&server, with_visibility("note", "group", "jira-developers")).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let restriction = CommentVisibility::Group("jira-developers".into());
+        add_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "note",
+            Some(&restriction),
+        )
+        .await
+        .unwrap();
+    }
+
+    /// The case from #157: editing a restricted comment without a flag must not
+    /// republish it. The current restriction is read and sent back.
+    #[tokio::test]
+    async fn update_without_a_flag_keeps_the_existing_restriction() {
+        let server = MockServer::start().await;
+        current_comment(
+            &server,
+            json!({ "id": "10500", "visibility": { "type": "role", "value": "Developer", "identifier": "Developer" } }),
+            1,
+        )
+        .await;
+        expect_put(
+            &server,
+            json!({ "body": markdown_to_adf("edited"), "visibility": {
+                "type": "role", "value": "Developer", "identifier": "Developer"
+            } }),
+        )
+        .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        update_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "10500",
+            "edited",
+            &VisibilityChange::Keep,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// A group restriction is restated with its identifier, so a renamed group
+    /// still resolves.
+    #[tokio::test]
+    async fn update_without_a_flag_keeps_a_group_restriction_with_its_identifier() {
+        let server = MockServer::start().await;
+        let group = json!({
+            "type": "group", "value": "jira-developers",
+            "identifier": "276f955c-63d7-42c8-9520-92d01dca0625"
+        });
+        current_comment(&server, json!({ "id": "10500", "visibility": group }), 1).await;
+        expect_put(
+            &server,
+            json!({ "body": markdown_to_adf("edited"), "visibility": group }),
+        )
+        .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        update_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "10500",
+            "edited",
+            &VisibilityChange::Keep,
+        )
+        .await
+        .unwrap();
+    }
+
+    /// A restriction the CLI cannot restate must not become an unrestricted
+    /// update: no PUT is sent.
+    #[tokio::test]
+    async fn update_sends_no_put_when_the_restriction_cannot_be_restated() {
+        let server = MockServer::start().await;
+        current_comment(
+            &server,
+            json!({ "id": "10500", "visibility": { "type": "role" } }),
+            1,
+        )
+        .await;
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let err = update_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "10500",
+            "edited",
+            &VisibilityChange::Keep,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("neither value nor identifier"),
+            "{err:#}"
+        );
+    }
+
+    #[tokio::test]
+    async fn update_without_a_flag_leaves_a_public_comment_public() {
+        let server = MockServer::start().await;
+        current_comment(&server, json!({ "id": "10500" }), 1).await;
+        expect_put(&server, body_only("edited")).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        update_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "10500",
+            "edited",
+            &VisibilityChange::Keep,
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_with_visibility_public_removes_the_restriction_without_reading() {
+        let server = MockServer::start().await;
+        current_comment(&server, json!({ "id": "10500" }), 0).await;
+        expect_put(&server, body_only("edited")).await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        update_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "10500",
+            "edited",
+            &VisibilityChange::Public,
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_with_a_group_sets_it_without_reading() {
+        let server = MockServer::start().await;
+        current_comment(&server, json!({ "id": "10500" }), 0).await;
+        expect_put(
+            &server,
+            with_visibility("edited", "group", "jira-developers"),
+        )
+        .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let change = VisibilityChange::Set(CommentVisibility::Group("jira-developers".into()));
+        update_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "10500",
+            "edited",
+            &change,
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_fails_before_writing_when_the_comment_cannot_be_read() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(COMMENT))
+            .respond_with(
+                ResponseTemplate::new(404).set_body_json(json!({ "errorMessages": ["gone"] })),
+            )
+            .mount(&server)
+            .await;
+        Mock::given(method("PUT"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let err = update_comment(
+            &ctx(&server, &renderer),
+            "DEV-1",
+            "10500",
+            "edited",
+            &VisibilityChange::Keep,
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().contains("before updating"), "{err:#}");
     }
 }
