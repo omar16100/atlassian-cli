@@ -38,7 +38,7 @@ impl RetryConfig {
     /// the `backoff` crate is unmaintained (RUSTSEC-2025-0012), so this method
     /// and the `backoff` dependency go away in the next breaking release.
     #[deprecated(
-        since = "0.10.1",
+        since = "0.11.0",
         note = "use RetryConfig::delays(); backoff() is removed in the next breaking release"
     )]
     pub fn backoff(&self) -> ExponentialBackoff {

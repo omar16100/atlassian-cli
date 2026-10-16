@@ -11,6 +11,15 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-16
+
+A dependency release. Nothing a script can observe changes: the CLI keeps the
+same commands, output and TLS backend. The `atlassian-cli-api` library gains
+`RetryConfig::delays()` and the `query` module, deprecates
+`RetryConfig::backoff()`, and the workspace sheds the unused rustls stack, the
+deprecated `serde_yaml`, `urlencoding` and eight unused declarations. The release
+binary is about 13% smaller.
+
 ### Deprecated
 
 - `RetryConfig::backoff()` in `atlassian-cli-api` is deprecated. Use
@@ -534,7 +543,8 @@ in scripts.
 First release: a Rust CLI for Jira, Confluence and Bitbucket, distributed through
 cargo-dist with a Homebrew tap and a shell installer.
 
-[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/omar16100/atlassian-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/omar16100/atlassian-cli/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/omar16100/atlassian-cli/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/omar16100/atlassian-cli/compare/v0.9.1...v0.9.2
