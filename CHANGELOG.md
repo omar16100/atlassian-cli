@@ -21,7 +21,7 @@ resolve. `git log` remains the complete record.
   Jira replaces visibility on every update; before, editing a restricted comment
   through the CLI republished it. `update --visibility-public` removes a
   restriction. The flags are mutually exclusive. Reported and first implemented
-  by Kim Kennof. (#157, #PRNUM)
+  by Kim Kennof. (#157, #170)
 
 ## [0.11.0] - 2026-10-16
 
