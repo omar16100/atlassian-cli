@@ -222,10 +222,10 @@ native-tls-vendored`. `stream` dropped. The three licence allowances left `deny.
 
 `cargo tree -i` finds no dependents for `rustls`, `hyper-rustls`, `tokio-rustls`,
 `rustls-webpki`, `rustls-platform-verifier`, `aws-lc-rs`, `aws-lc-sys` and `webpki-root-certs`
-on any target. `rustls-pki-types` stays, as predicted. `dist-workspace.toml` carries a
-temporary `pr-run-mode = "upload"` (with `cache-builds = false`, so the generated workflow
-needs no new cache step) so the Release workflow builds the four targets on the PR; remove
-both before merge. The uploaded artifacts are visible to anyone with read access to the repo. Live tenant test on macOS (aarch64) with the release binary: `jira api /rest/api/3/serverInfo` returned the tenant's server info over HTTPS, so the native-tls handshake and system trust store work; `auth test` returned 401 because the stored token is expired (a pre-existing blocker on this Mac, 28 Sep 2026). Linux live test: not run locally; the PR's four-target artifact builds prove compilation only.
+on any target. `rustls-pki-types` stays, as predicted. The four release targets were built on the PR with a temporary
+`pr-run-mode = "upload"` plus `cache-builds = false` in `dist-workspace.toml` (Release run
+38847415620: all four `build-local-artifacts` jobs green, `host`, `announce` and
+`publish-homebrew-formula` skipped). Both settings were removed again before merge. Live tenant test on macOS (aarch64) with the release binary: `jira api /rest/api/3/serverInfo` returned the tenant's server info over HTTPS, so the native-tls handshake and system trust store work; `auth test` returned 401 because the stored token is expired (a pre-existing blocker on this Mac, 28 Sep 2026). Linux live test: the `x86_64-unknown-linux-musl` artifact from that run, executed in an `alpine:3.20` container (amd64), returned the same server info over HTTPS, and `auth test` returned the same 401. Vendored OpenSSL with the container's CA bundle works.
 
 ## Verification
 

@@ -3103,5 +3103,6 @@ compiled and never used. `default-features = false` with `charset, http2, system
 multipart, native-tls-vendored` keeps the backend the CLI already used and drops the rest.
 `stream` was unused and is gone too. `deny.toml` no longer allows ISC, OpenSSL and
 CDLA-Permissive-2.0, which existed only for the rustls subtree. Lock 386 to 349, release graph
-227 to 218. `dist-workspace.toml` has a temporary `pr-run-mode = "upload"` so the PR builds all
-four release targets; remove it before merge.
+227 to 218. The four release targets were built on the PR (Release run 38847415620) through a temporary
+`pr-run-mode = "upload"`, removed again before merge. The musl artifact ran in an Alpine container
+against the real tenant over HTTPS.
