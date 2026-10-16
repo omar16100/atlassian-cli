@@ -3071,3 +3071,12 @@ moves the lock from 0.23.45 to 0.23.46, the patched release. `cargo deny` also f
 RUSTSEC-2024-0449 (unsafe-libyaml, pulled in by serde_yaml, which is itself deprecated). There is no
 maintained upgrade, so `deny.toml` ignores it with a reason, the same way backoff and instant are
 handled. Replacing serde_yaml is tracked in `docs/todo.md`.
+
+## 2026-10-16: dependency cuts plan (branch `docs/dependency-cuts-plan`)
+
+Wrote `docs/16102026_dependency_cuts_plan.md` after the owner asked for libraries to remove.
+Largest finding: reqwest compiles two TLS stacks and selects native-tls at run time, so rustls
+and aws-lc-rs are dead weight. Also eight unused dependency declarations (and the dead file
+`crates/api/src/client.rs`), tokio `full`, `backoff`, `urlencoding`, and feature cuts on argon2,
+futures, criterion and proptest. Codex reviewed the plan; corrections are marked in the doc.
+No code changed in this branch.
