@@ -13,12 +13,22 @@ resolve. `git log` remains the complete record.
 
 ## [0.11.0] - 2026-10-16
 
-A dependency release. Nothing a script can observe changes: the CLI keeps the
-same commands, output and TLS backend. The `atlassian-cli-api` library gains
-`RetryConfig::delays()` and the `query` module, deprecates
-`RetryConfig::backoff()`, and the workspace sheds the unused rustls stack, the
-deprecated `serde_yaml`, `urlencoding` and eight unused declarations. The release
-binary is about 13% smaller.
+A dependency release. Commands, output formats and the TLS backend are
+unchanged. Retry delays now come from the crate's own generator: the same
+policy, with arithmetic that can differ from the old `backoff` crate by a
+nanosecond. The `atlassian-cli-api` library gains `RetryConfig::delays()` and
+the `query` module and deprecates `RetryConfig::backoff()`. The workspace sheds
+the unused rustls stack, the deprecated `serde_yaml`, `urlencoding` and nine
+unused declarations. The `aarch64-apple-darwin` release binary measured 25.2 MB
+before this work and 21.9 MB after the TLS change.
+
+### Added
+
+- `RetryConfig::delays()` and `RetryDelays` in `atlassian-cli-api`: the
+  exponential delay generator the client uses between attempts. (#165)
+- `query::encode_query_component` in `atlassian-cli-api`: percent-encodes a
+  query string key or value with the RFC 3986 unreserved set, the same output
+  the removed `urlencoding` crate produced. (#166)
 
 ### Deprecated
 
