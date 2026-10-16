@@ -26,7 +26,7 @@ resolve. `git log` remains the complete record.
   RUSTSEC-2024-0449) with `yaml_serde`, the same code base continued by the
   YAML organization on `libyaml-rs`. The serializer and the emitter are the
   same code, so YAML output does not change; golden tests pin the output text
-  for the tested values, and the shipped example config parses. (#PRNUM)
+  for the tested values, and the shipped example config parses. (#167)
 
 - Bumped `rustls` from 0.23.45 to 0.23.46, which closes RUSTSEC-2026-0346,
   RUSTSEC-2026-0347, RUSTSEC-2026-0348 and RUSTSEC-2026-0349 (TLS secret
