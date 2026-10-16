@@ -3179,3 +3179,14 @@ Changelog promoted to `## [0.12.0] - 2026-10-16` (one entry, the comment visibil
 #170), version bumped in the root manifest and the five internal pins. Minor bump: new flags and
 an observable change (`comments update` without a visibility flag reads before it writes). Shipped: tag `v0.12.0` on `f50e7fe`, 14 release assets, six crates on crates.io, Homebrew
 formula at 0.12.0, downloaded macOS artifact verified. Record: `docs/16102026_release_0_12_0_plan.md`.
+
+## 2026-10-16: Confluence CQL search pagination (draft PR #173)
+
+`confluence search cql` made one `/wiki/rest/api/content/search` request, so a
+server page cap could silently hide later matches even when `--limit` was
+higher. All four Confluence search variants now follow `_links.next` through
+the shared pagination driver. `--limit` applies to the combined results, with
+`--limit 0` requesting all pages within the request safety budget. Truncated
+results warn on stderr. An end-to-end mock covers the 250-to-251 boundary and
+the total limit. The Confluence page wrapper also normalizes Atlassian's
+`/rest/api/...` next link to `/wiki/rest/api/...`.

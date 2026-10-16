@@ -423,14 +423,17 @@ pub async fn fetch_paged<P: Page>(
 ```
 
 The *wrapper* is generic, not the item: `BitbucketPage<T>` keys on `values`,
-`JiraPage<T>` on `issues`. A single `fetch_paged<T>` cannot work, because
+`JiraPage<T>` on `issues`, and `ConfluencePage<T>` on `results`. A single
+`fetch_paged<T>` cannot work, because
 `ApiClient::get::<T>` deserializes the whole body and nothing tells it which key
 holds the items; passing the key as a string would mean a `serde_json::Value`
 round-trip that costs a second parse and discards type errors.
 
 `Continuation` is an enum because the products differ substantively: Bitbucket
 returns an absolute URL (resolved through `safe_join`, so a cursor pointing at
-another origin is refused), Jira an opaque token that the driver places back on
+another origin is refused), Confluence CQL search returns a `_links.next` URL
+(its `/rest/api/...` path is normalized to the site's `/wiki/rest/api/...`
+route), and Jira an opaque token that the driver places back on
 the *original* path, replacing any previous one; appending would put two
 `nextPageToken` values on the third page.
 
@@ -441,6 +444,10 @@ established.
 
 Data flow: **command → fetch_paged → ApiClient::get (per page) → PageInfo →
 ListMeta → OutputRenderer envelope.**
+
+Confluence search retains its existing array output and reports a truncated
+result on stderr when the requested total or the pagination request budget is
+reached.
 
 ---
 

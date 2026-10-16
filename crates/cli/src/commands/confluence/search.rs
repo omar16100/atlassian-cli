@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context, Result};
+use atlassian_cli_api::pagination::{fetch_paged, ConfluencePage, PageLimits};
 use serde::{Deserialize, Serialize};
 
 use super::utils::ConfluenceContext;
@@ -10,11 +11,6 @@ pub async fn search_cql(
     cql: &str,
     limit: Option<usize>,
 ) -> Result<()> {
-    #[derive(Deserialize)]
-    struct SearchResponse {
-        results: Vec<SearchResult>,
-    }
-
     // Only `id` is guaranteed; `title`/`type` may be null or absent for some
     // content types, which would otherwise abort the parse.
     #[derive(Deserialize)]
@@ -26,22 +22,22 @@ pub async fn search_cql(
         content_type: Option<String>,
     }
 
-    let mut query_params = vec![format!(
-        "cql={}",
+    // With no flag, retain the existing one-page default. `--limit` is a total
+    // result count, not a per-request page size; 0 asks for everything.
+    let limit = limit.unwrap_or(25);
+    let page_size = if limit == 0 { 250 } else { limit.min(250) };
+    let query = format!(
+        "/wiki/rest/api/content/search?cql={}&limit={page_size}",
         atlassian_cli_api::query::encode_query_component(cql)
-    )];
+    );
 
-    if let Some(l) = limit {
-        query_params.push(format!("limit={}", l));
-    }
-
-    let query_string = query_params.join("&");
-
-    let response: SearchResponse = ctx
-        .client
-        .get(&format!("/wiki/rest/api/content/search?{}", query_string))
-        .await
-        .context("Failed to search with CQL")?;
+    let (results, page) = fetch_paged::<ConfluencePage<SearchResult>>(
+        &ctx.client,
+        &query,
+        PageLimits::from_cli_limit(limit),
+    )
+    .await
+    .context("Failed to search with CQL")?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -50,13 +46,26 @@ pub async fn search_cql(
         content_type: &'a str,
     }
 
-    if response.results.is_empty() {
+    if results.is_empty() {
         ctx.verify_auth().await?;
         tracing::info!("No results found");
     }
 
-    let rows: Vec<Row<'_>> = response
-        .results
+    if page.truncated {
+        if limit == 0 || results.len() < limit {
+            eprintln!(
+                "warning: showing {} results; pagination stopped before completion.",
+                results.len()
+            );
+        } else {
+            eprintln!(
+                "warning: showing {} results; more match this query. Raise --limit, or use --limit 0 for all.",
+                results.len()
+            );
+        }
+    }
+
+    let rows: Vec<Row<'_>> = results
         .iter()
         .map(|r| Row {
             id: r.id.as_str(),

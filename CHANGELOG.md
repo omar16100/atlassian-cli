@@ -11,6 +11,12 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Fixed
+
+- Confluence `search cql`, `text`, `in-space`, and `params` follow additional
+  result pages. `--limit` now applies to the full result set, and incomplete
+  results produce a warning instead of silently stopping at one page. (#173)
+
 ## [0.12.0] - 2026-10-16
 
 One feature, from a user report: Jira comments can be restricted to a project

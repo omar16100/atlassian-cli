@@ -107,6 +107,44 @@ impl<T: DeserializeOwned> Page for BitbucketPage<T> {
     }
 }
 
+/// A Confluence CQL search page. Confluence returns the next request as a URL
+/// under `_links.next`, often without the site's `/wiki` prefix.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfluencePage<T> {
+    pub results: Vec<T>,
+    #[serde(default, rename = "_links")]
+    pub links: Option<ConfluenceLinks>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfluenceLinks {
+    #[serde(default)]
+    pub next: Option<String>,
+}
+
+impl<T: DeserializeOwned> Page for ConfluencePage<T> {
+    type Item = T;
+
+    fn into_parts(self) -> (Vec<T>, Option<Continuation>, Option<u64>) {
+        let next = self
+            .links
+            .and_then(|links| links.next)
+            .filter(|next| !next.trim().is_empty())
+            .map(|next| {
+                // The documented link starts `/rest/api/...`, whereas the
+                // Cloud endpoint lives under `/wiki/rest/api/...`. Keep the
+                // server's cursor and query intact, and let ApiClient check
+                // the resulting URL's origin before making the request.
+                if next.starts_with("/rest/api/") {
+                    Continuation::Url(format!("/wiki{next}"))
+                } else {
+                    Continuation::Url(next)
+                }
+            });
+        (self.results, next, None)
+    }
+}
+
 /// A Jira `/search/jql` page.
 #[derive(Debug, Clone, Deserialize)]
 pub struct JiraPage<T> {
