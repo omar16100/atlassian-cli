@@ -4,6 +4,7 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
     "RUSTSEC-2025-0012",  # backoff is unmaintained (used by api crate)
     "RUSTSEC-2024-0384",  # instant is unmaintained (dependency of backoff)
+    "RUSTSEC-2024-0449",  # unsafe-libyaml is unmaintained (dependency of serde_yaml, used by the cli, config and output crates); no maintained upgrade exists yet
 ]
 
 [licenses]

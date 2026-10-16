@@ -185,3 +185,5 @@
 - [ ] Prepare documentation: feature comparison vs ACLI/Appfire, FAQ, roadmap, launch blog post, Atlassian Community announcement.
 - [ ] Define support process (issue templates) and version/update policy (semver, `atlassian-cli version --check-update`).
 - [ ] Set up CI with lint/tests/security scans (`cargo fmt`, `cargo clippy`, `cargo test`, `cargo audit`, `cargo deny`) and release automation.
+
+- Replace `serde_yaml` (deprecated, depends on unmaintained `unsafe-libyaml`, RUSTSEC-2024-0449) in the cli, config and output crates with a maintained YAML crate, then drop the ignore from `deny.toml`. Noted 16 Oct 2026.

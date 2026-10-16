@@ -11,6 +11,13 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Security
+
+- Bumped `rustls` from 0.23.45 to 0.23.46, which closes RUSTSEC-2026-0346,
+  RUSTSEC-2026-0347, RUSTSEC-2026-0348 and RUSTSEC-2026-0349 (TLS secret
+  exposure through `Debug`, ECH rejection data leak, unbounded Brotli
+  certificate decompression, and a key exchange downgrade). (#PRNUM)
+
 ## [0.10.0] - 2026-09-28
 
 Fixes the six items from a user report that were still open on 0.9.3. Several

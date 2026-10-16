@@ -3062,3 +3062,12 @@ The reporter re-tested 14 items on 0.9.3; eight were already fixed (they had bee
 - [x] crates.io: all six crates at 0.10.0. Homebrew tap formula at 0.10.0; archive URLs return 200, aarch64 macOS sha256 matches.
 - [x] Released aarch64 macOS binary: `--version` 0.10.0, `[REPO] [PIPELINE]` on `pipeline get`, `--reviewers` on `pr update`, `--debug` accepted after a subcommand.
 - Plan doc status set to shipped: `docs/28092026_release_0_10_0_plan.md`.
+
+## 2026-10-16: rustls 0.23.46 and the unsafe-libyaml advisory (branch `fix/rustls-0.23.46`)
+
+The Security workflow on `main` failed after the merge of #156 because four rustls advisories
+(RUSTSEC-2026-0346 to 0349) were published after that PR's own check ran. `cargo update -p rustls`
+moves the lock from 0.23.45 to 0.23.46, the patched release. `cargo deny` also flagged
+RUSTSEC-2024-0449 (unsafe-libyaml, pulled in by serde_yaml, which is itself deprecated). There is no
+maintained upgrade, so `deny.toml` ignores it with a reason, the same way backoff and instant are
+handled. Replacing serde_yaml is tracked in `docs/todo.md`.
