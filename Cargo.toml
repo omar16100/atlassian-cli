@@ -20,7 +20,7 @@ homepage = "https://atlassian-cli.pages.dev"
 [workspace.dependencies]
 # CLI
 clap = { version = "4.6", features = ["derive", "env", "wrap_help"] }
-tokio = { version = "1.51", features = ["full"] }
+tokio = { version = "1.51", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "io-util"] }
 
 # HTTP & Serialization
 reqwest = { version = "0.13", features = ["json", "multipart", "stream", "native-tls-vendored"] }
@@ -51,10 +51,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
 url = "2.5"
 dirs = "7.0"
-futures = "0.3"
-backoff = { version = "0.4", features = ["tokio"] }
-async-trait = "0.1"
-async-stream = "0.3"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+backoff = "0.4"
 htmd = "0.5"
 # Markdown -> ADF conversion for Jira descriptions/comments
 pulldown-cmark = { version = "0.13", default-features = false }
@@ -62,8 +60,8 @@ pulldown-cmark = { version = "0.13", default-features = false }
 # Testing
 wiremock = "0.6"
 cargo-husky = { version = "1", default-features = false, features = ["user-hooks"] }
-criterion = { version = "0.8", features = ["html_reports", "async_tokio"] }
-proptest = "1.11"
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support", "async_tokio"] }
+proptest = { version = "1.11", default-features = false, features = ["std"] }
 
 # The profile that 'dist' will build with
 [profile.dist]

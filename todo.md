@@ -3080,3 +3080,16 @@ and aws-lc-rs are dead weight. Also eight unused dependency declarations (and th
 `crates/api/src/client.rs`), tokio `full`, `backoff`, `urlencoding`, and feature cuts on argon2,
 futures, criterion and proptest. Codex reviewed the plan; corrections are marked in the doc.
 No code changed in this branch.
+
+## 2026-10-16: dependency cuts, PR 1 (branch `chore/dependency-cuts-1`)
+
+Manifest-only cuts from `docs/16102026_dependency_cuts_plan.md`, findings 2, 4 and 6:
+- Removed declarations with zero uses: `async-trait`, `async-stream`, `futures`, `anyhow` from
+  the api crate; `tokio`, `thiserror`, `dirs` from auth; `thiserror`, `tracing` from config.
+  Deleted the dead file `crates/api/src/client.rs` (never declared as a module).
+- tokio `full` became `rt-multi-thread, macros, time, sync, fs, io-util`.
+- bulk uses `futures-util` (`std` only) instead of the `futures` umbrella.
+- `argon2` with `default-features = false, features = ["alloc"]`; `backoff` without its unused
+  `tokio` feature; `criterion` without `plotters` and `rayon`; `proptest` with `std` only.
+Result: lock 403 to 386 packages, release graph 237 to 227, `cargo deny check` clean,
+`make pre-commit` green. No behaviour change, so no CHANGELOG entry.

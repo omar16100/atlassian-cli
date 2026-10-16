@@ -12,9 +12,7 @@ description = "Configuration management for Atlassian CLI"
 serde.workspace = true
 serde_yaml.workspace = true
 anyhow.workspace = true
-thiserror.workspace = true
 dirs.workspace = true
-tracing.workspace = true
 indexmap = { version = "2.14", features = ["serde"] }
 
 [package.metadata.release]

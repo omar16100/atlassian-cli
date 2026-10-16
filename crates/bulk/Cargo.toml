@@ -14,7 +14,7 @@ indicatif.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-futures.workspace = true
+futures-util.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

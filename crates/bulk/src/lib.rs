@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use futures::stream::{self, StreamExt, TryStreamExt};
+use futures_util::stream::{self, StreamExt, TryStreamExt};
 use indicatif::{ProgressBar, ProgressStyle};
 use thiserror::Error;
 use tokio::sync::Semaphore;

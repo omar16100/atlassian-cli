@@ -12,16 +12,12 @@ description = "API client library for Atlassian Cloud products"
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-anyhow.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true
 tracing.workspace = true
 backoff.workspace = true
-async-trait.workspace = true
 chrono.workspace = true
-futures.workspace = true
-async-stream.workspace = true
 secrecy = "0.10"
 
 [dev-dependencies]

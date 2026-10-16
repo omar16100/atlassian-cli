@@ -1,6 +1,6 @@
 # Dependency cuts, 16 Oct 2026
 
-Status: proposed, not started. Measured on `main` at `1301e23` plus the rustls 0.23.46 bump
+Status: PR 1 (findings 2, 4, 6 and the `backoff` feature) implemented on branch `chore/dependency-cuts-1`, 16 Oct 2026; PRs 2 to 5 not started. Measured on `main` at `1301e23` plus the rustls 0.23.46 bump
 from PR #160. Reviewed by Codex on 16 Oct 2026
 (`/Users/macmini/projects/codex/atlassian_cli_dependency_cuts_16oct2026.txt`); its
 corrections are folded in and marked **[codex]**.
@@ -192,6 +192,22 @@ compatibility tests in `crates/auth` after the `argon2` change.
    ignores removed, and the public API decision recorded.
 4. PR: finding 5 (`urlencoding` to `percent-encoding`) with `encode_query_component`.
 5. Separate review: `serde_yaml` replacement.
+
+## PR 1 result (16 Oct 2026)
+
+Measured on `aarch64-apple-darwin`, normal edges, `--no-dedupe`:
+
+| Metric | Before (`7a298e7`) | After |
+| --- | --- | --- |
+| `Cargo.lock` packages | 403 | 386 |
+| Binary graph, distinct packages | 237 | 227 |
+| Release binary bytes | 25182160 | 25139232 (0.2% smaller; the removed crates were mostly dev or already linked out) |
+
+Gone from the lock file: `async-trait`, `async-stream`, `async-stream-impl`,
+`signal-hook-registry`, `plotters`, `rayon` and their private dependencies. `password-hash`
+stays listed in `Cargo.lock` because the lock file records optional dependencies, but no
+target compiles it (`cargo tree -i password-hash --target all` finds no dependents).
+`futures` (the umbrella) left the release graph; it stays in dev builds through wiremock.
 
 ## Verification
 
