@@ -23,7 +23,10 @@ clap = { version = "4.6", features = ["derive", "env", "wrap_help"] }
 tokio = { version = "1.51", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "io-util"] }
 
 # HTTP & Serialization
-reqwest = { version = "0.13", features = ["json", "multipart", "stream", "native-tls-vendored"] }
+# default-features = false keeps reqwest to one TLS stack. The 0.13 defaults add rustls,
+# and with both backends compiled reqwest selects native-tls anyway, so the rustls and
+# aws-lc subtree was dead weight. See docs/16102026_dependency_cuts_plan.md, finding 1.
+reqwest = { version = "0.13", default-features = false, features = ["charset", "http2", "system-proxy", "json", "multipart", "native-tls-vendored"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"

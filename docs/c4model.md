@@ -874,7 +874,7 @@ Error Handling:
 | CLI Framework | Clap 4.6 | Argument parsing with derive macros |
 | Async Runtime | Tokio 1.51 (`rt-multi-thread`, `macros`, `time`, `sync`, `fs`, `io-util`) | Non-blocking I/O; `net` arrives through reqwest and hyper-util |
 | Streams | futures-util 0.3 (`std` only) | Bounded concurrency in the bulk executor |
-| HTTP Client | Reqwest 0.13 | REST API communication |
+| HTTP Client | Reqwest 0.13, native-tls only (`default-features = false`; vendored OpenSSL on Linux GNU and musl, Security.framework on macOS) | REST API communication |
 | Serialization | Serde | JSON/YAML/XML conversion |
 | Output | Tabled, Colored | Terminal tables & colors |
 | Progress | Indicatif | Progress bars |

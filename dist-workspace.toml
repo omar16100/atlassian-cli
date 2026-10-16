@@ -10,6 +10,12 @@ ci = "github"
 # The installers to generate for each app
 installers = ["shell", "homebrew"]
 # Target platforms to build apps for (Rust target-triple syntax)
+# Temporary for PR 2 of the dependency cuts: build the four release targets on the PR.
+# Remove before merge.
+pr-run-mode = "upload"
+# pr-run-mode = "upload" flips cache-builds on, which would need a rust-cache step in
+# release.yml; keep the generated workflow unchanged.
+cache-builds = false
 targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 # Publish jobs to run in CI
 publish-jobs = ["homebrew"]

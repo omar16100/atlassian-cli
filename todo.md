@@ -3093,3 +3093,15 @@ Manifest-only cuts from `docs/16102026_dependency_cuts_plan.md`, findings 2, 4 a
   `tokio` feature; `criterion` without `plotters` and `rayon`; `proptest` with `std` only.
 Result: lock 403 to 386 packages, release graph 237 to 227, `cargo deny check` clean,
 `make pre-commit` green. No behaviour change, so no CHANGELOG entry.
+
+## 2026-10-16: dependency cuts, PR 2, one TLS stack (branch `chore/dependency-cuts-2-tls`)
+
+Finding 1, option A of `docs/16102026_dependency_cuts_plan.md`. reqwest 0.13 defaults to rustls,
+and the workspace also enabled `native-tls-vendored`; with both compiled reqwest selects
+native-tls at run time, so rustls, hyper-rustls, rustls-platform-verifier and aws-lc-sys were
+compiled and never used. `default-features = false` with `charset, http2, system-proxy, json,
+multipart, native-tls-vendored` keeps the backend the CLI already used and drops the rest.
+`stream` was unused and is gone too. `deny.toml` no longer allows ISC, OpenSSL and
+CDLA-Permissive-2.0, which existed only for the rustls subtree. Lock 386 to 349, release graph
+227 to 218. `dist-workspace.toml` has a temporary `pr-run-mode = "upload"` so the PR builds all
+four release targets; remove it before merge.
