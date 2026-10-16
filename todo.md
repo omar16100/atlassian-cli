@@ -3177,5 +3177,5 @@ comment operations to `jira/comments.rs` is a follow-up.
 
 Changelog promoted to `## [0.12.0] - 2026-10-16` (one entry, the comment visibility feature from
 #170), version bumped in the root manifest and the five internal pins. Minor bump: new flags and
-an observable change (`comments update` without a visibility flag reads before it writes). Plan and verification record:
-`docs/16102026_release_0_12_0_plan.md`.
+an observable change (`comments update` without a visibility flag reads before it writes). Shipped: tag `v0.12.0` on `f50e7fe`, 14 release assets, six crates on crates.io, Homebrew
+formula at 0.12.0, downloaded macOS artifact verified. Record: `docs/16102026_release_0_12_0_plan.md`.
