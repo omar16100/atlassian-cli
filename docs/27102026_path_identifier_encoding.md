@@ -1,6 +1,6 @@
 # Identifiers in write and delete request paths are percent-encoded
 
-Status: prepared for v0.13.0 (PR #178).
+Status: included in v0.13.0 (PR #178, integration PR #179).
 
 ## Problem
 
