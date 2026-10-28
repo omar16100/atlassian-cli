@@ -1,6 +1,6 @@
 # `confluence bulk delete`: listing by default and a confirmation gate
 
-Status: prepared for v0.13.0 (PR #176).
+Status: included in v0.13.0 (PR #176, integration PR #179).
 
 ## Problem
 

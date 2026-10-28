@@ -1,6 +1,6 @@
 # `jira bulk`: confirmed changes and per-issue transitions
 
-Status: prepared for v0.13.0 (PR #177).
+Status: included in v0.13.0 (PR #177, integration PR #179).
 
 ## Problem
 

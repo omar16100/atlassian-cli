@@ -3333,3 +3333,11 @@ The lockfile keeps Tokio 1.54.1 and updates `ctutils` to 0.4.4 and
 `rustls-webpki` to 0.103.16. The security workflow requires `cargo audit` success.
 No advisory exception was added. Version 0.13.0 remains prepared, with all new
 change notes under `[Unreleased]`. Release tags and publication remain pending.
+
+## 2026-10-28: release v0.13.0
+
+The user authorized publication after PR #179 merged. The release branch
+promotes the change notes to `0.13.0 - 2026-10-28` and updates the compare links.
+All six crates and the five internal dependency pins already use version 0.13.0.
+The release procedure checks CI before the tag and verifies GitHub assets,
+crates.io packages and Homebrew after publication.
