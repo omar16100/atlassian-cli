@@ -16,9 +16,9 @@ resolve. `git log` remains the complete record.
 - `bitbucket pr comments` reports `resolved` and `deleted` for each comment.
   `resolved` is the state of the comment's thread, so replies in a resolved
   thread report it too. A deleted comment, which Bitbucket returns with empty
-  content, can now be told apart from an empty one.
+  content, can now be told apart from an empty one. (#183)
 - `bitbucket pr comments --unresolved` hides every comment in a resolved
-  thread, replies included.
+  thread, replies included. (#183)
 
 ## [0.13.0] - 2026-10-28
 
