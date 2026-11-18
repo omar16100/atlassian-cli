@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use atlassian_cli_output::OutputFormat;
@@ -137,12 +139,20 @@ struct Comment {
     parent: Option<CommentParent>,
     #[serde(default)]
     inline: Option<Inline>,
+    #[serde(default)]
+    deleted: bool,
+    #[serde(default)]
+    resolution: Option<CommentResolution>,
 }
 
 #[derive(Deserialize)]
 struct CommentContent {
     raw: String,
 }
+
+/// Present only on the root comment of a resolved thread.
+#[derive(Deserialize)]
+struct CommentResolution {}
 
 #[derive(Deserialize)]
 struct CommentParent {
@@ -214,9 +224,12 @@ struct CommentRow<'a> {
     /// Appended rather than inserted: JSON key order, CSV columns and table
     /// headers stay additive for anything already parsing this output.
     location: String,
+    /// The state of the whole thread, so replies report it too.
+    resolved: bool,
+    deleted: bool,
 }
 
-fn comment_row(comment: &Comment) -> CommentRow<'_> {
+fn comment_row(comment: &Comment, resolved: bool) -> CommentRow<'_> {
     CommentRow {
         id: comment.id,
         author: comment.user.display_name.as_str(),
@@ -224,7 +237,36 @@ fn comment_row(comment: &Comment) -> CommentRow<'_> {
         created: comment.created_on.as_deref().unwrap_or(""),
         parent: comment.parent.as_ref().map(|parent| parent.id),
         location: format_comment_location(comment.inline.as_ref()),
+        resolved,
+        deleted: comment.deleted,
     }
+}
+
+/// Whether the thread containing `comment` is resolved, found by walking up to
+/// its root. A parent missing from `by_id` ends the walk as unresolved.
+fn thread_resolved(comment: &Comment, by_id: &HashMap<i64, &Comment>) -> bool {
+    let mut current = comment;
+    // Bounded so a parent cycle in a malformed response cannot loop forever.
+    for _ in 0..=by_id.len() {
+        if current.resolution.is_some() {
+            return true;
+        }
+        match current.parent.as_ref().and_then(|p| by_id.get(&p.id)) {
+            Some(parent) => current = parent,
+            None => return false,
+        }
+    }
+    false
+}
+
+fn comment_rows(comments: &[Comment], unresolved_only: bool) -> Vec<CommentRow<'_>> {
+    let by_id: HashMap<i64, &Comment> = comments.iter().map(|c| (c.id, c)).collect();
+    comments
+        .iter()
+        .map(|c| (c, thread_resolved(c, &by_id)))
+        .filter(|&(_, resolved)| !(unresolved_only && resolved))
+        .map(|(c, resolved)| comment_row(c, resolved))
+        .collect()
 }
 
 /// Build the JSON body for a PR-comment POST.
@@ -826,6 +868,7 @@ pub async fn list_pr_comments(
     workspace: &str,
     repo_slug: &str,
     pr_id: i64,
+    unresolved_only: bool,
 ) -> Result<()> {
     // Was a single unpaginated GET, and Bitbucket serves 20 comments per page by
     // default, so any busier pull request was silently cut short.
@@ -848,14 +891,24 @@ pub async fn list_pr_comments(
         );
     }
 
-    let rows: Vec<CommentRow<'_>> = comments.iter().map(comment_row).collect();
+    let rows = comment_rows(&comments, unresolved_only);
+    let empty_message = if unresolved_only {
+        "No unresolved comments found"
+    } else {
+        "No comments found"
+    };
 
     if rows.is_empty() {
-        tracing::info!(pr_id, workspace, repo_slug, "No comments found");
+        tracing::info!(
+            pr_id,
+            workspace,
+            repo_slug,
+            unresolved_only,
+            "{empty_message}"
+        );
     }
 
-    ctx.renderer
-        .render_list_or_empty(&rows, "No comments found")
+    ctx.renderer.render_list_or_empty(&rows, empty_message)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1621,12 +1674,123 @@ mod tests {
         }))
         .unwrap();
 
-        let row = serde_json::to_value(comment_row(&comment)).unwrap();
+        let row = serde_json::to_value(comment_row(&comment, false)).unwrap();
         assert_eq!(row["content"], "First line\nIdempotency marker");
         assert_eq!(row["parent"], 843649259);
 
         comment.parent = None;
-        assert!(serde_json::to_value(comment_row(&comment)).unwrap()["parent"].is_null());
+        assert!(serde_json::to_value(comment_row(&comment, false)).unwrap()["parent"].is_null());
+    }
+
+    fn thread_comment(id: i64, parent: Option<i64>, resolved: bool) -> Comment {
+        let mut raw = serde_json::json!({
+            "id": id,
+            "content": {"raw": format!("comment {id}")},
+            "user": {"display_name": "Dana"}
+        });
+        if let Some(parent) = parent {
+            raw["parent"] = serde_json::json!({"id": parent});
+        }
+        if resolved {
+            raw["resolution"] = serde_json::json!({
+                "type": "comment_resolution",
+                "user": {"display_name": "Dana"},
+                "created_on": "2026-11-18T10:00:00Z"
+            });
+        }
+        serde_json::from_value(raw).unwrap()
+    }
+
+    fn row_ids(rows: &[CommentRow<'_>]) -> Vec<i64> {
+        rows.iter().map(|row| row.id).collect()
+    }
+
+    #[test]
+    fn comment_rows_report_deleted_and_resolved_state() {
+        let comments: Vec<Comment> = serde_json::from_value(serde_json::json!([
+            {
+                "id": 1,
+                "content": {"raw": ""},
+                "user": {"display_name": "Dana"},
+                "deleted": true
+            },
+            {
+                "id": 2,
+                "content": {"raw": "Fixed"},
+                "user": {"display_name": "Dana"},
+                "deleted": false,
+                "resolution": {"type": "comment_resolution"}
+            },
+            {
+                "id": 3,
+                "content": {"raw": "No state fields"},
+                "user": {"display_name": "Dana"},
+                "resolution": null
+            }
+        ]))
+        .unwrap();
+
+        let rows = serde_json::to_value(comment_rows(&comments, false)).unwrap();
+        assert_eq!(rows[0]["deleted"], true);
+        assert_eq!(rows[0]["resolved"], false);
+        assert_eq!(rows[1]["deleted"], false);
+        assert_eq!(rows[1]["resolved"], true);
+        assert_eq!(rows[2]["deleted"], false);
+        assert_eq!(rows[2]["resolved"], false);
+    }
+
+    #[test]
+    fn replies_inherit_their_thread_resolution() {
+        // Bitbucket sets `resolution` on the root only, so 11 and 12 must look
+        // it up through their parents.
+        let comments = vec![
+            thread_comment(10, None, true),
+            thread_comment(11, Some(10), false),
+            thread_comment(12, Some(11), false),
+            thread_comment(20, None, false),
+            thread_comment(21, Some(20), false),
+        ];
+
+        let resolved: Vec<(i64, bool)> = comment_rows(&comments, false)
+            .iter()
+            .map(|row| (row.id, row.resolved))
+            .collect();
+        assert_eq!(
+            resolved,
+            vec![(10, true), (11, true), (12, true), (20, false), (21, false)]
+        );
+    }
+
+    #[test]
+    fn unresolved_only_drops_whole_resolved_threads() {
+        let comments = vec![
+            thread_comment(10, None, true),
+            thread_comment(11, Some(10), false),
+            thread_comment(20, None, false),
+            thread_comment(21, Some(20), false),
+            thread_comment(30, None, true),
+        ];
+
+        assert_eq!(row_ids(&comment_rows(&comments, true)), vec![20, 21]);
+        assert_eq!(
+            row_ids(&comment_rows(&comments, false)),
+            vec![10, 11, 20, 21, 30]
+        );
+    }
+
+    #[test]
+    fn a_reply_whose_parent_is_missing_counts_as_unresolved() {
+        let comments = vec![thread_comment(11, Some(10), false)];
+        assert_eq!(row_ids(&comment_rows(&comments, true)), vec![11]);
+    }
+
+    #[test]
+    fn a_parent_cycle_does_not_hang_the_thread_walk() {
+        let comments = vec![
+            thread_comment(1, Some(2), false),
+            thread_comment(2, Some(1), false),
+        ];
+        assert_eq!(row_ids(&comment_rows(&comments, true)), vec![1, 2]);
     }
 
     #[tokio::test]

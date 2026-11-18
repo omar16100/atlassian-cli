@@ -3341,3 +3341,16 @@ promotes the change notes to `0.13.0 - 2026-10-28` and updates the compare links
 All six crates and the five internal dependency pins already use version 0.13.0.
 The release procedure checks CI before the tag and verifies GitHub assets,
 crates.io packages and Homebrew after publication.
+
+## 2026-11-18: resolved and deleted state on `bb pr comments`
+
+`bb pr comments` dropped the `deleted` and `resolution` fields Bitbucket returns,
+so a deleted comment looked like an empty one and nothing showed which threads
+were resolved. Rows now carry `resolved` and `deleted`, appended after
+`location` to keep the output additive.
+
+Bitbucket sets `resolution` on a thread's root comment only. On a live pull
+request with 67 comments, none of the replies in resolved threads carried one.
+`resolved` is therefore computed per thread by walking parents to the root, and
+`--unresolved` drops whole resolved threads, replies included. The walk is
+bounded by the comment count so a malformed parent cycle cannot hang it.

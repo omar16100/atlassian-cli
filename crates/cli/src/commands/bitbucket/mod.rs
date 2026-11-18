@@ -395,6 +395,9 @@ enum PrCommands {
         repo: String,
         /// Pull request ID.
         pr_id: i64,
+        /// Hide comments in resolved threads, replies included.
+        #[arg(long)]
+        unresolved: bool,
     },
     /// Add a comment to a pull request, optionally inline or as a threaded reply
     #[command(long_about = "Add a comment to a pull request.\n\n\
@@ -1290,9 +1293,11 @@ pub async fn execute(
             PrCommands::Diff { repo, pr_id } => {
                 pullrequests::get_pr_diff(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Comments { repo, pr_id } => {
-                pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
-            }
+            PrCommands::Comments {
+                repo,
+                pr_id,
+                unresolved,
+            } => pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id, unresolved).await,
             PrCommands::Comment {
                 repo,
                 pr_id,
