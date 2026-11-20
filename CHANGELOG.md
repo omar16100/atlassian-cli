@@ -23,6 +23,20 @@ resolve. `git log` remains the complete record.
 
 ### Fixed
 
+- `confluence page add-restriction` sends the request body that the Confluence
+  REST specification requires: a `results` array, `accountId` for a user and
+  `id` for a group. Before, the server refused the body with "Required request
+  body is missing". `--subject-id` for a group is the group ID, not the group
+  name. `--operation` accepts only `read` or `update` and `--subject-type`
+  accepts only `user` or `group`. The values are case-sensitive, `--help` shows
+  them, and other values are refused before a request is sent, with a usage
+  error and exit code 2. An empty or blank `--subject-id` is refused before a
+  request is sent, and spaces at the two ends of the value are removed. The
+  change is verified against the specification and a mock server, not against a
+  live site. (#194)
+
+### Fixed
+
 - `confluence space list`, `page list` and `blog list` accept a `--limit` above
   250. Before, the value was sent as the page size of one request and the server
   refused it. `--limit` is now a total: the page size is clamped to 250 and the

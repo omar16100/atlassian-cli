@@ -907,6 +907,64 @@ pub async fn get_page_restrictions(ctx: &ConfluenceContext<'_>, page_id: &str) -
     Ok(())
 }
 
+/// Who a content restriction names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RestrictionSubject {
+    User,
+    Group,
+}
+
+/// Convert `--subject-type` to a subject.
+///
+/// clap accepts only `user` and `group` for the option (and only `read` and
+/// `update` for `--operation`), so the command line is checked in one place.
+/// The error arm is for a caller that does not come through clap.
+fn restriction_subject(subject_type: &str) -> Result<RestrictionSubject> {
+    match subject_type {
+        "user" => Ok(RestrictionSubject::User),
+        "group" => Ok(RestrictionSubject::Group),
+        other => anyhow::bail!("Invalid --subject-type '{other}'. Use user or group."),
+    }
+}
+
+/// Trim `--subject-id` and refuse a value that is empty or blank.
+///
+/// An empty ID gives a request that names no user and no group. The
+/// specification does not say what the server does with it, so it is not sent.
+/// The trimmed value is the value that is sent.
+fn restriction_subject_id(subject_id: &str) -> Result<&str> {
+    let trimmed = subject_id.trim();
+    if trimmed.is_empty() {
+        anyhow::bail!("--subject-id must not be empty.");
+    }
+    Ok(trimmed)
+}
+
+/// Build the body for `POST /wiki/rest/api/content/{id}/restriction`.
+///
+/// The Confluence Cloud REST API v1 specification
+/// (<https://dac-static.atlassian.com/cloud/confluence/swagger.v3.json>,
+/// schema `ContentRestrictionAddOrUpdateArray`) requires a `results` array with
+/// one entry for each operation. A user is named by `accountId` and a group by
+/// `id`. The body sent before was one bare object with `identifier` fields,
+/// which is not in the specification.
+fn restriction_payload(operation: &str, subject: RestrictionSubject, subject_id: &str) -> Value {
+    let restrictions = match subject {
+        RestrictionSubject::User => json!({
+            "user": { "results": [{ "accountId": subject_id }] }
+        }),
+        RestrictionSubject::Group => json!({
+            "group": { "results": [{ "id": subject_id }] }
+        }),
+    };
+    json!({
+        "results": [{
+            "operation": operation,
+            "restrictions": restrictions
+        }]
+    })
+}
+
 // Add page restriction
 pub async fn add_page_restriction(
     ctx: &ConfluenceContext<'_>,
@@ -915,15 +973,10 @@ pub async fn add_page_restriction(
     subject_type: &str,
     subject_id: &str,
 ) -> Result<()> {
-    let payload = json!({
-        "operation": operation,
-        "restrictions": {
-            subject_type: [{
-                "type": subject_type,
-                "identifier": subject_id
-            }]
-        }
-    });
+    let subject = restriction_subject(subject_type)?;
+    let subject_id = restriction_subject_id(subject_id)?;
+    let payload = restriction_payload(operation, subject, subject_id);
+    tracing::debug!(%page_id, %operation, ?subject, "Adding a content restriction");
 
     let _: Value = ctx
         .client
@@ -1391,6 +1444,63 @@ mod page_not_found_tests {
         assert!(err.chain().any(|c| c
             .downcast_ref::<atlassian_cli_api::error::ApiError>()
             .is_some()));
+    }
+}
+
+#[cfg(test)]
+mod restriction_tests {
+    use super::*;
+
+    #[test]
+    fn user_payload_has_a_results_array_and_an_account_id() {
+        let payload = restriction_payload("update", RestrictionSubject::User, "acc-1");
+        assert_eq!(
+            payload,
+            json!({
+                "results": [{
+                    "operation": "update",
+                    "restrictions": { "user": { "results": [{ "accountId": "acc-1" }] } }
+                }]
+            })
+        );
+    }
+
+    #[test]
+    fn group_payload_names_the_group_by_id() {
+        let payload = restriction_payload("read", RestrictionSubject::Group, "grp-1");
+        assert_eq!(
+            payload,
+            json!({
+                "results": [{
+                    "operation": "read",
+                    "restrictions": { "group": { "results": [{ "id": "grp-1" }] } }
+                }]
+            })
+        );
+    }
+
+    /// The value that is checked is the value that is sent.
+    #[test]
+    fn subject_id_is_trimmed_and_a_blank_value_is_refused() {
+        assert_eq!(restriction_subject_id("acc-1").unwrap(), "acc-1");
+        assert_eq!(restriction_subject_id("  acc-1\t").unwrap(), "acc-1");
+        assert!(restriction_subject_id("").is_err());
+        assert!(restriction_subject_id("  ").is_err());
+    }
+
+    #[test]
+    fn only_user_and_group_are_subject_types() {
+        assert_eq!(
+            restriction_subject("user").unwrap(),
+            RestrictionSubject::User
+        );
+        assert_eq!(
+            restriction_subject("group").unwrap(),
+            RestrictionSubject::Group
+        );
+        for bad in ["", "team", "User"] {
+            assert!(restriction_subject(bad).is_err(), "{bad:?}");
+        }
     }
 }
 

@@ -3442,3 +3442,12 @@ size of one request, so a value above the v2 maximum of 250 failed.
 truncated result. `--limit 0` returns all results within the request budget.
 `blog list` accepts a blog post with a null title or status. Built-binary
 tests and unit tests cover the change.
+## 2026-11-20: Confluence `page add-restriction` sends the documented body
+
+`confluence page add-restriction` sent one bare object with `identifier` fields.
+The Confluence REST specification requires a `results` array, `accountId` for a
+user and `id` for a group. `restriction_payload` in `confluence/pages.rs` builds
+that body. clap accepts only the documented values of `--operation` and
+`--subject-type`. `--subject-id` is trimmed, and an empty value is refused.
+The change is verified against the specification and a mock server, not against
+a live site. Built-binary tests and unit tests cover the change.
