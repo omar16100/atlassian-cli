@@ -12,9 +12,9 @@ Error: Failed to get page <id>: Resource not found: /wiki/api/v2/pages/<id>
 ```
 
 The ID was correct. It was the ID of a folder, and folders have their own
-command (`confluence folder get <id>`). A scan of commands that coding agents
-ran found 10 failures of this type. The hint sent the caller to check an ID
-that had no fault.
+command (`confluence folder get <id>`). Coding agents that used the CLI made
+this error more than one time. The hint sent the caller to check an ID that had
+no fault.
 
 A 404 from `GET /wiki/api/v2/pages/{id}` has three probable causes: the ID is
 wrong, the profile has no permission to view the page, or the ID belongs to
