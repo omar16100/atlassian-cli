@@ -409,12 +409,14 @@ async fn user_search_lists_the_matches_as_json() {
         json!([
             {
                 "account_id": "acc-1",
+                "account_type": "atlassian",
                 "display_name": "Dev One",
                 "email": "dev@example.com",
                 "active": true
             },
             {
                 "account_id": "acc-2",
+                "account_type": "atlassian",
                 "display_name": "Dev Two",
                 "email": null,
                 "active": true
@@ -467,5 +469,510 @@ async fn user_search_respects_the_limit() {
         String::from_utf8_lossy(&out.stderr).contains("--limit"),
         "a cut list must say so on stderr: {}",
         text(&out)
+    );
+}
+
+async fn mount_myself(server: &MockServer) {
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/myself"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(user(
+            "acc-me",
+            "Owner",
+            Some("owner@example.com"),
+        )))
+        .mount(server)
+        .await;
+}
+
+async fn mount_issue_search(server: &MockServer, keys: &[&str]) {
+    let issues: Vec<Value> = keys.iter().map(|key| json!({ "key": key })).collect();
+    Mock::given(method("POST"))
+        .and(path_matcher("/rest/api/3/search/jql"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "issues": issues })))
+        .mount(server)
+        .await;
+}
+
+fn create_args<'a>(extra: &[&'a str]) -> Vec<&'a str> {
+    let mut args = vec![
+        "jira",
+        "issue",
+        "create",
+        "--project",
+        "PROJ",
+        "--issue-type",
+        "Task",
+        "--summary",
+        "Check the login page",
+    ];
+    args.extend_from_slice(extra);
+    args
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn create_with_me_uses_the_current_user() {
+    let server = MockServer::start().await;
+    mount_myself(&server).await;
+    Mock::given(method("POST"))
+        .and(path_matcher("/rest/api/3/issue"))
+        .and(body_partial_json(
+            json!({"fields": {"assignee": {"id": "acc-me"}}}),
+        ))
+        .respond_with(
+            ResponseTemplate::new(201).set_body_json(json!({"key": "PROJ-1", "id": "10001"})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(&config, &create_args(&["--assignee", "me"]));
+
+    assert!(out.status.success(), "{}", text(&out));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn create_with_upper_case_me_uses_the_current_user() {
+    let server = MockServer::start().await;
+    mount_myself(&server).await;
+    Mock::given(method("POST"))
+        .and(path_matcher("/rest/api/3/issue"))
+        .and(body_partial_json(
+            json!({"fields": {"assignee": {"id": "acc-me"}}}),
+        ))
+        .respond_with(
+            ResponseTemplate::new(201).set_body_json(json!({"key": "PROJ-1", "id": "10001"})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(&config, &create_args(&["--assignee", " ME"]));
+
+    assert!(out.status.success(), "{}", text(&out));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn create_trims_the_assignee_before_the_lookup() {
+    let server = server_with_users(
+        "dev@example.com",
+        json!([user("acc-1", "Dev One", Some("dev@example.com"))]),
+    )
+    .await;
+    Mock::given(method("POST"))
+        .and(path_matcher("/rest/api/3/issue"))
+        .and(body_partial_json(
+            json!({"fields": {"assignee": {"id": "acc-1"}}}),
+        ))
+        .respond_with(
+            ResponseTemplate::new(201).set_body_json(json!({"key": "PROJ-1", "id": "10001"})),
+        )
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(&config, &create_args(&["--assignee", " dev@example.com "]));
+
+    assert!(out.status.success(), "{}", text(&out));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_empty_assignee_is_an_error_before_a_request() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(&config, &create_args(&["--assignee", "  "]));
+    let combined = text(&out);
+
+    assert!(!out.status.success(), "{combined}");
+    assert!(combined.contains("--assignee"), "{combined}");
+    assert!(combined.contains("empty"), "{combined}");
+    assert!(request_paths(&server).await.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn create_checks_the_field_collision_before_the_lookup() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &create_args(&[
+            "--assignee",
+            "dev@example.com",
+            "--field",
+            r#"assignee={"id":"acc-9"}"#,
+        ]),
+    );
+    let combined = text(&out);
+
+    assert!(!out.status.success(), "{combined}");
+    assert!(combined.contains("collides with --assignee"), "{combined}");
+    assert!(
+        request_paths(&server).await.is_empty(),
+        "the collision is a local error, so no lookup must run"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn update_resolves_an_email_assignee_in_the_same_request() {
+    let server = server_with_users(
+        "dev@example.com",
+        json!([user("acc-1", "Dev One", Some("dev@example.com"))]),
+    )
+    .await;
+    Mock::given(method("PUT"))
+        .and(path_matcher("/rest/api/3/issue/PROJ-1"))
+        .and(body_partial_json(json!({
+            "fields": {"summary": "New title", "assignee": {"id": "acc-1"}}
+        })))
+        .respond_with(ResponseTemplate::new(204))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "update",
+            "PROJ-1",
+            "--summary",
+            "New title",
+            "--assignee",
+            "dev@example.com",
+        ],
+    );
+
+    assert!(out.status.success(), "{}", text(&out));
+    assert_eq!(
+        request_paths(&server).await,
+        vec![
+            "GET /rest/api/3/user/search".to_string(),
+            "PUT /rest/api/3/issue/PROJ-1".to_string()
+        ]
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn update_with_only_an_assignee_is_a_valid_update() {
+    let server = MockServer::start().await;
+    mount_myself(&server).await;
+    Mock::given(method("PUT"))
+        .and(path_matcher("/rest/api/3/issue/PROJ-1"))
+        .and(body_json(json!({"fields": {"assignee": {"id": "acc-me"}}})))
+        .respond_with(ResponseTemplate::new(204))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &["jira", "issue", "update", "PROJ-1", "--assignee", "@me"],
+    );
+
+    assert!(out.status.success(), "{}", text(&out));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn update_checks_the_field_collision_before_the_lookup() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "update",
+            "PROJ-1",
+            "--assignee",
+            "dev@example.com",
+            "--field",
+            r#"assignee={"id":"acc-9"}"#,
+        ],
+    );
+    let combined = text(&out);
+
+    assert!(!out.status.success(), "{combined}");
+    assert!(combined.contains("collides with --assignee"), "{combined}");
+    assert!(request_paths(&server).await.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn watchers_remove_resolves_an_email() {
+    let server = server_with_users(
+        "dev@example.com",
+        json!([user("acc-1", "Dev One", Some("dev@example.com"))]),
+    )
+    .await;
+    Mock::given(method("DELETE"))
+        .and(path_matcher("/rest/api/3/issue/PROJ-1/watchers"))
+        .and(query_param("accountId", "acc-1"))
+        .respond_with(ResponseTemplate::new(204))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "issue",
+            "watchers",
+            "remove",
+            "PROJ-1",
+            "dev@example.com",
+        ],
+    );
+
+    assert!(out.status.success(), "{}", text(&out));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_assign_list_mode_shows_the_account_id_and_writes_nothing() {
+    let server = server_with_users(
+        "dev@example.com",
+        json!([user("acc-1", "Dev One", Some("dev@example.com"))]),
+    )
+    .await;
+    mount_issue_search(&server, &["PROJ-1", "PROJ-2"]).await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "bulk",
+            "assign",
+            "--jql",
+            "project = PROJ",
+            "--assignee",
+            "dev@example.com",
+            "-f",
+            "json",
+        ],
+    );
+
+    assert!(out.status.success(), "{}", text(&out));
+    let rows: Value = serde_json::from_slice(&out.stdout).expect("stdout must be JSON");
+    assert_eq!(
+        rows,
+        json!([
+            {"key": "PROJ-1", "assignee": "acc-1", "action": "would assign"},
+            {"key": "PROJ-2", "assignee": "acc-1", "action": "would assign"}
+        ])
+    );
+    assert_eq!(
+        request_paths(&server).await,
+        vec![
+            "GET /rest/api/3/user/search".to_string(),
+            "POST /rest/api/3/search/jql".to_string()
+        ],
+        "one lookup, one search, no write"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_assign_with_an_unknown_email_fails_before_the_list() {
+    let server = server_with_users("nobody@example.com", json!([])).await;
+    mount_issue_search(&server, &["PROJ-1"]).await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "bulk",
+            "assign",
+            "--jql",
+            "project = PROJ",
+            "--assignee",
+            "nobody@example.com",
+            "-f",
+            "json",
+        ],
+    );
+
+    assert!(!out.status.success(), "{}", text(&out));
+    assert!(out.stdout.is_empty(), "no list must print: {}", text(&out));
+    assert_eq!(
+        request_paths(&server).await,
+        vec!["GET /rest/api/3/user/search".to_string()]
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_assign_without_yes_names_the_user_in_the_refusal() {
+    let server = server_with_users(
+        "dev@example.com",
+        json!([user("acc-1", "Dev One", Some("dev@example.com"))]),
+    )
+    .await;
+    mount_issue_search(&server, &["PROJ-1"]).await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    // The test has no terminal on stdin, so the confirmation refuses and
+    // prints its warning.
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "bulk",
+            "assign",
+            "--jql",
+            "project = PROJ",
+            "--assignee",
+            "dev@example.com",
+            "--execute",
+        ],
+    );
+    let combined = text(&out);
+
+    assert!(!out.status.success(), "{combined}");
+    assert!(combined.contains("Dev One (acc-1)"), "{combined}");
+}
+
+fn write_import_file(dir: &Path, rows: Value) -> std::path::PathBuf {
+    let file = dir.join("import.json");
+    std::fs::write(&file, serde_json::to_vec(&rows).unwrap()).unwrap();
+    file
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_import_dry_run_makes_no_lookup() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/user/search"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let file = write_import_file(
+        dir.path(),
+        json!([{"summary": "Row one", "issue_type": "Task", "assignee": "dev@example.com"}]),
+    );
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "bulk",
+            "import",
+            "--file",
+            file.to_str().unwrap(),
+            "--project",
+            "PROJ",
+            "--dry-run",
+        ],
+    );
+
+    assert!(out.status.success(), "{}", text(&out));
+    assert!(request_paths(&server).await.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_import_creates_nothing_when_one_row_does_not_resolve() {
+    let server = server_with_users(
+        "dev@example.com",
+        json!([user("acc-1", "Dev One", Some("dev@example.com"))]),
+    )
+    .await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/rest/api/3/user/search"))
+        .and(query_param("query", "nobody@example.com"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!([])))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path_matcher("/rest/api/3/issue"))
+        .respond_with(
+            ResponseTemplate::new(201).set_body_json(json!({"key": "PROJ-1", "id": "10001"})),
+        )
+        .expect(0)
+        .mount(&server)
+        .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let file = write_import_file(
+        dir.path(),
+        json!([
+            {"summary": "Row one", "issue_type": "Task", "assignee": "dev@example.com"},
+            {"summary": "Row two", "issue_type": "Task", "assignee": "nobody@example.com"}
+        ]),
+    );
+
+    let out = run(
+        &config,
+        &[
+            "jira",
+            "bulk",
+            "import",
+            "--file",
+            file.to_str().unwrap(),
+            "--project",
+            "PROJ",
+        ],
+    );
+    let combined = text(&out);
+
+    assert!(!out.status.success(), "{combined}");
+    assert!(combined.contains("Row two"), "{combined}");
+    assert!(
+        !request_paths(&server)
+            .await
+            .contains(&"POST /rest/api/3/issue".to_string()),
+        "no issue must be created"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn user_search_shows_the_account_type() {
+    let server = server_with_users(
+        "dev",
+        json!([{
+            "accountId": "acc-5",
+            "accountType": "app",
+            "displayName": "Dev Bot",
+            "active": false
+        }]),
+    )
+    .await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(&config, &["jira", "user", "search", "dev", "-f", "json"]);
+
+    assert!(out.status.success(), "{}", text(&out));
+    let rows: Value = serde_json::from_slice(&out.stdout).expect("stdout must be JSON");
+    assert_eq!(
+        rows,
+        json!([{
+            "account_id": "acc-5",
+            "account_type": "app",
+            "display_name": "Dev Bot",
+            "email": null,
+            "active": false
+        }])
     );
 }

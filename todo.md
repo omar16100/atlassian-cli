@@ -3418,8 +3418,10 @@ wrong result with exit code 0. See
 
 `--assignee <email>` sent the email address as a Jira account ID, and Jira
 rejected it. The new module `crates/cli/src/commands/jira/users.rs` resolves a
-value before the command sends it: `me` gives the current user, a value with
-`@` goes through the Jira user search, and all other values stay account IDs.
-Issue create, issue assign, bulk assign, bulk import rows and the watcher add
-and remove commands use it. `jira user search <query>` (alias `users`) lists
-account IDs. Details are in `docs/20112026_jira_assignee_email_lookup.md`.
+value before the command sends it: `me` or `@me` gives the current user, a
+value with `@` goes through the Jira user search, and all other values stay
+account IDs. Issue create, issue assign, bulk assign, bulk import rows and the
+watcher add and remove commands use it. `jira issue update --assignee` is new
+and uses it too. Create and update run the `--field` collision checks before
+the lookup. `jira user search <query>` (alias `users`) lists account IDs with
+the account type. Details are in `docs/20112026_jira_assignee_email_lookup.md`.

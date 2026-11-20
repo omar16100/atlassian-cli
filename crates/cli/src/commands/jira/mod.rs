@@ -275,10 +275,13 @@ enum IssueCommands {
     },
 
     /// Update an existing issue
-    #[command(long_about = "Update an existing issue.\n\n\
+    #[command(long_about = "Update an existing issue.\n\nExamples:\n  \
+        jira issue update PROJ-1 --summary \"New title\" --priority High\n  \
+        jira issue update PROJ-1 --assignee dev@example.com\n  \
+        jira issue update PROJ-1 --assignee me\n\n\
         --field (repeatable) lets you set arbitrary fields (including customfield_*); \
         discover IDs with `jira fields list`. --field cannot collide with \
-        --summary, --description, or --priority when those are also set.")]
+        --summary, --description, --assignee, or --priority when those are also set.")]
     Update {
         /// Issue key
         key: String,
@@ -289,6 +292,10 @@ enum IssueCommands {
         /// italic, inline code, links, code blocks). Plain text stays a paragraph.
         #[arg(long)]
         description: Option<String>,
+        /// New assignee: an account ID, an email address (looked up with the
+        /// user search), or `me` for the current user.
+        #[arg(long)]
+        assignee: Option<String>,
         /// New priority
         #[arg(long)]
         priority: Option<String>,
@@ -1107,10 +1114,10 @@ enum UserCommands {
         jira user search \"Dev One\"\n  \
         jira user search dev@example.com --format json\n\n\
         The query matches the start of a display name or of an email address.\n\
-        Output columns: account_id, display_name, email, active. The email is empty\n\
-        (null in JSON) when the privacy settings of the user hide it. Jira returns\n\
-        no users when your account does not have the 'Browse users and groups'\n\
-        global permission."
+        Output columns: account_id, display_name, email, account_type, active. The\n\
+        email is empty (null in JSON) when the privacy settings of the user hide\n\
+        it. Jira returns no users when your account does not have the 'Browse\n\
+        users and groups' global permission."
     )]
     Search {
         /// Text to search for
@@ -1174,10 +1181,19 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 sprint,
             } => {
                 let custom_fields = issues::parse_custom_fields(&fields)?;
-                let assignee = match assignee {
-                    Some(value) => Some(users::resolve_account_id(&ctx.client, &value).await?),
-                    None => None,
-                };
+                // Local checks first, so a bad command makes no lookup.
+                issues::check_create_collisions(
+                    &custom_fields,
+                    description.is_some(),
+                    assignee.is_some(),
+                    priority.is_some(),
+                )?;
+                let assignee = users::resolve_optional_account_id(
+                    &ctx.client,
+                    assignee.as_deref(),
+                    "--assignee",
+                )
+                .await?;
                 issues::create_issue(
                     &ctx,
                     &project,
@@ -1195,16 +1211,32 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 key,
                 summary,
                 description,
+                assignee,
                 priority,
                 fields,
                 sprint,
             } => {
                 let custom_fields = issues::parse_custom_fields(&fields)?;
+                // Local checks first, so a bad command makes no lookup.
+                issues::check_update_collisions(
+                    &custom_fields,
+                    summary.is_some(),
+                    description.is_some(),
+                    assignee.is_some(),
+                    priority.is_some(),
+                )?;
+                let assignee = users::resolve_optional_account_id(
+                    &ctx.client,
+                    assignee.as_deref(),
+                    "--assignee",
+                )
+                .await?;
                 issues::update_issue(
                     &ctx,
                     &key,
                     summary.as_deref(),
                     description.as_deref(),
+                    assignee.as_deref(),
                     priority.as_deref(),
                     &custom_fields,
                     sprint.as_deref(),
@@ -1230,18 +1262,19 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 .await
             }
             IssueCommands::Assign { key, assignee } => {
-                let assignee = users::resolve_account_id(&ctx.client, &assignee).await?;
+                let assignee =
+                    users::resolve_account_id(&ctx.client, &assignee, "--assignee").await?;
                 issues::assign_issue(&ctx, &key, &assignee).await
             }
             IssueCommands::Unassign { key } => issues::unassign_issue(&ctx, &key).await,
             IssueCommands::Watchers(watcher_cmd) => match watcher_cmd {
                 WatcherCommands::List { key } => issues::list_watchers(&ctx, &key).await,
                 WatcherCommands::Add { key, user } => {
-                    let user = users::resolve_account_id(&ctx.client, &user).await?;
+                    let user = users::resolve_account_id(&ctx.client, &user, "<USER>").await?;
                     issues::add_watcher(&ctx, &key, &user).await
                 }
                 WatcherCommands::Remove { key, user } => {
-                    let user = users::resolve_account_id(&ctx.client, &user).await?;
+                    let user = users::resolve_account_id(&ctx.client, &user, "<USER>").await?;
                     issues::remove_watcher(&ctx, &key, &user).await
                 }
             },
@@ -1490,8 +1523,17 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 concurrency,
             } => {
                 let execute = execute && !dry_run;
-                let assignee = users::resolve_account_id(&ctx.client, &assignee).await?;
-                bulk::bulk_assign(&ctx, &jql, &assignee, execute, yes, concurrency).await
+                let user = users::resolve_user(&ctx.client, &assignee, "--assignee").await?;
+                bulk::bulk_assign(
+                    &ctx,
+                    &jql,
+                    &user.account_id,
+                    &user.label(),
+                    execute,
+                    yes,
+                    concurrency,
+                )
+                .await
             }
             BulkCommands::Label {
                 jql,

@@ -138,10 +138,14 @@ struct AssignRow<'a> {
 //
 // Lists the matching issues by default. `--execute` overwrites their assignee,
 // after the match count is typed back or `--yes` is given.
+//
+// `assignee` is the account ID. `assignee_label` is the text for the
+// confirmation: the display name with the account ID when a lookup found one.
 pub async fn bulk_assign(
     ctx: &JiraContext<'_>,
     jql: &str,
     assignee: &str,
+    assignee_label: &str,
     execute: bool,
     assume_yes: bool,
     concurrency: usize,
@@ -176,7 +180,7 @@ pub async fn bulk_assign(
         confirm_destructive(
             &issue_keys.len().to_string(),
             &format!(
-                "About to assign {} issue(s) to {assignee}.\n\
+                "About to assign {} issue(s) to {assignee_label}.\n\
                  Any current assignee is overwritten.\n\
                  Re-run without --execute to list them first.",
                 issue_keys.len()
@@ -503,7 +507,7 @@ async fn resolve_import_assignees(
         let account_id = match resolved.get(value) {
             Some(account_id) => account_id.clone(),
             None => {
-                let account_id = super::users::resolve_account_id(client, value)
+                let account_id = super::users::resolve_account_id(client, value, "assignee")
                     .await
                     .with_context(|| format!("Row '{}': assignee '{value}'", issue.summary))?;
                 resolved.insert(value.clone(), account_id.clone());
@@ -1330,7 +1334,7 @@ mod tests {
         bulk_transition(&ctx, "project = X", "Done", false, false, 2)
             .await
             .unwrap();
-        bulk_assign(&ctx, "project = X", "acc-1", true, true, 2)
+        bulk_assign(&ctx, "project = X", "acc-1", "acc-1", true, true, 2)
             .await
             .unwrap();
         bulk_label(
@@ -1354,7 +1358,7 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Json);
         let ctx = jira_ctx(&server, &renderer);
 
-        bulk_assign(&ctx, "project = X", "acc-1", false, false, 2)
+        bulk_assign(&ctx, "project = X", "acc-1", "acc-1", false, false, 2)
             .await
             .unwrap();
 
@@ -1367,7 +1371,7 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Json);
         let ctx = jira_ctx(&server, &renderer);
 
-        bulk_assign(&ctx, "project = X", "acc-1", true, true, 2)
+        bulk_assign(&ctx, "project = X", "acc-1", "acc-1", true, true, 2)
             .await
             .unwrap();
 
