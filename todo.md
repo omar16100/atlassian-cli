@@ -3526,3 +3526,13 @@ Pull request 183 by an external author adds `resolved` and `deleted` to
 unchanged. The option and its dispatch are applied in `bitbucket/args.rs` and
 `bitbucket/mod.rs`, because pull request 189 moved the clap argument tree after
 183 was opened. A parse test covers the option with each form of the repository.
+
+## 2026-11-21: lockfile reference after two merges
+
+The Security workflow failed on `main` after pull request 197 with "invalid
+Cargo.lock dependency tree: failed to find dependency: syn 3.0.3". Pull request
+198 added `jiff-static`, which had a reference to `syn 3.0.3` in the lockfile.
+Pull request 197 moved `syn` to 3.0.10, and its branch was made before 198, so
+the merged lockfile kept one reference to a version that it no longer had.
+`cargo check --workspace` corrected the one line. `cargo audit` and
+`cargo deny check` pass.
