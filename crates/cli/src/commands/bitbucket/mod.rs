@@ -27,6 +27,8 @@ pub(crate) mod workspaces;
 #[cfg(test)]
 mod path_encoding_tests;
 #[cfg(test)]
+mod pr_list_page_size_tests;
+#[cfg(test)]
 mod repo_argument_tests;
 use args::*;
 use utils::BitbucketContext;
