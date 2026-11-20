@@ -74,7 +74,7 @@ pub async fn search_cql(
         })
         .collect();
 
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No results found")
 }
 
 // Text search

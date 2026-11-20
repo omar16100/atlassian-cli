@@ -201,6 +201,13 @@ async fn run() -> Result<()> {
 /// `RUST_LOG=atlassian_cli=off` cannot silence the flag; a more specific one
 /// (`atlassian_cli_api=trace`) still refines it, and `RUST_LOG`'s level for
 /// other crates is kept.
+///
+/// Without `--debug` and without `RUST_LOG`, the level is `warn`. It used to be
+/// `info`, and almost every command logs an `info` line that repeats what it
+/// prints on stdout ("Issue created successfully"). A caller that captured
+/// output with `2>&1` got that line inside the JSON. A successful command now
+/// writes nothing to stderr unless it has a warning. `RUST_LOG=info` and
+/// `--debug` show the lines again.
 fn tracing_directives(debug: bool, rust_log: Option<&str>) -> String {
     const DEBUG: &str = "atlassian_cli=debug,atlassian-cli=debug";
     let rust_log = rust_log.map(str::trim).filter(|v| !v.is_empty());
@@ -208,7 +215,7 @@ fn tracing_directives(debug: bool, rust_log: Option<&str>) -> String {
         (true, None) => format!("info,{DEBUG}"),
         (true, Some(user)) => format!("{user},{DEBUG}"),
         (false, Some(user)) => user.to_string(),
-        (false, None) => "info".to_string(),
+        (false, None) => "warn".to_string(),
     }
 }
 
@@ -685,6 +692,63 @@ mod cli_definition_tests {
         assert!(debug_events_logged(&tracing_directives(false, None)).is_empty());
     }
 
+    /// The levels of the CLI's own events that a filter built from
+    /// `directives` lets through.
+    fn cli_levels_logged(directives: &str) -> Vec<&'static str> {
+        use std::io::Write;
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone, Default)]
+        struct Buffer(Arc<Mutex<Vec<u8>>>);
+        impl Write for Buffer {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let buffer = Buffer::default();
+        let writer = buffer.clone();
+        let subscriber = fmt()
+            .with_env_filter(EnvFilter::new(directives))
+            .with_writer(move || writer.clone())
+            .finish();
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!(target: "atlassian_cli::commands::jira", "info-event");
+            tracing::warn!(target: "atlassian_cli_api", "warn-event");
+            tracing::error!(target: "atlassian_cli_api", "error-event");
+        });
+        let text = String::from_utf8(buffer.0.lock().unwrap().clone()).unwrap();
+        ["info-event", "warn-event", "error-event"]
+            .into_iter()
+            .filter(|event| text.contains(event))
+            .collect()
+    }
+
+    /// The default level was `info`. Each command logs an `info` line that
+    /// repeats its stdout message, and that line broke JSON captured with
+    /// `2>&1`. Warnings stay, because the user must read them.
+    #[test]
+    fn the_default_level_hides_info_and_keeps_warnings() {
+        assert_eq!(
+            cli_levels_logged(&tracing_directives(false, None)),
+            vec!["warn-event", "error-event"]
+        );
+    }
+
+    #[test]
+    fn rust_log_and_debug_still_show_info() {
+        let all = vec!["info-event", "warn-event", "error-event"];
+        assert_eq!(
+            cli_levels_logged(&tracing_directives(false, Some("info"))),
+            all
+        );
+        assert_eq!(cli_levels_logged(&tracing_directives(true, None)), all);
+    }
+
     #[test]
     fn debug_wins_over_rust_log_but_keeps_its_refinements() {
         // RUST_LOG trying to switch the CLI's logging off does not beat --debug.
@@ -698,7 +762,7 @@ mod cli_definition_tests {
             vec!["command-event"]
         );
         assert_eq!(tracing_directives(false, Some("warn")), "warn");
-        assert_eq!(tracing_directives(false, Some("  ")), "info");
+        assert_eq!(tracing_directives(false, Some("  ")), "warn");
     }
 
     /// `bb pr list --debug` was rejected: the flag was not global.

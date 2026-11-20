@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::time::timeout;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 #[derive(Clone)]
 pub struct RateLimiter {
@@ -63,7 +63,10 @@ impl RateLimiter {
         if let (Some(remaining), Some(limit)) = (state.remaining, state.limit) {
             let usage_pct = ((limit - remaining) as f64 / limit as f64) * 100.0;
             if usage_pct > 80.0 {
-                warn!(
+                // Not a warning: nothing is wrong yet, and this fires for
+                // each response of a successful command. The wait itself has
+                // its own warning in the client.
+                info!(
                     remaining,
                     limit,
                     usage_pct = format!("{:.1}%", usage_pct),

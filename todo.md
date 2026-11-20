@@ -3356,3 +3356,17 @@ includes the two updates of Dependabot pull request #182. `deny.toml` ignores
 RUSTSEC-2026-0543 as a temporary exception, because `chrono` is a direct
 dependency and its replacement is a separate change. No release was made.
 
+## 2026-11-20: quiet stderr by default (PR #184)
+
+The default log level changed from `info` to `warn`
+(`crates/cli/src/main.rs`, `tracing_directives`). Each command logged an `info`
+line that repeated its stdout message, and callers that used `2>&1` got that line
+inside the JSON. `RUST_LOG=info` and `--debug` still show the lines. `auth login`,
+`auth logout` and a cancelled `bb project delete` had no output other than the
+log line, so they print their result on stdout now. An independent review found
+more: `auth login -f json` printed a note and a prompt before the JSON, `auth
+logout` reported success when a credentials file was unreadable, eight empty
+lists lost their hint in a table, and "Rate limit usage high" was a warning on
+successful runs. All are corrected. New tests:
+`crates/cli/tests/quiet_stderr_e2e.rs` and two filter tests in `main.rs`.
+See `docs/20112026_quiet_default_logging.md`.

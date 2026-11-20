@@ -7,7 +7,8 @@ use atlassian_cli_config::{site_base_url, Config};
 use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use clap::{Args, Subcommand};
 use serde::Serialize;
-use tracing::debug;
+
+use super::common::{render_success, MutationResult};
 use url::Url;
 
 /// The Jira user endpoint. Also serves Jira Service Management.
@@ -248,8 +249,8 @@ pub async fn handle(
     renderer: &OutputRenderer,
 ) -> Result<()> {
     match command {
-        AuthCommand::Login(args) => login(args, config, config_path, store),
-        AuthCommand::Logout(args) => logout(args, config, config_path, store),
+        AuthCommand::Login(args) => login(args, config, config_path, store, renderer),
+        AuthCommand::Logout(args) => logout(args, config, config_path, store, renderer),
         AuthCommand::List(args) => list_profiles(args, config, store, renderer),
         AuthCommand::Status(args) => auth_status(args, config, store, renderer).await,
         AuthCommand::Whoami(args) => whoami(args, config, store, renderer).await,
@@ -299,6 +300,7 @@ fn login(
     config: &mut Config,
     config_path: Option<&Path>,
     store: &CredentialStore,
+    renderer: &OutputRenderer,
 ) -> Result<()> {
     // Migrate any existing plaintext credentials to encrypted storage
     if let Ok(count) = store.migrate_plaintext_to_encrypted() {
@@ -343,9 +345,9 @@ fn login(
     }
 
     if args.bitbucket {
-        login_bitbucket(&args, &token, config, config_path, store)
+        login_bitbucket(&args, &token, config, config_path, store, renderer)
     } else {
-        login_jira_confluence(&args, &token, config, config_path, store)
+        login_jira_confluence(&args, &token, config, config_path, store, renderer)
     }
 }
 
@@ -355,6 +357,7 @@ fn login_jira_confluence(
     config: &mut Config,
     config_path: Option<&Path>,
     store: &CredentialStore,
+    renderer: &OutputRenderer,
 ) -> Result<()> {
     let base_url_str = args
         .base_url
@@ -384,7 +387,14 @@ fn login_jira_confluence(
     // Both sides trim trailing slashes the same way. Comparing a
     // single-slash-trimmed string against `site_base_url`, which trims all of
     // them, made `https://site/wiki//` look normalised when it was not.
-    if site_base_url(base_url.as_str()) != base_url.as_str().trim_end_matches('/') {
+    // Only for the formats that people read. In a machine format, stdout is
+    // the result object and nothing else.
+    if site_base_url(base_url.as_str()) != base_url.as_str().trim_end_matches('/')
+        && matches!(
+            renderer.format(),
+            OutputFormat::Table | OutputFormat::Markdown
+        )
+    {
         println!(
             "Note: /wiki is added automatically for Confluence requests, so it is not needed \
              in the base URL. Keeping it is harmless and marks this profile as Confluence."
@@ -422,7 +432,21 @@ fn login_jira_confluence(
         base_url = %base_url,
         "Profile saved and token stored securely"
     );
-    Ok(())
+    // The log line above was the only output of a login. It is hidden at the
+    // default level now, so the result goes to stdout. A user name or password
+    // in the URL is not part of the site address and is not printed.
+    let mut shown_url = base_url.clone();
+    let _ = shown_url.set_username("");
+    let _ = shown_url.set_password(None);
+    let message = format!(
+        "Saved profile '{}' for {shown_url}. The token is stored encrypted.",
+        args.profile_name()
+    );
+    render_success(
+        renderer,
+        &format!("✅ {message}"),
+        &MutationResult::with_id(message.as_str(), args.profile_name()),
+    )
 }
 
 fn login_bitbucket(
@@ -431,6 +455,7 @@ fn login_bitbucket(
     config: &mut Config,
     config_path: Option<&Path>,
     store: &CredentialStore,
+    renderer: &OutputRenderer,
 ) -> Result<()> {
     let profile_entry = config
         .profiles
@@ -483,7 +508,34 @@ fn login_bitbucket(
         auth_type = auth_type,
         "Bitbucket credentials saved successfully"
     );
-    Ok(())
+    let message = format!(
+        "Saved Bitbucket credentials for profile '{}' ({auth_type} auth). The token is stored encrypted.",
+        args.profile_name()
+    );
+    render_success(
+        renderer,
+        &format!("✅ {message}"),
+        &MutationResult::with_id(message.as_str(), args.profile_name()),
+    )
+}
+
+/// Remove one secret from the encrypted store and from a legacy plaintext
+/// file.
+///
+/// A secret that is not there is not an error: the two store methods return
+/// `Ok` for a missing key and for a missing file. An error means a store could
+/// not be read or written, so the secret can still be on disk. Logout logged
+/// that at debug level only and then reported success. The two stores are
+/// always tried, so one damaged file does not keep a token in the other.
+fn remove_secret(store: &CredentialStore, key: &str) -> Result<()> {
+    let encrypted = store
+        .delete_encrypted(key)
+        .context("Could not remove the token from the encrypted credentials file");
+    let plaintext = store
+        .delete(key)
+        .context("Could not remove the token from the plaintext credentials file");
+    encrypted?;
+    plaintext
 }
 
 fn logout(
@@ -491,44 +543,27 @@ fn logout(
     config: &mut Config,
     config_path: Option<&Path>,
     store: &CredentialStore,
+    renderer: &OutputRenderer,
 ) -> Result<()> {
     let _profile = config
         .profiles
         .get(&args.profile)
         .ok_or_else(|| anyhow!("Profile '{}' does not exist", args.profile))?;
 
-    if args.bitbucket {
+    let removed = if args.bitbucket {
         // Only remove Bitbucket token
-        let secret_key = bitbucket_token_key(&args.profile);
-        // Try encrypted first, then plaintext (for migration cleanup)
-        if let Err(e) = store.delete_encrypted(&secret_key) {
-            debug!("No encrypted Bitbucket token to delete: {e}");
-            if let Err(e) = store.delete(&secret_key) {
-                debug!("No plaintext Bitbucket token to delete: {e}");
-            }
-        }
+        remove_secret(store, &bitbucket_token_key(&args.profile))?;
         tracing::info!(profile = %args.profile, "Bitbucket credentials removed");
+        "Removed the Bitbucket credentials"
     } else {
         // Remove both Jira and Bitbucket tokens
-        let secret_key = token_key(&args.profile);
-        // Try encrypted first, then plaintext (for migration cleanup)
-        if let Err(e) = store.delete_encrypted(&secret_key) {
-            debug!("No encrypted Jira token to delete: {e}");
-            if let Err(e) = store.delete(&secret_key) {
-                debug!("No plaintext Jira token to delete: {e}");
-            }
-        }
-
-        let bb_secret_key = bitbucket_token_key(&args.profile);
-        // Try encrypted first, then plaintext (for migration cleanup)
-        if let Err(e) = store.delete_encrypted(&bb_secret_key) {
-            debug!("No encrypted Bitbucket token to delete: {e}");
-            if let Err(e) = store.delete(&bb_secret_key) {
-                debug!("No plaintext Bitbucket token to delete: {e}");
-            }
-        }
+        let jira = remove_secret(store, &token_key(&args.profile));
+        let bitbucket = remove_secret(store, &bitbucket_token_key(&args.profile));
+        jira?;
+        bitbucket?;
         tracing::info!(profile = %args.profile, "Credentials removed");
-    }
+        "Removed the credentials"
+    };
 
     if args.remove_profile {
         config.profiles.shift_remove(&args.profile);
@@ -545,7 +580,17 @@ fn logout(
     config
         .save(config_path)
         .context("Unable to persist configuration file")?;
-    Ok(())
+
+    let message = if args.remove_profile {
+        format!("{removed} and the profile '{}'.", args.profile)
+    } else {
+        format!("{removed} of profile '{}'.", args.profile)
+    };
+    render_success(
+        renderer,
+        &format!("✅ {message}"),
+        &MutationResult::with_id(message.as_str(), args.profile.as_str()),
+    )
 }
 
 fn list_profiles(
@@ -607,35 +652,38 @@ fn list_profiles(
         rows.push(row);
     }
 
-    if rows.is_empty() {
-        if args.all {
-            tracing::info!("No profiles configured. Use `atlassian-cli auth login` to add one.");
-        } else {
-            tracing::info!("No profiles with active credentials. Use `atlassian-cli auth login` to add one, or `auth list --all` to see all profiles.");
-        }
-    }
-
-    renderer.render(&rows)
+    // The hint was a log line, which the default level hides now. Table and
+    // markdown print it; the machine formats print an empty list.
+    let empty_message = if args.all {
+        "No profiles configured. Use `atlassian-cli auth login` to add one."
+    } else {
+        "No profiles with active credentials. Use `atlassian-cli auth login` to add one, or `auth list --all` to see all profiles."
+    };
+    renderer.render_list_or_empty(&rows, empty_message)
 }
 
 fn read_token_from_stdin(args: &LoginArgs) -> Result<String> {
     use std::io::{self, Write};
 
+    // The prompt goes to stderr, as the other login prompts do, so stdout has
+    // only the result.
     if args.bitbucket && args.bearer {
-        println!("Enter a repository, workspace, or project access token.");
-        println!("Create at: Repository/Workspace settings -> Access tokens");
+        eprintln!("Enter a repository, workspace, or project access token.");
+        eprintln!("Create at: Repository/Workspace settings -> Access tokens");
     } else if args.bitbucket {
-        println!("App passwords are deprecated. Use Bitbucket API tokens instead.");
-        println!("Create at: https://id.atlassian.com/manage-profile/security/api-tokens");
-        println!("  -> Click 'Create API token' -> Select 'Bitbucket' as the app -> Assign scopes");
-        println!("Required scopes: Account (read), Repositories (read/write), Pull requests (read/write)");
+        eprintln!("App passwords are deprecated. Use Bitbucket API tokens instead.");
+        eprintln!("Create at: https://id.atlassian.com/manage-profile/security/api-tokens");
+        eprintln!(
+            "  -> Click 'Create API token' -> Select 'Bitbucket' as the app -> Assign scopes"
+        );
+        eprintln!("Required scopes: Account (read), Repositories (read/write), Pull requests (read/write)");
     } else {
-        println!(
+        eprintln!(
             "You can get the API token from: https://id.atlassian.com/manage-profile/security/api-tokens"
         );
     }
-    print!("Enter API token: ");
-    io::stdout().flush().context("Failed to flush stdout")?;
+    eprint!("Enter API token: ");
+    io::stderr().flush().context("Failed to flush stderr")?;
 
     let token = rpassword::read_password().context("Failed to read token")?;
     Ok(token.trim().to_owned())

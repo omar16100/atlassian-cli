@@ -66,7 +66,7 @@ pub async fn list_alerts(
     } else {
         tracing::info!("Found {} alerts", rows.len());
     }
-    ctx.renderer.render(&rows)
+    ctx.renderer.render_list_or_empty(&rows, "No alerts found")
 }
 
 /// Get alert details by ID or alias.
@@ -443,7 +443,8 @@ pub async fn list_recipients(ctx: &OpsgenieContext<'_>, identifier: &str) -> Res
             identifier
         );
     }
-    ctx.renderer.render(&response.data.users)
+    ctx.renderer
+        .render_list_or_empty(&response.data.users, "No recipients found")
 }
 
 /// List alert logs.
@@ -481,7 +482,8 @@ pub async fn list_logs(ctx: &OpsgenieContext<'_>, identifier: &str, limit: usize
             identifier
         );
     }
-    ctx.renderer.render(&response.data)
+    ctx.renderer
+        .render_list_or_empty(&response.data, "No logs found")
 }
 
 /// List alert notes.
@@ -517,5 +519,6 @@ pub async fn list_notes(ctx: &OpsgenieContext<'_>, identifier: &str, limit: usiz
             identifier
         );
     }
-    ctx.renderer.render(&response.data)
+    ctx.renderer
+        .render_list_or_empty(&response.data, "No notes found")
 }
