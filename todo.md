@@ -3470,7 +3470,7 @@ list of Bitbucket accepts 50 at most. `page_size_capped` and
 `PULL_REQUEST_MAX_PAGE_SIZE` in `bitbucket/utils.rs` limit the page size, and
 the pagination driver follows the next pages. The other list commands are not
 changed. See `docs/20112026_bb_pr_list_page_size.md`.
-## 2026-11-20: downloads retry when the body stops (PR #PRNUM)
+## 2026-11-20: downloads retry when the body stops (PR #199)
 ## 2026-11-20: downloads retry when the body stops (PR #196)
 
 `bb pipeline logs` failed at times on a large log with "error decoding response
@@ -3518,3 +3518,11 @@ expression that gives a time before the year -9999 is now an error.
 RUSTSEC-2026-0543 entry is removed from `deny.toml`. Details are in
 `docs/20112026_replace_chrono.md`.
 
+
+## 2026-11-21: integrate pull request 183 (PR #199)
+
+Pull request 183 by an external author adds `resolved` and `deleted` to
+`bb pr comments` and the `--unresolved` option. Its two commits are merged
+unchanged. The option and its dispatch are applied in `bitbucket/args.rs` and
+`bitbucket/mod.rs`, because pull request 189 moved the clap argument tree after
+183 was opened. A parse test covers the option with each form of the repository.
