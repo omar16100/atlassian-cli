@@ -11,89 +11,11 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
-### Changed
+## [0.14.0] - 2026-11-21
 
-- **Breaking for callers of the API crate:** the field
-  `RateLimitInfo::reset_at` is now `Option<std::time::SystemTime>`. It was
-  `Option<chrono::DateTime<chrono::Utc>>`. This is a part of the `chrono`
-  removal. (#198)
-- The clock in `bb pipeline watch --log` lines can show UTC when `TZ` has a zone
-  name that the machine cannot resolve. Before, the system zone was used in
-  that case. (#198)
-- A relative time expression for `bb pipeline list --since` or `--before` that
-  gives a time before the year -9999, such as `5000000d`, is now an error.
-  Before, it gave a timestamp with a negative year, and a larger value caused a
-  panic. All other time expressions give the same output as before. (#198)
-
-### Security
-
-- Remove the unmaintained `chrono` crate (RUSTSEC-2026-0543). The CLI now uses
-  `jiff` 1.0, and the API crate uses the standard library. The advisory check
-  no longer ignores RUSTSEC-2026-0543. (#198)
-
-- Update `pulldown-cmark` to 0.13.6 to correct RUSTSEC-2026-0433 (quadratic
-  parsing of nested image wikilinks). Update `rustix` to 1.1.6 to correct
-  RUSTSEC-2026-0486 (unsound xattr functions). Update `hyper` to 1.12.0, which
-  no longer depends on the unmaintained `pin-utils` (RUSTSEC-2026-0441).
-  `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
-  unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
-  check ignores it until `chrono` is replaced. (#190)
-
-### Changed
-
-- The API crate has a new variant `ApiError::BodyReadFailed` for a response
-  body that does not arrive in full. A caller of the crate that matches
-  `ApiError` with no wildcard arm must add it. (#196)
-
-### Fixed
-
-- `bb pipeline logs` failed at times on a large log with "error decoding
-  response body", and printed nothing. A download is now tried again (three
-  tries in total) when its body stops: the connection closes, or no data comes
-  for 30 seconds. It has 300 seconds for the full request, where it had 30.
-  This applies to `bb pipeline logs`, the Jira and Confluence attachment
-  downloads, the Bamboo log and artifact commands and the Opsgenie schedule
-  export. When each try fails, the error text is "Failed to read the response
-  body", where it was "Invalid response format". Ordinary API calls keep the
-  limit of 30 seconds. (#196)
-
-### Fixed
-
-- `confluence page add-restriction` sends the request body that the Confluence
-  REST specification requires: a `results` array, `accountId` for a user and
-  `id` for a group. Before, the server refused the body with "Required request
-  body is missing". `--subject-id` for a group is the group ID, not the group
-  name. `--operation` accepts only `read` or `update` and `--subject-type`
-  accepts only `user` or `group`. The values are case-sensitive, `--help` shows
-  them, and other values are refused before a request is sent, with a usage
-  error and exit code 2. An empty or blank `--subject-id` is refused before a
-  request is sent, and spaces at the two ends of the value are removed. The
-  change is verified against the specification and a mock server, not against a
-  live site. (#194)
-
-### Fixed
-
-- `confluence space list`, `page list` and `blog list` accept a `--limit` above
-  250. Before, the value was sent as the page size of one request and the server
-  refused it. `--limit` is now a total: the page size is clamped to 250 and the
-  commands follow the next pages. `--limit 0` returns all results, within the
-  request safety budget. Without `--limit` the commands return 25 results, as
-  before, and now send `limit=25`. When more results exist than the commands
-  show, a warning goes to stderr, also for an explicit small `--limit`. Stdout
-  and the output keys do not change. `blog list` no longer fails when a blog
-  post has a null title or status: the value is empty in the output. (#193)
-
-### Fixed
-
-- `confluence page get`, `page update` and `page publish` explain a 404. When
-  the ID is a folder, the hint names `confluence folder get <id>`. For other IDs
-  the hint names the probable causes (wrong ID, no permission, or not a page).
-  Only a 404 causes one more request, to the folder endpoint. The `Error:` line
-  and the exit code do not change, only the `Hint:` line on stderr does.
-  `page get` now refuses an ID that is empty, `.`, `..` or contains `/` before it
-  sends a request. `page get` now percent-encodes the ID, so a value such as
-  `123?version=2` is one literal path segment and no longer reaches the query
-  string. (#192)
+This release changes output and errors that scripts can see. Each such entry
+starts with **Behaviour change**. The entries of the API crate that can break a
+caller start with **Breaking** or name the new enum variant.
 
 ### Added
 
@@ -108,29 +30,7 @@ resolve. `git log` remains the complete record.
   `jira issue create`, `update`, `assign` and `jira bulk assign`, in
   `jira issue watchers add` and `remove`, and in the `assignee` of a
   `jira bulk import` row. (#188)
-
-### Fixed
-
-- An email address now gets its account ID from the Jira user search in
-  `--assignee` of `jira issue create`, `jira issue assign` and
-  `jira bulk assign`, in the user argument of `jira issue watchers add` and
-  `remove`, and in the `assignee` of each `jira bulk import` row. Before, the
-  CLI sent the email address as the account ID and Jira answered "Please select
-  a valid user". No match, or more than one match, is an error that names the
-  matches, and the command changes nothing. One result that shows a different
-  email address is an error too, because the search matches the start of an
-  email address. `jira bulk import` looks up all rows before it creates the
-  first issue. Scripts can see these changes: for an email address or `me`,
-  the result text of `jira issue assign` and the watcher commands, and the
-  `assignee` column of the `jira bulk assign` list, show the account ID.
-  `jira bulk assign` makes the lookup in list mode too, so an unknown email
-  address fails before the list. A user value that is empty or only spaces is
-  an error before a request. All other values with no `@` go to Jira unchanged,
-  as before. (#188)
-
-### Added
-
-- `bb commit browse --path <file>` prints the content of the file to stdout, with
+- **Behaviour change:** `bb commit browse --path <file>` prints the content of the file to stdout, with
   the bytes unchanged and no added newline, for every `--format`. Before, a file
   path failed with "Invalid response format". `--output <file>` (`-o`) writes the
   content to a file and does not replace an existing file without `--force`. A
@@ -153,10 +53,132 @@ resolve. `git log` remains the complete record.
     `/` sends one more request for the branch, and one more for the tag if the
     branch does not exist. A path that gives a 404 sends one more request.
   - A closed pipe on stdout (`| head -1`) in file mode is not an error. (#187)
+- `bitbucket pr comments` reports `resolved` and `deleted` for each comment.
+  `resolved` is the state of the comment's thread, so replies in a resolved
+  thread report it too. A deleted comment, which Bitbucket returns with empty
+  content, can now be told apart from an empty one. The table output has the
+  two new columns. Implemented by Tanner Bennett. (#183, #199)
+- `bitbucket pr comments --unresolved` hides every comment in a resolved
+  thread, replies included. Implemented by Tanner Bennett. (#183, #199)
+- `--help` of `bb pr get`, `bb pr list`, `bb pipeline get`, `bb pipeline list`
+  and `bb pipeline steps` lists the keys of the JSON and YAML output, with the
+  type of each key. The output is flat (`source`, `destination`, `author` and
+  `state` are strings, not objects as in the Bitbucket REST API), and the help
+  now says so and names the `bitbucket api` path for the API response. (#186)
+- `bb pipeline list`, `get`, `latest` and `watch` have a new key `commit_hash`
+  in JSON and YAML output: the full commit hash. `commit` still has the first 7
+  characters. The table, markdown and CSV formats are unchanged. (#186)
+- `jira issue comment` and `jira issue link` are aliases of `jira issue comments`
+  and `jira issue links`. (#185)
+
+### Changed
+
+- **Breaking for callers of the API crate:** the field
+  `RateLimitInfo::reset_at` is now `Option<std::time::SystemTime>`. It was
+  `Option<chrono::DateTime<chrono::Utc>>`. This is a part of the `chrono`
+  removal. (#198)
+- **Behaviour change:** The clock in `bb pipeline watch --log` lines can show UTC when `TZ` has a zone
+  name that the machine cannot resolve. Before, the system zone was used in
+  that case. (#198)
+- **Behaviour change:** A relative time expression for `bb pipeline list --since` or `--before` that
+  gives a time before the year -9999, such as `5000000d`, is now an error.
+  Before, it gave a timestamp with a negative year, and a larger value caused a
+  panic. All other time expressions give the same output as before. (#198)
+- The API crate has a new variant `ApiError::BodyReadFailed` for a response
+  body that does not arrive in full. A caller of the crate that matches
+  `ApiError` with no wildcard arm must add it. (#196)
+- **Behaviour change:** A successful command no longer writes log lines to stderr. The default log
+  level is now `warn` (it was `info`), so lines such as
+  `INFO Issue created successfully` no longer appear in output captured with
+  `2>&1`, where they broke JSON parsing. Warnings (truncated lists, retries,
+  rate limit waits) still go to stderr, and so do the "Found N" and "Listing
+  only" messages of the bulk commands. `RUST_LOG=info` and `--debug` show the
+  log lines again. Scripts that read the `INFO` lines, including the per-item
+  lines of the bulk commands and "Rate limit usage high" (now `info`), must set
+  `RUST_LOG=info`. (#184)
+- **Behaviour change:** `auth login` and `auth logout` print their result on stdout (a result object
+  in the machine formats), because the log line was their only output. The
+  token prompt of `auth login` now goes to stderr. (#184)
+- **Behaviour change:** An empty `auth list`, `bamboo project list`, `confluence search` or
+  `opsgenie alert list`, `recipients`, `logs` or `notes` prints its "No ... found"
+  message in the table and markdown formats. Before, the message was a log line
+  and the table was `[]`. The machine formats still print `[]`. (#184)
+- **Behaviour change:** `--help` prints the global options (`--profile`, `--config`, `--config-dir`,
+  `--format`, `--envelope`, `--debug`) below a `Global options:` heading, after
+  the options of the command. Before, they were mixed into the option list of
+  each command. Scripts that parse help text see the new section. (#185)
 
 ### Fixed
 
-- `--repo` works on every Bitbucket command that takes a repository: `bb pr`,
+- `bb pipeline logs` failed at times on a large log with "error decoding
+  response body", and printed nothing. A download is now tried again (three
+  tries in total) when its body stops: the connection closes, or no data comes
+  for 30 seconds. It has 300 seconds for the full request, where it had 30.
+  This applies to `bb pipeline logs`, the Jira and Confluence attachment
+  downloads, the Bamboo log and artifact commands and the Opsgenie schedule
+  export. When each try fails, the error text is "Failed to read the response
+  body", where it was "Invalid response format". Ordinary API calls keep the
+  limit of 30 seconds. (#196)
+- **Behaviour change:** `confluence page add-restriction` sends the request body that the Confluence
+  REST specification requires: a `results` array, `accountId` for a user and
+  `id` for a group. Before, the server refused the body with "Required request
+  body is missing". `--subject-id` for a group is the group ID, not the group
+  name. `--operation` accepts only `read` or `update` and `--subject-type`
+  accepts only `user` or `group`. The values are case-sensitive, `--help` shows
+  them, and other values are refused before a request is sent, with a usage
+  error and exit code 2. An empty or blank `--subject-id` is refused before a
+  request is sent, and spaces at the two ends of the value are removed. The
+  change is verified against the specification and a mock server, not against a
+  live site. (#194)
+- **Behaviour change:** `confluence page remove-restriction` removes only the user or the group that
+  you name, for the operation that you name. Before, it sent
+  `DELETE /wiki/rest/api/content/{id}/restriction`, which the Confluence REST
+  specification describes as the request that removes all restrictions of the
+  content. It now sends the `byOperation` request for one user (`accountId`) or
+  one group. `--subject-id` for a group is the group ID, not the group name:
+  the specification has no restriction endpoint that takes a group name, so a
+  name is sent as an ID, which is not expected to work. `--operation` accepts only
+  `read` or `update` and `--subject-type` accepts only `user` or `group`. The
+  values are case-sensitive, `--help` shows them, and other values are refused
+  before a request is sent, with a usage error and exit code 2. An empty or
+  blank `--subject-id` is refused before a request is sent, and spaces at the
+  two ends of the value are removed. The change is verified against the
+  specification and a mock server, not against a live site. (#195)
+- **Behaviour change:** `confluence space list`, `page list` and `blog list` accept a `--limit` above
+  250. Before, the value was sent as the page size of one request and the server
+  refused it. `--limit` is now a total: the page size is clamped to 250 and the
+  commands follow the next pages. `--limit 0` returns all results, within the
+  request safety budget. Without `--limit` the commands return 25 results, as
+  before, and now send `limit=25`. When more results exist than the commands
+  show, a warning goes to stderr, also for an explicit small `--limit`. Stdout
+  and the output keys do not change. `blog list` no longer fails when a blog
+  post has a null title or status: the value is empty in the output. (#193)
+- **Behaviour change:** `confluence page get`, `page update` and `page publish` explain a 404. When
+  the ID is a folder, the hint names `confluence folder get <id>`. For other IDs
+  the hint names the probable causes (wrong ID, no permission, or not a page).
+  Only a 404 causes one more request, to the folder endpoint. The `Error:` line
+  and the exit code do not change, only the `Hint:` line on stderr does.
+  `page get` now refuses an ID that is empty, `.`, `..` or contains `/` before it
+  sends a request. `page get` now percent-encodes the ID, so a value such as
+  `123?version=2` is one literal path segment and no longer reaches the query
+  string. (#192)
+- **Behaviour change:** An email address now gets its account ID from the Jira user search in
+  `--assignee` of `jira issue create`, `jira issue assign` and
+  `jira bulk assign`, in the user argument of `jira issue watchers add` and
+  `remove`, and in the `assignee` of each `jira bulk import` row. Before, the
+  CLI sent the email address as the account ID and Jira answered "Please select
+  a valid user". No match, or more than one match, is an error that names the
+  matches, and the command changes nothing. One result that shows a different
+  email address is an error too, because the search matches the start of an
+  email address. `jira bulk import` looks up all rows before it creates the
+  first issue. Scripts can see these changes: for an email address or `me`,
+  the result text of `jira issue assign` and the watcher commands, and the
+  `assignee` column of the `jira bulk assign` list, show the account ID.
+  `jira bulk assign` makes the lookup in list mode too, so an unknown email
+  address fails before the list. A user value that is empty or only spaces is
+  an error before a request. All other values with no `@` go to Jira unchanged,
+  as before. (#188)
+- **Behaviour change:** `--repo` works on every Bitbucket command that takes a repository: `bb pr`,
   `bb branch`, `bb commit`, `bb webhook`, `bb ssh-key`, `bb permission`, `bb repo`
   and `bb bulk delete-branches`. Before, `bb pr get --repo web_app 42` failed with
   "unexpected argument '--repo'". The repository can be the first argument (as
@@ -181,75 +203,24 @@ resolve. `git log` remains the complete record.
     argument after the repository (`Missing argument: expected [REPO] <PR_ID>.`) and
     for a pull request ID, comment ID or restriction ID that is not a number
     (`Invalid PR_ID ...`). (#189)
-
-### Changed
-
-- A successful command no longer writes log lines to stderr. The default log
-  level is now `warn` (it was `info`), so lines such as
-  `INFO Issue created successfully` no longer appear in output captured with
-  `2>&1`, where they broke JSON parsing. Warnings (truncated lists, retries,
-  rate limit waits) still go to stderr, and so do the "Found N" and "Listing
-  only" messages of the bulk commands. `RUST_LOG=info` and `--debug` show the
-  log lines again. Scripts that read the `INFO` lines, including the per-item
-  lines of the bulk commands and "Rate limit usage high" (now `info`), must set
-  `RUST_LOG=info`. (#184)
-- `auth login` and `auth logout` print their result on stdout (a result object
-  in the machine formats), because the log line was their only output. The
-  token prompt of `auth login` now goes to stderr. (#184)
-- An empty `auth list`, `bamboo project list`, `confluence search` or
-  `opsgenie alert list`, `recipients`, `logs` or `notes` prints its "No ... found"
-  message in the table and markdown formats. Before, the message was a log line
-  and the table was `[]`. The machine formats still print `[]`. (#184)
-
-### Fixed
-
-- `auth logout` fails when it cannot read or write a credentials file. Before,
+- **Behaviour change:** `auth logout` fails when it cannot read or write a credentials file. Before,
   it reported success and the token could stay on disk. It also removes the
   token from a legacy plaintext credentials file in each case. (#184)
-- `--help` of `bb pr get`, `bb pr list`, `bb pipeline get`, `bb pipeline list`
-  and `bb pipeline steps` lists the keys of the JSON and YAML output, with the
-  type of each key. The output is flat (`source`, `destination`, `author` and
-  `state` are strings, not objects as in the Bitbucket REST API), and the help
-  now says so and names the `bitbucket api` path for the API response. (#186)
-- `bb pipeline list`, `get`, `latest` and `watch` have a new key `commit_hash`
-  in JSON and YAML output: the full commit hash. `commit` still has the first 7
-  characters. The table, markdown and CSV formats are unchanged. (#186)
-- `jira issue comment` and `jira issue link` are aliases of `jira issue comments`
-  and `jira issue links`. (#185)
-
-### Changed
-
-- `--help` prints the global options (`--profile`, `--config`, `--config-dir`,
-  `--format`, `--envelope`, `--debug`) below a `Global options:` heading, after
-  the options of the command. Before, they were mixed into the option list of
-  each command. Scripts that parse help text see the new section. (#185)
-- `confluence page remove-restriction` removes only the user or the group that
-  you name, for the operation that you name. Before, it sent
-  `DELETE /wiki/rest/api/content/{id}/restriction`, which the Confluence REST
-  specification describes as the request that removes all restrictions of the
-  content. It now sends the `byOperation` request for one user (`accountId`) or
-  one group. `--subject-id` for a group is the group ID, not the group name:
-  the specification has no restriction endpoint that takes a group name, so a
-  name is sent as an ID, which is not expected to work. `--operation` accepts only
-  `read` or `update` and `--subject-type` accepts only `user` or `group`. The
-  values are case-sensitive, `--help` shows them, and other values are refused
-  before a request is sent, with a usage error and exit code 2. An empty or
-  blank `--subject-id` is refused before a request is sent, and spaces at the
-  two ends of the value are removed. The change is verified against the
-  specification and a mock server, not against a live site. (#195)
 - `bb pr list --limit 0` and each `--limit` above 50 failed with "Invalid
   pagelen". The pull request list of Bitbucket accepts a page size of 50 at
   most. The command now asks for pages of 50 at most and follows the next
   pages, so `--limit 0` returns all pull requests. (#191)
-### Added
 
-- `bitbucket pr comments` reports `resolved` and `deleted` for each comment.
-  `resolved` is the state of the comment's thread, so replies in a resolved
-  thread report it too. A deleted comment, which Bitbucket returns with empty
-  content, can now be told apart from an empty one. The table output has the
-  two new columns. Implemented by Tanner Bennett. (#183, #199)
-- `bitbucket pr comments --unresolved` hides every comment in a resolved
-  thread, replies included. Implemented by Tanner Bennett. (#183, #199)
+### Security
+
+- Remove the unmaintained `chrono` crate (RUSTSEC-2026-0543). The CLI now uses
+  `jiff` 1.0, and the API crate uses the standard library. The advisory check
+  no longer ignores RUSTSEC-2026-0543. (#198)
+- Update `pulldown-cmark` to 0.13.6 to correct RUSTSEC-2026-0433 (quadratic
+  parsing of nested image wikilinks). Update `rustix` to 1.1.6 to correct
+  RUSTSEC-2026-0486 (unsound xattr functions). Update `hyper` to 1.12.0, which
+  no longer depends on the unmaintained `pin-utils` (RUSTSEC-2026-0441).
+  `rpassword` moves to 7.5.5 and `want` to 0.3.2. (#190)
 
 ## [0.13.0] - 2026-10-28
 
@@ -876,7 +847,8 @@ in scripts.
 First release: a Rust CLI for Jira, Confluence and Bitbucket, distributed through
 cargo-dist with a Homebrew tap and a shell installer.
 
-[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/omar16100/atlassian-cli/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/omar16100/atlassian-cli/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/omar16100/atlassian-cli/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/omar16100/atlassian-cli/compare/v0.10.0...v0.11.0

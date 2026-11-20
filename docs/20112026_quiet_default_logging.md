@@ -1,6 +1,6 @@
 # Quiet stderr: the default log level is `warn`
 
-Status: in progress on `fix/quiet-default-logging` (PR #184).
+Status: shipped in v0.14.0 (PR #184).
 
 ## Problem
 

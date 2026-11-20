@@ -1,6 +1,6 @@
 # `bb commit browse` prints the content of a file
 
-Status: in progress on `feat/bb-browse-file-content` (PR #187).
+Status: shipped in v0.14.0 (PR #187).
 
 ## Problem
 

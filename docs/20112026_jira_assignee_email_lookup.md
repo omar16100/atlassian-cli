@@ -1,6 +1,6 @@
 # Jira assignee email lookup and `jira user search`
 
-Status: in progress on `fix/jira-assignee-email` (PR #188).
+Status: shipped in v0.14.0 (PR #188).
 
 ## Problem
 
