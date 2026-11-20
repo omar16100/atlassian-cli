@@ -194,13 +194,13 @@ resolve. `git log` remains the complete record.
   content. It now sends the `byOperation` request for one user (`accountId`) or
   one group. `--subject-id` for a group is the group ID, not the group name:
   the specification has no restriction endpoint that takes a group name, so a
-  name is sent as an ID and the server refuses it. `--operation` accepts only
+  name is sent as an ID, which is not expected to work. `--operation` accepts only
   `read` or `update` and `--subject-type` accepts only `user` or `group`. The
   values are case-sensitive, `--help` shows them, and other values are refused
   before a request is sent, with a usage error and exit code 2. An empty or
   blank `--subject-id` is refused before a request is sent, and spaces at the
   two ends of the value are removed. The change is verified against the
-  specification and a mock server, not against a live site. (#PR)
+  specification and a mock server, not against a live site. (#195)
 
 ## [0.13.0] - 2026-10-28
 

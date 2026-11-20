@@ -1,6 +1,6 @@
 # `confluence page remove-restriction`: the endpoint for one subject
 
-Status: in progress on fix/confluence-remove-restriction-endpoint (PR #PR)
+Status: in progress on fix/confluence-remove-restriction-endpoint (PR #195).
 
 This branch is stacked on `fix/confluence-add-restriction-body`, see
 [20112026_confluence_restriction_requests.md](20112026_confluence_restriction_requests.md).
