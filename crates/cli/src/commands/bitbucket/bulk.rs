@@ -1,7 +1,9 @@
 use anyhow::{bail, Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
+use super::rfc3339::Rfc3339;
 use super::utils::{encode_path_segment, encode_ref_path, BitbucketContext};
 use crate::commands::common::confirm_destructive;
 
@@ -32,15 +34,11 @@ struct Target {
 /// A repository with no `updated_on` is never stale: absent data is not
 /// evidence of disuse, and treating it as such would mutate repositories on the
 /// strength of a missing field.
-pub(crate) fn is_stale(
-    updated_on: Option<&str>,
-    now: chrono::DateTime<chrono::Utc>,
-    days: i64,
-) -> bool {
+pub(crate) fn is_stale(updated_on: Option<&str>, now: Timestamp, days: i64) -> bool {
     let Some(updated) = updated_on else {
         return false;
     };
-    let Ok(updated_date) = chrono::DateTime::parse_from_rfc3339(updated) else {
+    let Some(updated_date) = Rfc3339::parse(updated) else {
         // Not stale, but say so. A server-side date-format change would
         // otherwise turn this command into a permanent "No stale repositories
         // found" with nothing to explain why.
@@ -50,16 +48,30 @@ pub(crate) fn is_stale(
         );
         return false;
     };
-    // `try_days` rather than `days`: the latter panics on a value large enough
-    // to overflow, and `--days` comes from the command line.
-    let Some(threshold) = chrono::Duration::try_days(days) else {
+    // A checked calculation: `--days` comes from the command line.
+    let Some(threshold_nanos) = stale_threshold_nanos(days) else {
         tracing::warn!(
             days,
             "Staleness threshold is out of range; treating nothing as stale"
         );
         return false;
     };
-    now.signed_duration_since(updated_date) > threshold
+    updated_date.elapsed_nanos(now) > threshold_nanos
+}
+
+/// The largest staleness threshold in seconds, positive or negative. This is
+/// the limit that the command had before (`i64::MAX` milliseconds), so the
+/// `--days` values in range do not change.
+const MAX_THRESHOLD_SECONDS: u64 = i64::MAX.unsigned_abs() / 1_000;
+
+/// The staleness threshold of `days` in nanoseconds, or `None` when `days` is
+/// out of range.
+fn stale_threshold_nanos(days: i64) -> Option<i128> {
+    let seconds = days.checked_mul(86_400)?;
+    if seconds.unsigned_abs() > MAX_THRESHOLD_SECONDS {
+        return None;
+    }
+    Some(i128::from(seconds) * 1_000_000_000)
 }
 
 /// Disable the issue tracker and wiki on stale repositories.
@@ -100,7 +112,7 @@ pub async fn disable_features_on_stale_repos(
         );
     }
 
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
 
     #[derive(Serialize)]
     struct StaleRepo<'a> {
@@ -467,11 +479,18 @@ mod tests {
             .collect()
     }
 
+    /// The RFC 3339 time that is `days` days and `seconds` seconds before
+    /// `now`, in the form that Bitbucket sends (`+00:00`).
+    fn time_before(now: Timestamp, days: i64, seconds: i64) -> String {
+        let duration = jiff::SignedDuration::from_secs(days * 86_400 + seconds);
+        super::super::rfc3339::format_utc(now - duration)
+    }
+
     /// A repository with no `updated_on` must never be treated as stale:
     /// acting on a missing field would mutate repositories on no evidence.
     #[test]
     fn missing_updated_on_is_never_stale() {
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         assert!(!is_stale(None, now, 180));
         assert!(!is_stale(Some("not-a-date"), now, 180));
     }
@@ -479,29 +498,27 @@ mod tests {
     /// Exactly at the threshold is not stale: the comparison is strict.
     #[test]
     fn the_threshold_boundary_is_exclusive() {
-        let now = chrono::Utc::now();
-        let exactly = (now - chrono::Duration::days(180)).to_rfc3339();
+        let now = Timestamp::now();
+        let exactly = time_before(now, 180, 0);
         assert!(!is_stale(Some(&exactly), now, 180));
 
-        let a_moment_older =
-            (now - chrono::Duration::days(180) - chrono::Duration::seconds(1)).to_rfc3339();
+        let a_moment_older = time_before(now, 180, 1);
         assert!(is_stale(Some(&a_moment_older), now, 180));
     }
 
-    /// `chrono::Duration::days` panics on an overflowing value, and `--days`
-    /// is user input.
+    /// The threshold calculation must not overflow: `--days` is user input.
     #[test]
     fn an_absurd_threshold_does_not_panic() {
-        let now = chrono::Utc::now();
-        let old = (now - chrono::Duration::days(500)).to_rfc3339();
+        let now = Timestamp::now();
+        let old = time_before(now, 500, 0);
         assert!(!is_stale(Some(&old), now, i64::MAX));
     }
 
     #[test]
     fn staleness_compares_against_the_threshold() {
-        let now = chrono::Utc::now();
-        let old = (now - chrono::Duration::days(200)).to_rfc3339();
-        let recent = (now - chrono::Duration::days(10)).to_rfc3339();
+        let now = Timestamp::now();
+        let old = time_before(now, 200, 0);
+        let recent = time_before(now, 10, 0);
         assert!(is_stale(Some(&old), now, 180));
         assert!(!is_stale(Some(&recent), now, 180));
     }
@@ -515,9 +532,7 @@ mod tests {
 
     /// `is_stale` with the current time fixed at the RFC 3339 time `now`.
     fn stale(updated_on: Option<&str>, now: &str, days: i64) -> bool {
-        let now = chrono::DateTime::parse_from_rfc3339(now)
-            .unwrap()
-            .with_timezone(&chrono::Utc);
+        let now: Timestamp = now.parse().unwrap();
         is_stale(updated_on, now, days)
     }
 
@@ -716,7 +731,7 @@ mod tests {
     /// nothing is mutated.
     #[tokio::test]
     async fn stale_repo_listing_mutates_nothing() {
-        let old = (chrono::Utc::now() - chrono::Duration::days(400)).to_rfc3339();
+        let old = time_before(Timestamp::now(), 400, 0);
         let server = server_with_repos(&[("dusty", old)]).await;
         let renderer = OutputRenderer::new(OutputFormat::Json);
         let ctx = ctx_for(&server, &renderer);
@@ -730,9 +745,9 @@ mod tests {
 
     #[tokio::test]
     async fn execute_disables_features_only_on_stale_repos() {
-        let now = chrono::Utc::now();
-        let old = (now - chrono::Duration::days(400)).to_rfc3339();
-        let fresh = (now - chrono::Duration::days(3)).to_rfc3339();
+        let now = Timestamp::now();
+        let old = time_before(now, 400, 0);
+        let fresh = time_before(now, 3, 0);
         let server = server_with_repos(&[("dusty", old), ("busy", fresh)]).await;
         let renderer = OutputRenderer::new(OutputFormat::Json);
         let ctx = ctx_for(&server, &renderer);

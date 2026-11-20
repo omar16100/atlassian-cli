@@ -16,6 +16,7 @@ mod positional;
 mod pullrequests;
 mod repos;
 mod source;
+mod rfc3339;
 mod time_parser;
 pub mod utils;
 mod variables;

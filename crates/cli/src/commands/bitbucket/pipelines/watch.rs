@@ -231,16 +231,16 @@ fn paused_message(status: &str, pending: Option<usize>) -> String {
 }
 
 /// The local wall clock time as `HH:MM:SS`, for the lines of the log mode.
+///
+/// `jiff` reads the system time zone from the `TZ` variable, then from
+/// `/etc/localtime`. If it finds no time zone, the clock is in UTC.
 fn local_clock() -> String {
-    clock_text(&chrono::Local::now())
+    clock_text(&jiff::ZonedDateTime::now())
 }
 
 /// The wall clock time of `time` as `HH:MM:SS`, in the time zone of `time`.
-fn clock_text<Tz: chrono::TimeZone>(time: &chrono::DateTime<Tz>) -> String
-where
-    Tz::Offset: std::fmt::Display,
-{
-    time.format("%H:%M:%S").to_string()
+fn clock_text(time: &jiff::ZonedDateTime) -> String {
+    time.strftime("%H:%M:%S").to_string()
 }
 
 #[cfg(test)]
@@ -253,7 +253,12 @@ mod tests {
 
     /// `clock_text` for an RFC 3339 time, in the offset of that time.
     fn clock_at(time: &str) -> String {
-        clock_text(&chrono::DateTime::parse_from_rfc3339(time).unwrap())
+        let instant: jiff::Timestamp = time.parse().unwrap();
+        let offset = jiff::fmt::temporal::Pieces::parse(time)
+            .unwrap()
+            .to_numeric_offset()
+            .unwrap();
+        clock_text(&instant.to_zoned_datetime(jiff::tz::TimeZone::fixed(offset)))
     }
 
     #[test]

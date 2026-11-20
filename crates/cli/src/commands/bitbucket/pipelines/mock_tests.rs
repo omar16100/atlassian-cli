@@ -204,3 +204,111 @@ async fn logs_failed_only_fetches_only_the_failed_step() {
     .await
     .unwrap();
 }
+
+/// `--since` and `--before` go into the `q` filter in one fixed form: a
+/// numeric offset, never `Z`, and the fraction that the caller gave.
+#[tokio::test]
+async fn list_sends_the_parsed_time_expressions_in_the_query() {
+    use super::super::time_parser::parse_time_expression;
+    use super::list::list_pipelines;
+
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/2\.0/repositories/ws/web_app/pipelines/?$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"values": []})))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let since = parse_time_expression("2024-01-01").unwrap();
+    let before = parse_time_expression("2024-06-01T08:30:00.5+08:00").unwrap();
+    let renderer = OutputRenderer::new(OutputFormat::Json);
+    list_pipelines(
+        &ctx(&server, &renderer),
+        "ws",
+        "web_app",
+        10,
+        None,
+        None,
+        None,
+        Some(&since),
+        Some(&before),
+        false,
+        false,
+    )
+    .await
+    .unwrap();
+
+    let requests = server.received_requests().await.unwrap();
+    let filter = requests[0]
+        .url
+        .query_pairs()
+        .find(|(name, _)| name == "q")
+        .map(|(_, value)| value.into_owned())
+        .expect("the request must have a q filter");
+    assert!(
+        filter.contains(r#"created_on>="2024-01-01T00:00:00+00:00""#),
+        "filter: {filter}"
+    );
+    assert!(
+        filter.contains(r#"created_on<"2024-06-01T08:30:00.500+08:00""#),
+        "filter: {filter}"
+    );
+}
+
+/// A step that runs has no `duration_in_seconds`. The duration is calculated
+/// from `started_on` and the clock.
+#[tokio::test]
+async fn steps_show_a_calculated_duration_only_for_a_running_step() {
+    use super::steps::fetch_steps;
+
+    let running = |uuid: &str, started_on: &str| {
+        json!({
+            "uuid": uuid,
+            "name": uuid,
+            "state": {"name": "IN_PROGRESS"},
+            "started_on": started_on
+        })
+    };
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"/steps/?$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(steps_page(json!([
+            // A start time in the future gives zero.
+            running("{future}", "9999-12-31T23:59:59.123456+00:00"),
+            running("{past}", "2000-01-01T00:00:00+08:00"),
+            running("{invalid}", "2000-01-01 00:00"),
+            {
+                "uuid": "{done}",
+                "name": "done",
+                "state": {"name": "COMPLETED", "result": {"name": "SUCCESSFUL"}},
+                "started_on": "2000-01-01T00:00:00Z",
+                "completed_on": "2000-01-01T00:01:05Z",
+                "duration_in_seconds": 65
+            }
+        ]))))
+        .mount(&server)
+        .await;
+
+    let renderer = OutputRenderer::new(OutputFormat::Json);
+    let steps = fetch_steps(&ctx(&server, &renderer), "ws", "web_app", PIPELINE, true)
+        .await
+        .unwrap();
+    let duration = |uuid: &str| {
+        steps
+            .iter()
+            .find(|step| step.uuid == uuid)
+            .unwrap()
+            .duration
+            .clone()
+    };
+
+    assert_eq!(duration("{future}").as_deref(), Some("~0s"));
+    let past = duration("{past}").expect("a running step must have a duration");
+    assert!(past.starts_with('~') && past.contains("h ") && past.ends_with('s'));
+    // From the year 2000 to the present is more than 200000 hours.
+    let hours: u64 = past[1..past.find('h').unwrap()].parse().unwrap();
+    assert!(hours > 200_000, "duration: {past}");
+    assert_eq!(duration("{invalid}"), None);
+    assert_eq!(duration("{done}").as_deref(), Some("1m 5s"));
+}

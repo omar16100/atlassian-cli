@@ -1,5 +1,12 @@
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Duration, Utc};
+use jiff::{SignedDuration, Timestamp};
+
+use super::rfc3339::{format_rfc3339, format_utc, Rfc3339};
+
+/// The years that a date-only expression accepts. These are the limits that
+/// the command had before, so the accepted inputs do not change.
+const MIN_DATE_YEAR: i64 = -262_143;
+const MAX_DATE_YEAR: i64 = 262_142;
 
 /// Parse time expressions into ISO8601/RFC3339 format for Bitbucket API
 ///
@@ -8,33 +15,31 @@ use chrono::{DateTime, Duration, Utc};
 /// - ISO8601 with timezone: "2024-01-01T10:00:00Z"
 /// - ISO8601 date only: "2024-01-01" (assumes 00:00:00 UTC)
 ///
-/// All timestamps are in UTC. Relative durations calculate from Utc::now().
+/// All timestamps are in UTC. Relative durations calculate from the current
+/// UTC time.
 pub fn parse_time_expression(expr: &str) -> Result<String> {
-    parse_time_expression_at(expr, Utc::now())
+    parse_time_expression_at(expr, Timestamp::now())
 }
 
 /// `parse_time_expression` for a given current time. A test can call this with
 /// a fixed time.
-fn parse_time_expression_at(expr: &str, now: DateTime<Utc>) -> Result<String> {
+fn parse_time_expression_at(expr: &str, now: Timestamp) -> Result<String> {
     // Try parsing as relative duration first
     if let Some(result) = try_parse_relative(expr, now)? {
         return Ok(result);
     }
 
     // Try parsing as ISO8601 datetime with timezone
-    if let Ok(dt) = DateTime::parse_from_rfc3339(expr) {
-        return Ok(dt.to_rfc3339());
+    if let Some(timestamp) = Rfc3339::parse(expr) {
+        return Ok(timestamp.to_output_string());
     }
 
     // Try parsing as ISO8601 date only (assume UTC 00:00:00)
-    if let Ok(date) = chrono::NaiveDate::parse_from_str(expr, "%Y-%m-%d") {
-        let datetime = date
-            .and_hms_opt(0, 0, 0)
-            .ok_or_else(|| anyhow!("Invalid date: {}", expr))?;
-        let utc_datetime = DateTime::<Utc>::from_naive_utc_and_offset(datetime, Utc);
-        return Ok(utc_datetime.to_rfc3339());
+    if let Some((year, month, day)) = parse_date_only(expr) {
+        return Ok(format_rfc3339(year, month, day, 0, 0, 0, 0, 0));
     }
 
+    tracing::debug!(expr, "Time expression matches no supported format");
     Err(anyhow!(
         "Invalid time expression: '{}'\n\
         Supported formats:\n\
@@ -49,7 +54,7 @@ fn parse_time_expression_at(expr: &str, now: DateTime<Utc>) -> Result<String> {
 /// Returns None if not a relative duration format
 /// Returns Some(Err) if format matches but value is invalid
 /// Returns Some(Ok(timestamp)) if successfully parsed
-fn try_parse_relative(expr: &str, now: DateTime<Utc>) -> Result<Option<String>> {
+fn try_parse_relative(expr: &str, now: Timestamp) -> Result<Option<String>> {
     let expr = expr.trim();
 
     // Must have at least 2 chars (e.g., "1h")
@@ -81,15 +86,82 @@ fn try_parse_relative(expr: &str, now: DateTime<Utc>) -> Result<Option<String>> 
         ));
     }
 
-    let duration = match unit {
-        'h' => Duration::hours(value),
-        'd' => Duration::days(value),
-        'w' => Duration::weeks(value),
+    let seconds_per_unit: i64 = match unit {
+        'h' => 3_600,
+        'd' => 86_400,
+        'w' => 604_800,
         _ => unreachable!(), // Already validated above
     };
 
-    let target = now - duration;
-    Ok(Some(target.to_rfc3339()))
+    // A checked calculation: the value comes from the command line. The
+    // earliest time that can be given is in the year -9999.
+    let target = value
+        .checked_mul(seconds_per_unit)
+        .and_then(|seconds| now.checked_sub(SignedDuration::from_secs(seconds)).ok());
+    let Some(target) = target else {
+        tracing::debug!(expr, "Relative duration is out of range");
+        return Err(anyhow!(
+            "Invalid relative duration: '{}' - duration is too large (the result is before the year -9999)",
+            expr
+        ));
+    };
+    Ok(Some(format_utc(target)))
+}
+
+/// Parse a date with no time: a year, a month and a day with `-` between them.
+///
+/// The rules are those that the command had before. The month and the day have
+/// one or two digits. The year has one to four digits, or a sign and one or
+/// more digits. White space is accepted before each number, and not after the
+/// date. The date must be a real date in the proleptic Gregorian calendar.
+fn parse_date_only(expr: &str) -> Option<(i32, u32, u32)> {
+    let rest = expr.trim_start();
+    let (year, rest) = if let Some(unsigned) = rest.strip_prefix('-') {
+        let (value, rest) = leading_number(unsigned, usize::MAX)?;
+        (-value, rest)
+    } else if let Some(unsigned) = rest.strip_prefix('+') {
+        leading_number(unsigned, usize::MAX)?
+    } else {
+        leading_number(rest, 4)?
+    };
+    let rest = rest.strip_prefix('-')?;
+    let (month, rest) = leading_number(rest.trim_start(), 2)?;
+    let rest = rest.strip_prefix('-')?;
+    let (day, rest) = leading_number(rest.trim_start(), 2)?;
+    if !rest.is_empty() {
+        return None;
+    }
+
+    if !(MIN_DATE_YEAR..=MAX_DATE_YEAR).contains(&year) {
+        return None;
+    }
+    let is_leap_year = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap_year => 29,
+        2 => 28,
+        _ => return None,
+    };
+    if !(1..=days_in_month).contains(&day) {
+        return None;
+    }
+    Some((year as i32, month as u32, day as u32))
+}
+
+/// Read one to `max_digits` ASCII digits from the start of `input`. Give the
+/// number and the text after it. A number that does not fit gives `None`.
+fn leading_number(input: &str, max_digits: usize) -> Option<(i64, &str)> {
+    let digit_count = input
+        .bytes()
+        .take(max_digits)
+        .take_while(u8::is_ascii_digit)
+        .count();
+    if digit_count == 0 {
+        return None;
+    }
+    let value = input[..digit_count].parse::<i64>().ok()?;
+    Some((value, &input[digit_count..]))
 }
 
 #[cfg(test)]
@@ -101,21 +173,21 @@ mod tests {
         let result = parse_time_expression("24h");
         assert!(result.is_ok());
         // Just verify it's a valid RFC3339 timestamp
-        assert!(DateTime::parse_from_rfc3339(&result.unwrap()).is_ok());
+        assert!(Rfc3339::parse(&result.unwrap()).is_some());
     }
 
     #[test]
     fn test_parse_relative_days() {
         let result = parse_time_expression("7d");
         assert!(result.is_ok());
-        assert!(DateTime::parse_from_rfc3339(&result.unwrap()).is_ok());
+        assert!(Rfc3339::parse(&result.unwrap()).is_some());
     }
 
     #[test]
     fn test_parse_relative_weeks() {
         let result = parse_time_expression("2w");
         assert!(result.is_ok());
-        assert!(DateTime::parse_from_rfc3339(&result.unwrap()).is_ok());
+        assert!(Rfc3339::parse(&result.unwrap()).is_some());
     }
 
     #[test]
@@ -192,24 +264,22 @@ mod tests {
     fn test_large_duration() {
         let result = parse_time_expression("365d");
         assert!(result.is_ok());
-        assert!(DateTime::parse_from_rfc3339(&result.unwrap()).is_ok());
+        assert!(Rfc3339::parse(&result.unwrap()).is_some());
     }
 
     #[test]
     fn test_relative_duration_calculation() {
-        // Mock time for reproducible test
-        // We can't easily mock Utc::now(), but we can verify the result is in the past
+        // This test uses the real clock, so it can only verify that the result
+        // is in the past.
         let result = parse_time_expression("1h").unwrap();
-        let parsed = DateTime::parse_from_rfc3339(&result).unwrap();
-        let now = Utc::now();
+        let parsed = Rfc3339::parse(&result).unwrap();
+        let now = Timestamp::now();
 
         // The parsed time should be approximately 1 hour ago (allowing small test execution time)
-        let diff = now.signed_duration_since(parsed);
-        assert!(diff.num_hours() >= 0);
-        assert!(diff.num_hours() <= 1);
+        let diff_seconds = parsed.elapsed_nanos(now) / 1_000_000_000;
         // Should be close to 1 hour (within 1 second tolerance for test execution)
-        assert!(diff.num_seconds() >= 3599);
-        assert!(diff.num_seconds() <= 3601);
+        assert!(diff_seconds >= 3599);
+        assert!(diff_seconds <= 3601);
     }
 }
 
@@ -233,9 +303,7 @@ mod pinned_tests {
 
     /// Parse `expr` with the current time fixed at the RFC 3339 time `now`.
     fn at(expr: &str, now: &str) -> Result<String> {
-        let now = DateTime::parse_from_rfc3339(now)
-            .unwrap()
-            .with_timezone(&Utc);
+        let now: Timestamp = now.parse().unwrap();
         parse_time_expression_at(expr, now)
     }
 
@@ -596,15 +664,31 @@ mod pinned_tests {
         }
     }
 
-    /// `chrono` behaviour for durations that go out of its range. These are
-    /// the only inputs whose result changes when `chrono` is removed.
+    /// These are the only inputs whose result changed when `chrono` was
+    /// removed. With `chrono`, `5000000d` gave
+    /// `-11663-05-09T12:34:56.123456789+00:00`, and the other three
+    /// expressions caused a panic. Each of them is now an error.
     #[test]
     fn a_relative_expression_out_of_range() {
-        // 2026-11-20 minus 5000000 days is in the year -11663.
-        assert_eq!(ok("5000000d"), "-11663-05-09T12:34:56.123456789+00:00");
-        for expr in ["9223372036854775807h", "9223372036854775807d", "200000000d"] {
-            let result = std::panic::catch_unwind(|| at(expr, NOW));
-            assert!(result.is_err(), "{expr:?} must panic with chrono");
+        for expr in [
+            "5000000d",
+            "9223372036854775807h",
+            "9223372036854775807d",
+            "200000000d",
+        ] {
+            assert_eq!(
+                err(expr),
+                format!(
+                    "Invalid relative duration: '{expr}' - duration is too large (the result is before the year -9999)"
+                ),
+            );
         }
+    }
+
+    /// The earliest result is in the second day of the year -9999.
+    #[test]
+    fn the_limit_of_a_relative_expression() {
+        assert_eq!(ok("4392363d"), "-9999-01-02T12:34:56.123456789+00:00");
+        assert!(at("4392364d", NOW).is_err());
     }
 }

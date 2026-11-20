@@ -11,7 +11,21 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Changed
+
+- The API crate field `RateLimitInfo::reset_at` is now
+  `Option<std::time::SystemTime>`. It was `Option<chrono::DateTime<chrono::Utc>>`.
+  This is a part of the `chrono` removal. (#PR)
+- A relative time expression for `bb pipeline list --since` or `--before` that
+  gives a time before the year -9999, such as `5000000d`, is now an error.
+  Before, it gave a timestamp with a negative year, and a larger value caused a
+  panic. All other time expressions give the same output as before. (#PR)
+
 ### Security
+
+- Remove the unmaintained `chrono` crate (RUSTSEC-2026-0543). The CLI now uses
+  `jiff` 1.0, and the API crate uses the standard library. The advisory check
+  no longer ignores RUSTSEC-2026-0543. (#PR)
 
 - Update `pulldown-cmark` to 0.13.6 to correct RUSTSEC-2026-0433 (quadratic
   parsing of nested image wikilinks). Update `rustix` to 1.1.6 to correct

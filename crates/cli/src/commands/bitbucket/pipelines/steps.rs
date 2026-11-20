@@ -3,8 +3,9 @@
 use anyhow::{Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use atlassian_cli_output::OutputFormat;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
+use super::super::rfc3339::Rfc3339;
 use super::super::utils::BitbucketContext;
 use super::list::resolve_pipeline_id;
 use super::model::{PipelineStep, StepInfo};
@@ -60,7 +61,7 @@ pub(super) async fn fetch_steps(
                         // In-progress step: compute client-side elapsed time
                         step.started_on
                             .as_ref()
-                            .and_then(|started_str| running_step_duration(started_str, Utc::now()))
+                            .and_then(|started_str| running_step_duration(started_str, Timestamp::now()))
                     } else {
                         None
                     }
@@ -87,10 +88,17 @@ pub(super) async fn fetch_steps(
 /// The duration text of a step that runs now: the time from `started_on` to
 /// `now` in whole seconds, with a `~` before it. A start time in the future
 /// gives `~0s`. A start time that is not valid RFC 3339 gives `None`.
-fn running_step_duration(started_on: &str, now: DateTime<Utc>) -> Option<String> {
-    let started = DateTime::parse_from_rfc3339(started_on).ok()?;
-    let elapsed = now - started.with_timezone(&Utc);
-    let secs = elapsed.num_seconds().max(0) as u64;
+fn running_step_duration(started_on: &str, now: Timestamp) -> Option<String> {
+    let Some(started) = Rfc3339::parse(started_on) else {
+        tracing::debug!(
+            started_on,
+            "Step start time is not valid RFC 3339; no duration shown"
+        );
+        return None;
+    };
+    // A part of a second is dropped. The division rounds toward zero.
+    let elapsed_seconds = started.elapsed_nanos(now) / 1_000_000_000;
+    let secs = u64::try_from(elapsed_seconds.max(0)).unwrap_or(u64::MAX);
     Some(format!("~{}", format_duration_secs(secs)))
 }
 
@@ -213,9 +221,7 @@ mod tests {
     /// `running_step_duration` with the current time fixed at the RFC 3339
     /// time `now`.
     fn running(started_on: &str, now: &str) -> Option<String> {
-        let now = DateTime::parse_from_rfc3339(now)
-            .unwrap()
-            .with_timezone(&Utc);
+        let now: Timestamp = now.parse().unwrap();
         running_step_duration(started_on, now)
     }
 

@@ -225,6 +225,15 @@ that give access, and by `repo create`.
 supply one. The clap argument tree is in `commands/bitbucket/args.rs`; `mod.rs`
 keeps the entry point and the dispatch.
 
+**Timestamps** (`commands/bitbucket/rfc3339.rs`). The Bitbucket commands read
+RFC 3339 times with a strict parser and write one fixed form (a fraction of
+zero, three, six or nine digits, and `+00:00`, never `Z`). `time_parser.rs`
+(`pipeline list --since` and `--before`), `bulk.rs` (stale repositories) and
+`pipelines/steps.rs` (the duration of a running step) use this module. The
+`jiff` crate supplies the current time, the calendar and the local clock of
+`pipeline watch --log`. The API crate uses no date crate: `ratelimit.rs` keeps
+the reset time as a count of seconds from the Unix epoch.
+
 **Pull request edits** (`commands/bitbucket/pullrequests.rs`). Bitbucket edits
 a pull request with a PUT of the pull request, so `pr update` and
 `pr reviewers --add` GET it first and PUT title, description and reviewers
@@ -734,7 +743,7 @@ pub struct BulkExecutor {
 │  ├─────────────────────────┤           ├─────────────────────────┤      │
 │  │ - max_retries: u32      │           │ - limit: u32            │      │
 │  │ - initial_backoff: ms   │           │ - remaining: u32        │      │
-│  │ - max_backoff: ms       │           │ - reset_at: Instant     │      │
+│  │ - max_backoff: ms       │           │ - reset_at: epoch secs  │      │
 │  └─────────────────────────┘           └─────────────────────────┘      │
 │                                                                          │
 │  ┌─────────────────────────┐           ┌─────────────────────────┐      │

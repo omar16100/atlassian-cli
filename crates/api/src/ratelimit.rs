@@ -1,8 +1,7 @@
-use chrono::{DateTime, Utc};
 use reqwest::header::HeaderMap;
 use reqwest::Response;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tracing::{debug, info, warn};
@@ -12,10 +11,49 @@ pub struct RateLimiter {
     state: Arc<Mutex<RateLimitState>>,
 }
 
+/// The largest and the smallest `x-ratelimit-reset` values that are accepted,
+/// in seconds from the Unix epoch: the last second of the year 262142 and the
+/// first second of the year -262143. These are the limits that the client had
+/// before, so the accepted values do not change.
+const MAX_RESET_EPOCH_SECS: i64 = 8_210_266_876_799;
+const MIN_RESET_EPOCH_SECS: i64 = -8_334_601_228_800;
+
 struct RateLimitState {
     remaining: Option<u32>,
-    reset_at: Option<DateTime<Utc>>,
+    /// The reset time in seconds from the Unix epoch.
+    reset_at: Option<i64>,
     limit: Option<u32>,
+}
+
+/// The current time as whole seconds from the Unix epoch (rounded down) and
+/// the nanoseconds after that second.
+fn unix_now() -> (i64, u32) {
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(since_epoch) => (
+            i64::try_from(since_epoch.as_secs()).unwrap_or(i64::MAX),
+            since_epoch.subsec_nanos(),
+        ),
+        // The system clock is before 1970.
+        Err(error) => {
+            let before_epoch = error.duration();
+            let secs = i64::try_from(before_epoch.as_secs()).unwrap_or(i64::MAX);
+            match before_epoch.subsec_nanos() {
+                0 => (-secs, 0),
+                nanos => (-secs - 1, 1_000_000_000 - nanos),
+            }
+        }
+    }
+}
+
+/// The `SystemTime` of a count of seconds from the Unix epoch, or `None` when
+/// the platform cannot represent that time.
+fn system_time_from_epoch_secs(secs: i64) -> Option<SystemTime> {
+    let distance = Duration::from_secs(secs.unsigned_abs());
+    if secs >= 0 {
+        UNIX_EPOCH.checked_add(distance)
+    } else {
+        UNIX_EPOCH.checked_sub(distance)
+    }
 }
 
 impl RateLimiter {
@@ -59,8 +97,10 @@ impl RateLimiter {
         if let Some(reset) = headers.get("x-ratelimit-reset") {
             if let Ok(s) = reset.to_str() {
                 if let Ok(timestamp) = s.parse::<i64>() {
-                    if let Some(dt) = DateTime::from_timestamp(timestamp, 0) {
-                        state.reset_at = Some(dt);
+                    if (MIN_RESET_EPOCH_SECS..=MAX_RESET_EPOCH_SECS).contains(&timestamp) {
+                        state.reset_at = Some(timestamp);
+                    } else {
+                        debug!(timestamp, "Rate limit reset time is out of range, ignored");
                     }
                 }
             }
@@ -83,12 +123,14 @@ impl RateLimiter {
     }
 
     pub async fn check_limit(&self) -> Option<u64> {
-        self.check_limit_at(Utc::now()).await
+        let (now_secs, now_nanos) = unix_now();
+        self.check_limit_at(now_secs, now_nanos).await
     }
 
-    /// The wait for a given current time. A test can call this with a fixed
-    /// time.
-    async fn check_limit_at(&self, now: DateTime<Utc>) -> Option<u64> {
+    /// The wait for a given current time: whole seconds from the Unix epoch
+    /// (rounded down) and the nanoseconds after that second. A test can call
+    /// this with a fixed time.
+    async fn check_limit_at(&self, now_secs: i64, now_nanos: u32) -> Option<u64> {
         let Ok(state) = timeout(Duration::from_secs(5), self.state.lock()).await else {
             warn!("Rate limiter lock timeout, skipping check");
             return None;
@@ -97,8 +139,12 @@ impl RateLimiter {
         if let Some(remaining) = state.remaining {
             if remaining == 0 {
                 if let Some(reset_at) = state.reset_at {
-                    if reset_at > now {
-                        let wait_secs = (reset_at - now).num_seconds() as u64;
+                    // The reset time is a whole second. It is in the future
+                    // only when it is after the current whole second.
+                    if reset_at > now_secs {
+                        // A part of a second is dropped, not rounded.
+                        let started_second = i64::from(now_nanos > 0);
+                        let wait_secs = (reset_at.saturating_sub(now_secs) - started_second) as u64;
                         debug!(wait_secs, "Rate limit exceeded, need to wait");
                         return Some(wait_secs);
                     }
@@ -121,7 +167,7 @@ impl RateLimiter {
         RateLimitInfo {
             limit: state.limit,
             remaining: state.remaining,
-            reset_at: state.reset_at,
+            reset_at: state.reset_at.and_then(system_time_from_epoch_secs),
         }
     }
 }
@@ -136,7 +182,10 @@ impl Default for RateLimiter {
 pub struct RateLimitInfo {
     pub limit: Option<u32>,
     pub remaining: Option<u32>,
-    pub reset_at: Option<DateTime<Utc>>,
+    /// The time at which the limit resets. It is `None` when no reset time is
+    /// known, or when the platform cannot represent the time as a
+    /// `SystemTime`.
+    pub reset_at: Option<SystemTime>,
 }
 
 #[cfg(test)]
@@ -164,13 +213,16 @@ mod tests {
 
     /// The stored reset time, in seconds from the Unix epoch.
     fn reset_epoch_secs(info: &RateLimitInfo) -> Option<i64> {
-        info.reset_at.map(|t| t.timestamp())
+        info.reset_at
+            .map(|time| match time.duration_since(UNIX_EPOCH) {
+                Ok(since_epoch) => since_epoch.as_secs() as i64,
+                Err(error) => -(error.duration().as_secs() as i64),
+            })
     }
 
     /// The wait that `check_limit` gives at a fixed current time.
     async fn wait_at(limiter: &RateLimiter, now_secs: i64, now_nanos: u32) -> Option<u64> {
-        let now = DateTime::from_timestamp(now_secs, now_nanos).unwrap();
-        limiter.check_limit_at(now).await
+        limiter.check_limit_at(now_secs, now_nanos).await
     }
 
     /// A limiter with no requests left and the given reset header.
