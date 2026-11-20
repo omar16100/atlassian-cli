@@ -59,7 +59,7 @@ The specification has one endpoint for each subject:
 - **Group ID.** `--subject-id` for a group is the group ID, not the group
   name. The help said "user ID or group name". The specification has no
   restriction endpoint that names a group by its name. A group name is sent as
-  a group ID, and the server refuses it.
+  a group ID, which is not expected to work.
 - **Output.** The success line on stdout does not change.
 
 What a script can see:
