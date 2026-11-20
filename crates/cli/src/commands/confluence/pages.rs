@@ -998,6 +998,42 @@ pub async fn add_page_restriction(
     Ok(())
 }
 
+/// Build the request path that removes one user or one group from one
+/// operation of a content restriction.
+///
+/// The Confluence Cloud REST API v1 specification
+/// (<https://dac-static.atlassian.com/cloud/confluence/swagger.v3.json>) has
+/// one endpoint for each subject:
+/// `DELETE .../restriction/byOperation/{operationKey}/user?accountId=...` and
+/// `DELETE .../restriction/byOperation/{operationKey}/byGroupId/{groupId}`.
+///
+/// The path sent before was `DELETE .../restriction?operation=...`. The
+/// specification gives that endpoint no such parameters and says that it
+/// removes all restrictions of the content, so it must not be used here.
+fn remove_restriction_path(
+    page_id: &str,
+    operation: &str,
+    subject: RestrictionSubject,
+    subject_id: &str,
+) -> Result<String> {
+    let base = format!(
+        "/wiki/rest/api/content/{}/restriction/byOperation/{}",
+        encode_path_segment(page_id)?,
+        encode_path_segment(operation)?
+    );
+    Ok(match subject {
+        RestrictionSubject::User => format!(
+            "{base}/user?{}",
+            UrlParamsBuilder::new()
+                .add("accountId", subject_id)
+                .finish()
+        ),
+        RestrictionSubject::Group => {
+            format!("{base}/byGroupId/{}", encode_path_segment(subject_id)?)
+        }
+    })
+}
+
 // Remove page restriction
 pub async fn remove_page_restriction(
     ctx: &ConfluenceContext<'_>,
@@ -1006,18 +1042,14 @@ pub async fn remove_page_restriction(
     subject_type: &str,
     subject_id: &str,
 ) -> Result<()> {
-    let query_string = UrlParamsBuilder::new()
-        .add("operation", operation)
-        .add(&format!("{}.identifier", subject_type), subject_id)
-        .finish();
+    let subject = restriction_subject(subject_type)?;
+    let subject_id = restriction_subject_id(subject_id)?;
+    let path = remove_restriction_path(page_id, operation, subject, subject_id)?;
+    tracing::debug!(%page_id, %operation, ?subject, "Removing a content restriction");
 
     let _: Value = ctx
         .client
-        .delete(&format!(
-            "/wiki/rest/api/content/{}/restriction?{}",
-            encode_path_segment(page_id)?,
-            query_string
-        ))
+        .delete(&path)
         .await
         .with_context(|| format!("Failed to remove restriction from page {}", page_id))?;
 
@@ -1477,6 +1509,40 @@ mod restriction_tests {
                 }]
             })
         );
+    }
+
+    #[test]
+    fn remove_path_for_a_user_puts_the_account_id_in_the_query() {
+        let path =
+            remove_restriction_path("1001", "read", RestrictionSubject::User, "557058:acc-1")
+                .unwrap();
+        assert_eq!(
+            path,
+            "/wiki/rest/api/content/1001/restriction/byOperation/read/user?accountId=557058%3Aacc-1"
+        );
+    }
+
+    #[test]
+    fn remove_path_for_a_group_puts_the_group_id_in_the_path() {
+        let path =
+            remove_restriction_path("1001", "update", RestrictionSubject::Group, "grp-1").unwrap();
+        assert_eq!(
+            path,
+            "/wiki/rest/api/content/1001/restriction/byOperation/update/byGroupId/grp-1"
+        );
+    }
+
+    /// The remove path never is the endpoint that removes all restrictions.
+    #[test]
+    fn remove_path_always_has_the_by_operation_segment() {
+        for subject in [RestrictionSubject::User, RestrictionSubject::Group] {
+            let path = remove_restriction_path("1001", "read", subject, "x").unwrap();
+            assert!(path.contains("/restriction/byOperation/read/"), "{path}");
+        }
+        assert!(remove_restriction_path("1001", "read", RestrictionSubject::Group, "a/b").is_err());
+        assert!(remove_restriction_path("1001", "read", RestrictionSubject::Group, "").is_err());
+        // The operation is one path segment too.
+        assert!(remove_restriction_path("1001", "read/x", RestrictionSubject::User, "x").is_err());
     }
 
     /// The value that is checked is the value that is sent.
