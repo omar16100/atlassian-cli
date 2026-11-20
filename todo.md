@@ -3451,3 +3451,14 @@ that body. clap accepts only the documented values of `--operation` and
 `--subject-type`. `--subject-id` is trimmed, and an empty value is refused.
 The change is verified against the specification and a mock server, not against
 a live site. Built-binary tests and unit tests cover the change.
+
+## 2026-11-20: Confluence `page remove-restriction` removes one subject only
+
+`confluence page remove-restriction` sent the DELETE that the Confluence REST
+specification describes as "Removes all restrictions (read and update) on a
+piece of content." `remove_restriction_path` in `confluence/pages.rs` now builds
+the `byOperation` path for one user or one group. The page ID, the operation and
+the group ID are encoded as path segments. clap accepts only the documented
+values of `--operation` and `--subject-type`, and an empty `--subject-id` is
+refused. The change is verified against the specification and a mock server,
+not against a live site. Built-binary tests and unit tests cover the change.

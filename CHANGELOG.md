@@ -187,6 +187,20 @@ resolve. `git log` remains the complete record.
   `--format`, `--envelope`, `--debug`) below a `Global options:` heading, after
   the options of the command. Before, they were mixed into the option list of
   each command. Scripts that parse help text see the new section. (#185)
+- `confluence page remove-restriction` removes only the user or the group that
+  you name, for the operation that you name. Before, it sent
+  `DELETE /wiki/rest/api/content/{id}/restriction`, which the Confluence REST
+  specification describes as the request that removes all restrictions of the
+  content. It now sends the `byOperation` request for one user (`accountId`) or
+  one group. `--subject-id` for a group is the group ID, not the group name:
+  the specification has no restriction endpoint that takes a group name, so a
+  name is sent as an ID and the server refuses it. `--operation` accepts only
+  `read` or `update` and `--subject-type` accepts only `user` or `group`. The
+  values are case-sensitive, `--help` shows them, and other values are refused
+  before a request is sent, with a usage error and exit code 2. An empty or
+  blank `--subject-id` is refused before a request is sent, and spaces at the
+  two ends of the value are removed. The change is verified against the
+  specification and a mock server, not against a live site. (#PR)
 
 ## [0.13.0] - 2026-10-28
 
