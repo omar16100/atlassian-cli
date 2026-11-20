@@ -539,3 +539,47 @@ fn test_auth_login_without_flags_is_not_a_parse_error() {
         "it must still fail without a terminal rather than proceeding"
     );
 }
+
+/// The global options have a heading of their own in `--help`, below the
+/// options of the command.
+#[test]
+fn test_help_separates_global_options() {
+    let output = Sandbox::new()
+        .cli()
+        .args(["jira", "issue", "get", "--help"])
+        .output()
+        .expect("Failed to execute jira issue get help");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let options = stdout.find("\nOptions:\n").expect("an Options heading");
+    let globals = stdout
+        .find("\nGlobal options:\n")
+        .expect("a Global options heading");
+    assert!(options < globals, "{stdout}");
+    assert!(stdout[options..globals].contains("--fields"), "{stdout}");
+    assert!(!stdout[options..globals].contains("--profile"), "{stdout}");
+    assert!(stdout[globals..].contains("--profile"), "{stdout}");
+}
+
+/// `jira issue comment` and `jira issue link` are aliases of the plural names.
+#[test]
+fn test_jira_issue_singular_aliases() {
+    for (alias, expected) in [
+        ("comment", "List comments on an issue"),
+        ("link", "List links for an issue"),
+    ] {
+        let output = Sandbox::new()
+            .cli()
+            .args(["jira", "issue", alias, "--help"])
+            .output()
+            .expect("Failed to execute alias help");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(
+            output.status.success(),
+            "`jira issue {alias}` was rejected: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(stdout.contains(expected), "{stdout}");
+    }
+}

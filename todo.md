@@ -3405,3 +3405,12 @@ long help of `bb pr get`, `pr list`, `pipeline get`, `pipeline list` and
 compare each list with the keys that the row types serialise. Pipeline JSON and
 YAML output has the new key `commit_hash` (full hash). No existing key changed.
 See `docs/20112026_bb_json_output_keys.md`.
+## 2026-11-20: help heading for global options, two Jira aliases (PR #185)
+
+`--help` printed the six global options in the option list of each command. They
+have a `Global options:` heading of their own now (`help_heading` on each global
+in `crates/cli/src/main.rs`). `jira issue comment` and `jira issue link` are
+visible aliases of `comments` and `links`. `confluence search content` gets no
+alias: the intent of the caller is not known, and a wrong alias would give a
+wrong result with exit code 0. See
+`docs/20112026_help_global_options_and_aliases.md`.

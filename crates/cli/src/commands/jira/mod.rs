@@ -346,11 +346,11 @@ enum IssueCommands {
     Watchers(WatcherCommands),
 
     /// Manage issue links
-    #[command(subcommand)]
+    #[command(subcommand, visible_alias = "link")]
     Links(LinkCommands),
 
     /// Manage issue comments
-    #[command(subcommand)]
+    #[command(subcommand, visible_alias = "comment")]
     Comments(CommentCommands),
 }
 
