@@ -20,11 +20,12 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+
 ### Changed
 
 - The API crate has a new variant `ApiError::BodyReadFailed` for a response
   body that does not arrive in full. A caller of the crate that matches
-  `ApiError` with no wildcard arm must add it. (#PRNUM)
+  `ApiError` with no wildcard arm must add it. (#196)
 
 ### Fixed
 
@@ -36,7 +37,7 @@ resolve. `git log` remains the complete record.
   downloads, the Bamboo log and artifact commands and the Opsgenie schedule
   export. When each try fails, the error text is "Failed to read the response
   body", where it was "Invalid response format". Ordinary API calls keep the
-  limit of 30 seconds. (#PRNUM)
+  limit of 30 seconds. (#196)
 
 ### Fixed
 
