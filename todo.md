@@ -3341,3 +3341,18 @@ promotes the change notes to `0.13.0 - 2026-10-28` and updates the compare links
 All six crates and the five internal dependency pins already use version 0.13.0.
 The release procedure checks CI before the tag and verifies GitHub assets,
 crates.io packages and Homebrew after publication.
+
+## 2026-11-20: dependency advisories
+
+The security workflow failed on `main` and on each open pull request.
+`cargo audit` reported RUSTSEC-2026-0433 in `pulldown-cmark` 0.13.5.
+`cargo deny check advisories` reported RUSTSEC-2026-0441 (`pin-utils`,
+unmaintained, through `hyper` 1.8.1), RUSTSEC-2026-0486 (`rustix` 1.1.4) and
+RUSTSEC-2026-0543 (`chrono`, unmaintained, no patched version).
+
+The lockfile moves `pulldown-cmark` to 0.13.6, `rpassword` to 7.5.5, `hyper` to
+1.12.0, `want` to 0.3.2 and `rustix` to 1.1.6, and drops `pin-utils`. This
+includes the two updates of Dependabot pull request #182. `deny.toml` ignores
+RUSTSEC-2026-0543 as a temporary exception, because `chrono` is a direct
+dependency and its replacement is a separate change. No release was made.
+

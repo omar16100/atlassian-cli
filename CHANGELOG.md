@@ -11,6 +11,16 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Security
+
+- Update `pulldown-cmark` to 0.13.6 to correct RUSTSEC-2026-0433 (quadratic
+  parsing of nested image wikilinks). Update `rustix` to 1.1.6 to correct
+  RUSTSEC-2026-0486 (unsound xattr functions). Update `hyper` to 1.12.0, which
+  no longer depends on the unmaintained `pin-utils` (RUSTSEC-2026-0441).
+  `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
+  unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
+  check ignores it until `chrono` is replaced. (#PRNUM)
+
 ## [0.13.0] - 2026-10-28
 
 ### Added
