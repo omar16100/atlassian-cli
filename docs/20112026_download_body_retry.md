@@ -1,6 +1,6 @@
 # Downloads: a second try when the body stops, and a longer limit
 
-Status: in progress on `fix/download-body-retry` (PR #196).
+Status: shipped in v0.14.0 (PR #196).
 
 ## Problem
 

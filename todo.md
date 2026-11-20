@@ -3536,3 +3536,12 @@ Pull request 197 moved `syn` to 3.0.10, and its branch was made before 198, so
 the merged lockfile kept one reference to a version that it no longer had.
 `cargo check --workspace` corrected the one line. `cargo audit` and
 `cargo deny check` pass.
+
+## 2026-11-21: release v0.14.0
+
+The owner authorized the merges and the release. Pull requests #184 to #200
+are in `main`. The release branch promotes the change notes to
+`0.14.0 - 2026-11-21`, groups them into one section for each type, sets version
+0.14.0 in the workspace and in the five internal dependency pins, and sets the
+status line of each dated document of this release. See
+`docs/21112026_release_0_14_0_plan.md`.

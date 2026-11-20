@@ -1,6 +1,6 @@
 # Help: a heading for global options, and two aliases
 
-Status: in progress on `feat/help-global-options-and-aliases` (PR #185).
+Status: shipped in v0.14.0 (PR #185).
 
 ## Problem
 

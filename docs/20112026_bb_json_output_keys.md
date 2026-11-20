@@ -1,6 +1,6 @@
 # Bitbucket: output keys in `--help`, and the full commit hash
 
-Status: in progress on `docs/bb-json-output-keys` (PR #186).
+Status: shipped in v0.14.0 (PR #186).
 
 ## Problem
 

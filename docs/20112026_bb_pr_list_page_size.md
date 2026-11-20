@@ -1,6 +1,6 @@
 # `bb pr list`: page size of 50 at most
 
-Status: in progress on `fix/bb-pr-list-page-size` (PR #191).
+Status: shipped in v0.14.0 (PR #191).
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # `confluence page add-restriction`: the documented request body
 
-Status: in progress on `fix/confluence-add-restriction-body` (PR #194).
+Status: shipped in v0.14.0 (PR #194).
 
 ## Problem
 
