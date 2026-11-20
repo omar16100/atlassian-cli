@@ -223,6 +223,7 @@ pub(super) fn non_empty_string(s: &str) -> std::result::Result<String, String> {
 #[derive(Subcommand, Debug, Clone)]
 pub(super) enum PrCommands {
     /// List pull requests for a repository.
+    #[command(long_about = super::output_keys::pr_list_help())]
     List {
         /// Repository slug. Defaults to --repo, then the git remote.
         #[arg(value_name = "REPO")]
@@ -234,6 +235,7 @@ pub(super) enum PrCommands {
         limit: usize,
     },
     /// Get pull request details.
+    #[command(long_about = super::output_keys::pr_get_help())]
     #[command(override_usage = "atlassian-cli bitbucket pr get [OPTIONS] [REPO] <PR_ID>")]
     Get {
         /// Repository slug (defaults to --repo, then the git remote), then the
@@ -483,6 +485,7 @@ pub(super) enum ProjectCommands {
 #[derive(Subcommand, Debug, Clone)]
 pub(super) enum PipelineCommands {
     /// List pipelines.
+    #[command(long_about = super::output_keys::pipeline_list_help())]
     List {
         /// Repository slug. Defaults to --repo, then the git remote.
         #[arg(value_name = "REPO")]
@@ -516,6 +519,7 @@ pub(super) enum PipelineCommands {
         steps: bool,
     },
     /// Get pipeline details.
+    #[command(long_about = super::output_keys::pipeline_get_help())]
     Get {
         /// Repository slug (defaults to --repo, then the git remote), then the
         /// pipeline UUID or build number.
@@ -625,6 +629,7 @@ pub(super) enum PipelineCommands {
         log: bool,
     },
     /// List steps for a pipeline.
+    #[command(long_about = super::output_keys::pipeline_steps_help())]
     Steps {
         /// Repository slug (defaults to --repo, then the git remote), then the
         /// pipeline UUID or build number.

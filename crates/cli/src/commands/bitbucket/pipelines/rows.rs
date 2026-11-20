@@ -12,7 +12,7 @@ use atlassian_cli_output::OutputFormat;
 use super::model::{Pipeline, PipelineRow, PipelineView, StepInfo};
 use super::state::{
     count_pending_manual_steps, format_status_for_display, format_steps_summary, get_commit_hash,
-    get_pipeline_status, is_awaiting_action,
+    get_full_commit_hash, get_pipeline_status, is_awaiting_action,
 };
 
 /// The state cell: coloured with an icon in a table, an icon in markdown, the
@@ -54,6 +54,14 @@ pub(super) fn pending_manual_steps(status: &str, steps: Option<&[StepInfo]>) -> 
     }
 }
 
+/// The full commit hash for the two structured formats, `None` for the others.
+fn full_commit_hash(pipeline: &Pipeline, format: OutputFormat) -> Option<String> {
+    match format {
+        OutputFormat::Json | OutputFormat::Yaml => get_full_commit_hash(pipeline),
+        _ => None,
+    }
+}
+
 fn ref_name(pipeline: &Pipeline) -> Option<String> {
     pipeline.target.as_ref().and_then(|t| t.ref_name.clone())
 }
@@ -74,6 +82,7 @@ pub(super) fn build_pipeline_row(
         created: pipeline.created_on.clone(),
         steps_summary: steps.and_then(|s| steps_summary(s, format)),
         pending_manual_steps: pending_manual_steps(&status, steps),
+        commit_hash: full_commit_hash(pipeline, format),
     }
 }
 
@@ -101,6 +110,7 @@ pub(super) fn build_pipeline_view(
         steps_summary: steps.as_deref().and_then(|s| steps_summary(s, format)),
         steps,
         pending_manual_steps: pending,
+        commit_hash: full_commit_hash(pipeline, format),
     }
 }
 
@@ -138,6 +148,104 @@ mod tests {
             step("build", "SUCCESSFUL", "AUTOMATIC"),
             step("deploy-prod", "PENDING", "MANUAL"),
         ]
+    }
+
+    use crate::commands::bitbucket::output_keys::{
+        assert_documented, PIPELINE_GET, PIPELINE_LIST, PIPELINE_STEP,
+    };
+
+    /// The help of `pipeline list`, `get` and `steps` lists the output keys.
+    /// These keep the lists equal to what the rows serialise.
+    #[test]
+    fn pipeline_list_help_lists_exactly_the_keys_of_a_row() {
+        let full = build_pipeline_row(&paused_pipeline(), Some(&steps()), OutputFormat::Json);
+        assert_documented(
+            &serde_json::to_value(full).unwrap(),
+            PIPELINE_LIST,
+            true,
+            "pipeline list --steps",
+        );
+        let bare: Pipeline = serde_json::from_value(serde_json::json!({"uuid": "{p}"})).unwrap();
+        assert_documented(
+            &serde_json::to_value(build_pipeline_row(&bare, None, OutputFormat::Json)).unwrap(),
+            PIPELINE_LIST,
+            false,
+            "pipeline list",
+        );
+    }
+
+    #[test]
+    fn pipeline_get_help_lists_exactly_the_keys_of_the_view() {
+        let view = build_pipeline_view(&paused_pipeline(), Some(steps()), true, OutputFormat::Json);
+        let json = serde_json::to_value(&view).unwrap();
+        assert_documented(&json, PIPELINE_GET, true, "pipeline get --steps");
+        let view = build_pipeline_view(&paused_pipeline(), None, false, OutputFormat::Json);
+        assert_documented(
+            &serde_json::to_value(&view).unwrap(),
+            PIPELINE_GET,
+            false,
+            "pipeline get",
+        );
+    }
+
+    #[test]
+    fn pipeline_steps_help_lists_exactly_the_keys_of_a_step() {
+        let full = StepInfo {
+            uuid: "{s-1}".to_string(),
+            name: "build".to_string(),
+            status: "SUCCESSFUL".to_string(),
+            started: Some("2026-11-20T10:00:00Z".to_string()),
+            completed: Some("2026-11-20T10:02:05Z".to_string()),
+            duration: Some("2m 5s".to_string()),
+            logs_url: Some("https://example.com/logs".to_string()),
+            trigger: Some("AUTOMATIC".to_string()),
+        };
+        assert_documented(
+            &serde_json::to_value(&full).unwrap(),
+            PIPELINE_STEP,
+            true,
+            "pipeline steps",
+        );
+        let mut bare = step("build", "PENDING", "MANUAL");
+        bare.trigger = None;
+        assert_documented(
+            &serde_json::to_value(&bare).unwrap(),
+            PIPELINE_STEP,
+            false,
+            "pipeline steps, pending step",
+        );
+    }
+
+    /// Scripts went to the raw API for the full commit hash: `commit` is cut to
+    /// 7 characters. JSON and YAML have the full hash in `commit_hash`. The
+    /// tabular formats do not, so their columns stay as they were.
+    #[test]
+    fn the_full_commit_hash_is_in_json_and_yaml_only() {
+        for format in [OutputFormat::Json, OutputFormat::Yaml] {
+            let row =
+                serde_json::to_value(build_pipeline_row(&paused_pipeline(), None, format)).unwrap();
+            assert_eq!(row["commit"], "0123456", "{format:?}: unchanged");
+            assert_eq!(row["commit_hash"], "0123456789abcdef", "{format:?}");
+            let view =
+                serde_json::to_value(build_pipeline_view(&paused_pipeline(), None, false, format))
+                    .unwrap();
+            assert_eq!(view["commit"], "0123456", "{format:?}: unchanged");
+            assert_eq!(view["commit_hash"], "0123456789abcdef", "{format:?}");
+        }
+        for format in [
+            OutputFormat::Table,
+            OutputFormat::Markdown,
+            OutputFormat::Csv,
+            OutputFormat::Quiet,
+        ] {
+            let row =
+                serde_json::to_value(build_pipeline_row(&paused_pipeline(), None, format)).unwrap();
+            assert!(row.get("commit_hash").is_none(), "{format:?}: {row}");
+            let view =
+                serde_json::to_value(build_pipeline_view(&paused_pipeline(), None, false, format))
+                    .unwrap();
+            assert!(view.get("commit_hash").is_none(), "{format:?}: {view}");
+        }
     }
 
     /// The reported JSON: `"state": "IN_PROGRESS 🔄"`, `"completed": ""`.

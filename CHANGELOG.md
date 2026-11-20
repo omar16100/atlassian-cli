@@ -99,6 +99,14 @@ resolve. `git log` remains the complete record.
 - `auth logout` fails when it cannot read or write a credentials file. Before,
   it reported success and the token could stay on disk. It also removes the
   token from a legacy plaintext credentials file in each case. (#184)
+- `--help` of `bb pr get`, `bb pr list`, `bb pipeline get`, `bb pipeline list`
+  and `bb pipeline steps` lists the keys of the JSON and YAML output, with the
+  type of each key. The output is flat (`source`, `destination`, `author` and
+  `state` are strings, not objects as in the Bitbucket REST API), and the help
+  now says so and names the `bitbucket api` path for the API response. (#186)
+- `bb pipeline list`, `get`, `latest` and `watch` have a new key `commit_hash`
+  in JSON and YAML output: the full commit hash. `commit` still has the first 7
+  characters. The table, markdown and CSV formats are unchanged. (#186)
 
 ## [0.13.0] - 2026-10-28
 
