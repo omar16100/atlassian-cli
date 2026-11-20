@@ -3,8 +3,9 @@
 use anyhow::{Context, Result};
 use atlassian_cli_api::pagination::{fetch_paged, BitbucketPage, PageLimits};
 use atlassian_cli_output::OutputFormat;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
+use super::super::rfc3339::Rfc3339;
 use super::super::utils::BitbucketContext;
 use super::list::resolve_pipeline_id;
 use super::model::{PipelineStep, StepInfo};
@@ -58,16 +59,9 @@ pub(super) async fn fetch_steps(
                         Some(format_duration_secs(secs))
                     } else if step.started_on.is_some() && step.completed_on.is_none() {
                         // In-progress step: compute client-side elapsed time
-                        step.started_on.as_ref().and_then(|started_str| {
-                            DateTime::parse_from_rfc3339(started_str).ok().map(
-                                |started| {
-                                    let elapsed =
-                                        Utc::now() - started.with_timezone(&Utc);
-                                    let secs = elapsed.num_seconds().max(0) as u64;
-                                    format!("~{}", format_duration_secs(secs))
-                                },
-                            )
-                        })
+                        step.started_on
+                            .as_ref()
+                            .and_then(|started_str| running_step_duration(started_str, Timestamp::now()))
                     } else {
                         None
                     }
@@ -89,6 +83,23 @@ pub(super) async fn fetch_steps(
             }
         })
         .collect())
+}
+
+/// The duration text of a step that runs now: the time from `started_on` to
+/// `now` in whole seconds, with a `~` before it. A start time in the future
+/// gives `~0s`. A start time that is not valid RFC 3339 gives `None`.
+fn running_step_duration(started_on: &str, now: Timestamp) -> Option<String> {
+    let Some(started) = Rfc3339::parse(started_on) else {
+        tracing::debug!(
+            started_on,
+            "Step start time is not valid RFC 3339; no duration shown"
+        );
+        return None;
+    };
+    // A part of a second is dropped. The division rounds toward zero.
+    let elapsed_seconds = started.elapsed_nanos(now) / 1_000_000_000;
+    let secs = u64::try_from(elapsed_seconds.max(0)).unwrap_or(u64::MAX);
+    Some(format!("~{}", format_duration_secs(secs)))
 }
 
 pub async fn list_steps(
@@ -199,6 +210,177 @@ pub async fn pipeline_has_failed_steps(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The `pinned_` tests pin the duration text of a running step for fixed
+    // times. The expected values were recorded with `chrono` and did not
+    // change when `chrono` was removed. Only the helper `running` knows the
+    // time types.
+
+    const STEP_NOW: &str = "2026-11-20T12:00:00Z";
+
+    /// `running_step_duration` with the current time fixed at the RFC 3339
+    /// time `now`.
+    fn running(started_on: &str, now: &str) -> Option<String> {
+        let now: Timestamp = now.parse().unwrap();
+        running_step_duration(started_on, now)
+    }
+
+    #[test]
+    fn pinned_the_duration_of_a_running_step() {
+        for (started, expected) in [
+            ("2026-11-20T12:00:00Z", "~0s"),
+            ("2026-11-20T11:59:59Z", "~1s"),
+            ("2026-11-20T11:59:01Z", "~59s"),
+            ("2026-11-20T11:59:00Z", "~1m 0s"),
+            ("2026-11-20T11:58:30Z", "~1m 30s"),
+            ("2026-11-20T11:00:01Z", "~59m 59s"),
+            ("2026-11-20T11:00:00Z", "~1h 0m 0s"),
+            ("2026-11-20T08:54:55Z", "~3h 5m 5s"),
+            ("2026-11-19T12:00:00Z", "~24h 0m 0s"),
+            ("2026-11-10T10:30:15Z", "~241h 29m 45s"),
+            // Bitbucket sends a fraction and `+00:00`.
+            ("2026-11-20T11:58:30.123456+00:00", "~1m 29s"),
+            // An offset is used.
+            ("2026-11-20T19:58:30+08:00", "~1m 30s"),
+            ("2026-11-20T06:58:30-05:00", "~1m 30s"),
+            ("2026-11-20t11:58:30z", "~1m 30s"),
+            ("2026-11-20 11:58:30Z", "~1m 30s"),
+            ("0000-01-01T00:00:00Z", "~17767332h 0m 0s"),
+        ] {
+            assert_eq!(
+                running(started, STEP_NOW).as_deref(),
+                Some(expected),
+                "started {started:?}"
+            );
+        }
+    }
+
+    /// A part of a second is dropped, not rounded.
+    #[test]
+    fn pinned_the_duration_drops_a_part_of_a_second() {
+        for (started, now, expected) in [
+            (
+                "2026-11-20T12:00:00Z",
+                "2026-11-20T12:01:29.999999999Z",
+                "~1m 29s",
+            ),
+            (
+                "2026-11-20T12:00:00.5Z",
+                "2026-11-20T12:01:30.4Z",
+                "~1m 29s",
+            ),
+            (
+                "2026-11-20T12:00:00.5Z",
+                "2026-11-20T12:01:30.5Z",
+                "~1m 30s",
+            ),
+            (
+                "2026-11-20T12:00:00.000000001Z",
+                "2026-11-20T12:00:01Z",
+                "~0s",
+            ),
+            // Digits after the ninth are not used.
+            (
+                "2026-11-20T12:00:00.0000000009Z",
+                "2026-11-20T12:00:01Z",
+                "~1s",
+            ),
+        ] {
+            assert_eq!(
+                running(started, now).as_deref(),
+                Some(expected),
+                "started {started:?}, current time {now:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn pinned_a_start_time_in_the_future_gives_zero() {
+        for started in [
+            "2026-11-20T12:00:00.000000001Z",
+            "2026-11-20T12:00:01Z",
+            "2026-11-21T12:00:00Z",
+            "2026-11-20T12:00:01+00:00",
+            "2026-11-20T12:00:00-00:01",
+            "9999-12-31T23:59:59Z",
+            "9999-12-31T23:59:59-23:59",
+        ] {
+            assert_eq!(
+                running(started, STEP_NOW).as_deref(),
+                Some("~0s"),
+                "started {started:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn pinned_an_invalid_start_time_gives_no_duration() {
+        for started in [
+            "",
+            "not-a-date",
+            "2026-11-20",
+            "2026-11-20T11:58:30",
+            "2026-11-20T11:58Z",
+            "2026-11-20T11:58:30+0000",
+            "2026-11-20T11:58:30Z ",
+            " 2026-11-20T11:58:30Z",
+            "2026-11-31T11:58:30Z",
+            "2026-11-20T24:00:00Z",
+            "2026-11-20T11:58:30+00:00[UTC]",
+            "20261120T115830Z",
+        ] {
+            assert_eq!(running(started, STEP_NOW), None, "started {started:?}");
+        }
+    }
+
+    /// A leap second (`:60`) is read as second 59 when the time of day of the
+    /// current time (UTC) is later than second 59. If not, it is read as the
+    /// first second of the next minute.
+    #[test]
+    fn pinned_a_leap_second_in_the_start_time() {
+        for (started, now, expected) in [
+            // Current time of day later: 11:59:60 is read as 11:59:59.
+            ("2026-11-20T11:59:60Z", "2026-11-20T12:00:10Z", "~11s"),
+            ("2026-11-20T11:59:60.5Z", "2026-11-20T12:00:10Z", "~10s"),
+            ("2026-11-20T11:59:60Z", "2026-11-20T12:00:00Z", "~1s"),
+            (
+                "2026-11-19T11:59:60Z",
+                "2026-11-20T12:00:10Z",
+                "~24h 0m 11s",
+            ),
+            // Same second of the day: read as 12:00:00.
+            ("2026-11-20T11:59:60Z", "2026-11-20T11:59:59.900Z", "~0s"),
+            (
+                "2026-11-19T11:59:60Z",
+                "2026-11-20T11:59:59.900Z",
+                "~23h 59m 59s",
+            ),
+            // Current time of day earlier: read as 12:00:00.
+            (
+                "2026-11-19T11:59:60Z",
+                "2026-11-20T11:59:50Z",
+                "~23h 59m 50s",
+            ),
+            (
+                "2026-11-19T11:59:60.5Z",
+                "2026-11-20T11:59:50Z",
+                "~23h 59m 49s",
+            ),
+            // With an offset, the time of day in UTC decides.
+            ("2026-11-20T19:59:60+08:00", "2026-11-20T12:00:10Z", "~11s"),
+            (
+                "2026-11-19T19:59:60+08:00",
+                "2026-11-20T11:59:50Z",
+                "~23h 59m 50s",
+            ),
+        ] {
+            assert_eq!(
+                running(started, now).as_deref(),
+                Some(expected),
+                "started {started:?}, current time {now:?}"
+            );
+        }
+    }
 
     /// The reported symptom: `logs_url` is a full Bitbucket URL, and including
     /// it pushed the steps table past any terminal width, leaving JSON as the
