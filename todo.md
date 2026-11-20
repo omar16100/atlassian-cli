@@ -3425,3 +3425,11 @@ watcher add and remove commands use it. `jira issue update --assignee` is new
 and uses it too. Create and update run the `--field` collision checks before
 the lookup. `jira user search <query>` (alias `users`) lists account IDs with
 the account type. Details are in `docs/20112026_jira_assignee_email_lookup.md`.
+## 2026-11-20: Confluence page 404 hint names the folder command
+
+`confluence page get`, `page update` and `page publish` share one page read
+(`fetch_page`). On a 404 it sends one request to the folder endpoint. A folder ID
+gets a hint that names `confluence folder get <id>`. Other IDs get a hint with
+the probable causes. `HintedContext` in `commands/common.rs` carries the hint to
+`main.rs`. The `Error:` line does not change. The probe is sent one time with
+no retry. Built-binary tests and unit tests cover the change.

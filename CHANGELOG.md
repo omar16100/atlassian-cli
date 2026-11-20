@@ -21,6 +21,18 @@ resolve. `git log` remains the complete record.
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
 
+### Fixed
+
+- `confluence page get`, `page update` and `page publish` explain a 404. When
+  the ID is a folder, the hint names `confluence folder get <id>`. For other IDs
+  the hint names the probable causes (wrong ID, no permission, or not a page).
+  Only a 404 causes one more request, to the folder endpoint. The `Error:` line
+  and the exit code do not change, only the `Hint:` line on stderr does.
+  `page get` now refuses an ID that is empty, `.`, `..` or contains `/` before it
+  sends a request. `page get` now percent-encodes the ID, so a value such as
+  `123?version=2` is one literal path segment and no longer reaches the query
+  string. (#192)
+
 ### Added
 
 - `jira user search <query>` (alias `jira users search`) lists the users that

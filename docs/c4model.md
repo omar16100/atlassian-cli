@@ -255,7 +255,10 @@ one atomic rename, then the original is renamed to `.migrated`.
 - `common.rs` - `render_success`/`MutationResult`, the typed confirmation for
   destructive commands, and `ExportFormat`/`resolve_export_format`: the file
   format of `jira bulk export`, `jira audit export` and `confluence bulk export`
-  (`--export-format`, else a global `--format` of json or csv, else JSON)
+  (`--export-format`, else a global `--format` of json or csv, else JSON).
+  It also has `HintedContext`: an `anyhow` context that carries a hint. `main.rs`
+  prints that hint in place of `ApiError::suggestion()`. `confluence page get`,
+  `update` and `publish` use it for a 404 (one probe of the folder endpoint)
 
 **Global arguments.** `main.rs` declares `--profile`, `--config`, `--config-dir`,
 `--format`, `--envelope` and `--debug` as clap globals, and `BitbucketArgs` adds
