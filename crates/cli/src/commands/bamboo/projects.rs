@@ -42,7 +42,8 @@ pub async fn list_projects(ctx: &BambooContext<'_>, limit: usize) -> Result<()> 
     } else {
         tracing::info!("Found {} projects", rows.len());
     }
-    ctx.renderer.render(&rows)
+    ctx.renderer
+        .render_list_or_empty(&rows, "No projects found")
 }
 
 /// Get project details.

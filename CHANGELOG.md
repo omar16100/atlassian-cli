@@ -21,6 +21,31 @@ resolve. `git log` remains the complete record.
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
 
+### Changed
+
+- A successful command no longer writes log lines to stderr. The default log
+  level is now `warn` (it was `info`), so lines such as
+  `INFO Issue created successfully` no longer appear in output captured with
+  `2>&1`, where they broke JSON parsing. Warnings (truncated lists, retries,
+  rate limit waits) still go to stderr, and so do the "Found N" and "Listing
+  only" messages of the bulk commands. `RUST_LOG=info` and `--debug` show the
+  log lines again. Scripts that read the `INFO` lines, including the per-item
+  lines of the bulk commands and "Rate limit usage high" (now `info`), must set
+  `RUST_LOG=info`. (#184)
+- `auth login` and `auth logout` print their result on stdout (a result object
+  in the machine formats), because the log line was their only output. The
+  token prompt of `auth login` now goes to stderr. (#184)
+- An empty `auth list`, `bamboo project list`, `confluence search` or
+  `opsgenie alert list`, `recipients`, `logs` or `notes` prints its "No ... found"
+  message in the table and markdown formats. Before, the message was a log line
+  and the table was `[]`. The machine formats still print `[]`. (#184)
+
+### Fixed
+
+- `auth logout` fails when it cannot read or write a credentials file. Before,
+  it reported success and the token could stay on disk. It also removes the
+  token from a legacy plaintext credentials file in each case. (#184)
+
 ## [0.13.0] - 2026-10-28
 
 ### Added

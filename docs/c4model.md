@@ -406,6 +406,12 @@ Debug data flow: **`--debug` (global) → `main::tracing_directives` →
 → `ApiClient` request/response events → stderr.** `RUST_LOG` directives are
 appended as refinements; stdout carries only command output.
 
+Without `--debug` and without `RUST_LOG` the filter is `warn`. Commands log an
+`info` event that repeats their stdout message, and at the old default (`info`)
+those events reached stderr and broke JSON captured with `2>&1`. A successful
+command now writes nothing to stderr unless it has a warning. A command result
+must go to stdout through the renderer, not through an `info` event.
+
 **Path segments** (`crates/api/src/path.rs`). Commands build request paths with
 `format!`, so a caller-provided identifier has to be made safe before it is
 interpolated. `encode_path_segment` percent-encodes everything outside the

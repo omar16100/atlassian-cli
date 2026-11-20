@@ -293,6 +293,8 @@ pub async fn delete_project(
         io::stdin().read_line(&mut input)?;
         if !input.trim().eq_ignore_ascii_case("y") {
             tracing::info!("Project deletion cancelled");
+            // The log line is hidden at the default level, so say it on stdout.
+            println!("Cancelled. Project {project_key} was not deleted.");
             return Ok(());
         }
     }
