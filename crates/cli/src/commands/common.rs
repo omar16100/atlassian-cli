@@ -1,3 +1,6 @@
+use std::io::Write;
+use std::path::Path;
+
 use anyhow::{Context, Result};
 use atlassian_cli_output::{OutputFormat, OutputRenderer};
 use serde::Serialize;
@@ -50,6 +53,38 @@ pub fn render_success(
         }
         _ => renderer.render(&result),
     }
+}
+
+/// Write bytes to `path`, refusing to clobber an existing file without `force`.
+///
+/// The no-force path uses `create_new` rather than an `exists()` check followed
+/// by a write: that would race, and it would happily follow a symlink planted at
+/// the target between the two steps.
+pub fn write_bytes(path: &Path, bytes: &[u8], force: bool) -> Result<()> {
+    let mut file = if force {
+        std::fs::File::create(path)
+            .with_context(|| format!("Failed to write file: {}", path.display()))?
+    } else {
+        match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+        {
+            Ok(file) => file,
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                anyhow::bail!(
+                    "{} already exists. Use --force to overwrite.",
+                    path.display()
+                );
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("Failed to write file: {}", path.display()))
+            }
+        }
+    };
+    file.write_all(bytes)
+        .with_context(|| format!("Failed to write file: {}", path.display()))
 }
 
 /// File format written by the `export` commands (`jira bulk export`,

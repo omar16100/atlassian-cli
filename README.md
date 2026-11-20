@@ -315,6 +315,9 @@ crates/
    atlassian-cli bitbucket --workspace myteam commit list api-service --branch main
    atlassian-cli bitbucket --workspace myteam commit diff api-service abc123
    atlassian-cli bitbucket --workspace myteam commit browse api-service --commit main --path src/
+   # a file path prints the file content (bytes unchanged); --output writes it to a file
+   atlassian-cli bitbucket --workspace myteam commit browse api-service --commit main --path src/main.rs
+   atlassian-cli bitbucket --workspace myteam commit browse api-service --commit main --path logo.png --output ./logo.png
 
    # Bitbucket - Bulk Operations (list candidates only; --execute applies)
    # archive-repos disables issues and wiki, it does not archive.

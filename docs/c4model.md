@@ -304,6 +304,8 @@ key. The separate `bulk/transition_tests.rs` module tests these rules.
 - `pullrequests.rs` - PR management
 - `pipelines.rs` - CI/CD pipeline control
 - `commits.rs` - Commit history
+- `source.rs` - `bb commit browse`: directory list, or raw file content
+  through `ApiClient::get_bytes` after a `format=meta` request
 - `permissions.rs` - Access control
 - `webhooks.rs` - Webhook management
 - `bulk.rs` - Bulk repository operations

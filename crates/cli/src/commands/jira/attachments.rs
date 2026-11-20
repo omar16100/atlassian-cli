@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use super::utils::JiraContext;
-use crate::commands::common::{render_success, MutationResult};
+use crate::commands::common::{render_success, write_bytes, MutationResult};
 
 // ---------------------------------------------------------------------------
 // Model (shared with `jira issue get`)
@@ -373,38 +373,6 @@ async fn fetch_attachment_bytes(ctx: &JiraContext<'_>, attachment_id: &str) -> R
         .get_bytes(&format!("/rest/api/3/attachment/content/{attachment_id}"))
         .await
         .with_context(|| format!("Failed to download attachment {attachment_id}"))
-}
-
-/// Write bytes to `path`, refusing to clobber an existing file without `force`.
-///
-/// The no-force path uses `create_new` rather than an `exists()` check followed
-/// by a write: that would race, and it would happily follow a symlink planted at
-/// the target between the two steps.
-fn write_bytes(path: &Path, bytes: &[u8], force: bool) -> Result<()> {
-    let mut file = if force {
-        fs::File::create(path)
-            .with_context(|| format!("Failed to write file: {}", path.display()))?
-    } else {
-        match fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
-        {
-            Ok(file) => file,
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-                bail!(
-                    "{} already exists. Use --force to overwrite.",
-                    path.display()
-                );
-            }
-            Err(err) => {
-                return Err(err)
-                    .with_context(|| format!("Failed to write file: {}", path.display()))
-            }
-        }
-    };
-    file.write_all(bytes)
-        .with_context(|| format!("Failed to write file: {}", path.display()))
 }
 
 fn write_stdout(bytes: &[u8]) -> Result<()> {

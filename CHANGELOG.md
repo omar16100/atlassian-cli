@@ -20,6 +20,17 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+### Added
+
+- `bb commit browse --path <file>` prints the content of the file to stdout, with
+  the bytes unchanged and no added newline, for every `--format`. Before, a file
+  path failed with "Invalid response format". `--output <file>` (`-o`) writes the
+  content to a file and does not replace an existing file without `--force`. A
+  directory path and the repository root list as before, with the same output
+  keys. Scripts can see three differences: a path that does not exist gives a
+  new error text that names the path and the revision, a `--path` with an empty,
+  `.` or `..` segment is refused before a request is sent, and a directory path
+  sends one more request (`?format=meta`). (#PR)
 
 ### Fixed
 

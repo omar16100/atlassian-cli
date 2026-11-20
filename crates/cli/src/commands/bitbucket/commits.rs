@@ -61,20 +61,6 @@ struct FileInfo {
     path: String,
 }
 
-#[derive(Deserialize)]
-struct SourceFile {
-    path: String,
-    #[serde(rename = "type")]
-    file_type: String,
-    #[serde(default)]
-    size: Option<i64>,
-}
-
-#[derive(Deserialize)]
-struct SourceList {
-    values: Vec<SourceFile>,
-}
-
 pub async fn list_commits(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
@@ -230,51 +216,4 @@ pub async fn get_commit_diff(
     }
 
     ctx.renderer.render_list_or_empty(&rows, "No changes found")
-}
-
-pub async fn browse_source(
-    ctx: &BitbucketContext<'_>,
-    workspace: &str,
-    repo_slug: &str,
-    commit: &str,
-    path: Option<&str>,
-) -> Result<()> {
-    let api_path = if let Some(p) = path {
-        format!("/2.0/repositories/{workspace}/{repo_slug}/src/{commit}/{p}")
-    } else {
-        format!("/2.0/repositories/{workspace}/{repo_slug}/src/{commit}/")
-    };
-
-    let response: SourceList = ctx.client.get(&api_path).await.with_context(|| {
-        format!("Failed to browse source at {commit} in {workspace}/{repo_slug}")
-    })?;
-
-    #[derive(Serialize)]
-    struct Row<'a> {
-        file_type: &'a str,
-        path: &'a str,
-        size: String,
-    }
-
-    let rows: Vec<Row<'_>> = response
-        .values
-        .iter()
-        .map(|file| Row {
-            file_type: file.file_type.as_str(),
-            path: file.path.as_str(),
-            size: file.size.map(|s| format!("{s} bytes")).unwrap_or_default(),
-        })
-        .collect();
-
-    if rows.is_empty() {
-        tracing::info!(
-            commit,
-            path = path.unwrap_or("/"),
-            workspace,
-            repo_slug,
-            "No files found"
-        );
-    }
-
-    ctx.renderer.render_list_or_empty(&rows, "No files found")
 }

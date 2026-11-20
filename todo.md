@@ -3380,3 +3380,13 @@ rules and the error text of the pipeline commands. Commands that delete, that ar
 not reversible, or that give access, and `repo create`, do not read the Git remote. The clap argument tree moved from
 `bitbucket/mod.rs` to `bitbucket/args.rs` to keep the files below 2000 lines.
 Details: `docs/20112026_bb_repo_flag.md`.
+## 2026-11-20: bb commit browse prints file content
+
+`bb commit browse --path <file>` failed with "Invalid response format", because
+the command parsed each response as a directory list. The command now sends a
+`format=meta` request to find the type of the path. A file gives its raw bytes
+on stdout, or in the `--output` file (`--force` replaces an existing file). A
+directory lists as before. The code moved to `commands/bitbucket/source.rs`,
+and `write_bytes` moved to `commands/common.rs`. The workspace, repository,
+revision and path are encoded in the request path. See
+`docs/20112026_bb_browse_file_content.md`.
