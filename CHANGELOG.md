@@ -19,7 +19,7 @@ resolve. `git log` remains the complete record.
   no longer depends on the unmaintained `pin-utils` (RUSTSEC-2026-0441).
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
-  check ignores it until `chrono` is replaced. (#PRNUM)
+  check ignores it until `chrono` is replaced. (#190)
 
 ## [0.13.0] - 2026-10-28
 
