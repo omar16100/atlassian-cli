@@ -3440,4 +3440,5 @@ size of one request, so a value above the v2 maximum of 250 failed.
 `fetch_v2_list` in `confluence/utils.rs` now clamps the page size, follows
 `_links.next` with the shared `fetch_paged` driver and warns on stderr for a
 truncated result. `--limit 0` returns all results within the request budget.
-Seven built-binary tests and two unit tests cover the change.
+`blog list` accepts a blog post with a null title or status. Built-binary
+tests and unit tests cover the change.

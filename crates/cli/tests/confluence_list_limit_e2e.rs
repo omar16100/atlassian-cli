@@ -285,3 +285,190 @@ async fn blog_list_above_the_maximum_clamps_and_follows_next() {
     assert_eq!(server.received_requests().await.unwrap().len(), 2);
     server.verify().await;
 }
+
+/// Mount a first page that must carry `first_query`, and a second page behind
+/// a `next` link that has a cursor only.
+async fn mount_two_pages(
+    server: &MockServer,
+    collection: &str,
+    first_query: (&str, &str),
+    second_page: serde_json::Value,
+) {
+    Mock::given(method("GET"))
+        .and(path_matcher(format!("/wiki/api/v2/{collection}")))
+        .and(query_param("cursor", "page-2"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(serde_json::json!({ "results": second_page })),
+        )
+        .with_priority(1)
+        .expect(1)
+        .mount(server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path_matcher(format!("/wiki/api/v2/{collection}")))
+        .and(query_param("limit", "250"))
+        .and(query_param(first_query.0, first_query.1))
+        .and(query_param_is_missing("cursor"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "results": items(1..=2),
+            "_links": { "next": format!("/wiki/api/v2/{collection}?cursor=page-2") }
+        })))
+        .expect(1)
+        .mount(server)
+        .await;
+}
+
+/// The query string of the request that carried the cursor.
+async fn second_request_query(server: &MockServer) -> String {
+    server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter_map(|r| r.url.query().map(str::to_string))
+        .find(|q| q.contains("cursor="))
+        .expect("no request carried the cursor")
+}
+
+/// The next pages use the link of the server unchanged. The first request has
+/// the filter and the page size. The second request has only what the server
+/// put in the link: the CLI adds no `limit` and no filter to it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn space_list_with_a_type_filter_follows_the_next_link_unchanged() {
+    let server = MockServer::start().await;
+    mount_two_pages(
+        &server,
+        "spaces",
+        ("type", "global"),
+        serde_json::json!(items(3..=3)),
+    )
+    .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(
+        &config,
+        &[
+            "confluence",
+            "space",
+            "list",
+            "--space-type",
+            "global",
+            "--limit",
+            "0",
+            "-f",
+            "json",
+        ],
+    );
+
+    assert_eq!(rows(&out).len(), 3);
+    assert_eq!(second_request_query(&server).await, "cursor=page-2");
+    server.verify().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn page_list_with_a_space_follows_the_next_link_unchanged() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/wiki/api/v2/spaces"))
+        .and(query_param("keys", "DOCS"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "results": [{ "id": "786433", "key": "DOCS", "name": "Documentation" }]
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    mount_two_pages(
+        &server,
+        "pages",
+        ("space-id", "786433"),
+        serde_json::json!(items(3..=3)),
+    )
+    .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(
+        &config,
+        &[
+            "confluence",
+            "page",
+            "list",
+            "--space",
+            "DOCS",
+            "--limit",
+            "0",
+            "-f",
+            "json",
+        ],
+    );
+
+    assert_eq!(rows(&out).len(), 3);
+    assert_eq!(second_request_query(&server).await, "cursor=page-2");
+    server.verify().await;
+}
+
+/// An explicit small limit warns too when the server has more rows.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn page_list_with_a_small_limit_warns_when_more_exist() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/wiki/api/v2/pages"))
+        .and(query_param("limit", "10"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "results": items(1..=10),
+            "_links": { "next": "/wiki/api/v2/pages?cursor=page-2" }
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(
+        &config,
+        &["confluence", "page", "list", "--limit", "10", "-f", "json"],
+    );
+
+    assert_eq!(rows(&out).len(), 10);
+    assert!(String::from_utf8_lossy(&out.stderr).contains("warning: showing 10 pages; more exist"));
+    server.verify().await;
+}
+
+/// One blog post with a null `title` and no `status` on a followed page must
+/// not fail the full list.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn blog_list_accepts_a_null_title_on_a_followed_page() {
+    let server = MockServer::start().await;
+    mount_two_pages(
+        &server,
+        "blogposts",
+        ("space-id", "786433"),
+        serde_json::json!([{ "id": "3", "title": null }]),
+    )
+    .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(
+        &config,
+        &[
+            "confluence",
+            "blog",
+            "list",
+            "--space",
+            "786433",
+            "--limit",
+            "0",
+            "-f",
+            "json",
+        ],
+    );
+
+    let rows = rows(&out);
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[2]["id"], "3");
+    assert_eq!(rows[2]["title"], "");
+    assert_eq!(rows[2]["status"], "");
+    server.verify().await;
+}

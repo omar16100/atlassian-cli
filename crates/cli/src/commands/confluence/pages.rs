@@ -982,11 +982,16 @@ pub async fn list_blogposts(
     space_id: Option<&str>,
     limit: Option<usize>,
 ) -> Result<()> {
+    // Only `id` is required, as in `list_pages`. The list now covers more than
+    // one server page, so one item with a null `title` or `status` must not
+    // fail the full list.
     #[derive(Deserialize)]
     struct Blogpost {
         id: String,
-        title: String,
-        status: String,
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        status: Option<String>,
     }
 
     // `--limit` is a total. The helper clamps the page size to the server
@@ -1012,8 +1017,8 @@ pub async fn list_blogposts(
         .iter()
         .map(|b| Row {
             id: b.id.as_str(),
-            title: b.title.as_str(),
-            status: b.status.as_str(),
+            title: b.title.as_deref().unwrap_or(""),
+            status: b.status.as_deref().unwrap_or(""),
         })
         .collect();
 

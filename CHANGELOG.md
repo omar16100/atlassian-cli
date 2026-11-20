@@ -28,8 +28,9 @@ resolve. `git log` remains the complete record.
   commands follow the next pages. `--limit 0` returns all results, within the
   request safety budget. Without `--limit` the commands return 25 results, as
   before, and now send `limit=25`. When more results exist than the commands
-  show, a warning goes to stderr. Stdout and the output keys do not change.
-  (#PR)
+  show, a warning goes to stderr, also for an explicit small `--limit`. Stdout
+  and the output keys do not change. `blog list` no longer fails when a blog
+  post has a null title or status: the value is empty in the output. (#PR)
 
 ### Fixed
 

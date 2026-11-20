@@ -57,11 +57,31 @@ What a script can see:
   warning to stderr when the site has more than 25 items.
 - `--limit 0` returned an error before. It now returns all items.
 - A limit above 250 returned an error before. It now returns up to that total.
+- An explicit small limit (for example `--limit 10`) also writes the warning to
+  stderr when more rows exist. Before, it wrote nothing.
+- `blog list` gives an empty `title` or `status` for a blog post where the
+  server gives null or no value. Before, such an item made the command fail.
 
 ## Limitations
 
-- The request budget of 50 requests limits `--limit 0` to 12,500 items (50
-  requests of 250). The warning says that the result is incomplete.
+- The first request has the page size and the filters (`type`, `space-id`).
+  Each next request uses the `_links.next` link of the server unchanged. The
+  CLI adds no `limit` and no filter to it. The specification describes the
+  link as "the relative URL for the next set of results, using a cursor query
+  parameter", and does not say that the link keeps `limit` or the filters. So
+  later pages have the size and the filters that the server puts in the link.
+  It is not verified on a live site that the cursor keeps the filters.
+- A link with no `limit` gives pages of the server default, 25. `--limit 0`
+  then stops at 50 requests of that page size, with the warning that the
+  result is incomplete. With pages of 250 the request budget of 50 requests
+  gives 12,500 items at most.
+- The CLI does not add a missing `limit` to the link. That needs a change in
+  the shared pagination driver or a second loop, and the effect of a changed
+  cursor link on a live site is not known.
+- `confluence search` has its own default of 25 and its own clamp to 250 in
+  `confluence/search.rs`. It uses the v1 search endpoint, and the constants in
+  `confluence/utils.rs` are the values of the v2 specification, so search does
+  not use them.
 - `page versions`, `page comments` and `attachment list` have no `--limit`
   option and are not changed. `page comments` follows the next pages with its
   own loop. `page versions` and `attachment list` read one server page.
@@ -81,6 +101,12 @@ What a script can see:
 - `space_list_without_a_limit_asks_for_one_page_of_25`.
 - `page_list_above_the_maximum_clamps_and_follows_next`.
 - `blog_list_above_the_maximum_clamps_and_follows_next`.
+- `space_list_with_a_type_filter_follows_the_next_link_unchanged`: asserts the
+  query of the second request.
+- `page_list_with_a_space_follows_the_next_link_unchanged`: asserts the query
+  of the second request.
+- `page_list_with_a_small_limit_warns_when_more_exist`.
+- `blog_list_accepts_a_null_title_on_a_followed_page`.
 
 Unit tests in `crates/cli/src/commands/confluence/utils.rs` cover
 `v2_page_size`.
