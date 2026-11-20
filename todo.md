@@ -3433,3 +3433,12 @@ gets a hint that names `confluence folder get <id>`. Other IDs get a hint with
 the probable causes. `HintedContext` in `commands/common.rs` carries the hint to
 `main.rs`. The `Error:` line does not change. The probe is sent one time with
 no retry. Built-binary tests and unit tests cover the change.
+## 2026-11-20: Confluence list commands treat `--limit` as a total
+
+`confluence space list`, `page list` and `blog list` sent `--limit` as the page
+size of one request, so a value above the v2 maximum of 250 failed.
+`fetch_v2_list` in `confluence/utils.rs` now clamps the page size, follows
+`_links.next` with the shared `fetch_paged` driver and warns on stderr for a
+truncated result. `--limit 0` returns all results within the request budget.
+`blog list` accepts a blog post with a null title or status. Built-binary
+tests and unit tests cover the change.

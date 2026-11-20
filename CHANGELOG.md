@@ -23,6 +23,18 @@ resolve. `git log` remains the complete record.
 
 ### Fixed
 
+- `confluence space list`, `page list` and `blog list` accept a `--limit` above
+  250. Before, the value was sent as the page size of one request and the server
+  refused it. `--limit` is now a total: the page size is clamped to 250 and the
+  commands follow the next pages. `--limit 0` returns all results, within the
+  request safety budget. Without `--limit` the commands return 25 results, as
+  before, and now send `limit=25`. When more results exist than the commands
+  show, a warning goes to stderr, also for an explicit small `--limit`. Stdout
+  and the output keys do not change. `blog list` no longer fails when a blog
+  post has a null title or status: the value is empty in the output. (#193)
+
+### Fixed
+
 - `confluence page get`, `page update` and `page publish` explain a 404. When
   the ID is a folder, the hint names `confluence folder get <id>`. For other IDs
   the hint names the probable causes (wrong ID, no permission, or not a page).

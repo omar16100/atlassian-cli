@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::PathBuf;
 
-use super::utils::{resolve_space_id, ConfluenceContext};
+use super::utils::{fetch_v2_list, resolve_space_id, ConfluenceContext};
 use crate::commands::common::{render_success, HintedContext, MutationResult};
 use crate::query::UrlParamsBuilder;
 
@@ -18,11 +18,6 @@ pub async fn list_pages(
     space_key: Option<&str>,
     limit: Option<usize>,
 ) -> Result<()> {
-    #[derive(Deserialize)]
-    struct PagesResponse {
-        results: Vec<Page>,
-    }
-
     // Fields beyond `id` are optional: the Confluence v2 pages list may omit `type`
     // entirely and can return null/absent `title`/`status` for some content, which
     // would otherwise abort the whole parse with "error decoding response body".
@@ -47,28 +42,17 @@ pub async fn list_pages(
         None => None,
     };
 
-    let query_string = {
-        let mut builder = UrlParamsBuilder::new();
-
-        if let Some(l) = limit {
-            builder = builder.add("limit", &l.to_string());
-        }
-
-        builder = builder.add_optional("space-id", space_id.as_deref());
-
-        let params = builder.finish();
-        if params.is_empty() {
-            String::new()
-        } else {
-            format!("?{}", params)
-        }
-    };
-
-    let response: PagesResponse = ctx
-        .client
-        .get(&format!("/wiki/api/v2/pages{}", query_string))
-        .await
-        .context("Failed to list pages")?;
+    // `--limit` is a total. The helper clamps the page size to the server
+    // maximum and follows the next pages.
+    let pages: Vec<Page> = fetch_v2_list(
+        ctx,
+        "/wiki/api/v2/pages",
+        UrlParamsBuilder::new().add_optional("space-id", space_id.as_deref()),
+        limit,
+        "pages",
+    )
+    .await
+    .context("Failed to list pages")?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -78,8 +62,7 @@ pub async fn list_pages(
         status: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .results
+    let rows: Vec<Row<'_>> = pages
         .iter()
         .map(|p| Row {
             id: p.id.as_str(),
@@ -999,40 +982,29 @@ pub async fn list_blogposts(
     space_id: Option<&str>,
     limit: Option<usize>,
 ) -> Result<()> {
-    #[derive(Deserialize)]
-    struct BlogpostsResponse {
-        results: Vec<Blogpost>,
-    }
-
+    // Only `id` is required, as in `list_pages`. The list now covers more than
+    // one server page, so one item with a null `title` or `status` must not
+    // fail the full list.
     #[derive(Deserialize)]
     struct Blogpost {
         id: String,
-        title: String,
-        status: String,
+        #[serde(default)]
+        title: Option<String>,
+        #[serde(default)]
+        status: Option<String>,
     }
 
-    let query_string = {
-        let mut builder = UrlParamsBuilder::new();
-
-        if let Some(l) = limit {
-            builder = builder.add("limit", &l.to_string());
-        }
-
-        builder = builder.add_optional("space-id", space_id);
-
-        let params = builder.finish();
-        if params.is_empty() {
-            String::new()
-        } else {
-            format!("?{}", params)
-        }
-    };
-
-    let response: BlogpostsResponse = ctx
-        .client
-        .get(&format!("/wiki/api/v2/blogposts{}", query_string))
-        .await
-        .context("Failed to list blog posts")?;
+    // `--limit` is a total. The helper clamps the page size to the server
+    // maximum and follows the next pages.
+    let blogposts: Vec<Blogpost> = fetch_v2_list(
+        ctx,
+        "/wiki/api/v2/blogposts",
+        UrlParamsBuilder::new().add_optional("space-id", space_id),
+        limit,
+        "blog posts",
+    )
+    .await
+    .context("Failed to list blog posts")?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -1041,13 +1013,12 @@ pub async fn list_blogposts(
         status: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .results
+    let rows: Vec<Row<'_>> = blogposts
         .iter()
         .map(|b| Row {
             id: b.id.as_str(),
-            title: b.title.as_str(),
-            status: b.status.as_str(),
+            title: b.title.as_deref().unwrap_or(""),
+            status: b.status.as_deref().unwrap_or(""),
         })
         .collect();
 

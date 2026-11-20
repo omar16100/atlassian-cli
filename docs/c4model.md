@@ -510,6 +510,11 @@ reached. The default total limit is 25. The request budget is 50, including
 with `--limit 0`. `ConfluenceLinks` exposes the next URL. The driver rejects a
 foreign origin and treats a blank next URL as the end of the result set.
 
+`confluence space list`, `page list` and `blog list` use the same driver through
+`fetch_v2_list` in `confluence/utils.rs`. `--limit` is a total with a default of
+25. The page size is clamped to 250, the maximum of the v2 endpoints. A
+truncated result gives a warning on stderr.
+
 ---
 
 ### Auth Crate Components

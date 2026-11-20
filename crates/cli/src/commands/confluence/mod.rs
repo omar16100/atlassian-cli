@@ -77,7 +77,7 @@ enum SpaceCommands {
         long_about = "List spaces.\n\nExamples:\n  confluence space list\n  confluence space list --limit 50\n  confluence space list --space-type global"
     )]
     List {
-        /// Maximum number of results
+        /// Maximum total results (0 for all; default: 25)
         #[arg(long)]
         limit: Option<usize>,
         /// Filter by space type (global, personal)
@@ -205,7 +205,7 @@ enum PageCommands {
         /// Filter by space key
         #[arg(long)]
         space: Option<String>,
-        /// Maximum number of results
+        /// Maximum total results (0 for all; default: 25)
         #[arg(long)]
         limit: Option<usize>,
     },
@@ -373,7 +373,7 @@ enum BlogCommands {
         /// Filter by space ID
         #[arg(long)]
         space: Option<String>,
-        /// Maximum number of results
+        /// Maximum total results (0 for all; default: 25)
         #[arg(long)]
         limit: Option<usize>,
     },

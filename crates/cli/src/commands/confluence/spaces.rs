@@ -3,7 +3,7 @@ use atlassian_cli_api::path::encode_path_segment;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::utils::ConfluenceContext;
+use super::utils::{fetch_v2_list, ConfluenceContext};
 use crate::commands::common::{render_success, MutationResult};
 use crate::query::UrlParamsBuilder;
 
@@ -13,11 +13,6 @@ pub async fn list_spaces(
     limit: Option<usize>,
     space_type: Option<&str>,
 ) -> Result<()> {
-    #[derive(Deserialize)]
-    struct SpacesResponse {
-        results: Vec<Space>,
-    }
-
     // Only `id` is guaranteed; the v2 spaces list may omit `type` and can return
     // null/absent `key`/`name`/`status`, which would otherwise abort the parse.
     #[derive(Deserialize)]
@@ -33,28 +28,17 @@ pub async fn list_spaces(
         status: Option<String>,
     }
 
-    let query_string = {
-        let mut builder = UrlParamsBuilder::new();
-
-        if let Some(l) = limit {
-            builder = builder.add("limit", &l.to_string());
-        }
-
-        builder = builder.add_optional("type", space_type);
-
-        let params = builder.finish();
-        if params.is_empty() {
-            String::new()
-        } else {
-            format!("?{}", params)
-        }
-    };
-
-    let response: SpacesResponse = ctx
-        .client
-        .get(&format!("/wiki/api/v2/spaces{}", query_string))
-        .await
-        .context("Failed to list spaces")?;
+    // `--limit` is a total. The helper clamps the page size to the server
+    // maximum and follows the next pages.
+    let spaces: Vec<Space> = fetch_v2_list(
+        ctx,
+        "/wiki/api/v2/spaces",
+        UrlParamsBuilder::new().add_optional("type", space_type),
+        limit,
+        "spaces",
+    )
+    .await
+    .context("Failed to list spaces")?;
 
     #[derive(Serialize)]
     struct Row<'a> {
@@ -65,8 +49,7 @@ pub async fn list_spaces(
         status: &'a str,
     }
 
-    let rows: Vec<Row<'_>> = response
-        .results
+    let rows: Vec<Row<'_>> = spaces
         .iter()
         .map(|s| Row {
             id: s.id.as_str(),
