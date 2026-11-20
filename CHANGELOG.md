@@ -20,6 +20,30 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+### Added
+
+- `jira user search <query>` (alias `jira users search`) lists the users that
+  match a display name or an email address. The output keys are `account_id`,
+  `display_name`, `email` and `active`. `email` is empty (`null` in JSON) when
+  Jira does not return it. (#PR)
+- `--assignee me` gives the current user in `jira issue create`,
+  `jira issue assign` and `jira bulk assign`. `jira issue watchers add` and
+  `remove` accept `me` too. (#PR)
+
+### Fixed
+
+- `--assignee <email>` in `jira issue create`, `jira issue assign` and
+  `jira bulk assign`, the user argument of `jira issue watchers add` and
+  `remove`, and the `assignee` of a `jira bulk import` row now look up the
+  account ID with the Jira user search. Before, the CLI sent the email address
+  as the account ID and Jira answered "Please select a valid user". No match,
+  or more than one match, is an error that names the matches, and the command
+  changes nothing. Scripts can see these changes: for an email address or
+  `me`, the result text of `jira issue assign` and the watcher commands, and
+  the `assignee` column of the `jira bulk assign` list, show the account ID.
+  `jira bulk assign` makes the lookup in list mode too, so an unknown email
+  address fails before the list. A value with no `@` goes to Jira unchanged,
+  as before. (#PR)
 
 ### Added
 

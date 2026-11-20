@@ -3414,3 +3414,12 @@ visible aliases of `comments` and `links`. `confluence search content` gets no
 alias: the intent of the caller is not known, and a wrong alias would give a
 wrong result with exit code 0. See
 `docs/20112026_help_global_options_and_aliases.md`.
+## 2026-11-20: Jira assignee email lookup and `jira user search`
+
+`--assignee <email>` sent the email address as a Jira account ID, and Jira
+rejected it. The new module `crates/cli/src/commands/jira/users.rs` resolves a
+value before the command sends it: `me` gives the current user, a value with
+`@` goes through the Jira user search, and all other values stay account IDs.
+Issue create, issue assign, bulk assign, bulk import rows and the watcher add
+and remove commands use it. `jira user search <query>` (alias `users`) lists
+account IDs. Details are in `docs/20112026_jira_assignee_email_lookup.md`.

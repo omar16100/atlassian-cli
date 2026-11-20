@@ -17,6 +17,7 @@ mod field_selection;
 mod fields_workflows;
 mod issues;
 mod projects;
+mod users;
 pub mod utils;
 mod webhooks;
 
@@ -113,6 +114,10 @@ enum JiraCommands {
     /// Audit log access
     #[command(subcommand)]
     Audit(AuditCommands),
+
+    /// Find users and their account IDs
+    #[command(subcommand, visible_alias = "users")]
+    User(UserCommands),
 
     /// Call any Jira REST endpoint using the configured auth profile
     #[command(
@@ -233,7 +238,8 @@ enum IssueCommands {
     /// Create a new issue
     #[command(long_about = "Create a new issue.\n\nExamples:\n  \
         jira issue create --project PROJ --issue-type Bug --summary \"Fix login error\"\n  \
-        jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee user@email.com --priority High\n  \
+        jira issue create --project PROJ --issue-type Story --summary \"Add feature\" --description \"Detailed description\" --assignee dev@example.com --priority High\n  \
+        jira issue create --project PROJ --issue-type Task --summary \"My task\" --assignee me\n  \
         jira issue create --project PROJ --issue-type Task --summary \"Test\" --field 'customfield_10001={\"value\":\"Alpha\"}' --field 'customfield_10002=[{\"value\":\"Beta\"}]'\n  \
         jira issue create --project PROJ --issue-type Task --summary \"=in value\" --field 'customfield_10020={\"formula\":\"a=b\"}'\n\n\
         Discover custom field IDs with: `jira fields list` or `jira fields get <id>`.\n\
@@ -253,7 +259,8 @@ enum IssueCommands {
         /// italic, inline code, links, code blocks). Plain text stays a paragraph.
         #[arg(long)]
         description: Option<String>,
-        /// Assignee account ID or email
+        /// Assignee: an account ID, an email address (looked up with the
+        /// user search), or `me` for the current user.
         #[arg(long)]
         assignee: Option<String>,
         /// Priority name (e.g., High, Medium, Low)
@@ -327,10 +334,17 @@ enum IssueCommands {
     },
 
     /// Assign issue to user
+    #[command(long_about = "Assign an issue to a user.\n\nExamples:\n  \
+        jira issue assign PROJ-1 --assignee me\n  \
+        jira issue assign PROJ-1 --assignee dev@example.com\n  \
+        jira issue assign PROJ-1 --assignee <account-id>\n\n\
+        An email address is looked up with the user search. Find an account ID\n\
+        with `jira user search <query>`.")]
     Assign {
         /// Issue key
         key: String,
-        /// User account ID or email
+        /// Assignee: an account ID, an email address (looked up with the
+        /// user search), or `me` for the current user.
         #[arg(long)]
         assignee: String,
     },
@@ -443,13 +457,15 @@ enum WatcherCommands {
     /// Add watcher to an issue
     Add {
         key: String,
-        /// User account ID or email
+        /// Watcher: an account ID, an email address (looked up with the user
+        /// search), or `me` for the current user.
         user: String,
     },
     /// Remove watcher from an issue
     Remove {
         key: String,
-        /// User account ID or email
+        /// Watcher: an account ID, an email address (looked up with the user
+        /// search), or `me` for the current user.
         user: String,
     },
 }
@@ -835,7 +851,8 @@ enum BulkCommands {
         /// JQL query to select issues
         #[arg(long)]
         jql: String,
-        /// Assignee account ID
+        /// Assignee: an account ID, an email address (looked up with the
+        /// user search), or `me` for the current user.
         #[arg(long)]
         assignee: String,
         /// Apply the change. Without this, the issues are only listed
@@ -899,7 +916,8 @@ enum BulkCommands {
     },
     /// Import issues from file
     Import {
-        /// Input file path (JSON)
+        /// Input file path (JSON). The `assignee` of a row is an account ID,
+        /// an email address (looked up with the user search), or `me`.
         #[arg(long)]
         file: std::path::PathBuf,
         /// Target project key
@@ -1081,6 +1099,28 @@ enum AuditCommands {
     },
 }
 
+#[derive(Subcommand, Debug, Clone)]
+enum UserCommands {
+    /// Search users by display name or email address
+    #[command(
+        long_about = "Search users by display name or email address.\n\nExamples:\n  \
+        jira user search \"Dev One\"\n  \
+        jira user search dev@example.com --format json\n\n\
+        The query matches the start of a display name or of an email address.\n\
+        Output columns: account_id, display_name, email, active. The email is empty\n\
+        (null in JSON) when the privacy settings of the user hide it. Jira returns\n\
+        no users when your account does not have the 'Browse users and groups'\n\
+        global permission."
+    )]
+    Search {
+        /// Text to search for
+        query: String,
+        /// Maximum results. 0 fetches every page.
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
+}
+
 pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRenderer) -> Result<()> {
     let ctx = JiraContext { client, renderer };
 
@@ -1134,6 +1174,10 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 sprint,
             } => {
                 let custom_fields = issues::parse_custom_fields(&fields)?;
+                let assignee = match assignee {
+                    Some(value) => Some(users::resolve_account_id(&ctx.client, &value).await?),
+                    None => None,
+                };
                 issues::create_issue(
                     &ctx,
                     &project,
@@ -1186,13 +1230,18 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 .await
             }
             IssueCommands::Assign { key, assignee } => {
+                let assignee = users::resolve_account_id(&ctx.client, &assignee).await?;
                 issues::assign_issue(&ctx, &key, &assignee).await
             }
             IssueCommands::Unassign { key } => issues::unassign_issue(&ctx, &key).await,
             IssueCommands::Watchers(watcher_cmd) => match watcher_cmd {
                 WatcherCommands::List { key } => issues::list_watchers(&ctx, &key).await,
-                WatcherCommands::Add { key, user } => issues::add_watcher(&ctx, &key, &user).await,
+                WatcherCommands::Add { key, user } => {
+                    let user = users::resolve_account_id(&ctx.client, &user).await?;
+                    issues::add_watcher(&ctx, &key, &user).await
+                }
                 WatcherCommands::Remove { key, user } => {
+                    let user = users::resolve_account_id(&ctx.client, &user).await?;
                     issues::remove_watcher(&ctx, &key, &user).await
                 }
             },
@@ -1441,6 +1490,7 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 concurrency,
             } => {
                 let execute = execute && !dry_run;
+                let assignee = users::resolve_account_id(&ctx.client, &assignee).await?;
                 bulk::bulk_assign(&ctx, &jql, &assignee, execute, yes, concurrency).await
             }
             BulkCommands::Label {
@@ -1584,6 +1634,9 @@ pub async fn execute(args: JiraArgs, client: ApiClient, renderer: &OutputRendere
                 )
                 .await
             }
+        },
+        JiraCommands::User(cmd) => match cmd {
+            UserCommands::Search { query, limit } => users::search_users(&ctx, &query, limit).await,
         },
         JiraCommands::Api(args) => crate::commands::api::run(&ctx.client, ctx.renderer, args).await,
     }

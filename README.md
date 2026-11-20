@@ -133,6 +133,8 @@ crates/
    atlassian-cli jira issue update DEV-123 --summary "Updated summary"
    atlassian-cli jira issue transition DEV-123 --transition "In Progress"
    atlassian-cli jira issue assign DEV-123 --assignee user@example.com
+   atlassian-cli jira issue assign DEV-123 --assignee me
+   atlassian-cli jira user search "Dev One"   # find an account ID
    atlassian-cli jira issue delete DEV-123 --force
 
    # Jira - Attachments
