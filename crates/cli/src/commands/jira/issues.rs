@@ -358,6 +358,49 @@ pub async fn view_issue(ctx: &JiraContext<'_>, key: &str) -> Result<()> {
     ctx.renderer.render(&view)
 }
 
+/// The `--field` collision rules of `jira issue create`. They are apart from
+/// the payload builder so that a caller can run them before a user lookup.
+pub(crate) fn check_create_collisions(
+    custom: &HashMap<String, Value>,
+    has_description: bool,
+    has_assignee: bool,
+    has_priority: bool,
+) -> Result<()> {
+    check_field_collisions(
+        custom,
+        &[
+            ("project", "--project"),
+            ("issuetype", "--issue-type"),
+            ("summary", "--summary"),
+        ],
+        &[
+            ("description", "--description", has_description),
+            ("assignee", "--assignee", has_assignee),
+            ("priority", "--priority", has_priority),
+        ],
+    )
+}
+
+/// The `--field` collision rules of `jira issue update`.
+pub(crate) fn check_update_collisions(
+    custom: &HashMap<String, Value>,
+    has_summary: bool,
+    has_description: bool,
+    has_assignee: bool,
+    has_priority: bool,
+) -> Result<()> {
+    check_field_collisions(
+        custom,
+        &[],
+        &[
+            ("summary", "--summary", has_summary),
+            ("description", "--description", has_description),
+            ("assignee", "--assignee", has_assignee),
+            ("priority", "--priority", has_priority),
+        ],
+    )
+}
+
 /// Build the POST body for `POST /rest/api/3/issue`. Pure, testable.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn build_create_payload(
@@ -371,18 +414,11 @@ pub(crate) fn build_create_payload(
 ) -> Result<Value> {
     use serde_json::json;
 
-    check_field_collisions(
+    check_create_collisions(
         custom,
-        &[
-            ("project", "--project"),
-            ("issuetype", "--issue-type"),
-            ("summary", "--summary"),
-        ],
-        &[
-            ("description", "--description", description.is_some()),
-            ("assignee", "--assignee", assignee.is_some()),
-            ("priority", "--priority", priority.is_some()),
-        ],
+        description.is_some(),
+        assignee.is_some(),
+        priority.is_some(),
     )?;
 
     let mut fields = json!({
@@ -454,22 +490,23 @@ pub async fn create_issue(
 }
 
 /// Build the PUT body for `PUT /rest/api/3/issue/{key}`. Pure, testable.
+///
+/// `assignee` is an account ID. It has the same shape as in the create body.
 pub(crate) fn build_update_payload(
     summary: Option<&str>,
     description: Option<&str>,
+    assignee: Option<&str>,
     priority: Option<&str>,
     custom: &HashMap<String, Value>,
 ) -> Result<Value> {
     use serde_json::json;
 
-    check_field_collisions(
+    check_update_collisions(
         custom,
-        &[],
-        &[
-            ("summary", "--summary", summary.is_some()),
-            ("description", "--description", description.is_some()),
-            ("priority", "--priority", priority.is_some()),
-        ],
+        summary.is_some(),
+        description.is_some(),
+        assignee.is_some(),
+        priority.is_some(),
     )?;
 
     let mut fields = json!({});
@@ -478,6 +515,9 @@ pub(crate) fn build_update_payload(
     }
     if let Some(desc) = description {
         fields["description"] = markdown_to_adf(desc);
+    }
+    if let Some(user) = assignee {
+        fields["assignee"] = json!({ "id": user });
     }
     if let Some(pri) = priority {
         fields["priority"] = json!({ "name": pri });
@@ -528,27 +568,31 @@ fn extract_active_sprint(value: &Value) -> Option<String> {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn update_issue(
     ctx: &JiraContext<'_>,
     key: &str,
     summary: Option<&str>,
     description: Option<&str>,
+    assignee: Option<&str>,
     priority: Option<&str>,
     custom_fields: &HashMap<String, Value>,
     sprint: Option<&str>,
 ) -> Result<()> {
     let has_fields = summary.is_some()
         || description.is_some()
+        || assignee.is_some()
         || priority.is_some()
         || !custom_fields.is_empty();
     if !has_fields && sprint.is_none() {
         bail!(
-            "Nothing to update for {key}: provide --summary, --description, --priority, --field, or --sprint"
+            "Nothing to update for {key}: provide --summary, --description, --assignee, --priority, --field, or --sprint"
         );
     }
 
     if has_fields {
-        let payload = build_update_payload(summary, description, priority, custom_fields)?;
+        let payload =
+            build_update_payload(summary, description, assignee, priority, custom_fields)?;
         let _: Value = ctx
             .client
             .put(
@@ -2619,7 +2663,7 @@ mod tests {
     #[test]
     fn build_update_payload_rejects_summary_collision() {
         let custom = cf(&[("summary", json!("raw"))]);
-        let err = build_update_payload(Some("typed"), None, None, &custom)
+        let err = build_update_payload(Some("typed"), None, None, None, &custom)
             .unwrap_err()
             .to_string();
         assert!(err.contains("collides"), "got: {err}");
@@ -2629,7 +2673,7 @@ mod tests {
     #[test]
     fn build_update_payload_raw_only_priority_ok() {
         let custom = cf(&[("priority", json!({"name": "Low"}))]);
-        let payload = build_update_payload(None, None, None, &custom).unwrap();
+        let payload = build_update_payload(None, None, None, None, &custom).unwrap();
         assert_eq!(payload["fields"]["priority"], json!({"name": "Low"}));
     }
 }

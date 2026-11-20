@@ -23,6 +23,39 @@ resolve. `git log` remains the complete record.
 
 ### Added
 
+- `jira user search <query>` (alias `jira users search`) lists the users that
+  match a display name or an email address. The output keys are `account_id`,
+  `display_name`, `email`, `account_type` and `active`. `email` is empty
+  (`null` in JSON) when Jira does not return it. (#188)
+- `jira issue update --assignee <account ID | email | me>` sets the assignee in
+  the same request as the other fields. `--field assignee=...` with
+  `--assignee` is an error. (#188)
+- `me` and `@me` (upper or lower case) give the current user in `--assignee` of
+  `jira issue create`, `update`, `assign` and `jira bulk assign`, in
+  `jira issue watchers add` and `remove`, and in the `assignee` of a
+  `jira bulk import` row. (#188)
+
+### Fixed
+
+- An email address now gets its account ID from the Jira user search in
+  `--assignee` of `jira issue create`, `jira issue assign` and
+  `jira bulk assign`, in the user argument of `jira issue watchers add` and
+  `remove`, and in the `assignee` of each `jira bulk import` row. Before, the
+  CLI sent the email address as the account ID and Jira answered "Please select
+  a valid user". No match, or more than one match, is an error that names the
+  matches, and the command changes nothing. One result that shows a different
+  email address is an error too, because the search matches the start of an
+  email address. `jira bulk import` looks up all rows before it creates the
+  first issue. Scripts can see these changes: for an email address or `me`,
+  the result text of `jira issue assign` and the watcher commands, and the
+  `assignee` column of the `jira bulk assign` list, show the account ID.
+  `jira bulk assign` makes the lookup in list mode too, so an unknown email
+  address fails before the list. A user value that is empty or only spaces is
+  an error before a request. All other values with no `@` go to Jira unchanged,
+  as before. (#188)
+
+### Added
+
 - `bb commit browse --path <file>` prints the content of the file to stdout, with
   the bytes unchanged and no added newline, for every `--format`. Before, a file
   path failed with "Invalid response format". `--output <file>` (`-o`) writes the

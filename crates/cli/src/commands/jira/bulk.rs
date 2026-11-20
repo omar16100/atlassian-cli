@@ -138,10 +138,14 @@ struct AssignRow<'a> {
 //
 // Lists the matching issues by default. `--execute` overwrites their assignee,
 // after the match count is typed back or `--yes` is given.
+//
+// `assignee` is the account ID. `assignee_label` is the text for the
+// confirmation: the display name with the account ID when a lookup found one.
 pub async fn bulk_assign(
     ctx: &JiraContext<'_>,
     jql: &str,
     assignee: &str,
+    assignee_label: &str,
     execute: bool,
     assume_yes: bool,
     concurrency: usize,
@@ -176,7 +180,7 @@ pub async fn bulk_assign(
         confirm_destructive(
             &issue_keys.len().to_string(),
             &format!(
-                "About to assign {} issue(s) to {assignee}.\n\
+                "About to assign {} issue(s) to {assignee_label}.\n\
                  Any current assignee is overwritten.\n\
                  Re-run without --execute to list them first.",
                 issue_keys.len()
@@ -456,6 +460,8 @@ pub async fn bulk_import(
         return Ok(());
     }
 
+    let issues = resolve_import_assignees(&ctx.client, issues).await?;
+
     let executor = BulkExecutor::new(concurrency, dry_run);
     let client = ctx.client.clone();
     let project = project.to_string();
@@ -486,6 +492,32 @@ pub async fn bulk_import(
 }
 
 // Helper functions
+
+/// Replaces each `assignee` of an import file with its account ID, before any
+/// issue is created. Each different value makes one lookup at most.
+async fn resolve_import_assignees(
+    client: &ApiClient,
+    mut issues: Vec<ImportIssue>,
+) -> Result<Vec<ImportIssue>> {
+    let mut resolved: HashMap<String, String> = HashMap::new();
+    for issue in &mut issues {
+        let Some(value) = issue.assignee.as_ref() else {
+            continue;
+        };
+        let account_id = match resolved.get(value) {
+            Some(account_id) => account_id.clone(),
+            None => {
+                let account_id = super::users::resolve_account_id(client, value, "assignee")
+                    .await
+                    .with_context(|| format!("Row '{}': assignee '{value}'", issue.summary))?;
+                resolved.insert(value.clone(), account_id.clone());
+                account_id
+            }
+        };
+        issue.assignee = Some(account_id);
+    }
+    Ok(issues)
+}
 
 /// Nothing matched: the same rendering as a preview with no rows, so a machine
 /// format gets an empty list rather than prose.
@@ -1057,6 +1089,43 @@ mod tests {
         assert_eq!(cf["customfield_10002"], json!([{"value": "Beta"}]));
     }
 
+    #[tokio::test]
+    async fn import_assignees_resolve_with_one_lookup_for_each_value() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path_matcher("/rest/api/3/user/search"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!([
+                {"accountId": "acc-1", "displayName": "Dev One", "emailAddress": "dev@example.com"}
+            ])))
+            .mount(&server)
+            .await;
+        let row = |assignee: Option<&str>| ImportIssue {
+            summary: "Row".to_string(),
+            issue_type: "Task".to_string(),
+            description: None,
+            assignee: assignee.map(str::to_string),
+            priority: None,
+            labels: vec![],
+            custom_fields: None,
+        };
+        let issues = vec![
+            row(Some("dev@example.com")),
+            row(Some("acc-9")),
+            row(None),
+            row(Some("dev@example.com")),
+        ];
+        let client = ApiClient::new(server.uri()).unwrap();
+
+        let resolved = resolve_import_assignees(&client, issues).await.unwrap();
+
+        let assignees: Vec<Option<&str>> = resolved.iter().map(|i| i.assignee.as_deref()).collect();
+        assert_eq!(
+            assignees,
+            vec![Some("acc-1"), Some("acc-9"), None, Some("acc-1")]
+        );
+        assert_eq!(server.received_requests().await.unwrap().len(), 1);
+    }
+
     #[test]
     fn test_import_issue_deserialize_without_custom_fields() {
         let json_str = r#"{
@@ -1265,7 +1334,7 @@ mod tests {
         bulk_transition(&ctx, "project = X", "Done", false, false, 2)
             .await
             .unwrap();
-        bulk_assign(&ctx, "project = X", "acc-1", true, true, 2)
+        bulk_assign(&ctx, "project = X", "acc-1", "acc-1", true, true, 2)
             .await
             .unwrap();
         bulk_label(
@@ -1289,7 +1358,7 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Json);
         let ctx = jira_ctx(&server, &renderer);
 
-        bulk_assign(&ctx, "project = X", "acc-1", false, false, 2)
+        bulk_assign(&ctx, "project = X", "acc-1", "acc-1", false, false, 2)
             .await
             .unwrap();
 
@@ -1302,7 +1371,7 @@ mod tests {
         let renderer = OutputRenderer::new(OutputFormat::Json);
         let ctx = jira_ctx(&server, &renderer);
 
-        bulk_assign(&ctx, "project = X", "acc-1", true, true, 2)
+        bulk_assign(&ctx, "project = X", "acc-1", "acc-1", true, true, 2)
             .await
             .unwrap();
 

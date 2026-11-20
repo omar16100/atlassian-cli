@@ -283,6 +283,12 @@ flows up to the global (`auth logout --profile`). No `bb` command redeclares
 - `automation.rs` - Automation rules management
 - `webhooks.rs` - Webhook CRUD
 - `audit.rs` - Audit log retrieval
+- `users.rs` - `jira user search`, and `resolve_account_id`: an email address
+  goes to `GET /rest/api/3/user/search`, `me` goes to `GET /rest/api/3/myself`,
+  and all other values pass through as account IDs with no request. `mod.rs`
+  calls it before issue create, update, assign, bulk assign and the watcher
+  commands, after the local `--field` collision checks;
+  `bulk.rs` calls it for each different `assignee` of an import file
 - `bulk.rs` - Bulk issue operations. `transition`, `assign` and `label` list by
   default and need `--execute` plus the typed confirmation or `--yes`; a
   transition is resolved against each issue's own transitions
