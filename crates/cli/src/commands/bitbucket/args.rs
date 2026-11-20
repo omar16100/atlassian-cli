@@ -942,17 +942,35 @@ pub(super) enum CommitCommands {
         #[arg(value_names = ["REPO", "HASH"], num_args = 1..=2)]
         targets: Vec<String>,
     },
-    /// Browse source code.
+    /// List a directory, or print the content of a file.
+    ///
+    /// With no --path, or with a --path that is a directory, the command lists
+    /// the entries. With a --path that is a file, the command writes the file
+    /// content to stdout: the bytes are not changed, no newline is added, and
+    /// --format has no effect on the content. With --output <file>, the content
+    /// goes to the file, and the confirmation on stdout obeys --format.
+    #[command(after_help = "EXAMPLES:\n  \
+            bb commit browse web_app --commit main                      # list the root\n  \
+            bb commit browse web_app --commit main --path src           # list a directory\n  \
+            bb commit browse web_app --commit main --path src/main.rs   # print a file\n  \
+            bb commit browse web_app --commit 1a2b3c4 --path logo.png --output ./logo.png")]
     Browse {
         /// Repository slug. Defaults to --repo, then the git remote.
         #[arg(value_name = "REPO")]
         repo_arg: Option<String>,
-        /// Commit hash or branch name.
+        /// Commit hash, branch or tag name.
         #[arg(long)]
         commit: String,
-        /// File path.
+        /// Path of a directory (lists it) or of a file (prints its content).
         #[arg(long)]
         path: Option<String>,
+        /// Write the file content to this file and not to stdout. `-` is
+        /// stdout. Applies to a file path only.
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+        /// Replace the --output file if it exists.
+        #[arg(long, requires = "output")]
+        force: bool,
     },
 }
 

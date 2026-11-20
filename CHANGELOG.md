@@ -21,6 +21,32 @@ resolve. `git log` remains the complete record.
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
 
+### Added
+
+- `bb commit browse --path <file>` prints the content of the file to stdout, with
+  the bytes unchanged and no added newline, for every `--format`. Before, a file
+  path failed with "Invalid response format". `--output <file>` (`-o`) writes the
+  content to a file and does not replace an existing file without `--force`. A
+  directory path and the repository root list as before, with the same output
+  keys. A `--commit` that is a branch or tag name with `/` now works: the command
+  resolves it to a commit hash through the refs endpoint. Scripts can see these
+  differences:
+  - A path or revision that does not exist gives a new error text that names the
+    path and the revision and has the message from Bitbucket. The context text
+    of the other errors of this command changed also.
+  - `%`, `?` and `#` in `--path` and `--commit` are sent as literal characters.
+    A value that is already percent-encoded (`a%20b`) and a query suffix such as
+    `src/?pagelen=100` do not work as before.
+  - A `--path` with an empty, `.` or `..` segment is refused before a request is
+    sent. A trailing `/` is removed.
+  - A `--commit` with a leading or trailing `/`, or a `.` or `..` component, is
+    refused.
+  - A workspace or repository value with `/` is refused.
+  - A directory path sends one more request (`?format=meta`). A `--commit` with
+    `/` sends one more request for the branch, and one more for the tag if the
+    branch does not exist. A path that gives a 404 sends one more request.
+  - A closed pipe on stdout (`| head -1`) in file mode is not an error. (#187)
+
 ### Fixed
 
 - `--repo` works on every Bitbucket command that takes a repository: `bb pr`,

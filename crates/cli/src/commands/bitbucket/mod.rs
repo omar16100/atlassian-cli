@@ -14,6 +14,7 @@ mod pipelines;
 mod positional;
 mod pullrequests;
 mod repos;
+mod source;
 mod time_parser;
 pub mod utils;
 mod variables;
@@ -1125,9 +1126,17 @@ async fn execute_in(
                 repo_arg,
                 commit,
                 path,
+                output,
+                force,
             } => {
                 let repo = repos.any(repo_arg, "commit browse")?;
-                commits::browse_source(&ctx, &workspace, &repo, &commit, path.as_deref()).await
+                let request = source::BrowseRequest {
+                    commit: &commit,
+                    path: path.as_deref(),
+                    output: output.as_deref(),
+                    force,
+                };
+                source::browse_source(&ctx, &workspace, &repo, &request).await
             }
         },
         BitbucketCommands::Bulk(cmd) => match cmd {
