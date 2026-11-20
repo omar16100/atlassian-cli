@@ -3545,3 +3545,13 @@ are in `main`. The release branch promotes the change notes to
 0.14.0 in the workspace and in the five internal dependency pins, and sets the
 status line of each dated document of this release. See
 `docs/21112026_release_0_14_0_plan.md`.
+
+## 2026-11-21: release runner for macOS
+
+The release workflow for the tag `v0.14.0` did not create a GitHub Release.
+The two macOS build jobs were cancelled before their first step, with the
+annotation "The configuration 'macos-14-arm64-us-default' is not supported".
+`dist-workspace.toml` set the runner `macos-14` for the two macOS targets, and
+GitHub no longer runs that image. The crates.io workflow published the six
+crates at 0.14.0. The runner is `macos-15` now. The pull request runs of the
+release workflow only make the plan, so they did not show this.
