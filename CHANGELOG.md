@@ -20,6 +20,7 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+
 ### Fixed
 
 - `--repo` works on every Bitbucket command that takes a repository: `bb pr`,
@@ -46,7 +47,7 @@ resolve. `git log` remains the complete record.
     exit code 1, not a usage error with exit code 2. The same is true for a missing
     argument after the repository (`Missing argument: expected [REPO] <PR_ID>.`) and
     for a pull request ID, comment ID or restriction ID that is not a number
-    (`Invalid PR_ID ...`). (#PR)
+    (`Invalid PR_ID ...`). (#189)
 
 ### Changed
 

@@ -1,6 +1,6 @@
 # `--repo` and the Git remote on all Bitbucket repository commands
 
-Status: in progress on fix/bb-repo-flag (PR #PR)
+Status: in progress on `fix/bb-repo-flag` (PR #189).
 
 ## Problem
 
