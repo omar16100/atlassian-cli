@@ -28,7 +28,9 @@ resolve. `git log` remains the complete record.
   Only a 404 causes one more request, to the folder endpoint. The `Error:` line
   and the exit code do not change, only the `Hint:` line on stderr does.
   `page get` now refuses an ID that is empty, `.`, `..` or contains `/` before it
-  sends a request. (#PR)
+  sends a request. `page get` now percent-encodes the ID, so a value such as
+  `123?version=2` is one literal path segment and no longer reaches the query
+  string. (#PR)
 
 ### Added
 

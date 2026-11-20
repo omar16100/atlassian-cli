@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
 use atlassian_cli_api::path::encode_path_segment;
+use atlassian_cli_api::retry::RetryConfig;
+use atlassian_cli_api::RawRequest;
 use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -108,6 +110,41 @@ fn page_not_found_hint(page_id: &str, is_folder: bool) -> String {
     }
 }
 
+/// Ask `GET /wiki/api/v2/folders/{id}` one time if the ID is a folder.
+///
+/// `segment` is the ID after `encode_path_segment`. The probe only improves a
+/// hint, so it must not delay the page error. `ApiClient::get` tries a 5xx or a
+/// 429 again with waits and a `warn!` line for each try. The probe uses a copy
+/// of the client with one attempt and `request_raw`, which gives the status
+/// with no retry and no warning. Each result that is not a 2xx means "not
+/// known to be a folder".
+async fn folder_exists(ctx: &ConfluenceContext<'_>, segment: &str) -> bool {
+    let probe_client = ctx.client.clone().with_retry_config(RetryConfig {
+        max_retries: 1,
+        ..RetryConfig::default()
+    });
+    let path = format!("/wiki/api/v2/folders/{segment}");
+    match probe_client
+        .request_raw(RawRequest {
+            method: reqwest::Method::GET,
+            path: &path,
+            headers: reqwest::header::HeaderMap::new(),
+            body: None,
+            timeout: None,
+        })
+        .await
+    {
+        Ok(response) => {
+            tracing::debug!(status = response.status, "Folder probe after a page 404");
+            response.is_success()
+        }
+        Err(probe_err) => {
+            tracing::debug!(error = %probe_err, "Folder probe after a page 404 failed");
+            false
+        }
+    }
+}
+
 /// `GET /wiki/api/v2/pages/{id}` with a hint that explains a 404.
 ///
 /// `query` is appended as given (for example `?body-format=storage`). Only a
@@ -131,17 +168,7 @@ async fn fetch_page(ctx: &ConfluenceContext<'_>, page_id: &str, query: &str) -> 
         return Err(anyhow::Error::new(err).context(message));
     }
 
-    let is_folder = match ctx
-        .client
-        .get::<Value>(&format!("/wiki/api/v2/folders/{segment}"))
-        .await
-    {
-        Ok(_) => true,
-        Err(probe_err) => {
-            tracing::debug!(%page_id, error = %probe_err, "Folder probe after a page 404 failed");
-            false
-        }
-    };
+    let is_folder = folder_exists(ctx, &segment).await;
     tracing::debug!(%page_id, is_folder, "Page GET returned 404");
 
     Err(anyhow::Error::new(err).context(HintedContext {

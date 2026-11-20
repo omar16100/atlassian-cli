@@ -11,7 +11,7 @@ use std::path::Path;
 use std::process::Command;
 
 use tempfile::TempDir;
-use wiremock::matchers::{method, path as path_matcher};
+use wiremock::matchers::{method, path as path_matcher, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 const BIN: &str = env!("CARGO_BIN_EXE_atlassian-cli");
@@ -79,13 +79,16 @@ fn not_found_body() -> serde_json::Value {
 #[tokio::test]
 async fn a_successful_page_get_makes_no_folder_request() {
     let server = MockServer::start().await;
-    mock_page(
-        &server,
-        "1001",
-        200,
-        serde_json::json!({ "id": "1001", "title": "Onboarding", "status": "current" }),
-    )
-    .await;
+    // The query is part of the match, so a lost `body-format` fails the test.
+    Mock::given(method("GET"))
+        .and(path_matcher("/wiki/api/v2/pages/1001"))
+        .and(query_param("body-format", "storage"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({ "id": "1001", "title": "Onboarding", "status": "current" }),
+        ))
+        .expect(1)
+        .mount(&server)
+        .await;
     mock_folder(&server, "1001", 200, 0).await;
 
     let dir = TempDir::new().unwrap();
@@ -241,6 +244,116 @@ async fn page_update_on_a_folder_id_names_the_folder_command() {
     assert!(
         stderr.contains("atlassian-cli confluence folder get 6006"),
         "{stderr}"
+    );
+    server.verify().await;
+}
+
+/// `page publish` reads the page first, with the same helper.
+#[tokio::test]
+async fn page_publish_on_a_folder_id_names_the_folder_command() {
+    let server = MockServer::start().await;
+    mock_page(&server, "7007", 404, not_found_body()).await;
+    mock_folder(&server, "7007", 200, 1).await;
+    Mock::given(method("PUT"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({})))
+        .expect(0)
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let body = dir.path().join("body.html");
+    std::fs::write(&body, "<p>Text</p>").unwrap();
+    let out = run(
+        &config,
+        &[
+            "confluence",
+            "page",
+            "publish",
+            "7007",
+            "--body",
+            body.to_str().unwrap(),
+        ],
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    assert!(!out.status.success());
+    assert!(
+        stderr.contains("atlassian-cli confluence folder get 7007"),
+        "{stderr}"
+    );
+    server.verify().await;
+}
+
+/// The probe only improves a hint, so it is sent one time. A 503 from the
+/// folder endpoint is not tried again, and no retry warning is printed.
+#[tokio::test]
+async fn a_failing_folder_probe_is_not_retried() {
+    let server = MockServer::start().await;
+    mock_page(&server, "8008", 404, not_found_body()).await;
+    mock_folder(&server, "8008", 503, 1).await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(&config, &["confluence", "page", "get", "8008"]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    assert!(!out.status.success());
+    assert!(
+        stderr.contains("Hint: Page 8008 was not found."),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("Error: Failed to get page 8008: Resource not found"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("retry"), "{stderr}");
+    assert!(!stderr.contains("WARN"), "{stderr}");
+    assert_eq!(server.received_requests().await.unwrap().len(), 2);
+    server.verify().await;
+}
+
+/// `page get` sends the ID as one path segment. A value with `/` is refused
+/// before a request is sent.
+#[tokio::test]
+async fn an_id_with_a_slash_sends_no_request() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    let out = run(&config, &["confluence", "page", "get", "a/b"]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(stderr.contains("Invalid identifier"), "{stderr}");
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+/// A query marker in the ID stays in the path segment. It does not reach the
+/// query string of the request.
+#[tokio::test]
+async fn an_id_with_a_query_marker_is_one_path_segment() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path_matcher("/wiki/api/v2/pages/123%3Fversion%3D2"))
+        .and(query_param("body-format", "storage"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(not_found_body()))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(&config, &["confluence", "page", "get", "123?version=2"]);
+
+    assert!(!out.status.success());
+    let requests = server.received_requests().await.unwrap();
+    assert!(
+        requests
+            .iter()
+            .all(|r| !r.url.query().unwrap_or("").contains("version")),
+        "the ID must not reach the query string"
     );
     server.verify().await;
 }
