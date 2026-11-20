@@ -265,6 +265,8 @@ crates/
    # Bitbucket - Pull Requests
    atlassian-cli bitbucket --workspace myteam pr list api-service --state OPEN --limit 5
    atlassian-cli bitbucket --workspace myteam pr get api-service 123
+   # The repository can also be --repo, or the git remote of the current directory
+   atlassian-cli bitbucket --workspace myteam pr get --repo api-service 123
    atlassian-cli bitbucket --workspace myteam pr create api-service --title "Add feature" --source feature/new --destination main
    atlassian-cli bitbucket --workspace myteam pr update api-service 123 --title "Updated title"
    atlassian-cli bitbucket --workspace myteam pr approve api-service 123

@@ -80,16 +80,18 @@ pub(super) enum RepoCommands {
     /// Show repository metadata.
     #[command(long_about = "Show repository metadata.\n\nExamples:\n  bb repo get my-repo")]
     Get {
-        /// Repository slug (e.g., my-repo)
-        slug: String,
+        /// Repository slug (e.g., my-repo). Defaults to --repo, then the git remote.
+        slug: Option<String>,
     },
     /// Create a new repository.
     #[command(
         long_about = "Create a new repository.\n\nExamples:\n  bb repo create my-new-repo\n  bb repo create my-repo --name \"My Repository\" --description \"Project repo\" --private"
     )]
     Create {
-        /// Repository slug (URL-friendly name, e.g., my-repo)
-        slug: String,
+        /// Repository slug (URL-friendly name, e.g., my-repo), or use --repo.
+        /// Not read from the git remote, because this command names a new
+        /// repository.
+        slug: Option<String>,
         /// Repository display name
         #[arg(long)]
         name: Option<String>,
@@ -105,8 +107,8 @@ pub(super) enum RepoCommands {
     },
     /// Update repository metadata.
     Update {
-        /// Repository slug.
-        slug: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        slug: Option<String>,
         /// New display name.
         #[arg(long)]
         name: Option<String>,
@@ -119,8 +121,9 @@ pub(super) enum RepoCommands {
     },
     /// Delete a repository, its pull requests, issues and wiki.
     Delete {
-        /// Repository slug.
-        slug: String,
+        /// Repository slug, or use --repo. Not read from the git remote, because
+        /// this command deletes.
+        slug: Option<String>,
         /// Skip the typed confirmation. `--yes` matches the other commands.
         #[arg(long, visible_alias = "yes")]
         force: bool,
@@ -131,43 +134,50 @@ pub(super) enum RepoCommands {
 pub(super) enum BranchCommands {
     /// List branches in a repository.
     List {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Maximum results. 0 fetches every page.
         #[arg(long, default_value_t = 25)]
         limit: usize,
     },
     /// Get branch details.
+    #[command(override_usage = "atlassian-cli bitbucket branch get [OPTIONS] [REPO] <BRANCH>")]
     Get {
-        /// Repository slug.
-        repo: String,
-        /// Branch name.
-        branch: String,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// branch name.
+        #[arg(value_names = ["REPO", "BRANCH"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// Create a new branch.
+    #[command(
+        override_usage = "atlassian-cli bitbucket branch create [OPTIONS] --from <FROM> [REPO] <BRANCH>"
+    )]
     Create {
-        /// Repository slug.
-        repo: String,
-        /// New branch name.
-        branch: String,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// new branch name.
+        #[arg(value_names = ["REPO", "BRANCH"], num_args = 1..=2)]
+        targets: Vec<String>,
         /// Source commit hash or branch name.
         #[arg(long)]
         from: String,
     },
     /// Delete a branch.
+    #[command(override_usage = "atlassian-cli bitbucket branch delete [OPTIONS] [REPO] <BRANCH>")]
     Delete {
-        /// Repository slug.
-        repo: String,
-        /// Branch name.
-        branch: String,
+        /// Repository slug (or use --repo; not read from the git remote, because
+        /// this command deletes), then the branch name.
+        #[arg(value_names = ["REPO", "BRANCH"], num_args = 1..=2)]
+        targets: Vec<String>,
         /// Skip the typed confirmation. `--yes` matches the bulk commands.
         #[arg(long, visible_alias = "yes")]
         force: bool,
     },
     /// Add branch protection (restriction).
     Protect {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Branch name pattern (e.g., "main", "release/*").
         #[arg(long)]
         pattern: String,
@@ -179,16 +189,20 @@ pub(super) enum BranchCommands {
         approvals: Option<i32>,
     },
     /// Remove branch protection.
+    #[command(
+        override_usage = "atlassian-cli bitbucket branch unprotect [OPTIONS] [REPO] <RESTRICTION_ID>"
+    )]
     Unprotect {
-        /// Repository slug.
-        repo: String,
-        /// Branch restriction ID.
-        restriction_id: i64,
+        /// Repository slug (or use --repo; not read from the git remote, because
+        /// this command deletes), then the branch restriction ID.
+        #[arg(value_names = ["REPO", "RESTRICTION_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// List branch restrictions.
     Restrictions {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
     },
 }
 
@@ -209,8 +223,9 @@ pub(super) fn non_empty_string(s: &str) -> std::result::Result<String, String> {
 pub(super) enum PrCommands {
     /// List pull requests for a repository.
     List {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         #[arg(long, default_value = "OPEN")]
         state: String,
         /// Maximum results. 0 fetches every page.
@@ -218,16 +233,18 @@ pub(super) enum PrCommands {
         limit: usize,
     },
     /// Get pull request details.
+    #[command(override_usage = "atlassian-cli bitbucket pr get [OPTIONS] [REPO] <PR_ID>")]
     Get {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// Create a new pull request.
     Create {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// PR title.
         #[arg(long)]
         title: String,
@@ -253,11 +270,12 @@ pub(super) enum PrCommands {
         default_reviewers: bool,
     },
     /// Update pull request.
+    #[command(override_usage = "atlassian-cli bitbucket pr update [OPTIONS] [REPO] <PR_ID>")]
     Update {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
         /// New title.
         #[arg(long)]
         title: Option<String>,
@@ -271,11 +289,12 @@ pub(super) enum PrCommands {
         reviewers: Option<Vec<String>>,
     },
     /// Merge pull request.
+    #[command(override_usage = "atlassian-cli bitbucket pr merge [OPTIONS] [REPO] <PR_ID>")]
     Merge {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
         /// Merge strategy: merge_commit, squash, or fast_forward.
         #[arg(long)]
         strategy: Option<String>,
@@ -284,39 +303,44 @@ pub(super) enum PrCommands {
         message: Option<String>,
     },
     /// Decline/close pull request.
+    #[command(override_usage = "atlassian-cli bitbucket pr decline [OPTIONS] [REPO] <PR_ID>")]
     Decline {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// Approve pull request.
+    #[command(override_usage = "atlassian-cli bitbucket pr approve [OPTIONS] [REPO] <PR_ID>")]
     Approve {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// Remove approval from pull request.
+    #[command(override_usage = "atlassian-cli bitbucket pr unapprove [OPTIONS] [REPO] <PR_ID>")]
     Unapprove {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// View pull request diff.
+    #[command(override_usage = "atlassian-cli bitbucket pr diff [OPTIONS] [REPO] <PR_ID>")]
     Diff {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// List pull request comments.
+    #[command(override_usage = "atlassian-cli bitbucket pr comments [OPTIONS] [REPO] <PR_ID>")]
     Comments {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// Add a comment to a pull request, optionally inline or as a threaded reply
     #[command(long_about = "Add a comment to a pull request.\n\n\
@@ -331,11 +355,14 @@ pub(super) enum PrCommands {
         --side selects which side of the diff --line refers to:\n  \
         new (default) = destination revision (added/unchanged lines)\n  \
         old           = source revision (removed lines)")]
+    #[command(
+        override_usage = "atlassian-cli bitbucket pr comment [OPTIONS] --text <TEXT> [REPO] <PR_ID>"
+    )]
     Comment {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
         /// Comment text (Markdown).
         #[arg(long, value_parser = non_empty_string)]
         text: String,
@@ -357,32 +384,35 @@ pub(super) enum PrCommands {
         side: pullrequests::Side,
     },
     /// Resolve a pull request diff comment thread.
+    #[command(
+        override_usage = "atlassian-cli bitbucket pr resolve-comment [OPTIONS] [REPO] <PR_ID> <COMMENT_ID>"
+    )]
     ResolveComment {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// Top-level comment ID.
-        comment_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID and the top-level comment ID.
+        #[arg(value_names = ["REPO", "PR_ID", "COMMENT_ID"], num_args = 1..=3)]
+        targets: Vec<String>,
     },
     /// Reopen a resolved pull request comment thread.
+    #[command(
+        override_usage = "atlassian-cli bitbucket pr reopen-comment [OPTIONS] [REPO] <PR_ID> <COMMENT_ID>"
+    )]
     ReopenComment {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// Top-level comment ID.
-        comment_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID and the top-level comment ID.
+        #[arg(value_names = ["REPO", "PR_ID", "COMMENT_ID"], num_args = 1..=3)]
+        targets: Vec<String>,
     },
     /// List pull request reviewers with review status, or add new reviewers.
     #[command(
         long_about = "List pull request reviewers with review status, or add new reviewers.\n\nWith no flags, lists current reviewers (role=REVIEWER) and whether each has approved, requested changes, or not responded.\n\nExamples:\n  bb pr reviewers my-repo 123\n  bb pr reviewers my-repo 123 --all\n  bb pr reviewers my-repo 123 --add {uuid}"
     )]
+    #[command(override_usage = "atlassian-cli bitbucket pr reviewers [OPTIONS] [REPO] <PR_ID>")]
     Reviewers {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// pull request ID.
+        #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
+        targets: Vec<String>,
         /// Reviewer UUIDs to add (comma-separated). If omitted, lists current reviewers instead.
         #[arg(long, value_delimiter = ',')]
         add: Vec<String>,
@@ -785,13 +815,15 @@ pub(super) enum EnvCommands {
 pub(super) enum WebhookCommands {
     /// List webhooks.
     List {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
     },
     /// Create webhook.
     Create {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Webhook URL.
         #[arg(long)]
         url: String,
@@ -806,11 +838,12 @@ pub(super) enum WebhookCommands {
         active: bool,
     },
     /// Delete webhook.
+    #[command(override_usage = "atlassian-cli bitbucket webhook delete [OPTIONS] [REPO] <UUID>")]
     Delete {
-        /// Repository slug.
-        repo: String,
-        /// Webhook UUID.
-        uuid: String,
+        /// Repository slug (or use --repo; not read from the git remote, because
+        /// this command deletes), then the webhook UUID.
+        #[arg(value_names = ["REPO", "UUID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
 }
 
@@ -818,13 +851,15 @@ pub(super) enum WebhookCommands {
 pub(super) enum SshKeyCommands {
     /// List SSH deploy keys.
     List {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
     },
     /// Add SSH deploy key.
     Add {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Key label.
         #[arg(long)]
         label: String,
@@ -833,11 +868,12 @@ pub(super) enum SshKeyCommands {
         key: String,
     },
     /// Delete SSH deploy key.
+    #[command(override_usage = "atlassian-cli bitbucket ssh-key delete [OPTIONS] [REPO] <UUID>")]
     Delete {
-        /// Repository slug.
-        repo: String,
-        /// Key UUID.
-        uuid: String,
+        /// Repository slug (or use --repo; not read from the git remote, because
+        /// this command deletes), then the key UUID.
+        #[arg(value_names = ["REPO", "UUID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
 }
 
@@ -845,13 +881,15 @@ pub(super) enum SshKeyCommands {
 pub(super) enum PermissionCommands {
     /// List repository permissions.
     List {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
     },
     /// Grant repository permission.
     Grant {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// User UUID.
         #[arg(long)]
         user_uuid: String,
@@ -860,11 +898,14 @@ pub(super) enum PermissionCommands {
         permission: String,
     },
     /// Revoke repository permission.
+    #[command(
+        override_usage = "atlassian-cli bitbucket permission revoke [OPTIONS] [REPO] <USER_UUID>"
+    )]
     Revoke {
-        /// Repository slug.
-        repo: String,
-        /// User UUID.
-        user_uuid: String,
+        /// Repository slug (or use --repo; not read from the git remote, because
+        /// this command deletes), then the user UUID.
+        #[arg(value_names = ["REPO", "USER_UUID"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
 }
 
@@ -872,8 +913,9 @@ pub(super) enum PermissionCommands {
 pub(super) enum CommitCommands {
     /// List commits.
     List {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Branch name.
         #[arg(long)]
         branch: Option<String>,
@@ -882,23 +924,26 @@ pub(super) enum CommitCommands {
         limit: usize,
     },
     /// Get commit details.
+    #[command(override_usage = "atlassian-cli bitbucket commit get [OPTIONS] [REPO] <HASH>")]
     Get {
-        /// Repository slug.
-        repo: String,
-        /// Commit hash.
-        hash: String,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// commit hash.
+        #[arg(value_names = ["REPO", "HASH"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// View commit diff.
+    #[command(override_usage = "atlassian-cli bitbucket commit diff [OPTIONS] [REPO] <HASH>")]
     Diff {
-        /// Repository slug.
-        repo: String,
-        /// Commit hash.
-        hash: String,
+        /// Repository slug (defaults to --repo, then the git remote), then the
+        /// commit hash.
+        #[arg(value_names = ["REPO", "HASH"], num_args = 1..=2)]
+        targets: Vec<String>,
     },
     /// Browse source code.
     Browse {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug. Defaults to --repo, then the git remote.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Commit hash or branch name.
         #[arg(long)]
         commit: String,
@@ -943,8 +988,10 @@ pub(super) enum BulkCommands {
     /// in the repository is considered, not just the first page. Lists
     /// candidates by default; pass --execute to actually delete.
     DeleteBranches {
-        /// Repository slug.
-        repo: String,
+        /// Repository slug, or use --repo. Not read from the git remote, because
+        /// this command deletes.
+        #[arg(value_name = "REPO")]
+        repo_arg: Option<String>,
         /// Exclude patterns (comma-separated).
         #[arg(long, value_delimiter = ',')]
         exclude: Vec<String>,

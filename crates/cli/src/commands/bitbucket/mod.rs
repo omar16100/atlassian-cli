@@ -24,6 +24,8 @@ pub(crate) mod workspaces;
 
 #[cfg(test)]
 mod path_encoding_tests;
+#[cfg(test)]
+mod repo_argument_tests;
 use args::*;
 use utils::BitbucketContext;
 
@@ -73,6 +75,94 @@ fn require_repo(
     })
 }
 
+/// Why a command does not read its repository from the Git remote.
+const DELETES: &str = "This command deletes or revokes";
+const NAMES_A_NEW_REPO: &str = "This command names a new repository";
+
+/// Where the repository of a command can come from, apart from its argument.
+struct RepoResolver {
+    /// The value of `--repo`.
+    flag: Option<String>,
+    /// The repository that the Git remote names.
+    git: Option<String>,
+}
+
+impl RepoResolver {
+    /// The argument, then `--repo`, then the Git remote.
+    fn any(&self, positional: Option<String>, cmd: &str) -> anyhow::Result<String> {
+        let chosen = positional::choose_repo(
+            positional.as_deref(),
+            self.flag.as_deref(),
+            self.git.as_deref(),
+        )?;
+        let repo = require_repo(chosen.as_deref(), None, cmd)?;
+        let source = if positional.is_some() {
+            "argument"
+        } else if self.flag.is_some() {
+            "--repo"
+        } else {
+            "git remote"
+        };
+        tracing::debug!(repo = %repo, source, command = cmd, "Resolved the repository");
+        Ok(repo)
+    }
+
+    /// The argument, then `--repo`. Not the Git remote.
+    ///
+    /// For a command that deletes, the directory that the user is in must not
+    /// select the target. Most of these commands have no confirmation prompt.
+    fn explicit(
+        &self,
+        positional: Option<String>,
+        cmd: &str,
+        reason: &str,
+    ) -> anyhow::Result<String> {
+        let chosen = positional::choose_repo(positional.as_deref(), self.flag.as_deref(), None)?;
+        if let Some(repo) = chosen {
+            let source = if positional.is_some() {
+                "argument"
+            } else {
+                "--repo"
+            };
+            tracing::debug!(
+                repo = %repo,
+                source,
+                command = cmd,
+                "Resolved the repository, git remote not read"
+            );
+            return Ok(repo);
+        }
+        let mut msg = format!(
+            "Repository required for '{cmd}'.\n\n\
+             {reason}, so it does not read the repository from the Git remote.\n\
+             Give the repository as an argument or with --repo <slug>.\n"
+        );
+        if let Some(git) = &self.git {
+            msg.push_str(&format!(
+                "\nThe Git remote names '{git}'. Add --repo {git} if that is the repository.\n"
+            ));
+        }
+        msg.push_str(&format!(
+            "\nExample:\n  atlassian-cli bb {cmd} --workspace <workspace> --repo <repo>\n"
+        ));
+        Err(anyhow::anyhow!(msg))
+    }
+}
+
+/// The repository and the pull request ID of `bb pr <command> [REPO] <PR_ID>`.
+///
+/// The ID is read first. A slug where the ID must be then gives an error about
+/// the argument order, and not an error about a missing repository.
+fn repo_and_pr(
+    repos: &RepoResolver,
+    targets: Vec<String>,
+    cmd: &str,
+) -> anyhow::Result<(String, i64)> {
+    let given = positional::split_repo_and_required(targets, &["PR_ID"])?;
+    let pr_id = given.number(0)?;
+    Ok((repos.any(given.repo, cmd)?, pr_id))
+}
+
 #[derive(Args, Debug, Clone)]
 pub struct BitbucketArgs {
     /// Workspace slug (defaults to workspace configured in profile base URL host prefix).
@@ -111,7 +201,29 @@ pub async fn execute(
 
     // Detect git context for auto-detection
     let git_ctx = git::detect_git_context(bitbucket_remote);
+    execute_in(
+        args,
+        client,
+        renderer,
+        inferred_workspace,
+        is_bearer,
+        git_ctx,
+    )
+    .await
+}
 
+/// Run a command that needs a workspace, with the Git context already read.
+///
+/// The Git context is a parameter so that a test can give one. A test cannot
+/// control the remotes of the directory that `cargo test` runs in.
+async fn execute_in(
+    args: BitbucketArgs,
+    client: ApiClient,
+    renderer: &OutputRenderer,
+    inferred_workspace: Option<&str>,
+    is_bearer: bool,
+    git_ctx: git::GitContext,
+) -> Result<()> {
     // CLI flag takes precedence, then git context, then inferred from profile
     let workspace = args
         .workspace
@@ -163,18 +275,12 @@ pub async fn execute(
         })?
         .to_string();
 
-    // Kept apart for pipeline commands, which also take the repository as an
-    // argument: an argument that disagrees with --repo is an error, while one
-    // that differs from the git remote simply wins.
-    let repo_flag = args.repo.clone();
-    let git_repo = git_ctx.repo_slug.clone();
-    let pipeline_repo = |positional: Option<String>, cmd: &str| -> anyhow::Result<String> {
-        let chosen = positional::choose_repo(
-            positional.as_deref(),
-            repo_flag.as_deref(),
-            git_repo.as_deref(),
-        )?;
-        require_repo(chosen.as_deref(), None, cmd)
+    // Kept apart from `global_repo` for the commands that also take the
+    // repository as an argument: an argument that disagrees with --repo is an
+    // error, while one that differs from the git remote simply wins.
+    let repos = RepoResolver {
+        flag: args.repo.clone(),
+        git: git_ctx.repo_slug.clone(),
     };
 
     // Global repo slug resolution
@@ -193,7 +299,10 @@ pub async fn execute(
     match args.command {
         BitbucketCommands::Repo(cmd) => match cmd {
             RepoCommands::List { limit } => repos::list_repos(&ctx, &workspace, limit).await,
-            RepoCommands::Get { slug } => repos::get_repo(&ctx, &workspace, &slug).await,
+            RepoCommands::Get { slug } => {
+                let slug = repos.any(slug, "repo get")?;
+                repos::get_repo(&ctx, &workspace, &slug).await
+            }
             RepoCommands::Create {
                 slug,
                 name,
@@ -201,6 +310,7 @@ pub async fn execute(
                 private,
                 project,
             } => {
+                let slug = repos.explicit(slug, "repo create", NAMES_A_NEW_REPO)?;
                 repos::create_repo(
                     &ctx,
                     &workspace,
@@ -218,6 +328,7 @@ pub async fn execute(
                 description,
                 language,
             } => {
+                let slug = repos.any(slug, "repo update")?;
                 repos::update_repo(
                     &ctx,
                     &workspace,
@@ -229,49 +340,68 @@ pub async fn execute(
                 .await
             }
             RepoCommands::Delete { slug, force } => {
+                let slug = repos.explicit(slug, "repo delete", DELETES)?;
                 repos::delete_repo(&ctx, &workspace, &slug, force).await
             }
         },
         BitbucketCommands::Branch(cmd) => match cmd {
-            BranchCommands::List { repo, limit } => {
+            BranchCommands::List { repo_arg, limit } => {
+                let repo = repos.any(repo_arg, "branch list")?;
                 branches::list_branches(&ctx, &workspace, &repo, limit).await
             }
-            BranchCommands::Get { repo, branch } => {
+            BranchCommands::Get { targets } => {
+                let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
+                let branch = given.text(0).to_string();
+                let repo = repos.any(given.repo, "branch get")?;
                 branches::get_branch(&ctx, &workspace, &repo, &branch).await
             }
-            BranchCommands::Create { repo, branch, from } => {
+            BranchCommands::Create { targets, from } => {
+                let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
+                let branch = given.text(0).to_string();
+                let repo = repos.any(given.repo, "branch create")?;
                 branches::create_branch(&ctx, &workspace, &repo, &branch, &from).await
             }
-            BranchCommands::Delete {
-                repo,
-                branch,
-                force,
-            } => branches::delete_branch(&ctx, &workspace, &repo, &branch, force).await,
+            BranchCommands::Delete { targets, force } => {
+                let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
+                let branch = given.text(0).to_string();
+                let repo = repos.explicit(given.repo, "branch delete", DELETES)?;
+                branches::delete_branch(&ctx, &workspace, &repo, &branch, force).await
+            }
             BranchCommands::Protect {
-                repo,
+                repo_arg,
                 pattern,
                 kind,
                 approvals,
             } => {
+                let repo = repos.any(repo_arg, "branch protect")?;
                 branches::protect_branch(&ctx, &workspace, &repo, &pattern, &kind, approvals).await
             }
-            BranchCommands::Unprotect {
-                repo,
-                restriction_id,
-            } => branches::unprotect_branch(&ctx, &workspace, &repo, restriction_id).await,
-            BranchCommands::Restrictions { repo } => {
+            BranchCommands::Unprotect { targets } => {
+                let given = positional::split_repo_and_required(targets, &["RESTRICTION_ID"])?;
+                let restriction_id = given.number(0)?;
+                let repo = repos.explicit(given.repo, "branch unprotect", DELETES)?;
+                branches::unprotect_branch(&ctx, &workspace, &repo, restriction_id).await
+            }
+            BranchCommands::Restrictions { repo_arg } => {
+                let repo = repos.any(repo_arg, "branch restrictions")?;
                 branches::list_restrictions(&ctx, &workspace, &repo).await
             }
         },
         BitbucketCommands::Pr(cmd) => match cmd {
-            PrCommands::List { repo, state, limit } => {
+            PrCommands::List {
+                repo_arg,
+                state,
+                limit,
+            } => {
+                let repo = repos.any(repo_arg, "pr list")?;
                 pullrequests::list_pull_requests(&ctx, &workspace, &repo, &state, limit).await
             }
-            PrCommands::Get { repo, pr_id } => {
+            PrCommands::Get { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr get")?;
                 pullrequests::get_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Create {
-                repo,
+                repo_arg,
                 title,
                 source,
                 destination,
@@ -279,6 +409,7 @@ pub async fn execute(
                 reviewers,
                 default_reviewers,
             } => {
+                let repo = repos.any(repo_arg, "pr create")?;
                 pullrequests::create_pull_request(
                     &ctx,
                     &workspace,
@@ -293,12 +424,12 @@ pub async fn execute(
                 .await
             }
             PrCommands::Update {
-                repo,
-                pr_id,
+                targets,
                 title,
                 description,
                 reviewers,
             } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr update")?;
                 pullrequests::update_pull_request(
                     &ctx,
                     &workspace,
@@ -311,11 +442,11 @@ pub async fn execute(
                 .await
             }
             PrCommands::Merge {
-                repo,
-                pr_id,
+                targets,
                 strategy,
                 message,
             } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr merge")?;
                 pullrequests::merge_pull_request(
                     &ctx,
                     &workspace,
@@ -326,30 +457,35 @@ pub async fn execute(
                 )
                 .await
             }
-            PrCommands::Decline { repo, pr_id } => {
+            PrCommands::Decline { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr decline")?;
                 pullrequests::decline_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Approve { repo, pr_id } => {
+            PrCommands::Approve { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr approve")?;
                 pullrequests::approve_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Unapprove { repo, pr_id } => {
+            PrCommands::Unapprove { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr unapprove")?;
                 pullrequests::unapprove_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Diff { repo, pr_id } => {
+            PrCommands::Diff { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr diff")?;
                 pullrequests::get_pr_diff(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Comments { repo, pr_id } => {
+            PrCommands::Comments { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comments")?;
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Comment {
-                repo,
-                pr_id,
+                targets,
                 text,
                 parent,
                 path,
                 line,
                 side,
             } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comment")?;
                 pullrequests::add_pr_comment(
                     &ctx,
                     &workspace,
@@ -363,22 +499,20 @@ pub async fn execute(
                 )
                 .await
             }
-            PrCommands::ResolveComment {
-                repo,
-                pr_id,
-                comment_id,
-            } => pullrequests::resolve_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
-            PrCommands::ReopenComment {
-                repo,
-                pr_id,
-                comment_id,
-            } => pullrequests::reopen_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
-            PrCommands::Reviewers {
-                repo,
-                pr_id,
-                add,
-                all,
-            } => {
+            PrCommands::ResolveComment { targets } => {
+                let given = positional::split_repo_and_required(targets, &["PR_ID", "COMMENT_ID"])?;
+                let (pr_id, comment_id) = (given.number(0)?, given.number(1)?);
+                let repo = repos.any(given.repo, "pr resolve-comment")?;
+                pullrequests::resolve_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await
+            }
+            PrCommands::ReopenComment { targets } => {
+                let given = positional::split_repo_and_required(targets, &["PR_ID", "COMMENT_ID"])?;
+                let (pr_id, comment_id) = (given.number(0)?, given.number(1)?);
+                let repo = repos.any(given.repo, "pr reopen-comment")?;
+                pullrequests::reopen_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await
+            }
+            PrCommands::Reviewers { targets, add, all } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr reviewers")?;
                 if add.is_empty() {
                     pullrequests::list_pr_reviewers(&ctx, &workspace, &repo, pr_id, all).await
                 } else {
@@ -442,7 +576,7 @@ pub async fn execute(
                 all,
                 steps,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline list")?;
+                let repo_slug = repos.any(repo_arg, "pipeline list")?;
 
                 // Handle --pr flag
                 let effective_branch = if let Some(pr_id) = pr {
@@ -517,7 +651,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline get")?;
+                let repo_slug = repos.any(given.repo, "pipeline get")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 pipelines::get_pipeline(&ctx, &workspace, &repo_slug, &id, steps).await
             }
@@ -526,7 +660,7 @@ pub async fn execute(
                 branch,
                 steps,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline latest")?;
+                let repo_slug = repos.any(repo_arg, "pipeline latest")?;
 
                 // Prefer explicit --branch over auto-detected
                 let effective_branch = if let Some(b) = branch {
@@ -577,7 +711,7 @@ pub async fn execute(
                 secured,
                 custom_pipeline,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline trigger")?;
+                let repo_slug = repos.any(repo_arg, "pipeline trigger")?;
                 pipelines::trigger_pipeline(
                     &ctx,
                     &workspace,
@@ -599,7 +733,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline stop")?;
+                let repo_slug = repos.any(given.repo, "pipeline stop")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 let pipeline_uuid =
                     pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &id).await?;
@@ -619,7 +753,7 @@ pub async fn execute(
                     &["PIPELINE", "STEP_UUID"],
                     &[pipeline_flag.is_some(), step_uuid_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline logs")?;
+                let repo_slug = repos.any(given.repo, "pipeline logs")?;
                 // Positional identifiers fill the slots no flag supplied, in order.
                 let mut ids = given.ids.into_iter();
                 let pipeline_positional = if pipeline_flag.is_none() {
@@ -663,7 +797,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline watch")?;
+                let repo_slug = repos.any(given.repo, "pipeline watch")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 let final_status = pipelines::watch_pipeline(
                     &ctx,
@@ -692,7 +826,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline steps")?;
+                let repo_slug = repos.any(given.repo, "pipeline steps")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 pipelines::list_steps(&ctx, &workspace, &repo_slug, &id).await
             }
@@ -702,7 +836,7 @@ pub async fn execute(
                 wait,
                 interval,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline status")?;
+                let repo_slug = repos.any(repo_arg, "pipeline status")?;
                 pipelines::pipeline_status(&ctx, &workspace, &repo_slug, steps, wait, interval)
                     .await
             }
@@ -715,7 +849,7 @@ pub async fn execute(
             } => {
                 let given =
                     positional::split_leading_repo(targets, &["PIPELINE"], &[pr.is_some()])?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline rerun")?;
+                let repo_slug = repos.any(given.repo, "pipeline rerun")?;
                 let pipeline_id = given.ids.into_iter().next();
 
                 // Determine which pipeline to rerun
@@ -856,16 +990,18 @@ pub async fn execute(
             }
         },
         BitbucketCommands::Webhook(cmd) => match cmd {
-            WebhookCommands::List { repo } => {
+            WebhookCommands::List { repo_arg } => {
+                let repo = repos.any(repo_arg, "webhook list")?;
                 webhooks::list_webhooks(&ctx, &workspace, &repo).await
             }
             WebhookCommands::Create {
-                repo,
+                repo_arg,
                 url,
                 description,
                 events,
                 active,
             } => {
+                let repo = repos.any(repo_arg, "webhook create")?;
                 webhooks::create_webhook(
                     &ctx,
                     &workspace,
@@ -877,48 +1013,81 @@ pub async fn execute(
                 )
                 .await
             }
-            WebhookCommands::Delete { repo, uuid } => {
+            WebhookCommands::Delete { targets } => {
+                let given = positional::split_repo_and_required(targets, &["UUID"])?;
+                let uuid = given.text(0).to_string();
+                let repo = repos.explicit(given.repo, "webhook delete", DELETES)?;
                 webhooks::delete_webhook(&ctx, &workspace, &repo, &uuid).await
             }
         },
         BitbucketCommands::SshKey(cmd) => match cmd {
-            SshKeyCommands::List { repo } => webhooks::list_ssh_keys(&ctx, &workspace, &repo).await,
-            SshKeyCommands::Add { repo, label, key } => {
+            SshKeyCommands::List { repo_arg } => {
+                let repo = repos.any(repo_arg, "ssh-key list")?;
+                webhooks::list_ssh_keys(&ctx, &workspace, &repo).await
+            }
+            SshKeyCommands::Add {
+                repo_arg,
+                label,
+                key,
+            } => {
+                let repo = repos.any(repo_arg, "ssh-key add")?;
                 webhooks::add_ssh_key(&ctx, &workspace, &repo, &label, &key).await
             }
-            SshKeyCommands::Delete { repo, uuid } => {
+            SshKeyCommands::Delete { targets } => {
+                let given = positional::split_repo_and_required(targets, &["UUID"])?;
+                let uuid = given.text(0).to_string();
+                let repo = repos.explicit(given.repo, "ssh-key delete", DELETES)?;
                 webhooks::delete_ssh_key(&ctx, &workspace, &repo, &uuid).await
             }
         },
         BitbucketCommands::Permission(cmd) => match cmd {
-            PermissionCommands::List { repo } => {
+            PermissionCommands::List { repo_arg } => {
+                let repo = repos.any(repo_arg, "permission list")?;
                 permissions::list_repo_permissions(&ctx, &workspace, &repo).await
             }
             PermissionCommands::Grant {
-                repo,
+                repo_arg,
                 user_uuid,
                 permission,
             } => {
+                let repo = repos.any(repo_arg, "permission grant")?;
                 permissions::grant_repo_permission(&ctx, &workspace, &repo, &user_uuid, &permission)
                     .await
             }
-            PermissionCommands::Revoke { repo, user_uuid } => {
+            PermissionCommands::Revoke { targets } => {
+                let given = positional::split_repo_and_required(targets, &["USER_UUID"])?;
+                let user_uuid = given.text(0).to_string();
+                let repo = repos.explicit(given.repo, "permission revoke", DELETES)?;
                 permissions::revoke_repo_permission(&ctx, &workspace, &repo, &user_uuid).await
             }
         },
         BitbucketCommands::Commit(cmd) => match cmd {
             CommitCommands::List {
-                repo,
+                repo_arg,
                 branch,
                 limit,
-            } => commits::list_commits(&ctx, &workspace, &repo, branch.as_deref(), limit).await,
-            CommitCommands::Get { repo, hash } => {
+            } => {
+                let repo = repos.any(repo_arg, "commit list")?;
+                commits::list_commits(&ctx, &workspace, &repo, branch.as_deref(), limit).await
+            }
+            CommitCommands::Get { targets } => {
+                let given = positional::split_repo_and_required(targets, &["HASH"])?;
+                let hash = given.text(0).to_string();
+                let repo = repos.any(given.repo, "commit get")?;
                 commits::get_commit(&ctx, &workspace, &repo, &hash).await
             }
-            CommitCommands::Diff { repo, hash } => {
+            CommitCommands::Diff { targets } => {
+                let given = positional::split_repo_and_required(targets, &["HASH"])?;
+                let hash = given.text(0).to_string();
+                let repo = repos.any(given.repo, "commit diff")?;
                 commits::get_commit_diff(&ctx, &workspace, &repo, &hash).await
             }
-            CommitCommands::Browse { repo, commit, path } => {
+            CommitCommands::Browse {
+                repo_arg,
+                commit,
+                path,
+            } => {
+                let repo = repos.any(repo_arg, "commit browse")?;
                 commits::browse_source(&ctx, &workspace, &repo, &commit, path.as_deref()).await
             }
         },
@@ -935,7 +1104,7 @@ pub async fn execute(
                 bulk::disable_features_on_stale_repos(&ctx, &workspace, days, execute, yes).await
             }
             BulkCommands::DeleteBranches {
-                repo,
+                repo_arg,
                 exclude,
                 execute,
                 yes,
@@ -948,6 +1117,7 @@ pub async fn execute(
                 // braces, so removing the `conflicts_with` can never silently
                 // turn `--dry-run` into a no-op that deletes.
                 let execute = execute && !dry_run;
+                let repo = repos.explicit(repo_arg, "bulk delete-branches", DELETES)?;
                 bulk::delete_branches(&ctx, &workspace, &repo, exclude, execute, yes).await
             }
         },

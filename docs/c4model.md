@@ -213,6 +213,17 @@ the repository). `choose_repo` resolves argument, then `--repo`, then the git
 remote; an argument that disagrees with `--repo` is an error. The argument's
 clap id is not `repo`, so it does not shadow the global `--repo`.
 
+All other commands that take a repository (`repo`, `branch`, `pr`, `webhook`,
+`ssh-key`, `permission`, `commit`, `bulk delete-branches`) use the same module.
+Their arguments after the repository are required, so
+`split_repo_and_required` decides by count only. `RepoResolver` in
+`commands/bitbucket/mod.rs` holds `--repo` and the Git remote for one run:
+`any` resolves argument, `--repo`, Git remote; `explicit` leaves out the Git
+remote and is used by the commands that delete or revoke and by `repo create`.
+`execute` reads the Git context and passes it to `execute_in`, so a test can
+supply one. The clap argument tree is in `commands/bitbucket/args.rs`; `mod.rs`
+keeps the entry point and the dispatch.
+
 **Pull request edits** (`commands/bitbucket/pullrequests.rs`). Bitbucket edits
 a pull request with a PUT of the pull request, so `pr update` and
 `pr reviewers --add` GET it first and PUT title, description and reviewers
@@ -254,7 +265,8 @@ the global is read (the export commands' `format: String` did this until the fix
 in #146). The unit tests in `main.rs` fail on any such redefinition and run
 clap's `debug_assert` over the whole tree, which catches reused long or short
 flag names. Redeclaring a global's id with the same type is allowed: the value
-flows up to the global (`auth logout --profile`, positional `repo` under `bb`).
+flows up to the global (`auth logout --profile`). No `bb` command redeclares
+`repo`: a positional with that id made clap reject `--repo` on the command.
 
 **Jira (`commands/jira/`):**
 - `issues.rs` - CRUD, search, transitions, assignments

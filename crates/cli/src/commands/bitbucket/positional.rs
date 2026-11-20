@@ -11,6 +11,11 @@
 //! repository. Otherwise the first value is the repository only when it cannot
 //! be a pipeline identifier (all digits, or a UUID). A repository whose slug is
 //! all digits therefore needs `--repo`, or all of its identifiers written out.
+//!
+//! The other command groups (`pr`, `branch`, `commit` and more) use the same
+//! `[REPO]` argument and the same `choose_repo`. Their arguments after the
+//! repository are all required, so `split_repo_and_required` decides by count
+//! only.
 
 use anyhow::{bail, Result};
 
@@ -91,6 +96,98 @@ pub(super) fn split_leading_repo(
         repo,
         ids: values.collect(),
     })
+}
+
+/// The positional values of a command whose arguments after the repository
+/// are all required (`bb pr get [REPO] <PR_ID>`).
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct RequiredPositionals {
+    pub(super) repo: Option<String>,
+    /// One value for each required argument, in order.
+    values: Vec<String>,
+    /// The names of the required arguments, for error text.
+    names: Vec<String>,
+}
+
+impl RequiredPositionals {
+    /// `[REPO] <PR_ID>`: the argument list as the help shows it.
+    fn usage(&self) -> String {
+        std::iter::once("[REPO]".to_string())
+            .chain(self.names.iter().map(|n| format!("<{n}>")))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// The required argument at `index`, as text.
+    pub(super) fn text(&self, index: usize) -> &str {
+        &self.values[index]
+    }
+
+    /// The required argument at `index`, as a number.
+    ///
+    /// A value that is not a number is most frequently a repository slug with
+    /// no identifier after it, so the error shows the argument order.
+    pub(super) fn number(&self, index: usize) -> Result<i64> {
+        let value = &self.values[index];
+        match value.parse::<i64>() {
+            Ok(number) => Ok(number),
+            Err(_) => bail!(
+                "Invalid {} '{value}': expected a number. Arguments: {}.",
+                self.names[index],
+                self.usage()
+            ),
+        }
+    }
+}
+
+/// Split `values` into an optional repository and the required arguments.
+///
+/// `required` names the arguments that follow the repository, in order
+/// (`["PR_ID"]` for `pr get`). Each of them is necessary, so the count alone
+/// decides: one value more than `required` means that the first value is the
+/// repository. No guess about the shape of a value is necessary.
+///
+/// clap accepts an empty list, because a list that clap requires shows in the
+/// help as `<REPO> [PR_ID]...`, which is the reverse of the truth. The check
+/// for a missing value is thus here.
+pub(super) fn split_repo_and_required(
+    values: Vec<String>,
+    required: &[&str],
+) -> Result<RequiredPositionals> {
+    let mut given = RequiredPositionals {
+        repo: None,
+        values: Vec::new(),
+        names: required.iter().map(|n| n.to_string()).collect(),
+    };
+    let count = values.len();
+    if count > required.len() + 1 {
+        bail!(
+            "Too many arguments: expected {}, got {count} values ({}).",
+            given.usage(),
+            values.join(" ")
+        );
+    }
+    if count == 0 {
+        bail!("Missing argument: expected {}.", given.usage());
+    }
+    if count < required.len() {
+        bail!(
+            "Missing argument: expected {}, got {count} values ({}).",
+            given.usage(),
+            values.join(" ")
+        );
+    }
+    let mut values = values.into_iter();
+    if count == required.len() + 1 {
+        given.repo = values.next();
+    }
+    given.values = values.collect();
+    tracing::debug!(
+        positional_repo = ?given.repo,
+        required = ?given.names,
+        "Split the positional arguments"
+    );
+    Ok(given)
 }
 
 /// The repository to use: positional, then `--repo`, then the git remote.
@@ -253,11 +350,64 @@ mod tests {
         assert!(err.contains("'a'") && err.contains("'b'"), "{err}");
     }
 
+    fn required(values: &[&str], names: &[&str]) -> Result<RequiredPositionals> {
+        split_repo_and_required(values.iter().map(|v| v.to_string()).collect(), names)
+    }
+
+    #[test]
+    fn required_arguments_are_split_by_count() {
+        let with_repo = required(&["web_app", "42"], &["PR_ID"]).unwrap();
+        assert_eq!(with_repo.repo.as_deref(), Some("web_app"));
+        assert_eq!(with_repo.number(0).unwrap(), 42);
+
+        let without_repo = required(&["42"], &["PR_ID"]).unwrap();
+        assert_eq!(without_repo.repo, None);
+        assert_eq!(without_repo.number(0).unwrap(), 42);
+
+        // A branch name is not a repository, although it does not look like
+        // an identifier.
+        let branch = required(&["main"], &["BRANCH"]).unwrap();
+        assert_eq!(branch.repo, None);
+        assert_eq!(branch.text(0), "main");
+
+        let two = required(&["web_app", "42", "9"], &["PR_ID", "COMMENT_ID"]).unwrap();
+        assert_eq!(two.repo.as_deref(), Some("web_app"));
+        assert_eq!((two.number(0).unwrap(), two.number(1).unwrap()), (42, 9));
+
+        let two_no_repo = required(&["42", "9"], &["PR_ID", "COMMENT_ID"]).unwrap();
+        assert_eq!(two_no_repo.repo, None);
+        assert_eq!(two_no_repo.number(1).unwrap(), 9);
+    }
+
+    #[test]
+    fn a_wrong_count_of_required_arguments_is_an_error() {
+        let few = required(&["42"], &["PR_ID", "COMMENT_ID"])
+            .unwrap_err()
+            .to_string();
+        assert!(
+            few.contains("Missing argument") && few.contains("[REPO] <PR_ID> <COMMENT_ID>"),
+            "{few}"
+        );
+        let many = required(&["a", "1", "2"], &["PR_ID"])
+            .unwrap_err()
+            .to_string();
+        assert!(many.contains("Too many arguments"), "{many}");
+    }
+
+    #[test]
+    fn a_value_that_is_not_a_number_names_the_argument_order() {
+        let given = required(&["web_app"], &["PR_ID"]).unwrap();
+        assert_eq!(
+            given.number(0).unwrap_err().to_string(),
+            "Invalid PR_ID 'web_app': expected a number. Arguments: [REPO] <PR_ID>."
+        );
+    }
+
     /// The whole path from the command line: clap accepts the forms, and the
     /// split gives the repository and identifiers the dispatcher uses.
     mod parsing {
-        use super::super::super::{BitbucketArgs, BitbucketCommands, PipelineCommands};
-        use super::super::split_leading_repo;
+        use super::super::super::{BitbucketArgs, BitbucketCommands, PipelineCommands, PrCommands};
+        use super::super::{split_leading_repo, split_repo_and_required};
         use clap::Parser;
 
         #[derive(Parser)]
@@ -355,6 +505,87 @@ mod tests {
             let given = split_leading_repo(targets, &["PIPELINE"], &[pr.is_some()]).unwrap();
             assert_eq!(given.repo.as_deref(), Some("web_app"));
             assert!(given.ids.is_empty());
+        }
+
+        fn pr_get(argv: &[&str]) -> (Option<String>, Vec<String>) {
+            let args = parse(argv);
+            match args.command {
+                BitbucketCommands::Pr(PrCommands::Get { targets }) => (args.repo, targets),
+                other => panic!("not pr get: {other:?}"),
+            }
+        }
+
+        fn strings(values: &[&str]) -> Vec<String> {
+            values.iter().map(|v| v.to_string()).collect()
+        }
+
+        /// The command that failed with "unexpected argument '--repo'".
+        #[test]
+        fn pr_get_takes_repo_as_a_flag_before_the_id() {
+            let (flag, targets) = pr_get(&["pr", "get", "--repo", "web_app", "42"]);
+            assert_eq!(flag.as_deref(), Some("web_app"));
+            assert_eq!(targets, strings(&["42"]));
+            let given = split_repo_and_required(targets, &["PR_ID"]).unwrap();
+            assert_eq!(given.repo, None);
+            assert_eq!(given.number(0).unwrap(), 42);
+        }
+
+        #[test]
+        fn pr_get_takes_repo_as_a_flag_in_other_positions() {
+            for argv in [
+                &["--repo", "web_app", "pr", "get", "42"][..],
+                &["pr", "--repo", "web_app", "get", "42"],
+                &["pr", "get", "42", "--repo", "web_app"],
+                &["pr", "get", "--repo=web_app", "42"],
+            ] {
+                let (flag, targets) = pr_get(argv);
+                assert_eq!(flag.as_deref(), Some("web_app"), "{argv:?}");
+                assert_eq!(targets, strings(&["42"]), "{argv:?}");
+            }
+        }
+
+        /// In a checkout: one value, no flag. The Git remote gives the repository.
+        #[test]
+        fn pr_get_takes_an_id_alone() {
+            let (flag, targets) = pr_get(&["pr", "get", "42"]);
+            assert_eq!(flag, None);
+            let given = split_repo_and_required(targets, &["PR_ID"]).unwrap();
+            assert_eq!(given.repo, None);
+            assert_eq!(given.number(0).unwrap(), 42);
+        }
+
+        /// The form that worked before this change.
+        #[test]
+        fn pr_get_takes_a_repo_and_an_id() {
+            let (flag, targets) = pr_get(&["pr", "get", "web_app", "42"]);
+            assert_eq!(flag, None);
+            let given = split_repo_and_required(targets, &["PR_ID"]).unwrap();
+            assert_eq!(given.repo.as_deref(), Some("web_app"));
+            assert_eq!(given.number(0).unwrap(), 42);
+        }
+
+        #[test]
+        fn pr_get_rejects_no_value_and_three_values() {
+            assert!(Cli::try_parse_from(["bb", "pr", "get", "web_app", "42", "43"]).is_err());
+            for argv in [&["pr", "get"][..], &["pr", "get", "--repo", "web_app"]] {
+                let (_, targets) = pr_get(argv);
+                let error = split_repo_and_required(targets, &["PR_ID"])
+                    .unwrap_err()
+                    .to_string();
+                assert_eq!(error, "Missing argument: expected [REPO] <PR_ID>.");
+            }
+        }
+
+        /// Options after the list do not become part of it.
+        #[test]
+        fn pr_comment_takes_the_list_and_then_its_options() {
+            let args = parse(&["pr", "comment", "--repo", "web_app", "42", "--text", "LGTM"]);
+            let BitbucketCommands::Pr(PrCommands::Comment { targets, text, .. }) = args.command
+            else {
+                panic!("not pr comment");
+            };
+            assert_eq!(targets, strings(&["42"]));
+            assert_eq!(text, "LGTM");
         }
 
         #[test]
