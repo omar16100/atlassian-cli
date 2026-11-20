@@ -3447,6 +3447,7 @@ tests and unit tests cover the change.
 `confluence page add-restriction` sent one bare object with `identifier` fields.
 The Confluence REST specification requires a `results` array, `accountId` for a
 user and `id` for a group. `restriction_payload` in `confluence/pages.rs` builds
-that body. `--operation` and `--subject-type` are checked before the request.
+that body. clap accepts only the documented values of `--operation` and
+`--subject-type`. `--subject-id` is trimmed, and an empty value is refused.
 The change is verified against the specification and a mock server, not against
-a live site. Three built-binary tests and four unit tests cover the change.
+a live site. Built-binary tests and unit tests cover the change.

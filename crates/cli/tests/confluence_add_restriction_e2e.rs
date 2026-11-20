@@ -145,21 +145,130 @@ async fn an_unknown_operation_or_subject_type_sends_no_request() {
     let dir = TempDir::new().unwrap();
     let config = write_config(dir.path(), &server.uri());
 
-    let bad_operation = run(&config, &add_args("delete", "user", "acc-1"));
-    assert!(!bad_operation.status.success());
-    let stderr = String::from_utf8_lossy(&bad_operation.stderr);
-    assert!(
-        stderr.contains("Invalid --operation 'delete'. Use read or update."),
-        "{stderr}"
-    );
+    // The values are case-sensitive, so `Read` is refused too.
+    for bad_operation in ["delete", "Read"] {
+        let out = run(&config, &add_args(bad_operation, "user", "acc-1"));
+        assert!(!out.status.success(), "{bad_operation}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("--operation"), "{stderr}");
+        assert!(
+            stderr.contains("[possible values: read, update]"),
+            "{stderr}"
+        );
+    }
 
-    let bad_subject = run(&config, &add_args("read", "team", "acc-1"));
-    assert!(!bad_subject.status.success());
-    let stderr = String::from_utf8_lossy(&bad_subject.stderr);
-    assert!(
-        stderr.contains("Invalid --subject-type 'team'. Use user or group."),
-        "{stderr}"
-    );
+    for bad_subject in ["team", "User"] {
+        let out = run(&config, &add_args("read", bad_subject, "acc-1"));
+        assert!(!out.status.success(), "{bad_subject}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(stderr.contains("--subject-type"), "{stderr}");
+        assert!(
+            stderr.contains("[possible values: user, group]"),
+            "{stderr}"
+        );
+    }
 
     assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+/// `--help` names the permitted values.
+#[test]
+fn help_lists_the_permitted_values() {
+    let out = Command::new(BIN)
+        .args(["confluence", "page", "add-restriction", "--help"])
+        .output()
+        .expect("failed to run the CLI");
+    // clap wraps the help text, so compare with the white space collapsed.
+    let stdout = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(out.status.success());
+    assert!(
+        stdout.contains("[possible values: read, update]"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("[possible values: user, group]"),
+        "{stdout}"
+    );
+}
+
+/// An empty or blank `--subject-id` names no subject. No request is sent.
+#[tokio::test]
+async fn an_empty_subject_id_sends_no_request() {
+    let server = MockServer::start().await;
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+
+    for blank in ["", "   "] {
+        let out = run(&config, &add_args("read", "user", blank));
+        assert!(!out.status.success(), "{blank:?}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("--subject-id must not be empty"),
+            "{stderr}"
+        );
+    }
+
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+/// The value that is checked is the value that is sent: spaces at the two ends
+/// are removed.
+#[tokio::test]
+async fn the_subject_id_is_sent_trimmed() {
+    let server = MockServer::start().await;
+    mock_add(
+        &server,
+        serde_json::json!({
+            "results": [{
+                "operation": "read",
+                "restrictions": {
+                    "user": { "results": [{ "accountId": "acc-1" }] }
+                }
+            }]
+        }),
+    )
+    .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(&config, &add_args("read", "user", "  acc-1 "));
+
+    assert!(
+        out.status.success(),
+        "command failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    server.verify().await;
+}
+
+/// A 404 from the server (no such content, or no permission) is a clear error
+/// and a non-zero exit. Nothing is written to stdout.
+#[tokio::test]
+async fn a_404_from_the_server_is_a_clear_error() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path_matcher("/wiki/rest/api/content/1001/restriction"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+            "statusCode": 404,
+            "message": "No content found with id: 1001"
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+
+    let dir = TempDir::new().unwrap();
+    let config = write_config(dir.path(), &server.uri());
+    let out = run(&config, &add_args("read", "user", "acc-1"));
+    let stderr = String::from_utf8_lossy(&out.stderr);
+
+    assert_eq!(out.status.code(), Some(1));
+    assert!(out.stdout.is_empty());
+    assert!(
+        stderr.contains("Error: Failed to add restriction to page 1001: Resource not found"),
+        "{stderr}"
+    );
+    server.verify().await;
 }

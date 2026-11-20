@@ -49,10 +49,17 @@ is not verified.
 
   A group uses `"group": { "results": [{ "id": "<value>" }] }`. The optional
   `type` field is not sent.
-- **Checks before the request.** `--operation` must be `read` or `update`, and
-  `--subject-type` must be `user` or `group`. These are the sets in the
-  specification. Other values are refused with an error and no request is
-  sent. Before, other values went to the server.
+- **Checks before the request.** clap accepts only `read` and `update` for
+  `--operation`, and only `user` and `group` for `--subject-type`
+  (`value_parser` on the two options). These are the sets in the
+  specification. The values are case-sensitive, so `Read` is refused. `--help`
+  shows the permitted values. clap refuses other values with its usage error
+  and exit code 2, and no request is sent. Before, other values went to the
+  server. There is one check only: the command function does not check
+  `--operation` a second time.
+- **`--subject-id`.** The value is trimmed, and the trimmed value is sent. An
+  empty or blank value is refused with `--subject-id must not be empty.` and
+  exit code 1, and no request is sent.
 - **Help text.** `--subject-id` is a user account ID or a group ID. The help
   said "user ID or group name". The specification names a group by its ID.
 - **Method and path.** `POST /wiki/rest/api/content/{id}/restriction` is
@@ -67,7 +74,14 @@ mock server. It is NOT verified against a live Confluence site.**
 
 - `--subject-id` for a group must be the group ID. The CLI does not resolve a
   group name to an ID.
+- The specification has no restriction endpoint that names a group by its
+  name. A group name given as `--subject-id` is sent as a group ID.
 - One invocation adds one user or one group for one operation.
+- `add-restriction` has no confirmation prompt and no dry run, as before.
+  `docs/08092026_remaining_hardening.md` lists the missing confirmation of the
+  restriction remove command as open.
+- Nothing here is verified against a live Confluence site. One live check on a
+  disposable page is advised before a release.
 - `get-restrictions` sends `GET /wiki/rest/api/content/{id}/restriction`, which
   agrees with the specification. It is not changed. It does not send the page
   ID through `encode_path_segment`.
@@ -81,6 +95,11 @@ body:
 - `add_restriction_for_a_user_sends_the_documented_body`
 - `add_restriction_for_a_group_sends_the_group_id`
 - `an_unknown_operation_or_subject_type_sends_no_request`
+- `help_lists_the_permitted_values`
+- `an_empty_subject_id_sends_no_request`
+- `the_subject_id_is_sent_trimmed`
+- `a_404_from_the_server_is_a_clear_error`
 
 Unit tests in `crates/cli/src/commands/confluence/pages.rs`
-(`restriction_tests`) cover the two bodies and the two checks.
+(`restriction_tests`) cover the two bodies, the subject type conversion and
+the `--subject-id` check.

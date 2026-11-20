@@ -914,24 +914,30 @@ enum RestrictionSubject {
     Group,
 }
 
-/// Check `--operation` against the set in the REST specification.
+/// Convert `--subject-type` to a subject.
 ///
-/// The value goes into a request body and into a request path, so a value
-/// outside the set is refused before a request is sent.
-fn restriction_operation(operation: &str) -> Result<&str> {
-    match operation {
-        "read" | "update" => Ok(operation),
-        other => anyhow::bail!("Invalid --operation '{other}'. Use read or update."),
-    }
-}
-
-/// Check `--subject-type` against the two subjects a restriction can name.
+/// clap accepts only `user` and `group` for the option (and only `read` and
+/// `update` for `--operation`), so the command line is checked in one place.
+/// The error arm is for a caller that does not come through clap.
 fn restriction_subject(subject_type: &str) -> Result<RestrictionSubject> {
     match subject_type {
         "user" => Ok(RestrictionSubject::User),
         "group" => Ok(RestrictionSubject::Group),
         other => anyhow::bail!("Invalid --subject-type '{other}'. Use user or group."),
     }
+}
+
+/// Trim `--subject-id` and refuse a value that is empty or blank.
+///
+/// An empty ID gives a request that names no user and no group. The
+/// specification does not say what the server does with it, so it is not sent.
+/// The trimmed value is the value that is sent.
+fn restriction_subject_id(subject_id: &str) -> Result<&str> {
+    let trimmed = subject_id.trim();
+    if trimmed.is_empty() {
+        anyhow::bail!("--subject-id must not be empty.");
+    }
+    Ok(trimmed)
 }
 
 /// Build the body for `POST /wiki/rest/api/content/{id}/restriction`.
@@ -967,8 +973,8 @@ pub async fn add_page_restriction(
     subject_type: &str,
     subject_id: &str,
 ) -> Result<()> {
-    let operation = restriction_operation(operation)?;
     let subject = restriction_subject(subject_type)?;
+    let subject_id = restriction_subject_id(subject_id)?;
     let payload = restriction_payload(operation, subject, subject_id);
     tracing::debug!(%page_id, %operation, ?subject, "Adding a content restriction");
 
@@ -1471,13 +1477,13 @@ mod restriction_tests {
         );
     }
 
+    /// The value that is checked is the value that is sent.
     #[test]
-    fn only_read_and_update_are_operations() {
-        assert_eq!(restriction_operation("read").unwrap(), "read");
-        assert_eq!(restriction_operation("update").unwrap(), "update");
-        for bad in ["", "delete", "Read", "read/x", "read?x"] {
-            assert!(restriction_operation(bad).is_err(), "{bad:?}");
-        }
+    fn subject_id_is_trimmed_and_a_blank_value_is_refused() {
+        assert_eq!(restriction_subject_id("acc-1").unwrap(), "acc-1");
+        assert_eq!(restriction_subject_id("  acc-1\t").unwrap(), "acc-1");
+        assert!(restriction_subject_id("").is_err());
+        assert!(restriction_subject_id("  ").is_err());
     }
 
     #[test]

@@ -340,11 +340,11 @@ enum PageCommands {
     AddRestriction {
         /// Page ID
         page_id: String,
-        /// Operation (read, update)
-        #[arg(long)]
+        /// Operation that the restriction applies to
+        #[arg(long, value_parser = ["read", "update"])]
         operation: String,
-        /// Subject type (user, group)
-        #[arg(long)]
+        /// Subject type
+        #[arg(long, value_parser = ["user", "group"])]
         subject_type: String,
         /// Subject identifier (user account ID or group ID)
         #[arg(long)]
