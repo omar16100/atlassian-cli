@@ -107,12 +107,16 @@ pub(super) fn count_pending_manual_steps(steps: &[StepInfo]) -> usize {
 
 /// The short (7-character) commit hash, when the pipeline has a commit target.
 pub(super) fn get_commit_hash(pipeline: &Pipeline) -> Option<String> {
+    get_full_commit_hash(pipeline).map(|h| h.chars().take(7).collect::<String>())
+}
+
+/// The commit hash as Bitbucket reports it, not cut.
+pub(super) fn get_full_commit_hash(pipeline: &Pipeline) -> Option<String> {
     pipeline
         .target
         .as_ref()
         .and_then(|t| t.commit.as_ref())
-        .and_then(|c| c.hash.as_ref())
-        .map(|h| h.chars().take(7).collect::<String>())
+        .and_then(|c| c.hash.clone())
 }
 
 /// Whether `watch` and `status --wait` should stop polling.

@@ -309,6 +309,10 @@ key. The separate `bulk/transition_tests.rs` module tests these rules.
 - `permissions.rs` - Access control
 - `webhooks.rs` - Webhook management
 - `bulk.rs` - Bulk repository operations
+- `output_keys.rs` - One table of output keys for each of `pr list`, `pr get`,
+  `pipeline list`, `pipeline get` and `pipeline steps`. The long help of those
+  commands is built from the tables, and tests compare each table with the
+  keys that the row types serialise
 
 **JSM (`commands/jsm/`):**
 - `servicedesk.rs` - Service desk management

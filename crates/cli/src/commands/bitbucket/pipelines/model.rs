@@ -128,6 +128,13 @@ pub(super) struct PipelineRow {
     /// Manual steps not yet started, reported only for a paused build.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) pending_manual_steps: Option<usize>,
+    /// The full commit hash, in JSON and YAML only. `commit` has 7 characters,
+    /// and scripts called the raw API to get the rest. It is a new key and not
+    /// a longer `commit`, so existing readers of `commit` see no change. The
+    /// tabular formats do not get it: their columns are the sorted keys, so a
+    /// new key would move the columns of a CSV.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) commit_hash: Option<String>,
 }
 
 /// `pipeline get`, and the final state `watch` prints in the machine formats.
@@ -147,6 +154,13 @@ pub(super) struct PipelineView {
     /// Manual steps not yet started, reported only for a paused build.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) pending_manual_steps: Option<usize>,
+    /// The full commit hash, in JSON and YAML only. `commit` has 7 characters,
+    /// and scripts called the raw API to get the rest. It is a new key and not
+    /// a longer `commit`, so existing readers of `commit` see no change. The
+    /// tabular formats do not get it: their columns are the sorted keys, so a
+    /// new key would move the columns of a CSV.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) commit_hash: Option<String>,
 }
 
 #[derive(Serialize, Clone)]

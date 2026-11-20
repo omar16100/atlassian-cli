@@ -17,7 +17,7 @@ pub struct PullRequestInfo {
 }
 
 #[derive(Deserialize)]
-struct PullRequest {
+pub(super) struct PullRequest {
     id: i64,
     title: String,
     state: String,
@@ -76,7 +76,7 @@ struct RepositoryWorkspace {
 }
 
 #[derive(Deserialize, Clone)]
-struct Participant {
+pub(super) struct Participant {
     #[serde(default)]
     approved: bool,
     user: User,
@@ -288,27 +288,7 @@ pub async fn list_pull_requests(
     .with_context(|| format!("Failed to list pull requests for {workspace}/{slug}"))?;
     warn_if_truncated(&page, pull_requests.len(), "pull requests");
 
-    #[derive(Serialize)]
-    struct Row<'a> {
-        id: i64,
-        title: &'a str,
-        state: &'a str,
-        author: &'a str,
-        source: &'a str,
-        destination: &'a str,
-    }
-
-    let rows: Vec<Row<'_>> = pull_requests
-        .iter()
-        .map(|pr| Row {
-            id: pr.id,
-            title: pr.title.as_str(),
-            state: pr.state.as_str(),
-            author: pr.author.display_name.as_str(),
-            source: pr.source.branch.name.as_str(),
-            destination: pr.destination.branch.name.as_str(),
-        })
-        .collect();
+    let rows: Vec<PrListRow<'_>> = pull_requests.iter().map(pr_list_row).collect();
 
     if rows.is_empty() {
         ctx.verify_auth().await?;
@@ -330,41 +310,75 @@ pub async fn get_pull_request(
         format!("Failed to fetch pull request {pr_id} from {workspace}/{repo_slug}")
     })?;
 
-    #[derive(Serialize)]
-    struct View<'a> {
-        id: i64,
-        title: &'a str,
-        state: &'a str,
-        author: &'a str,
-        source: &'a str,
-        destination: &'a str,
-        description: &'a str,
-        created: &'a str,
-        updated: &'a str,
-        comments: String,
-        tasks: String,
-        /// Kept for the table, which cannot show a nested list.
-        approvals: String,
-        /// Who the reviewers are and where each stands.
-        ///
-        /// The count above answered "how many approved" and nothing else: not
-        /// who they were, not their UUIDs, not whether anyone had requested
-        /// changes. Reading any of that meant leaving the CLI entirely. The
-        /// table shows them as a second table below the fields; only markdown,
-        /// which would flatten them into one cell, leaves them out.
-        #[serde(skip_serializing_if = "Vec::is_empty")]
-        reviewers: Vec<ReviewerRow<'a>>,
-    }
-
     let participants = pr.participants.clone().unwrap_or_default();
+    ctx.renderer
+        .render(&pr_view(&pr, &participants, ctx.renderer.format()))
+}
+
+/// One row of `pr list`. The keys are listed in the help of the command from
+/// `output_keys::PR_LIST`, and a test compares the two.
+#[derive(Serialize)]
+pub(super) struct PrListRow<'a> {
+    id: i64,
+    title: &'a str,
+    state: &'a str,
+    author: &'a str,
+    source: &'a str,
+    destination: &'a str,
+}
+
+pub(super) fn pr_list_row(pr: &PullRequest) -> PrListRow<'_> {
+    PrListRow {
+        id: pr.id,
+        title: pr.title.as_str(),
+        state: pr.state.as_str(),
+        author: pr.author.display_name.as_str(),
+        source: pr.source.branch.name.as_str(),
+        destination: pr.destination.branch.name.as_str(),
+    }
+}
+
+/// The output of `pr get`. The keys are listed in the help of the command from
+/// `output_keys::PR_GET`, and a test compares the two.
+#[derive(Serialize)]
+pub(super) struct PrView<'a> {
+    id: i64,
+    title: &'a str,
+    state: &'a str,
+    author: &'a str,
+    source: &'a str,
+    destination: &'a str,
+    description: &'a str,
+    created: &'a str,
+    updated: &'a str,
+    comments: String,
+    tasks: String,
+    /// Kept for the table, which cannot show a nested list.
+    approvals: String,
+    /// Who the reviewers are and where each stands.
+    ///
+    /// The count above answered "how many approved" and nothing else: not
+    /// who they were, not their UUIDs, not whether anyone had requested
+    /// changes. Reading any of that meant leaving the CLI entirely. The
+    /// table shows them as a second table below the fields; only markdown,
+    /// which would flatten them into one cell, leaves them out.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    reviewers: Vec<ReviewerRow<'a>>,
+}
+
+/// `participants` is the list of the pull request, passed in so the rows can
+/// borrow from it.
+pub(super) fn pr_view<'a>(
+    pr: &'a PullRequest,
+    participants: &'a [Participant],
+    format: OutputFormat,
+) -> PrView<'a> {
     let approvals = participants.iter().filter(|part| part.approved).count();
-
-    let reviewers = match ctx.renderer.format() {
+    let reviewers = match format {
         OutputFormat::Markdown => Vec::new(),
-        _ => reviewer_rows(&participants, false),
+        _ => reviewer_rows(participants, false),
     };
-
-    let view = View {
+    PrView {
         id: pr.id,
         title: pr.title.as_str(),
         state: pr.state.as_str(),
@@ -378,9 +392,7 @@ pub async fn get_pull_request(
         tasks: pr.task_count.map(|t| t.to_string()).unwrap_or_default(),
         approvals: approvals.to_string(),
         reviewers,
-    };
-
-    ctx.renderer.render(&view)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

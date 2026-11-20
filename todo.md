@@ -3396,3 +3396,12 @@ After a review: a `--commit` that contains `/` is resolved to a commit hash
 through `refs/branches/{name}` and then `refs/tags/{name}`. A 404 error has the
 message that Bitbucket sent. The command looks for an existing `--output` file
 before it sends a request. A broken pipe on stdout is not an error.
+## 2026-11-20: Bitbucket output keys in `--help`, full commit hash (PR #186)
+
+The JSON rows of the pull request and pipeline commands are flat, and no help
+text listed their keys, so scripts expected the REST API shape and failed. The
+long help of `bb pr get`, `pr list`, `pipeline get`, `pipeline list` and
+`pipeline steps` now lists the keys from `bitbucket/output_keys.rs`, and tests
+compare each list with the keys that the row types serialise. Pipeline JSON and
+YAML output has the new key `commit_hash` (full hash). No existing key changed.
+See `docs/20112026_bb_json_output_keys.md`.
