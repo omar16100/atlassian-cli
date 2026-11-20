@@ -20,19 +20,20 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+
 ### Added
 
 - `jira user search <query>` (alias `jira users search`) lists the users that
   match a display name or an email address. The output keys are `account_id`,
   `display_name`, `email`, `account_type` and `active`. `email` is empty
-  (`null` in JSON) when Jira does not return it. (#PR)
+  (`null` in JSON) when Jira does not return it. (#188)
 - `jira issue update --assignee <account ID | email | me>` sets the assignee in
   the same request as the other fields. `--field assignee=...` with
-  `--assignee` is an error. (#PR)
+  `--assignee` is an error. (#188)
 - `me` and `@me` (upper or lower case) give the current user in `--assignee` of
   `jira issue create`, `update`, `assign` and `jira bulk assign`, in
   `jira issue watchers add` and `remove`, and in the `assignee` of a
-  `jira bulk import` row. (#PR)
+  `jira bulk import` row. (#188)
 
 ### Fixed
 
@@ -51,7 +52,7 @@ resolve. `git log` remains the complete record.
   `jira bulk assign` makes the lookup in list mode too, so an unknown email
   address fails before the list. A user value that is empty or only spaces is
   an error before a request. All other values with no `@` go to Jira unchanged,
-  as before. (#PR)
+  as before. (#188)
 
 ### Added
 
