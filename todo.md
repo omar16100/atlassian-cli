@@ -3493,3 +3493,28 @@ request with 67 comments, none of the replies in resolved threads carried one.
 `resolved` is therefore computed per thread by walking parents to the root, and
 `--unresolved` drops whole resolved threads, replies included. The walk is
 bounded by the comment count so a malformed parent cycle cannot hang it.
+## 2026-11-20: replace chrono
+
+`chrono` (RUSTSEC-2026-0543, unmaintained) is removed. The branch
+`chore/replace-chrono` starts from `fix/security-advisories` (PR #190).
+
+The CLI uses `jiff` 1.0 for the current time, for date arithmetic and for the
+local clock of `pipeline watch --log`. The new module
+`crates/cli/src/commands/bitbucket/rfc3339.rs` has a strict RFC 3339 parser and
+the fixed output form, so the accepted inputs and the output strings stay the
+same. The API crate uses the standard library: the rate limit reset time is a
+count of seconds, and `RateLimitInfo::reset_at` is an
+`Option<std::time::SystemTime>`.
+
+The work was test first. The first commit pinned the behaviour of the five call
+sites with `chrono` in use. The second commit replaced `chrono`, and the pinned
+tests passed with the same expected values. One case changed: a relative
+expression that gives a time before the year -9999 is now an error.
+
+`Cargo.lock` adds 6 crates (`jiff`, `jiff-core`, `jiff-static`, `jiff-tzdb`,
+`jiff-tzdb-platform`, `portable-atomic-util`) and drops 7 (`chrono`,
+`iana-time-zone`, `iana-time-zone-haiku`, `android_system_properties`,
+`windows-core`, `windows-implement`, `windows-interface`). The
+RUSTSEC-2026-0543 entry is removed from `deny.toml`. Details are in
+`docs/20112026_replace_chrono.md`.
+
