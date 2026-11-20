@@ -32,6 +32,25 @@ impl MutationResult {
     }
 }
 
+/// A context message that carries its own hint for the user.
+///
+/// `main` prints `Hint:` from `ApiError::suggestion()`, which knows the HTTP
+/// status but not the command. Attach this as the `anyhow` context when a
+/// command knows a better hint than the general one. `Display` gives only the
+/// message, so the `Error:` line does not change, and the first error stays in
+/// the chain as the source.
+#[derive(Debug)]
+pub struct HintedContext {
+    pub message: String,
+    pub hint: String,
+}
+
+impl std::fmt::Display for HintedContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
 /// Render a success message respecting the output format.
 /// For Table format: prints emoji message to stdout
 /// For other formats: renders structured JSON/YAML/CSV/Quiet

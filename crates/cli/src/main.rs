@@ -94,13 +94,19 @@ enum AtlassianCommand {
 #[tokio::main]
 async fn main() {
     if let Err(err) = run().await {
-        // Check for ApiError in the chain and display suggestion
-        for cause in err.chain() {
-            if let Some(api_err) = cause.downcast_ref::<ApiError>() {
-                if let Some(hint) = api_err.suggestion() {
-                    eprintln!("Hint: {hint}");
+        // A command that knows a better hint than the general one attaches it
+        // as context. If there is none, use the suggestion of the ApiError in
+        // the chain.
+        if let Some(hinted) = err.downcast_ref::<commands::common::HintedContext>() {
+            eprintln!("Hint: {}", hinted.hint);
+        } else {
+            for cause in err.chain() {
+                if let Some(api_err) = cause.downcast_ref::<ApiError>() {
+                    if let Some(hint) = api_err.suggestion() {
+                        eprintln!("Hint: {hint}");
+                    }
+                    break;
                 }
-                break;
             }
         }
         eprintln!("Error: {err:#}");

@@ -7,7 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::utils::{resolve_space_id, ConfluenceContext};
-use crate::commands::common::{render_success, MutationResult};
+use crate::commands::common::{render_success, HintedContext, MutationResult};
 use crate::query::UrlParamsBuilder;
 
 // List pages
@@ -90,16 +90,69 @@ pub async fn list_pages(
     ctx.renderer.render(&rows)
 }
 
+/// The hint for a page GET that returned 404.
+///
+/// A 404 from Confluence does not say why. The ID can be wrong, the profile can
+/// have no permission, or the ID can belong to content that is not a page.
+fn page_not_found_hint(page_id: &str, is_folder: bool) -> String {
+    if is_folder {
+        format!(
+            "{page_id} is a folder, not a page. Use: atlassian-cli confluence folder get {page_id}"
+        )
+    } else {
+        format!(
+            "Page {page_id} was not found. Probable causes: the ID is wrong, the profile has no \
+             permission to view the page, or the ID is not a page (a blog post uses \
+             `atlassian-cli confluence blog get {page_id}`)."
+        )
+    }
+}
+
+/// `GET /wiki/api/v2/pages/{id}` with a hint that explains a 404.
+///
+/// `query` is appended as given (for example `?body-format=storage`). Only a
+/// 404 causes one more request, to `GET /wiki/api/v2/folders/{id}`, because a
+/// folder ID given to a page command is a frequent cause. A probe that fails
+/// for any reason keeps the general hint. The page error always stays the
+/// reported error.
+async fn fetch_page(ctx: &ConfluenceContext<'_>, page_id: &str, query: &str) -> Result<Value> {
+    let segment = encode_path_segment(page_id)?;
+    let err = match ctx
+        .client
+        .get::<Value>(&format!("/wiki/api/v2/pages/{segment}{query}"))
+        .await
+    {
+        Ok(page) => return Ok(page),
+        Err(err) => err,
+    };
+    let message = format!("Failed to get page {page_id}");
+
+    if !matches!(err, atlassian_cli_api::error::ApiError::NotFound { .. }) {
+        return Err(anyhow::Error::new(err).context(message));
+    }
+
+    let is_folder = match ctx
+        .client
+        .get::<Value>(&format!("/wiki/api/v2/folders/{segment}"))
+        .await
+    {
+        Ok(_) => true,
+        Err(probe_err) => {
+            tracing::debug!(%page_id, error = %probe_err, "Folder probe after a page 404 failed");
+            false
+        }
+    };
+    tracing::debug!(%page_id, is_folder, "Page GET returned 404");
+
+    Err(anyhow::Error::new(err).context(HintedContext {
+        message,
+        hint: page_not_found_hint(page_id, is_folder),
+    }))
+}
+
 // Get page details
 pub async fn get_page(ctx: &ConfluenceContext<'_>, page_id: &str, body_only: bool) -> Result<()> {
-    let page: Value = ctx
-        .client
-        .get(&format!(
-            "/wiki/api/v2/pages/{}?body-format=storage",
-            page_id
-        ))
-        .await
-        .with_context(|| format!("Failed to get page {}", page_id))?;
+    let page = fetch_page(ctx, page_id, "?body-format=storage").await?;
 
     let format = ctx.renderer.format();
 
@@ -209,11 +262,7 @@ pub async fn update_page(
 ) -> Result<()> {
     // Get current page first to get version and status
     let page_path = format!("/wiki/api/v2/pages/{}", encode_path_segment(page_id)?);
-    let current: Value = ctx
-        .client
-        .get(&page_path)
-        .await
-        .with_context(|| format!("Failed to get page {}", page_id))?;
+    let current = fetch_page(ctx, page_id, "").await?;
 
     let current_version = current
         .get("version")
@@ -302,11 +351,7 @@ pub async fn publish_page(
 ) -> Result<()> {
     // Get current page to verify it's a draft
     let page_path = format!("/wiki/api/v2/pages/{}", encode_path_segment(page_id)?);
-    let current: Value = ctx
-        .client
-        .get(&page_path)
-        .await
-        .with_context(|| format!("Failed to get page {}", page_id))?;
+    let current = fetch_page(ctx, page_id, "").await?;
 
     let current_status = current
         .get("status")
@@ -1304,6 +1349,51 @@ pub async fn delete_blogpost(
         &format!("✅ Deleted blog post: {blogpost_id}"),
         &MutationResult::with_id(format!("Deleted blog post: {blogpost_id}"), blogpost_id),
     )
+}
+
+#[cfg(test)]
+mod page_not_found_tests {
+    use super::*;
+
+    #[test]
+    fn folder_hint_names_the_folder_command() {
+        let hint = page_not_found_hint("2002", true);
+        assert!(hint.contains("2002 is a folder, not a page"), "{hint}");
+        assert!(
+            hint.contains("atlassian-cli confluence folder get 2002"),
+            "{hint}"
+        );
+    }
+
+    #[test]
+    fn general_hint_names_the_three_causes() {
+        let hint = page_not_found_hint("3003", false);
+        assert!(hint.contains("the ID is wrong"), "{hint}");
+        assert!(hint.contains("no permission"), "{hint}");
+        assert!(hint.contains("not a page"), "{hint}");
+        assert!(!hint.contains("is a folder"), "{hint}");
+    }
+
+    /// `main` finds the hint through the `anyhow` context, and the `Error:`
+    /// line keeps the first error.
+    #[test]
+    fn hinted_context_keeps_the_api_error_as_the_source() {
+        let api = atlassian_cli_api::error::ApiError::NotFound {
+            resource: "x".to_string(),
+        };
+        let err = anyhow::Error::new(api).context(HintedContext {
+            message: "Failed to get page 1".to_string(),
+            hint: "h".to_string(),
+        });
+        assert_eq!(err.downcast_ref::<HintedContext>().unwrap().hint, "h");
+        assert_eq!(
+            format!("{err:#}"),
+            "Failed to get page 1: Resource not found: x"
+        );
+        assert!(err.chain().any(|c| c
+            .downcast_ref::<atlassian_cli_api::error::ApiError>()
+            .is_some()));
+    }
 }
 
 #[cfg(test)]
