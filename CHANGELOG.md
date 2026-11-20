@@ -20,6 +20,7 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+
 ### Fixed
 
 - `confluence page get`, `page update` and `page publish` explain a 404. When
@@ -30,7 +31,7 @@ resolve. `git log` remains the complete record.
   `page get` now refuses an ID that is empty, `.`, `..` or contains `/` before it
   sends a request. `page get` now percent-encodes the ID, so a value such as
   `123?version=2` is one literal path segment and no longer reaches the query
-  string. (#PR)
+  string. (#192)
 
 ### Added
 

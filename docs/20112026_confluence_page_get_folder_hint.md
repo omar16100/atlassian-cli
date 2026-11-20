@@ -1,6 +1,6 @@
 # `confluence page get`: a 404 hint that names the cause
 
-Status: in progress on fix/confluence-page-get-folder-hint (PR #PR)
+Status: in progress on `fix/confluence-page-get-folder-hint` (PR #192).
 
 ## Problem
 
