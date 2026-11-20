@@ -3462,3 +3462,11 @@ the group ID are encoded as path segments. clap accepts only the documented
 values of `--operation` and `--subject-type`, and an empty `--subject-id` is
 refused. The change is verified against the specification and a mock server,
 not against a live site. Built-binary tests and unit tests cover the change.
+## 2026-11-20: `bb pr list` page size (PR #191)
+
+`bb pr list --limit 0` and each `--limit` above 50 failed with "Invalid
+pagelen", because the command sent a page size up to 100 and the pull request
+list of Bitbucket accepts 50 at most. `page_size_capped` and
+`PULL_REQUEST_MAX_PAGE_SIZE` in `bitbucket/utils.rs` limit the page size, and
+the pagination driver follows the next pages. The other list commands are not
+changed. See `docs/20112026_bb_pr_list_page_size.md`.

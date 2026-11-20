@@ -201,6 +201,10 @@ resolve. `git log` remains the complete record.
   blank `--subject-id` is refused before a request is sent, and spaces at the
   two ends of the value are removed. The change is verified against the
   specification and a mock server, not against a live site. (#195)
+- `bb pr list --limit 0` and each `--limit` above 50 failed with "Invalid
+  pagelen". The pull request list of Bitbucket accepts a page size of 50 at
+  most. The command now asks for pages of 50 at most and follows the next
+  pages, so `--limit 0` returns all pull requests. (#191)
 
 ## [0.13.0] - 2026-10-28
 

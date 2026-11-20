@@ -103,10 +103,26 @@ pub fn encode_ref_path(name: &str) -> anyhow::Result<String> {
 /// `--limit 0` means "everything", so it asks for a full page rather than
 /// clamping to zero and fetching nothing.
 pub fn page_size(limit: usize) -> usize {
+    page_size_capped(limit, MAX_PAGE_SIZE)
+}
+
+/// The general page size limit of Bitbucket.
+pub const MAX_PAGE_SIZE: usize = 100;
+
+/// The page size limit of the pull request list.
+///
+/// Bitbucket says that each API can have a limit of its own. The pull request
+/// list refuses a `pagelen` above 50 with "Invalid pagelen", so `bb pr list
+/// --limit 0` and each `--limit` above 50 failed. The rows after the first
+/// page come through the `next` link.
+pub const PULL_REQUEST_MAX_PAGE_SIZE: usize = 50;
+
+/// `page_size` for an endpoint that has a page size limit of its own.
+pub fn page_size_capped(limit: usize, max: usize) -> usize {
     if limit == 0 {
-        100
+        max
     } else {
-        limit.clamp(1, 100)
+        limit.clamp(1, max)
     }
 }
 
@@ -261,6 +277,16 @@ mod tests {
         assert_eq!(page_size(25), 25);
         assert_eq!(page_size(500), 100);
         assert_eq!(page_size(1), 1);
+    }
+
+    #[test]
+    fn a_capped_page_size_stays_below_the_cap_of_the_endpoint() {
+        let cap = PULL_REQUEST_MAX_PAGE_SIZE;
+        assert_eq!(page_size_capped(0, cap), 50);
+        assert_eq!(page_size_capped(51, cap), 50);
+        assert_eq!(page_size_capped(100, cap), 50);
+        assert_eq!(page_size_capped(50, cap), 50);
+        assert_eq!(page_size_capped(25, cap), 25);
     }
 
     /// The bug this exists for: `#` truncates the path at the client, so the

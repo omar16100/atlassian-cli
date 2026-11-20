@@ -4,7 +4,10 @@ use atlassian_cli_output::OutputFormat;
 use serde::{Deserialize, Serialize};
 use url::form_urlencoded;
 
-use super::utils::{encode_path_segment, page_size, warn_if_truncated, BitbucketContext};
+use super::utils::{
+    encode_path_segment, page_size_capped, warn_if_truncated, BitbucketContext,
+    PULL_REQUEST_MAX_PAGE_SIZE,
+};
 use crate::commands::common::{render_success, MutationResult};
 
 /// Information about a pull request for pipeline operations
@@ -275,7 +278,10 @@ pub async fn list_pull_requests(
 ) -> Result<()> {
     let query = form_urlencoded::Serializer::new(String::new())
         .append_pair("state", state)
-        .append_pair("pagelen", &page_size(limit).to_string())
+        .append_pair(
+            "pagelen",
+            &page_size_capped(limit, PULL_REQUEST_MAX_PAGE_SIZE).to_string(),
+        )
         .finish();
     let path = format!("/2.0/repositories/{workspace}/{slug}/pullrequests?{query}");
 
