@@ -344,6 +344,9 @@ pub(super) enum PrCommands {
         /// pull request ID.
         #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
         targets: Vec<String>,
+        /// Hide comments in resolved threads, replies included.
+        #[arg(long)]
+        unresolved: bool,
     },
     /// Add a comment to a pull request, optionally inline or as a threaded reply
     #[command(long_about = "Add a comment to a pull request.\n\n\

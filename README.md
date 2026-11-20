@@ -275,6 +275,8 @@ crates/
    atlassian-cli bitbucket --workspace myteam pr approve api-service 123
    atlassian-cli bitbucket --workspace myteam pr merge api-service 123 --strategy merge_commit
    atlassian-cli bitbucket --workspace myteam pr comments api-service 123
+   # Skip resolved threads (every row also reports `resolved` and `deleted`)
+   atlassian-cli bitbucket --workspace myteam pr comments api-service 123 --unresolved
    atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Looks good!"
    # Inline comment anchored to a line on the new (destination) side of the diff
    atlassian-cli bitbucket --workspace myteam pr comment api-service 123 --text "Nit: rename" --path src/main.rs --line 42

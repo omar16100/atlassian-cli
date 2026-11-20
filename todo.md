@@ -3481,3 +3481,15 @@ client has a read timeout of 30 seconds, and a body that stops is the retryable
 `ApiError::BodyReadFailed`. Tests: `crates/api/src/download_tests.rs`, with a
 socket server that stops in the middle of a body. See
 `docs/20112026_download_body_retry.md`.
+## 2026-11-18: resolved and deleted state on `bb pr comments`
+
+`bb pr comments` dropped the `deleted` and `resolution` fields Bitbucket returns,
+so a deleted comment looked like an empty one and nothing showed which threads
+were resolved. Rows now carry `resolved` and `deleted`, appended after
+`location` to keep the output additive.
+
+Bitbucket sets `resolution` on a thread's root comment only. On a live pull
+request with 67 comments, none of the replies in resolved threads carried one.
+`resolved` is therefore computed per thread by walking parents to the root, and
+`--unresolved` drops whole resolved threads, replies included. The walk is
+bounded by the comment count so a malformed parent cycle cannot hang it.
