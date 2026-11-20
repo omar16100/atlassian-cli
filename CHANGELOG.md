@@ -20,6 +20,7 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+
 ### Fixed
 
 - `confluence page add-restriction` sends the request body that the Confluence
@@ -32,7 +33,7 @@ resolve. `git log` remains the complete record.
   error and exit code 2. An empty or blank `--subject-id` is refused before a
   request is sent, and spaces at the two ends of the value are removed. The
   change is verified against the specification and a mock server, not against a
-  live site. (#PR)
+  live site. (#194)
 
 ### Fixed
 

@@ -1444,6 +1444,8 @@ mod page_not_found_tests {
         assert!(err.chain().any(|c| c
             .downcast_ref::<atlassian_cli_api::error::ApiError>()
             .is_some()));
+    }
+}
 
 #[cfg(test)]
 mod restriction_tests {
