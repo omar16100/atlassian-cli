@@ -3470,3 +3470,14 @@ list of Bitbucket accepts 50 at most. `page_size_capped` and
 `PULL_REQUEST_MAX_PAGE_SIZE` in `bitbucket/utils.rs` limit the page size, and
 the pagination driver follows the next pages. The other list commands are not
 changed. See `docs/20112026_bb_pr_list_page_size.md`.
+## 2026-11-20: downloads retry when the body stops (PR #PRNUM)
+## 2026-11-20: downloads retry when the body stops (PR #196)
+
+`bb pipeline logs` failed at times on a large log with "error decoding response
+body". The 30 second timeout of the client was a limit for the full request,
+the body included, and an error in the body read was `InvalidResponse`, which
+is not retried. `get_text` and `get_bytes` now have a limit of 300 seconds, the
+client has a read timeout of 30 seconds, and a body that stops is the retryable
+`ApiError::BodyReadFailed`. Tests: `crates/api/src/download_tests.rs`, with a
+socket server that stops in the middle of a body. See
+`docs/20112026_download_body_retry.md`.
