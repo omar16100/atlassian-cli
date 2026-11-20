@@ -4,6 +4,10 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
     "RUSTSEC-2025-0012",  # backoff is unmaintained (used by api crate)
     "RUSTSEC-2024-0384",  # instant is unmaintained (dependency of backoff)
+    # chrono is unmaintained and has no patched version. It is a direct
+    # dependency of the cli and api crates. Temporary: remove this line in the
+    # change that replaces chrono (jiff or time).
+    "RUSTSEC-2026-0543",
 ]
 
 [licenses]
