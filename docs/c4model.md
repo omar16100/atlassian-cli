@@ -258,8 +258,10 @@ one atomic rename, then the original is renamed to `.migrated`.
   (`--export-format`, else a global `--format` of json or csv, else JSON)
 
 **Global arguments.** `main.rs` declares `--profile`, `--config`, `--config-dir`,
-`--format` and `--envelope` as clap globals, and `BitbucketArgs` adds
-`--workspace` and `--repo`. clap keys arguments by id and skips propagating a
+`--format`, `--envelope` and `--debug` as clap globals, and `BitbucketArgs` adds
+`--workspace` and `--repo`. The six in `main.rs` have the help heading
+`Global options`, so `--help` prints them in a section of their own below the
+options of the command. clap keys arguments by id and skips propagating a
 global into a subcommand that already has an argument with that id, so a
 subcommand that redeclares a global's id with another type makes clap panic when
 the global is read (the export commands' `format: String` did this until the fix

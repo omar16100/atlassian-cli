@@ -17,6 +17,13 @@ use commands::auth::{self, AuthCommand};
 use commands::bitbucket::utils::extract_workspace_from_url;
 use tracing_subscriber::{fmt, EnvFilter};
 
+/// Heading of the global options in `--help`.
+///
+/// clap prints arguments that have a heading in a section of their own, after
+/// the `Options:` section. Without it, the six global options were mixed into
+/// the option list of each command.
+const GLOBAL_OPTIONS: &str = "Global options";
+
 #[derive(Parser, Debug)]
 #[command(name = "atlassian-cli", version, about = "Unified Atlassian Cloud CLI", long_about = None)]
 struct Cli {
@@ -25,12 +32,12 @@ struct Cli {
     // global: --format has always been accepted after the subcommand, so users
     // and most of the documentation write `... issue list --profile prod` too.
     // It was rejected, which made a large share of the published examples fail.
-    #[arg(short, long, global = true)]
+    #[arg(short, long, global = true, help_heading = GLOBAL_OPTIONS)]
     profile: Option<String>,
 
     /// Path to the config file. Moves config.yaml only; credentials stay in the
     /// config directory. Use --config-dir to move everything
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = GLOBAL_OPTIONS)]
     config: Option<PathBuf>,
 
     /// Directory holding config.yaml and credentials. Also settable with
@@ -41,15 +48,15 @@ struct Cli {
     // set-but-empty variable with "a value is required", and an empty export is
     // ordinary in shells, `docker -e VAR` and CI matrices, so `env` here made
     // every command hard-fail. The resolver treats an empty value as unset.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = GLOBAL_OPTIONS)]
     config_dir: Option<PathBuf>,
 
     /// Output format for command results (table, json, yaml, csv, quiet, markdown)
-    #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Table, global = true)]
+    #[arg(long, short = 'f', value_enum, default_value_t = OutputFormat::Table, global = true, help_heading = GLOBAL_OPTIONS)]
     format: OutputFormat,
 
     /// Wrap JSON/YAML list output in {"data": [...], "count": N} envelope.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = GLOBAL_OPTIONS)]
     envelope: bool,
 
     /// Log each request and response to stderr: method, URL, status, timing,
@@ -57,7 +64,7 @@ struct Cli {
     //
     // global: rejected after a subcommand before, so `bb pr list --debug`
     // failed to parse and the flag was only usable in one position.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = GLOBAL_OPTIONS)]
     debug: bool,
 
     #[command(subcommand)]
@@ -778,6 +785,90 @@ mod cli_definition_tests {
             let cli = parse(argv).unwrap_or_else(|e| panic!("{argv:?}: {e}"));
             assert!(cli.debug, "{argv:?}");
         }
+    }
+
+    /// The long help of a subcommand, as `--help` prints it.
+    fn long_help(path: &[&str]) -> String {
+        let mut root = Cli::command();
+        // Globals are copied into the subcommands when the tree is built.
+        root.build();
+        let mut cmd = &mut root;
+        for name in path {
+            cmd = cmd
+                .find_subcommand_mut(name)
+                .unwrap_or_else(|| panic!("no subcommand `{name}` in {path:?}"));
+        }
+        cmd.render_long_help().to_string()
+    }
+
+    /// The global options were mixed into the option list of each command, so
+    /// the options of the command itself were hard to find.
+    #[test]
+    fn help_lists_global_options_below_their_own_heading() {
+        const GLOBALS: [&str; 6] = [
+            "--profile",
+            "--config ",
+            "--config-dir",
+            "--format",
+            "--envelope",
+            "--debug",
+        ];
+        for path in [
+            &["jira", "issue", "get"][..],
+            &["bitbucket", "pr", "list"],
+            &["confluence", "search", "cql"],
+            &["confluence", "page", "get"],
+        ] {
+            let help = long_help(path);
+            let heading = help
+                .find("\nGlobal options:\n")
+                .unwrap_or_else(|| panic!("{path:?} has no `Global options:` heading:\n{help}"));
+            let (before, after) = help.split_at(heading);
+            for flag in GLOBALS {
+                assert!(
+                    after.contains(flag),
+                    "{path:?}: {flag} must be below the heading:\n{help}"
+                );
+                assert!(
+                    !before.contains(&format!("  {flag}"))
+                        && !before.contains(&format!(", {flag}")),
+                    "{path:?}: {flag} must not be among the command options:\n{help}"
+                );
+            }
+            // The heading comes after the options of the command.
+            let options = help
+                .find("\nOptions:\n")
+                .unwrap_or_else(|| panic!("{path:?} has no `Options:` heading:\n{help}"));
+            assert!(options < heading, "{path:?}:\n{help}");
+            assert!(before.contains("--help"), "{path:?}:\n{help}");
+        }
+        // An option of the command itself stays in the command's list.
+        let help = long_help(&["jira", "issue", "get"]);
+        let heading = help.find("\nGlobal options:\n").unwrap();
+        assert!(help[..heading].contains("--fields"), "{help}");
+        // The `auth` commands have a `--profile` of their own. It replaces the
+        // global one there, so it stays in the command's list.
+        let help = long_help(&["auth", "whoami"]);
+        let heading = help.find("\nGlobal options:\n").unwrap();
+        assert!(help[..heading].contains("--profile"), "{help}");
+        assert!(help[heading..].contains("--format"), "{help}");
+    }
+
+    /// Callers tried the singular names, and clap rejected them.
+    #[test]
+    fn jira_issue_comment_and_link_are_aliases() {
+        for argv in [
+            &["jira", "issue", "comment", "list", "PROJ-1"][..],
+            &["jira", "issue", "comments", "list", "PROJ-1"],
+            &["jira", "issue", "link", "list", "PROJ-1"],
+            &["jira", "issue", "links", "list", "PROJ-1"],
+        ] {
+            parse(argv).unwrap_or_else(|e| panic!("{argv:?}: {e}"));
+        }
+        // Visible: the help of `jira issue` names them.
+        let help = long_help(&["jira", "issue"]);
+        assert!(help.contains("[alias: comment]"), "{help}");
+        assert!(help.contains("[alias: link]"), "{help}");
     }
 
     #[test]

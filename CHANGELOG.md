@@ -107,6 +107,15 @@ resolve. `git log` remains the complete record.
 - `bb pipeline list`, `get`, `latest` and `watch` have a new key `commit_hash`
   in JSON and YAML output: the full commit hash. `commit` still has the first 7
   characters. The table, markdown and CSV formats are unchanged. (#186)
+- `jira issue comment` and `jira issue link` are aliases of `jira issue comments`
+  and `jira issue links`. (#185)
+
+### Changed
+
+- `--help` prints the global options (`--profile`, `--config`, `--config-dir`,
+  `--format`, `--envelope`, `--debug`) below a `Global options:` heading, after
+  the options of the command. Before, they were mixed into the option list of
+  each command. Scripts that parse help text see the new section. (#185)
 
 ## [0.13.0] - 2026-10-28
 
