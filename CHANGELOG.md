@@ -20,6 +20,7 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+
 ### Added
 
 - `bb commit browse --path <file>` prints the content of the file to stdout, with
@@ -44,7 +45,7 @@ resolve. `git log` remains the complete record.
   - A directory path sends one more request (`?format=meta`). A `--commit` with
     `/` sends one more request for the branch, and one more for the tag if the
     branch does not exist. A path that gives a 404 sends one more request.
-  - A closed pipe on stdout (`| head -1`) in file mode is not an error. (#PR)
+  - A closed pipe on stdout (`| head -1`) in file mode is not an error. (#187)
 
 ### Fixed
 

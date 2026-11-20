@@ -3381,6 +3381,7 @@ not reversible, or that give access, and `repo create`, do not read the Git remo
 `bitbucket/mod.rs` to `bitbucket/args.rs` to keep the files below 2000 lines.
 Details: `docs/20112026_bb_repo_flag.md`.
 ## 2026-11-20: bb commit browse prints file content
+## 2026-11-20: bb commit browse prints file content (PR #187)
 
 `bb commit browse --path <file>` failed with "Invalid response format", because
 the command parsed each response as a directory list. The command now sends a

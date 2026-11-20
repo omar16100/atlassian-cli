@@ -1,6 +1,6 @@
-Status: in progress on feat/bb-browse-file-content (PR #PR)
-
 # `bb commit browse` prints the content of a file
+
+Status: in progress on `feat/bb-browse-file-content` (PR #187).
 
 ## Problem
 
@@ -155,9 +155,16 @@ Before this change, these four values were not encoded in this command.
 
 - A path costs two requests (meta, then content or list). The root costs one.
   A revision that contains `/` costs one or two more (branch, then tag).
-- No request to a live Bitbucket site was made for this work. The description
-  does not state what `?format=meta` gives for a directory path with no
-  trailing slash, or how a `/` in a ref name must be written in the refs path.
+- The code and its tests use mock servers only. The description does not
+  state what `?format=meta` gives for a directory path with no trailing slash,
+  or how a `/` in a ref name must be written in the refs path.
+- During the review of this change, a reviewer made unauthenticated read
+  requests for a public repository on `api.bitbucket.org`. No test repeats
+  them. The reviewer reported two things. A revision with `/` in the `src` path
+  gives a 404 ("Commit not found" for the first segment), which is the reason
+  for the refs lookup. And `?format=meta` answers for a directory path with and
+  without a trailing slash. The refs lookup itself was not checked on a live
+  site.
 - A branch and a tag with the same name: the branch is used.
 - A failed write can leave a partial `--output` file.
 - `--output` with the path of an existing directory gives the message "already
