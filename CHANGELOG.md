@@ -20,6 +20,16 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+### Fixed
+
+- `confluence space list`, `page list` and `blog list` accept a `--limit` above
+  250. Before, the value was sent as the page size of one request and the server
+  refused it. `--limit` is now a total: the page size is clamped to 250 and the
+  commands follow the next pages. `--limit 0` returns all results, within the
+  request safety budget. Without `--limit` the commands return 25 results, as
+  before, and now send `limit=25`. When more results exist than the commands
+  show, a warning goes to stderr. Stdout and the output keys do not change.
+  (#PR)
 
 ### Fixed
 
