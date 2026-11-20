@@ -947,7 +947,8 @@ pub(super) enum CommitCommands {
     /// With no --path, or with a --path that is a directory, the command lists
     /// the entries. With a --path that is a file, the command writes the file
     /// content to stdout: the bytes are not changed, no newline is added, and
-    /// --format has no effect.
+    /// --format has no effect on the content. With --output <file>, the content
+    /// goes to the file, and the confirmation on stdout obeys --format.
     #[command(after_help = "EXAMPLES:\n  \
             bb commit browse web_app --commit main                      # list the root\n  \
             bb commit browse web_app --commit main --path src           # list a directory\n  \
@@ -957,7 +958,7 @@ pub(super) enum CommitCommands {
         /// Repository slug. Defaults to --repo, then the git remote.
         #[arg(value_name = "REPO")]
         repo_arg: Option<String>,
-        /// Commit hash or branch name.
+        /// Commit hash, branch or tag name.
         #[arg(long)]
         commit: String,
         /// Path of a directory (lists it) or of a file (prints its content).

@@ -3,8 +3,12 @@
 //! Bitbucket Cloud serves the two cases from one endpoint,
 //! `GET /2.0/repositories/{workspace}/{repo_slug}/src/{commit}/{path}`. A
 //! directory gives a JSON page of entries. A file gives the raw bytes of the
-//! file. The command asks for `?format=meta` first, which always gives a JSON
-//! object with a `type`, and then sends the request that fits the type.
+//! file. The command asks for `?format=meta` first, which gives a JSON object
+//! with a `type`, and then sends the request that fits the type.
+//!
+//! The endpoint takes one path segment as the revision. A branch or tag name
+//! that contains `/` is resolved to its commit hash first, through
+//! `refs/branches/{name}` and then `refs/tags/{name}`.
 //!
 //! The content of a file is never converted. The bytes that the server sends
 //! are the bytes that reach stdout or the output file.
@@ -15,6 +19,9 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use atlassian_cli_api::error::ApiError;
 use atlassian_cli_api::path::encode_path_segment;
+use atlassian_cli_api::RawRequest;
+use reqwest::header::HeaderMap;
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 
 use super::utils::{encode_ref_path, BitbucketContext};
@@ -44,6 +51,18 @@ struct SourceList {
 struct SourceMeta {
     #[serde(rename = "type")]
     entry_type: String,
+}
+
+/// A branch or a tag from `refs/branches/{name}` or `refs/tags/{name}`. Only
+/// the hash of the target commit is read.
+#[derive(Deserialize)]
+struct RefObject {
+    target: RefTarget,
+}
+
+#[derive(Deserialize)]
+struct RefTarget {
+    hash: String,
 }
 
 /// One row of a directory list. The keys are the output keys of the command.
@@ -124,31 +143,151 @@ enum Target {
     Listed(Vec<SourceRow>),
 }
 
+/// Gives the revision for the `src` request path.
+///
+/// A revision with no `/` (a commit hash, or a simple branch or tag name) is
+/// used as it is, and no request is sent. The `src` endpoint reads one path
+/// segment as the revision, so a name with `/` cannot go into that path. Such
+/// a name is resolved to the hash of its target commit: first as a branch,
+/// then as a tag if the branch request gives a 404.
+async fn resolve_revision(
+    ctx: &BitbucketContext<'_>,
+    repo_base: &str,
+    request: &BrowseRequest<'_>,
+    workspace: &str,
+    repo_slug: &str,
+) -> Result<String> {
+    let commit = request.commit;
+    let name = encode_ref_path(commit)?;
+    if !commit.contains('/') {
+        return Ok(name);
+    }
+
+    for kind in ["branches", "tags"] {
+        let ref_path = format!("{repo_base}/refs/{kind}/{name}");
+        match ctx.client.get::<RefObject>(&ref_path).await {
+            Ok(found) => {
+                tracing::debug!(
+                    revision = commit,
+                    kind,
+                    hash = %found.target.hash,
+                    "Resolved the revision to a commit hash"
+                );
+                return encode_path_segment(&found.target.hash).with_context(|| {
+                    format!("Bitbucket gave an invalid commit hash for revision {commit:?}")
+                });
+            }
+            Err(ApiError::NotFound { .. }) => {
+                tracing::debug!(
+                    revision = commit,
+                    kind,
+                    "The revision is not in this ref kind"
+                );
+            }
+            Err(err) => {
+                return Err(anyhow::Error::new(err).context(format!(
+                    "Failed to resolve revision {commit:?} in {workspace}/{repo_slug}"
+                )))
+            }
+        }
+    }
+    bail!(
+        "Revision {commit:?} is not a branch or a tag in {workspace}/{repo_slug}. A revision \
+         that contains '/' must be a branch name or a tag name. Check the name and the \
+         repository."
+    )
+}
+
+/// The `error.message` text of a Bitbucket error body, if the body has one.
+fn server_message(body: &[u8]) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_slice(body).ok()?;
+    let message = value.get("error")?.get("message")?.as_str()?.trim();
+    (!message.is_empty()).then(|| message.to_string())
+}
+
+/// The step after a 404 from the meta request.
+///
+/// The typed client keeps no body for a 404, so that error cannot say if the
+/// commit or the path is the cause. This sends the list request without the
+/// status mapping and reads the body. If the answer is a directory list, the
+/// command uses it. If not, the error has the message that Bitbucket sent.
+///
+/// The list part is defensive. The Bitbucket API description shows the meta
+/// link of a directory with a trailing slash, and does not state what a meta
+/// request with no trailing slash gives.
+async fn list_after_meta_404(
+    ctx: &BitbucketContext<'_>,
+    api_path: &str,
+    meta_err: ApiError,
+    request: &BrowseRequest<'_>,
+    workspace: &str,
+    repo_slug: &str,
+) -> Result<Target> {
+    tracing::debug!("The meta request gave a 404, sending the list request");
+    let response = match ctx
+        .client
+        .request_raw(RawRequest {
+            method: Method::GET,
+            path: api_path,
+            headers: HeaderMap::new(),
+            body: None,
+            timeout: None,
+        })
+        .await
+    {
+        Ok(response) => response,
+        Err(list_err) => {
+            tracing::debug!(error = %list_err, "The list request failed also");
+            return Err(browse_error(
+                meta_err, "find", request, workspace, repo_slug,
+            ));
+        }
+    };
+
+    if response.is_success() {
+        if let Ok(list) = serde_json::from_slice::<SourceList>(&response.body) {
+            return Ok(Target::Listed(directory_rows(list)));
+        }
+        return Err(browse_error(
+            meta_err, "find", request, workspace, repo_slug,
+        ));
+    }
+
+    let error = browse_error(meta_err, "find", request, workspace, repo_slug);
+    match server_message(&response.body) {
+        Some(message) => {
+            tracing::debug!(status = response.status, %message, "The list request failed also");
+            Err(error.context(format!("Bitbucket says: {message}")))
+        }
+        None => Err(error),
+    }
+}
+
 /// Finds what the path is, without a read of its content.
 ///
 /// No path is the repository root, which is always a directory, so that case
-/// sends no request. Each other path costs one `format=meta` request. The
-/// Content-Type of the content response is not used: Bitbucket derives it
-/// from the file name, so a `.json` file looks the same as a directory list.
-///
-/// If the meta request gives a 404, the command sends the list request that
-/// older releases sent, and uses the list if it is one. The Bitbucket document
-/// shows the meta link of a directory with a trailing slash only, so this keeps
-/// a directory list correct if Bitbucket refuses the form with no slash. The
-/// additional request occurs on the 404 path only.
+/// sends no `src` request here. Each other path costs one `format=meta`
+/// request. The Content-Type of the content response is not used: Bitbucket
+/// derives it from the file name, so a `.json` file looks the same as a
+/// directory list. A 404 from the meta request goes to
+/// [`list_after_meta_404`].
 async fn resolve_target(
     ctx: &BitbucketContext<'_>,
     workspace: &str,
     repo_slug: &str,
     request: &BrowseRequest<'_>,
 ) -> Result<Target> {
-    let base = format!(
-        "/2.0/repositories/{}/{}/src/{}",
+    let repo_base = format!(
+        "/2.0/repositories/{}/{}",
         encode_path_segment(workspace).context("Invalid workspace")?,
         encode_path_segment(repo_slug).context("Invalid repository")?,
-        encode_ref_path(request.commit)?,
     );
-    let Some(encoded_path) = encode_source_path(request.path.unwrap_or(""))? else {
+    // The path is checked before the revision, so that a refused path sends no
+    // request.
+    let encoded_path = encode_source_path(request.path.unwrap_or(""))?;
+    let revision = resolve_revision(ctx, &repo_base, request, workspace, repo_slug).await?;
+    let base = format!("{repo_base}/src/{revision}");
+    let Some(encoded_path) = encoded_path else {
         // The trailing slash is necessary for the root directory.
         return Ok(Target::Directory(format!("{base}/")));
     };
@@ -157,14 +296,7 @@ async fn resolve_target(
     let meta: SourceMeta = match ctx.client.get(&format!("{api_path}?format=meta")).await {
         Ok(meta) => meta,
         Err(err @ ApiError::NotFound { .. }) => {
-            tracing::debug!("The meta request gave a 404, trying the list request");
-            return match ctx.client.get::<SourceList>(&api_path).await {
-                Ok(list) => Ok(Target::Listed(directory_rows(list))),
-                Err(list_err) => {
-                    tracing::debug!(error = %list_err, "The list request failed also");
-                    Err(browse_error(err, "find", request, workspace, repo_slug))
-                }
-            };
+            return list_after_meta_404(ctx, &api_path, err, request, workspace, repo_slug).await;
         }
         Err(err) => return Err(browse_error(err, "find", request, workspace, repo_slug)),
     };
@@ -238,10 +370,18 @@ fn directory_rows(list: SourceList) -> Vec<SourceRow> {
 }
 
 /// Writes the content of a file to `out`, with no change and no added newline.
+///
+/// A broken pipe is not an error: in `bb commit browse ... | head -1` the
+/// reader closes the pipe when it has what it needs.
 fn write_file_content(out: &mut dyn Write, bytes: &[u8]) -> Result<()> {
-    out.write_all(bytes)
-        .context("Failed to write the file content to stdout")?;
-    out.flush().context("Failed to flush stdout")
+    match out.write_all(bytes).and_then(|()| out.flush()) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => {
+            tracing::debug!("The reader closed stdout before the end of the content");
+            Ok(())
+        }
+        Err(err) => Err(err).context("Failed to write the file content to stdout"),
+    }
 }
 
 /// `bb commit browse`. See [`browse_source_to`].
@@ -267,6 +407,18 @@ async fn browse_source_to(
     out: &mut (dyn Write + Send),
 ) -> Result<()> {
     let to_file = request.output.filter(|p| *p != Path::new("-"));
+
+    // An early check, so that a refused target costs no request. The real
+    // guard is `create_new` in `write_bytes`. `symlink_metadata` also finds a
+    // symbolic link that points to nothing.
+    if let Some(file) = to_file {
+        if !request.force && file.symlink_metadata().is_ok() {
+            bail!(
+                "{} already exists. Use --force to overwrite.",
+                file.display()
+            );
+        }
+    }
 
     let target = resolve_target(ctx, workspace, repo_slug, request).await?;
     if let (Target::Directory(_) | Target::Listed(_), Some(file)) = (&target, to_file) {
@@ -505,7 +657,19 @@ mod tests {
             let source = fetch_source(&context, "myworkspace", "web_app", &browse)
                 .await
                 .unwrap();
-            assert_eq!(source, Source::Directory(expected_rows()));
+            let Source::Directory(rows) = source else {
+                panic!("a directory path must give rows");
+            };
+            assert_eq!(rows, expected_rows());
+            // These rows go to the renderer. Their JSON keys are part of the
+            // output contract.
+            assert_eq!(
+                serde_json::to_value(&rows).unwrap(),
+                json!([
+                    { "file_type": "commit_directory", "path": "src/lib", "size": "" },
+                    { "file_type": "commit_file", "path": "src/main.rs", "size": "120 bytes" }
+                ])
+            );
 
             // The list goes through the renderer, not through `out`.
             let mut out: Vec<u8> = Vec::new();
@@ -514,18 +678,6 @@ mod tests {
                 .unwrap();
             assert!(out.is_empty(), "no raw bytes for a directory in {format:?}");
         }
-    }
-
-    // The JSON keys of a directory row are part of the output contract.
-    #[test]
-    fn directory_rows_keep_the_existing_json_keys() {
-        assert_eq!(
-            serde_json::to_value(expected_rows()).unwrap(),
-            json!([
-                { "file_type": "commit_directory", "path": "src/lib", "size": "" },
-                { "file_type": "commit_file", "path": "src/main.rs", "size": "120 bytes" }
-            ])
-        );
     }
 
     #[tokio::test]
@@ -572,12 +724,41 @@ mod tests {
         );
     }
 
+    const HASH: &str = "1a2b3c4d5e6f";
+    const BRANCH_REF: &str = "/2.0/repositories/myworkspace/web_app/refs/branches/feature/login";
+    const TAG_REF: &str = "/2.0/repositories/myworkspace/web_app/refs/tags/feature/login";
+
+    /// Mounts a ref answer (`target.hash`), with the number of calls expected.
+    async fn mount_ref(server: &MockServer, url_path: &str, status: u16, calls: u64) {
+        let template = if status == 200 {
+            ResponseTemplate::new(200).set_body_json(json!({
+                "name": "feature/login",
+                "target": { "type": "commit", "hash": HASH }
+            }))
+        } else {
+            ResponseTemplate::new(status).set_body_json(json!({
+                "type": "error",
+                "error": { "message": "No such ref" }
+            }))
+        };
+        Mock::given(method("GET"))
+            .and(path(url_path))
+            .respond_with(template)
+            .expect(calls)
+            .mount(server)
+            .await;
+    }
+
+    // Bitbucket reads one path segment as the revision, so `feature/login`
+    // cannot go into the `src` path. The command asks for the branch first.
     #[tokio::test]
-    async fn branch_name_with_a_slash_keeps_the_slash() {
-        let url = "/2.0/repositories/myworkspace/web_app/src/feature/login/README.md";
+    async fn revision_with_a_slash_is_resolved_to_the_branch_hash() {
+        let url = format!("/2.0/repositories/myworkspace/web_app/src/{HASH}/README.md");
         let server = MockServer::start().await;
-        mount_meta(&server, url, TYPE_FILE).await;
-        mount_file(&server, url, b"readme", "text/markdown").await;
+        mount_ref(&server, BRANCH_REF, 200, 1).await;
+        mount_ref(&server, TAG_REF, 200, 0).await;
+        mount_meta(&server, &url, TYPE_FILE).await;
+        mount_file(&server, &url, b"readme", "text/markdown").await;
         let renderer = OutputRenderer::new(OutputFormat::Table);
         let mut out: Vec<u8> = Vec::new();
 
@@ -592,6 +773,187 @@ mod tests {
         .unwrap();
 
         assert_eq!(out, b"readme");
+        assert_eq!(
+            received(&server).await,
+            vec![BRANCH_REF.to_string(), format!("{url}?format=meta"), url]
+        );
+    }
+
+    #[tokio::test]
+    async fn revision_with_a_slash_is_resolved_to_the_tag_hash_when_no_branch_exists() {
+        let url = format!("/2.0/repositories/myworkspace/web_app/src/{HASH}/README.md");
+        let server = MockServer::start().await;
+        mount_ref(&server, BRANCH_REF, 404, 1).await;
+        mount_ref(&server, TAG_REF, 200, 1).await;
+        mount_meta(&server, &url, TYPE_FILE).await;
+        mount_file(&server, &url, b"readme", "text/markdown").await;
+        let renderer = OutputRenderer::new(OutputFormat::Table);
+        let mut out: Vec<u8> = Vec::new();
+
+        browse_source_to(
+            &ctx(&server, &renderer),
+            "myworkspace",
+            "web_app",
+            &request("feature/login", Some("README.md")),
+            &mut out,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(out, b"readme");
+    }
+
+    #[tokio::test]
+    async fn revision_with_a_slash_that_is_not_a_branch_or_a_tag_is_an_error() {
+        let server = MockServer::start().await;
+        mount_ref(&server, BRANCH_REF, 404, 1).await;
+        mount_ref(&server, TAG_REF, 404, 1).await;
+        let renderer = OutputRenderer::new(OutputFormat::Table);
+        let mut out: Vec<u8> = Vec::new();
+
+        let err = browse_source_to(
+            &ctx(&server, &renderer),
+            "myworkspace",
+            "web_app",
+            &request("feature/login", Some("README.md")),
+            &mut out,
+        )
+        .await
+        .unwrap_err();
+
+        let text = format!("{err:#}");
+        assert!(text.contains("\"feature/login\""), "got {text}");
+        assert!(text.contains("not a branch or a tag"), "got {text}");
+        // No `src` request follows.
+        assert_eq!(
+            received(&server).await,
+            vec![BRANCH_REF.to_string(), TAG_REF.to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn revision_with_no_slash_makes_no_refs_request() {
+        let url = "/2.0/repositories/myworkspace/web_app/src/main/README.md";
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(wiremock::matchers::path_regex("/refs/"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(0)
+            .mount(&server)
+            .await;
+        mount_meta(&server, url, TYPE_FILE).await;
+        mount_file(&server, url, b"readme", "text/markdown").await;
+        let renderer = OutputRenderer::new(OutputFormat::Table);
+        let mut out: Vec<u8> = Vec::new();
+
+        browse_source_to(
+            &ctx(&server, &renderer),
+            "myworkspace",
+            "web_app",
+            &request("main", Some("README.md")),
+            &mut out,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(out, b"readme");
+    }
+
+    // The 404 of the meta request has no text of use. The list request that
+    // follows carries the cause, and the user must see it.
+    #[tokio::test]
+    async fn not_found_error_carries_the_message_of_the_server() {
+        for cause in ["Commit not found", "No such file or directory: nope.txt"] {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(query_param("format", "meta"))
+                .respond_with(ResponseTemplate::new(404))
+                .mount(&server)
+                .await;
+            Mock::given(method("GET"))
+                .and(query_param_is_missing("format"))
+                .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+                    "type": "error",
+                    "error": { "message": cause }
+                })))
+                .mount(&server)
+                .await;
+            let renderer = OutputRenderer::new(OutputFormat::Json);
+            let mut out: Vec<u8> = Vec::new();
+
+            let err = browse_source_to(
+                &ctx(&server, &renderer),
+                "myworkspace",
+                "web_app",
+                &request("main", Some("nope.txt")),
+                &mut out,
+            )
+            .await
+            .unwrap_err();
+
+            let text = format!("{err:#}");
+            assert!(text.contains(cause), "got {text}");
+            assert!(
+                text.contains("No file or directory \"nope.txt\" at revision \"main\""),
+                "got {text}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn existing_output_file_without_force_sends_no_request() {
+        let server = MockServer::start().await;
+        let renderer = OutputRenderer::new(OutputFormat::Json);
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("a.txt");
+        std::fs::write(&target, b"old").unwrap();
+        let mut out: Vec<u8> = Vec::new();
+        let mut browse = request("main", Some("a.txt"));
+        browse.output = Some(&target);
+
+        let err = browse_source_to(
+            &ctx(&server, &renderer),
+            "myworkspace",
+            "web_app",
+            &browse,
+            &mut out,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(err.to_string().contains("already exists"), "got {err}");
+        assert_eq!(std::fs::read(&target).unwrap(), b"old");
+        assert!(received(&server).await.is_empty());
+    }
+
+    /// A reader that went away, as in `bb commit browse ... | head -1`.
+    struct ClosedPipe;
+
+    impl Write for ClosedPipe {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::ErrorKind::BrokenPipe.into())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::ErrorKind::BrokenPipe.into())
+        }
+    }
+
+    /// A writer that fails for a different cause.
+    struct FullDisk;
+
+    impl Write for FullDisk {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::ErrorKind::StorageFull.into())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn broken_pipe_on_stdout_is_not_an_error() {
+        assert!(write_file_content(&mut ClosedPipe, b"content").is_ok());
+        assert!(write_file_content(&mut FullDisk, b"content").is_err());
     }
 
     #[tokio::test]

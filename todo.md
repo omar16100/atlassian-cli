@@ -3390,3 +3390,8 @@ directory lists as before. The code moved to `commands/bitbucket/source.rs`,
 and `write_bytes` moved to `commands/common.rs`. The workspace, repository,
 revision and path are encoded in the request path. See
 `docs/20112026_bb_browse_file_content.md`.
+
+After a review: a `--commit` that contains `/` is resolved to a commit hash
+through `refs/branches/{name}` and then `refs/tags/{name}`. A 404 error has the
+message that Bitbucket sent. The command looks for an existing `--output` file
+before it sends a request. A broken pipe on stdout is not an error.
