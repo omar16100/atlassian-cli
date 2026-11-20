@@ -421,6 +421,13 @@ pub struct ApiClient {
 // Features: HTTPS enforcement, SSRF protection, automatic retry
 ```
 
+**Time limits** (`HttpTimeouts` in `crates/api/src/lib.rs`). An ordinary request
+has 30 seconds for the full request. A download (`get_text`, `get_bytes`) has
+300 seconds, and the client has a read timeout of 30 seconds, which ends a
+download that stops. A body that does not arrive in full is
+`ApiError::BodyReadFailed`, which the retry loop treats as retryable, because
+only the two GET downloads make it.
+
 **Response handling** (`crates/api/src/response.rs`). Every request path sends
 its response through the same two functions: `log_response` (method, URL,
 status, elapsed time, at debug) and, for a non-2xx, `error_for_status`, which

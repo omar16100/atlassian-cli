@@ -296,6 +296,30 @@ impl RawResponse {
     }
 }
 
+/// The time limits of the HTTP client.
+///
+/// `request` is a limit for a full ordinary request, the body included. A
+/// download (`get_text`, `get_bytes`) gets `download` in its place, because a
+/// large log or file can take longer than an API call. `read` is the longest
+/// time with no data on a connection, so a download that stops is found long
+/// before `download` ends.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct HttpTimeouts {
+    pub(crate) request: Duration,
+    pub(crate) read: Duration,
+    pub(crate) download: Duration,
+}
+
+impl Default for HttpTimeouts {
+    fn default() -> Self {
+        Self {
+            request: Duration::from_secs(30),
+            read: Duration::from_secs(30),
+            download: Duration::from_secs(300),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct ApiClient {
     client: Client,
@@ -305,6 +329,8 @@ pub struct ApiClient {
     auth: Option<AuthMethod>,
     retry_config: RetryConfig,
     rate_limiter: RateLimiter,
+    /// The limit for a full download. See [`HttpTimeouts`].
+    download_timeout: Duration,
 }
 
 /// Refuse a request path that the URL parser would restructure.
@@ -427,6 +453,13 @@ fn decode_once(segment: &str) -> String {
 
 impl ApiClient {
     pub fn new(base_url: impl AsRef<str>) -> Result<Self> {
+        Self::new_with_timeouts(base_url, HttpTimeouts::default())
+    }
+
+    pub(crate) fn new_with_timeouts(
+        base_url: impl AsRef<str>,
+        timeouts: HttpTimeouts,
+    ) -> Result<Self> {
         let url = Url::parse(base_url.as_ref()).map_err(ApiError::InvalidUrl)?;
 
         // Enforce HTTPS for security (prevent accidental credential leaks over HTTP)
@@ -448,7 +481,9 @@ impl ApiClient {
 
         let client = Client::builder()
             .user_agent(format!("atlassian-cli/{}", env!("CARGO_PKG_VERSION")))
-            .timeout(Duration::from_secs(30))
+            .timeout(timeouts.request)
+            .connect_timeout(timeouts.request)
+            .read_timeout(timeouts.read)
             .build()
             .map_err(ApiError::RequestFailed)?;
 
@@ -464,7 +499,11 @@ impl ApiClient {
         let origin = url.clone();
         let raw_client = Client::builder()
             .user_agent(format!("atlassian-cli/{}", env!("CARGO_PKG_VERSION")))
-            .timeout(Duration::from_secs(30))
+            .timeout(timeouts.request)
+            .connect_timeout(timeouts.request)
+            // No read timeout here. In reqwest it is also a hard limit on the
+            // wait for the response headers, and a per-request timeout does
+            // not override it, so it would cut `api --timeout` above 30 s.
             .redirect(reqwest::redirect::Policy::custom(move |attempt| {
                 if attempt.previous().len() >= 10 {
                     attempt.error("too many redirects")
@@ -484,6 +523,7 @@ impl ApiClient {
             auth: None,
             retry_config: RetryConfig::default(),
             rate_limiter: RateLimiter::new(),
+            download_timeout: timeouts.download,
         })
     }
 
@@ -664,6 +704,10 @@ impl ApiClient {
             let mut req = self.client.request(Method::GET, joined.clone());
             req = self.apply_auth(req);
             req = req.header("Accept", "text/plain, */*;q=0.1");
+            // A log can be large, so the limit for the full request is the
+            // download limit. The read timeout of the client still ends a
+            // download that stops.
+            req = req.timeout(self.download_timeout);
 
             let started = Instant::now();
             let response = req.send().await.map_err(ApiError::RequestFailed)?;
@@ -675,9 +719,13 @@ impl ApiClient {
             if !status.is_success() {
                 return Err(error_for_status(response, &joined).await);
             }
+            // Retryable. This was `InvalidResponse`, which is not retried, so
+            // one body that did not arrive in full failed the command.
             response.text().await.map_err(|e| {
-                error!("Failed to read text response: {}", e);
-                ApiError::InvalidResponse(e.to_string())
+                debug!(error = ?e, timed_out = e.is_timeout(), "Failed to read text response");
+                // Without the URL: after a redirect it is the address of the
+                // file service, and the retry loop prints this text.
+                ApiError::BodyReadFailed(e.without_url().to_string())
             })
         })
         .await?;
@@ -806,6 +854,8 @@ impl ApiClient {
         let result = retry_with_backoff(&self.retry_config, || async {
             let mut req = self.client.request(Method::GET, joined.clone());
             req = self.apply_auth(req);
+            // See `get_text`: the download limit, and a retryable body error.
+            req = req.timeout(self.download_timeout);
 
             let started = Instant::now();
             let response = req.send().await.map_err(ApiError::RequestFailed)?;
@@ -818,8 +868,8 @@ impl ApiClient {
                 return Err(error_for_status(response, &joined).await);
             }
             response.bytes().await.map(|b| b.to_vec()).map_err(|e| {
-                error!("Failed to read bytes response: {}", e);
-                ApiError::InvalidResponse(e.to_string())
+                debug!(error = ?e, timed_out = e.is_timeout(), "Failed to read bytes response");
+                ApiError::BodyReadFailed(e.without_url().to_string())
             })
         })
         .await?;
@@ -910,6 +960,9 @@ impl ApiClient {
         &self.rate_limiter
     }
 }
+
+#[cfg(test)]
+mod download_tests;
 
 #[cfg(test)]
 mod tests {

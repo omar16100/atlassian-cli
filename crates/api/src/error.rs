@@ -38,6 +38,11 @@ pub enum ApiError {
     #[error("Invalid response format: {0}")]
     InvalidResponse(String),
 
+    /// The status and the headers arrived, and the body did not arrive in
+    /// full: the connection closed, or no data came for the read timeout.
+    #[error("Failed to read the response body: {0}")]
+    BodyReadFailed(String),
+
     #[error("Invalid identifier: {message}")]
     InvalidIdentifier { message: String },
 }
@@ -48,6 +53,9 @@ impl ApiError {
             ApiError::RateLimitExceeded { .. } => true,
             ApiError::ServerError { status, .. } if *status >= 500 => true,
             ApiError::Timeout { .. } => true,
+            // Only the downloads (`get_text`, `get_bytes`) make this error,
+            // and they are GET requests, so a second try is safe.
+            ApiError::BodyReadFailed(_) => true,
             ApiError::EndpointGone { .. } => false,
             _ => false,
         }
@@ -96,6 +104,9 @@ impl ApiError {
                 }
             }
             ApiError::Timeout { .. } => Some("Check your network connection or try again later".to_string()),
+            ApiError::BodyReadFailed(_) => Some(
+                "The download stopped before its end, on each try. Check your network connection or try again later".to_string(),
+            ),
             ApiError::EndpointGone { .. } => {
                 Some("This API endpoint has been removed by Atlassian. Update atlassian-cli to the latest version.".to_string())
             }
