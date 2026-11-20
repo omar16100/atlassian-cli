@@ -20,6 +20,16 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+### Fixed
+
+- `confluence page add-restriction` sends the request body that the Confluence
+  REST specification requires: a `results` array, `accountId` for a user and
+  `id` for a group. Before, the server refused the body with "Required request
+  body is missing". `--subject-id` for a group is the group ID, not the group
+  name. `--operation` must be `read` or `update` and `--subject-type` must be
+  `user` or `group`: other values are now refused before a request is sent. The
+  change is verified against the specification and a mock server, not against a
+  live site. (#PR)
 
 ### Fixed
 

@@ -346,7 +346,7 @@ enum PageCommands {
         /// Subject type (user, group)
         #[arg(long)]
         subject_type: String,
-        /// Subject identifier (user ID or group name)
+        /// Subject identifier (user account ID or group ID)
         #[arg(long)]
         subject_id: String,
     },
