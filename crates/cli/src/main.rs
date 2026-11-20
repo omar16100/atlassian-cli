@@ -613,10 +613,12 @@ mod cli_definition_tests {
     /// Every argument, anywhere in the tree, that reuses the id of a global
     /// argument declared by an ancestor but parses to a different type.
     ///
-    /// Reusing an id with the same value type is harmless and deliberate in
-    /// places: `bb branch list <repo>` and `auth logout --profile` both hand
-    /// their value up to the global of the same name. A different type is what
-    /// panics, because the parent then reads the global back as its own type.
+    /// Reusing an id with the same value type does not panic, and is deliberate
+    /// in one place: `auth logout --profile` hands its value up to the global of
+    /// the same name. It does hide the global on that command, so the `bb`
+    /// commands do not reuse `repo` (see `bitbucket/repo_argument_tests.rs`). A
+    /// different type is what panics, because the parent then reads the global
+    /// back as its own type.
     fn mistyped_global_shadows(
         cmd: &clap::Command,
         inherited: &[(String, clap::builder::ValueParser)],

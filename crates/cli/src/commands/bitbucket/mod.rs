@@ -1,9 +1,10 @@
 use anyhow::Result;
 use atlassian_cli_api::ApiClient;
 use atlassian_cli_output::OutputRenderer;
-use clap::{Args, Subcommand};
+use clap::Args;
 
 // Submodules
+mod args;
 mod branches;
 mod bulk;
 mod commits;
@@ -23,6 +24,9 @@ pub(crate) mod workspaces;
 
 #[cfg(test)]
 mod path_encoding_tests;
+#[cfg(test)]
+mod repo_argument_tests;
+use args::*;
 use utils::BitbucketContext;
 
 /// Resolve pipeline ID from positional arg or --pipeline flag.
@@ -71,972 +75,144 @@ fn require_repo(
     })
 }
 
+/// Why a command does not read its repository from the Git remote.
+///
+/// The rule is about the effect, not the HTTP verb: a command that deletes,
+/// that is not reversible, or that gives access needs an explicit repository.
+const DELETES: &str = "This command deletes or revokes";
+const NOT_REVERSIBLE: &str = "This command makes a change that is not reversible";
+const GIVES_ACCESS: &str = "This command gives access to the repository";
+const NAMES_A_NEW_REPO: &str = "This command names a new repository";
+
+/// Where the repository of a command can come from, apart from its argument.
+struct RepoResolver {
+    /// The value of `--repo`.
+    flag: Option<String>,
+    /// The repository that the Git remote names.
+    git: Option<String>,
+}
+
+impl RepoResolver {
+    /// The argument, then `--repo`, then the Git remote.
+    fn any(&self, positional: Option<String>, cmd: &str) -> anyhow::Result<String> {
+        let chosen = positional::choose_repo(
+            positional.as_deref(),
+            self.flag.as_deref(),
+            self.git.as_deref(),
+        )?;
+        let repo = require_repo(chosen.as_deref(), None, cmd)?;
+        let source = if positional.is_some() {
+            "argument"
+        } else if self.flag.is_some() {
+            "--repo"
+        } else {
+            "git remote"
+        };
+        tracing::debug!(repo = %repo, source, command = cmd, "Resolved the repository");
+        Ok(repo)
+    }
+
+    /// The repository of a command with required arguments after it.
+    ///
+    /// `reason` is `Some` for a command that does not read the Git remote.
+    /// When no repository resolves, the error says first how the values were
+    /// read, because a lone value is most frequently the repository with the
+    /// argument after it missing.
+    fn resolve(
+        &self,
+        given: &positional::RequiredPositionals,
+        cmd: &str,
+        reason: Option<&str>,
+    ) -> anyhow::Result<String> {
+        let resolved = match reason {
+            None => self.any(given.repo.clone(), cmd),
+            Some(reason) => self.explicit(given.repo.clone(), cmd, reason, &given.required_usage()),
+        };
+        match (resolved, given.read_note()) {
+            (Err(err), Some(note)) => Err(anyhow::anyhow!("{note}\n\n{err}")),
+            (resolved, _) => resolved,
+        }
+    }
+
+    /// The argument, then `--repo`. Not the Git remote.
+    ///
+    /// For a command that deletes, that is not reversible, or that gives
+    /// access, the directory that the user is in must not select the target.
+    /// Most of these commands have no confirmation prompt. `arguments` is the
+    /// required part of the command line after the repository, for the example.
+    fn explicit(
+        &self,
+        positional: Option<String>,
+        cmd: &str,
+        reason: &str,
+        arguments: &str,
+    ) -> anyhow::Result<String> {
+        let chosen = positional::choose_repo(positional.as_deref(), self.flag.as_deref(), None)?;
+        if let Some(repo) = chosen {
+            let source = if positional.is_some() {
+                "argument"
+            } else {
+                "--repo"
+            };
+            tracing::debug!(
+                repo = %repo,
+                source,
+                command = cmd,
+                "Resolved the repository, git remote not read"
+            );
+            return Ok(repo);
+        }
+        let mut msg = format!(
+            "Repository required for '{cmd}'.\n\n\
+             {reason}, so it does not read the repository from the Git remote.\n\
+             Give the repository as an argument or with --repo <slug>.\n"
+        );
+        if let Some(git) = &self.git {
+            msg.push_str(&format!(
+                "\nThe Git remote names '{git}'. Add --repo {git} if that is the repository.\n"
+            ));
+        }
+        let arguments = if arguments.is_empty() {
+            String::new()
+        } else {
+            format!(" {arguments}")
+        };
+        msg.push_str(&format!(
+            "\nExample:\n  atlassian-cli bb {cmd} --workspace <workspace> --repo <repo>{arguments}\n"
+        ));
+        Err(anyhow::anyhow!(msg))
+    }
+}
+
+/// The repository and the pull request ID of `bb pr <command> [REPO] <PR_ID>`.
+///
+/// The ID is read first. A slug where the ID must be then gives an error about
+/// the argument order, and not an error about a missing repository.
+fn repo_and_pr(
+    repos: &RepoResolver,
+    targets: Vec<String>,
+    cmd: &str,
+    reason: Option<&str>,
+) -> anyhow::Result<(String, i64)> {
+    let given = positional::split_repo_and_required(targets, &["PR_ID"])?;
+    let pr_id = given.number(0)?;
+    Ok((repos.resolve(&given, cmd, reason)?, pr_id))
+}
+
 #[derive(Args, Debug, Clone)]
 pub struct BitbucketArgs {
     /// Workspace slug (defaults to workspace configured in profile base URL host prefix).
     #[arg(long, global = true)]
     pub workspace: Option<String>,
 
-    /// Repository slug (auto-detected from git remote if not specified).
+    /// Repository slug. For most commands it is auto-detected from the git
+    /// remote if not specified. Commands that delete, that are not reversible,
+    /// or that give access need it here or as an argument.
     #[arg(long, global = true)]
     pub repo: Option<String>,
 
     #[command(subcommand)]
     command: BitbucketCommands,
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum BitbucketCommands {
-    /// Repository operations.
-    #[command(subcommand)]
-    Repo(RepoCommands),
-
-    /// Branch operations.
-    #[command(subcommand)]
-    Branch(BranchCommands),
-
-    /// Pull request operations.
-    #[command(subcommand)]
-    Pr(PrCommands),
-
-    /// Workspace operations.
-    #[command(subcommand)]
-    Workspace(WorkspaceCommands),
-
-    /// Project operations.
-    #[command(subcommand)]
-    Project(ProjectCommands),
-
-    /// Pipeline operations.
-    #[command(subcommand)]
-    Pipeline(PipelineCommands),
-
-    /// Webhook operations.
-    #[command(subcommand)]
-    Webhook(WebhookCommands),
-
-    /// SSH deploy key operations.
-    #[command(subcommand)]
-    SshKey(SshKeyCommands),
-
-    /// Repository permission operations.
-    #[command(subcommand)]
-    Permission(PermissionCommands),
-
-    /// Commit operations.
-    #[command(subcommand)]
-    Commit(CommitCommands),
-
-    /// Bulk operations.
-    #[command(subcommand)]
-    Bulk(BulkCommands),
-
-    /// Show current authenticated Bitbucket user.
-    Whoami,
-
-    /// Call any Bitbucket REST endpoint with the profile's credentials.
-    ///
-    /// The escape hatch for anything the typed commands do not expose. Paths
-    /// are relative to https://api.bitbucket.org, e.g. /2.0/user.
-    #[command(
-        long_about = "Call any Bitbucket REST endpoint with the profile's credentials.\n\nThe escape hatch for fields the typed commands drop. Paths are relative to https://api.bitbucket.org.\n\nExamples:\n  bb api /2.0/user\n  bb api /2.0/repositories/{workspace}/{repo}/pullrequests/1\n  bb api /2.0/repositories/{workspace}/{repo}/default-reviewers"
-    )]
-    Api(crate::commands::api::ApiArgs),
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum RepoCommands {
-    /// List repositories inside a workspace.
-    #[command(
-        long_about = "List repositories inside a workspace.\n\nExamples:\n  bb repo list\n  bb repo list --limit 50\n  bb repo list --workspace my-team"
-    )]
-    List {
-        /// Maximum results. 0 fetches every page.
-        #[arg(long, default_value_t = 25)]
-        limit: usize,
-    },
-    /// Show repository metadata.
-    #[command(long_about = "Show repository metadata.\n\nExamples:\n  bb repo get my-repo")]
-    Get {
-        /// Repository slug (e.g., my-repo)
-        slug: String,
-    },
-    /// Create a new repository.
-    #[command(
-        long_about = "Create a new repository.\n\nExamples:\n  bb repo create my-new-repo\n  bb repo create my-repo --name \"My Repository\" --description \"Project repo\" --private"
-    )]
-    Create {
-        /// Repository slug (URL-friendly name, e.g., my-repo)
-        slug: String,
-        /// Repository display name
-        #[arg(long)]
-        name: Option<String>,
-        /// Repository description
-        #[arg(long)]
-        description: Option<String>,
-        /// Make repository private
-        #[arg(long)]
-        private: bool,
-        /// Project key to associate with.
-        #[arg(long)]
-        project: Option<String>,
-    },
-    /// Update repository metadata.
-    Update {
-        /// Repository slug.
-        slug: String,
-        /// New display name.
-        #[arg(long)]
-        name: Option<String>,
-        /// New description.
-        #[arg(long)]
-        description: Option<String>,
-        /// Programming language.
-        #[arg(long)]
-        language: Option<String>,
-    },
-    /// Delete a repository, its pull requests, issues and wiki.
-    Delete {
-        /// Repository slug.
-        slug: String,
-        /// Skip the typed confirmation. `--yes` matches the other commands.
-        #[arg(long, visible_alias = "yes")]
-        force: bool,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum BranchCommands {
-    /// List branches in a repository.
-    List {
-        /// Repository slug.
-        repo: String,
-        /// Maximum results. 0 fetches every page.
-        #[arg(long, default_value_t = 25)]
-        limit: usize,
-    },
-    /// Get branch details.
-    Get {
-        /// Repository slug.
-        repo: String,
-        /// Branch name.
-        branch: String,
-    },
-    /// Create a new branch.
-    Create {
-        /// Repository slug.
-        repo: String,
-        /// New branch name.
-        branch: String,
-        /// Source commit hash or branch name.
-        #[arg(long)]
-        from: String,
-    },
-    /// Delete a branch.
-    Delete {
-        /// Repository slug.
-        repo: String,
-        /// Branch name.
-        branch: String,
-        /// Skip the typed confirmation. `--yes` matches the bulk commands.
-        #[arg(long, visible_alias = "yes")]
-        force: bool,
-    },
-    /// Add branch protection (restriction).
-    Protect {
-        /// Repository slug.
-        repo: String,
-        /// Branch name pattern (e.g., "main", "release/*").
-        #[arg(long)]
-        pattern: String,
-        /// Restriction kind (push, delete, force, restrict_merges).
-        #[arg(long)]
-        kind: String,
-        /// Number of required approvals.
-        #[arg(long)]
-        approvals: Option<i32>,
-    },
-    /// Remove branch protection.
-    Unprotect {
-        /// Repository slug.
-        repo: String,
-        /// Branch restriction ID.
-        restriction_id: i64,
-    },
-    /// List branch restrictions.
-    Restrictions {
-        /// Repository slug.
-        repo: String,
-    },
-}
-
-/// `clap` value parser that trims and rejects empty strings.
-///
-/// Used where an empty value would only produce a server-side 400 (`--text ""`,
-/// `--path ""`). Bitbucket rejects both, and the error is far more useful
-/// raised by clap at parse time.
-fn non_empty_string(s: &str) -> std::result::Result<String, String> {
-    if s.trim().is_empty() {
-        Err("value must not be empty".to_string())
-    } else {
-        Ok(s.to_string())
-    }
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum PrCommands {
-    /// List pull requests for a repository.
-    List {
-        /// Repository slug.
-        repo: String,
-        #[arg(long, default_value = "OPEN")]
-        state: String,
-        /// Maximum results. 0 fetches every page.
-        #[arg(long, default_value_t = 25)]
-        limit: usize,
-    },
-    /// Get pull request details.
-    Get {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-    },
-    /// Create a new pull request.
-    Create {
-        /// Repository slug.
-        repo: String,
-        /// PR title.
-        #[arg(long)]
-        title: String,
-        /// Source branch.
-        #[arg(long)]
-        source: String,
-        /// Destination branch.
-        #[arg(long)]
-        destination: String,
-        /// PR description.
-        #[arg(long)]
-        description: Option<String>,
-        /// Reviewer UUIDs (comma-separated). `bb permission list` and
-        /// `bb pr reviewers` both report the uuid to use.
-        #[arg(long, value_delimiter = ',')]
-        reviewers: Vec<String>,
-        /// Also add the repository's configured default reviewers.
-        ///
-        /// Atlassian apply these in the web UI only, so a pull request created
-        /// through the API gets none. Where a merge check requires a
-        /// default-reviewer approval, that leaves the pull request unmergeable.
-        #[arg(long)]
-        default_reviewers: bool,
-    },
-    /// Update pull request.
-    Update {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// New title.
-        #[arg(long)]
-        title: Option<String>,
-        /// New description.
-        #[arg(long)]
-        description: Option<String>,
-        /// Replace the reviewers with these account UUIDs (comma-separated).
-        /// An empty value removes every reviewer. `pr reviewers --add` adds
-        /// to the current set instead.
-        #[arg(long, value_delimiter = ',')]
-        reviewers: Option<Vec<String>>,
-    },
-    /// Merge pull request.
-    Merge {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// Merge strategy: merge_commit, squash, or fast_forward.
-        #[arg(long)]
-        strategy: Option<String>,
-        /// Merge commit message.
-        #[arg(long)]
-        message: Option<String>,
-    },
-    /// Decline/close pull request.
-    Decline {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-    },
-    /// Approve pull request.
-    Approve {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-    },
-    /// Remove approval from pull request.
-    Unapprove {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-    },
-    /// View pull request diff.
-    Diff {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-    },
-    /// List pull request comments.
-    Comments {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-    },
-    /// Add a comment to a pull request, optionally inline or as a threaded reply
-    #[command(long_about = "Add a comment to a pull request.\n\n\
-        By default, posts a top-level PR comment. Passing --path (with an optional --line and\n\
-        --side) anchors it to a file instead, and --parent replies inside an existing thread.\n\n\
-        Examples:\n  \
-        bb pr comment my-repo 123 --text \"LGTM\"\n  \
-        bb pr comment my-repo 123 --text \"Nit: rename\" --path src/main.rs --line 42\n  \
-        bb pr comment my-repo 123 --text \"Why remove?\" --path src/main.rs --line 17 --side old\n  \
-        bb pr comment my-repo 123 --text \"Whole-file comment\" --path README.md\n  \
-        bb pr comment my-repo 123 --text \"Fixed\" --parent 843649259\n\n\
-        --side selects which side of the diff --line refers to:\n  \
-        new (default) = destination revision (added/unchanged lines)\n  \
-        old           = source revision (removed lines)")]
-    Comment {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// Comment text (Markdown).
-        #[arg(long, value_parser = non_empty_string)]
-        text: String,
-        /// Parent comment ID for a threaded reply.
-        #[arg(long)]
-        parent: Option<i64>,
-        /// File path (relative to repo root) to anchor an inline comment to.
-        /// If omitted, posts a top-level PR comment.
-        #[arg(long, value_parser = non_empty_string)]
-        path: Option<String>,
-        /// Line number to anchor the inline comment to. Must be >= 1, because
-        /// Bitbucket line numbers are 1-indexed. Requires --path.
-        /// If omitted while --path is given, posts a file-level inline comment.
-        #[arg(long, requires = "path", value_parser = clap::value_parser!(u32).range(1..))]
-        line: Option<u32>,
-        /// Which side of the diff --line refers to: `new` (default) = destination
-        /// (added/unchanged lines), `old` = source (removed lines). Requires --line.
-        #[arg(long, requires = "line", default_value_t = pullrequests::Side::New, value_enum)]
-        side: pullrequests::Side,
-    },
-    /// Resolve a pull request diff comment thread.
-    ResolveComment {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// Top-level comment ID.
-        comment_id: i64,
-    },
-    /// Reopen a resolved pull request comment thread.
-    ReopenComment {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// Top-level comment ID.
-        comment_id: i64,
-    },
-    /// List pull request reviewers with review status, or add new reviewers.
-    #[command(
-        long_about = "List pull request reviewers with review status, or add new reviewers.\n\nWith no flags, lists current reviewers (role=REVIEWER) and whether each has approved, requested changes, or not responded.\n\nExamples:\n  bb pr reviewers my-repo 123\n  bb pr reviewers my-repo 123 --all\n  bb pr reviewers my-repo 123 --add {uuid}"
-    )]
-    Reviewers {
-        /// Repository slug.
-        repo: String,
-        /// Pull request ID.
-        pr_id: i64,
-        /// Reviewer UUIDs to add (comma-separated). If omitted, lists current reviewers instead.
-        #[arg(long, value_delimiter = ',')]
-        add: Vec<String>,
-        /// When listing, also include non-reviewer participants (commenters).
-        #[arg(long, conflicts_with = "add")]
-        all: bool,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum WorkspaceCommands {
-    /// List workspaces.
-    List {
-        /// Maximum results. 0 fetches every page.
-        #[arg(long, default_value_t = 25)]
-        limit: usize,
-    },
-    /// Get workspace details.
-    Get { slug: String },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum ProjectCommands {
-    /// List projects in workspace.
-    List {
-        /// Maximum results. 0 fetches every page.
-        #[arg(long, default_value_t = 25)]
-        limit: usize,
-    },
-    /// Get project details.
-    Get { key: String },
-    /// Create a new project.
-    Create {
-        /// Project key (uppercase).
-        key: String,
-        /// Project name.
-        #[arg(long)]
-        name: String,
-        /// Project description.
-        #[arg(long)]
-        description: Option<String>,
-        /// Make project private.
-        #[arg(long)]
-        private: bool,
-    },
-    /// Update project.
-    Update {
-        /// Project key.
-        key: String,
-        /// New name.
-        #[arg(long)]
-        name: Option<String>,
-        /// New description.
-        #[arg(long)]
-        description: Option<String>,
-    },
-    /// Delete project.
-    Delete {
-        /// Project key.
-        key: String,
-        /// Skip confirmation.
-        #[arg(long)]
-        force: bool,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum PipelineCommands {
-    /// List pipelines.
-    List {
-        /// Repository slug. Defaults to --repo, then the git remote.
-        #[arg(value_name = "REPO")]
-        repo_arg: Option<String>,
-        /// Maximum results. 0 fetches every page.
-        #[arg(long, default_value_t = 25)]
-        limit: usize,
-        /// Sort field (prefix with - for desc): created_on, -created_on.
-        #[arg(long)]
-        sort: Option<String>,
-        /// Show N most recent pipelines (shorthand for --sort=-created_on --limit=N).
-        #[arg(long)]
-        recent: Option<usize>,
-        /// Filter by branch name.
-        #[arg(long)]
-        branch: Option<String>,
-        /// Filter pipelines created after this time (inclusive). Examples: 24h, 7d, 2024-01-01T00:00:00Z
-        #[arg(long)]
-        since: Option<String>,
-        /// Filter pipelines created before this time (exclusive). Examples: 7d, 2024-12-01T00:00:00Z
-        #[arg(long)]
-        before: Option<String>,
-        /// Filter by pull request number (uses PR's source branch).
-        #[arg(long)]
-        pr: Option<i64>,
-        /// Fetch all pages (ignores --limit).
-        #[arg(long)]
-        all: bool,
-        /// Show step summary for each pipeline (adds N API calls).
-        #[arg(long)]
-        steps: bool,
-    },
-    /// Get pipeline details.
-    Get {
-        /// Repository slug (defaults to --repo, then the git remote), then the
-        /// pipeline UUID or build number.
-        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
-        targets: Vec<String>,
-        /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline")]
-        pipeline_flag: Option<String>,
-        /// Show pipeline steps with status.
-        #[arg(long)]
-        steps: bool,
-    },
-    /// Get latest pipeline for current or specified branch.
-    Latest {
-        /// Repository slug. Defaults to --repo, then the git remote.
-        #[arg(value_name = "REPO")]
-        repo_arg: Option<String>,
-        /// Branch name (auto-detected from current branch if not specified).
-        #[arg(long)]
-        branch: Option<String>,
-        /// Show pipeline steps with status.
-        #[arg(long)]
-        steps: bool,
-    },
-    /// Trigger a new pipeline.
-    Trigger {
-        /// Repository slug. Defaults to --repo, then the git remote.
-        #[arg(value_name = "REPO")]
-        repo_arg: Option<String>,
-        /// Branch or tag name.
-        #[arg(long)]
-        ref_name: String,
-        /// Reference type (branch or tag).
-        #[arg(long, default_value = "branch")]
-        ref_type: String,
-        /// Pipeline variables in KEY=VALUE format (can be repeated).
-        #[arg(long = "var")]
-        variables: Vec<String>,
-        /// Mark all variables as secured.
-        #[arg(long, default_value_t = false)]
-        secured: bool,
-        /// Custom pipeline name to trigger (selector pattern from bitbucket-pipelines.yml).
-        #[arg(long)]
-        custom_pipeline: Option<String>,
-    },
-    /// Stop a running pipeline.
-    Stop {
-        /// Repository slug (defaults to --repo, then the git remote), then the
-        /// pipeline UUID or build number.
-        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
-        targets: Vec<String>,
-        /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline")]
-        pipeline_flag: Option<String>,
-    },
-    /// Get pipeline logs.
-    Logs {
-        /// Repository slug (defaults to --repo, then the git remote), pipeline
-        /// UUID or build number, step UUID.
-        #[arg(value_names = ["REPO", "PIPELINE", "STEP_UUID"], num_args = 0..=3)]
-        targets: Vec<String>,
-        /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline")]
-        pipeline_flag: Option<String>,
-        /// Step UUID (alternative to positional).
-        #[arg(long = "step-uuid")]
-        step_uuid_flag: Option<String>,
-        /// Filter by step name pattern.
-        #[arg(long)]
-        step: Option<String>,
-        /// Grep pattern to filter log lines.
-        #[arg(long)]
-        grep: Option<String>,
-        /// Case-insensitive grep and step name matching.
-        #[arg(long, short = 'i')]
-        ignore_case: bool,
-        /// Show only failed steps.
-        #[arg(long)]
-        failed_only: bool,
-    },
-    /// Watch a running pipeline until it finishes or pauses for a manual step.
-    ///
-    /// Exit codes: 0 successful, 1 failed, stopped or unknown, 2 timed out,
-    /// 3 paused waiting on a manual step.
-    Watch {
-        /// Repository slug (defaults to --repo, then the git remote), then the
-        /// pipeline UUID or build number.
-        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
-        targets: Vec<String>,
-        /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline")]
-        pipeline_flag: Option<String>,
-        /// Poll interval in seconds.
-        #[arg(long, default_value_t = 5)]
-        interval: u64,
-        /// Show pipeline steps with status.
-        #[arg(long)]
-        steps: bool,
-        /// Shell command to run on pipeline completion. Receives env vars: PIPELINE_STATUS, PIPELINE_BUILD_NUMBER, PIPELINE_UUID, PIPELINE_REF_NAME.
-        #[arg(long)]
-        on_complete: Option<String>,
-        /// Timeout in seconds. Exit with code 2 if pipeline does not finish in time.
-        #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
-        timeout: Option<u64>,
-        /// Log mode: one line per poll, no ANSI escape codes. Auto-enabled when stdout is not a TTY.
-        #[arg(long)]
-        log: bool,
-    },
-    /// List steps for a pipeline.
-    Steps {
-        /// Repository slug (defaults to --repo, then the git remote), then the
-        /// pipeline UUID or build number.
-        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
-        targets: Vec<String>,
-        /// Pipeline UUID or build number (alternative to positional).
-        #[arg(long = "pipeline")]
-        pipeline_flag: Option<String>,
-    },
-    /// Get latest pipeline status (JSON output, smart exit codes).
-    ///
-    /// Exit codes: 0 successful, 1 failed, stopped or unknown, 2 in progress or
-    /// pending, 3 paused waiting on a manual step. `--wait` stops at a pause.
-    Status {
-        /// Repository slug. Defaults to --repo, then the git remote.
-        #[arg(value_name = "REPO")]
-        repo_arg: Option<String>,
-        /// Show pipeline steps with status.
-        #[arg(long)]
-        steps: bool,
-        /// Wait until the pipeline finishes, or pauses for a manual step.
-        #[arg(long)]
-        wait: bool,
-        /// Poll interval in seconds (used with --wait).
-        #[arg(long, default_value_t = 10)]
-        interval: u64,
-    },
-    /// Re-run a pipeline with the same commit.
-    Rerun {
-        /// Repository slug (defaults to --repo, then the git remote), then the
-        /// pipeline UUID or build number (omit with --pr).
-        #[arg(value_names = ["REPO", "PIPELINE"], num_args = 0..=2)]
-        targets: Vec<String>,
-        /// Re-run from pull request (uses PR's source branch).
-        #[arg(long)]
-        pr: Option<i64>,
-        /// Only re-run if there are failed steps (requires --pr).
-        #[arg(long, requires = "pr")]
-        failed_only: bool,
-        /// Pipeline variables in KEY=VALUE format (can be repeated).
-        #[arg(long = "var")]
-        variables: Vec<String>,
-        /// Mark all variables as secured.
-        #[arg(long, default_value_t = false)]
-        secured: bool,
-    },
-    /// Manage pipeline variables/secrets.
-    #[command(subcommand)]
-    Var(VarCommands),
-    /// Manage deployment environments.
-    #[command(subcommand)]
-    Env(EnvCommands),
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum VarCommands {
-    /// List pipeline variables.
-    #[command(
-        long_about = "List pipeline variables.\n\nExamples:\n  bb pipeline var list\n  bb pipeline var list --workspace-level\n  bb pipeline var list --deployment staging"
-    )]
-    List {
-        /// List workspace-level variables instead of repository variables.
-        #[arg(long, conflicts_with = "deployment")]
-        workspace_level: bool,
-        /// List variables for a deployment environment (name or UUID).
-        #[arg(long, conflicts_with = "workspace_level")]
-        deployment: Option<String>,
-        /// Maximum number of results.
-        #[arg(long, default_value_t = 100)]
-        limit: usize,
-    },
-    /// Get a pipeline variable by key.
-    Get {
-        /// Variable key name.
-        #[arg(long)]
-        key: String,
-        /// Get from workspace-level scope.
-        #[arg(long, conflicts_with = "deployment")]
-        workspace_level: bool,
-        /// Get from deployment environment (name or UUID).
-        #[arg(long, conflicts_with = "workspace_level")]
-        deployment: Option<String>,
-    },
-    /// Create a pipeline variable.
-    #[command(
-        long_about = "Create a pipeline variable.\n\nExamples:\n  bb pipeline var create --key MY_VAR --value hello\n  bb pipeline var create --key SECRET --value s3cr3t --secured\n  bb pipeline var create --workspace-level --key WS_VAR --value val"
-    )]
-    Create {
-        /// Variable key name.
-        #[arg(long)]
-        key: String,
-        /// Variable value.
-        #[arg(long)]
-        value: String,
-        /// Mark variable as secured (write-only, value hidden on read).
-        #[arg(long)]
-        secured: bool,
-        /// Create in workspace-level scope.
-        #[arg(long, conflicts_with = "deployment")]
-        workspace_level: bool,
-        /// Create in deployment environment (name or UUID).
-        #[arg(long, conflicts_with = "workspace_level")]
-        deployment: Option<String>,
-    },
-    /// Update a pipeline variable.
-    #[command(
-        long_about = "Update a pipeline variable.\n\nExamples:\n  bb pipeline var update --key MY_VAR --value newval\n  bb pipeline var update --key MY_VAR --value s3cr3t --secured\n  bb pipeline var update --key MY_VAR --value plaintext --unsecured"
-    )]
-    Update {
-        /// Variable key name.
-        #[arg(long)]
-        key: String,
-        /// New variable value.
-        #[arg(long)]
-        value: String,
-        /// Mark variable as secured.
-        #[arg(long, conflicts_with = "unsecured")]
-        secured: bool,
-        /// Mark variable as unsecured (removes write-only protection).
-        #[arg(long, conflicts_with = "secured")]
-        unsecured: bool,
-        /// Update in workspace-level scope.
-        #[arg(long, conflicts_with = "deployment")]
-        workspace_level: bool,
-        /// Update in deployment environment (name or UUID).
-        #[arg(long, conflicts_with = "workspace_level")]
-        deployment: Option<String>,
-    },
-    /// Delete a pipeline variable.
-    Delete {
-        /// Variable key name.
-        #[arg(long)]
-        key: String,
-        /// Delete from workspace-level scope.
-        #[arg(long, conflicts_with = "deployment")]
-        workspace_level: bool,
-        /// Delete from deployment environment (name or UUID).
-        #[arg(long, conflicts_with = "workspace_level")]
-        deployment: Option<String>,
-        /// Skip confirmation prompt.
-        #[arg(long)]
-        force: bool,
-    },
-}
-
-impl VarCommands {
-    fn is_workspace_level(&self) -> bool {
-        match self {
-            VarCommands::List {
-                workspace_level, ..
-            }
-            | VarCommands::Get {
-                workspace_level, ..
-            }
-            | VarCommands::Create {
-                workspace_level, ..
-            }
-            | VarCommands::Update {
-                workspace_level, ..
-            }
-            | VarCommands::Delete {
-                workspace_level, ..
-            } => *workspace_level,
-        }
-    }
-
-    fn deployment(&self) -> Option<String> {
-        match self {
-            VarCommands::List { deployment, .. }
-            | VarCommands::Get { deployment, .. }
-            | VarCommands::Create { deployment, .. }
-            | VarCommands::Update { deployment, .. }
-            | VarCommands::Delete { deployment, .. } => deployment.clone(),
-        }
-    }
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum EnvCommands {
-    /// List deployment environments.
-    List {
-        /// Maximum number of results.
-        #[arg(long, default_value_t = 100)]
-        limit: usize,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum WebhookCommands {
-    /// List webhooks.
-    List {
-        /// Repository slug.
-        repo: String,
-    },
-    /// Create webhook.
-    Create {
-        /// Repository slug.
-        repo: String,
-        /// Webhook URL.
-        #[arg(long)]
-        url: String,
-        /// Description.
-        #[arg(long)]
-        description: Option<String>,
-        /// Events (comma-separated).
-        #[arg(long, value_delimiter = ',')]
-        events: Vec<String>,
-        /// Active flag.
-        #[arg(long, default_value_t = true)]
-        active: bool,
-    },
-    /// Delete webhook.
-    Delete {
-        /// Repository slug.
-        repo: String,
-        /// Webhook UUID.
-        uuid: String,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum SshKeyCommands {
-    /// List SSH deploy keys.
-    List {
-        /// Repository slug.
-        repo: String,
-    },
-    /// Add SSH deploy key.
-    Add {
-        /// Repository slug.
-        repo: String,
-        /// Key label.
-        #[arg(long)]
-        label: String,
-        /// SSH public key.
-        #[arg(long)]
-        key: String,
-    },
-    /// Delete SSH deploy key.
-    Delete {
-        /// Repository slug.
-        repo: String,
-        /// Key UUID.
-        uuid: String,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum PermissionCommands {
-    /// List repository permissions.
-    List {
-        /// Repository slug.
-        repo: String,
-    },
-    /// Grant repository permission.
-    Grant {
-        /// Repository slug.
-        repo: String,
-        /// User UUID.
-        #[arg(long)]
-        user_uuid: String,
-        /// Permission level (read, write, admin).
-        #[arg(long)]
-        permission: String,
-    },
-    /// Revoke repository permission.
-    Revoke {
-        /// Repository slug.
-        repo: String,
-        /// User UUID.
-        user_uuid: String,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum CommitCommands {
-    /// List commits.
-    List {
-        /// Repository slug.
-        repo: String,
-        /// Branch name.
-        #[arg(long)]
-        branch: Option<String>,
-        /// Maximum results. 0 fetches every page.
-        #[arg(long, default_value_t = 25)]
-        limit: usize,
-    },
-    /// Get commit details.
-    Get {
-        /// Repository slug.
-        repo: String,
-        /// Commit hash.
-        hash: String,
-    },
-    /// View commit diff.
-    Diff {
-        /// Repository slug.
-        repo: String,
-        /// Commit hash.
-        hash: String,
-    },
-    /// Browse source code.
-    Browse {
-        /// Repository slug.
-        repo: String,
-        /// Commit hash or branch name.
-        #[arg(long)]
-        commit: String,
-        /// File path.
-        #[arg(long)]
-        path: Option<String>,
-    },
-}
-
-#[derive(Subcommand, Debug, Clone)]
-enum BulkCommands {
-    /// Disable the issue tracker and wiki on stale repositories.
-    ///
-    /// Despite the command name, this does NOT archive: Bitbucket Cloud has no
-    /// repository archive API. It sets has_issues and has_wiki to false, which
-    /// makes any existing issues and wiki pages inaccessible. Every repository
-    /// in the workspace is examined, not just the first page. Lists candidates
-    /// by default; pass --execute to apply.
-    ArchiveRepos {
-        /// Days threshold for staleness. Must be at least 1.
-        ///
-        /// Rejecting 0 and negatives matters: either would make every
-        /// repository "stale", which with --execute --yes in a script is a
-        /// workspace-wide change from a typo.
-        #[arg(long, default_value_t = 180, value_parser = clap::value_parser!(i64).range(1..=36_500))]
-        days: i64,
-        /// Apply the change. Without this, candidates are only listed.
-        #[arg(long)]
-        execute: bool,
-        /// Skip the typed confirmation required by --execute.
-        #[arg(long)]
-        yes: bool,
-        /// Deprecated: listing is now the default. Cannot be combined with
-        /// --execute, which it would otherwise silently override.
-        #[arg(long, hide = true, conflicts_with = "execute")]
-        dry_run: bool,
-    },
-    /// Delete branches by name. Does NOT check merge status.
-    ///
-    /// Any branch except main, master, develop, development and --exclude
-    /// matches is a candidate, whether or not it was ever merged. EVERY branch
-    /// in the repository is considered, not just the first page. Lists
-    /// candidates by default; pass --execute to actually delete.
-    DeleteBranches {
-        /// Repository slug.
-        repo: String,
-        /// Exclude patterns (comma-separated).
-        #[arg(long, value_delimiter = ',')]
-        exclude: Vec<String>,
-        /// Delete the matched branches. Without this, they are only listed.
-        #[arg(long)]
-        execute: bool,
-        /// Skip the typed confirmation required by --execute.
-        #[arg(long)]
-        yes: bool,
-        /// Deprecated: listing is now the default. Cannot be combined with
-        /// --execute, which it would otherwise silently override.
-        #[arg(long, hide = true, conflicts_with = "execute")]
-        dry_run: bool,
-    },
 }
 
 pub async fn execute(
@@ -1063,7 +239,29 @@ pub async fn execute(
 
     // Detect git context for auto-detection
     let git_ctx = git::detect_git_context(bitbucket_remote);
+    execute_in(
+        args,
+        client,
+        renderer,
+        inferred_workspace,
+        is_bearer,
+        git_ctx,
+    )
+    .await
+}
 
+/// Run a command that needs a workspace, with the Git context already read.
+///
+/// The Git context is a parameter so that a test can give one. A test cannot
+/// control the remotes of the directory that `cargo test` runs in.
+async fn execute_in(
+    args: BitbucketArgs,
+    client: ApiClient,
+    renderer: &OutputRenderer,
+    inferred_workspace: Option<&str>,
+    is_bearer: bool,
+    git_ctx: git::GitContext,
+) -> Result<()> {
     // CLI flag takes precedence, then git context, then inferred from profile
     let workspace = args
         .workspace
@@ -1115,18 +313,12 @@ pub async fn execute(
         })?
         .to_string();
 
-    // Kept apart for pipeline commands, which also take the repository as an
-    // argument: an argument that disagrees with --repo is an error, while one
-    // that differs from the git remote simply wins.
-    let repo_flag = args.repo.clone();
-    let git_repo = git_ctx.repo_slug.clone();
-    let pipeline_repo = |positional: Option<String>, cmd: &str| -> anyhow::Result<String> {
-        let chosen = positional::choose_repo(
-            positional.as_deref(),
-            repo_flag.as_deref(),
-            git_repo.as_deref(),
-        )?;
-        require_repo(chosen.as_deref(), None, cmd)
+    // Kept apart from `global_repo` for the commands that also take the
+    // repository as an argument: an argument that disagrees with --repo is an
+    // error, while one that differs from the git remote simply wins.
+    let repos = RepoResolver {
+        flag: args.repo.clone(),
+        git: git_ctx.repo_slug.clone(),
     };
 
     // Global repo slug resolution
@@ -1145,7 +337,10 @@ pub async fn execute(
     match args.command {
         BitbucketCommands::Repo(cmd) => match cmd {
             RepoCommands::List { limit } => repos::list_repos(&ctx, &workspace, limit).await,
-            RepoCommands::Get { slug } => repos::get_repo(&ctx, &workspace, &slug).await,
+            RepoCommands::Get { slug } => {
+                let slug = repos.any(slug, "repo get")?;
+                repos::get_repo(&ctx, &workspace, &slug).await
+            }
             RepoCommands::Create {
                 slug,
                 name,
@@ -1153,6 +348,7 @@ pub async fn execute(
                 private,
                 project,
             } => {
+                let slug = repos.explicit(slug, "repo create", NAMES_A_NEW_REPO, "")?;
                 repos::create_repo(
                     &ctx,
                     &workspace,
@@ -1170,6 +366,7 @@ pub async fn execute(
                 description,
                 language,
             } => {
+                let slug = repos.explicit(slug, "repo update", NOT_REVERSIBLE, "")?;
                 repos::update_repo(
                     &ctx,
                     &workspace,
@@ -1181,49 +378,68 @@ pub async fn execute(
                 .await
             }
             RepoCommands::Delete { slug, force } => {
+                let slug = repos.explicit(slug, "repo delete", DELETES, "")?;
                 repos::delete_repo(&ctx, &workspace, &slug, force).await
             }
         },
         BitbucketCommands::Branch(cmd) => match cmd {
-            BranchCommands::List { repo, limit } => {
+            BranchCommands::List { repo_arg, limit } => {
+                let repo = repos.any(repo_arg, "branch list")?;
                 branches::list_branches(&ctx, &workspace, &repo, limit).await
             }
-            BranchCommands::Get { repo, branch } => {
+            BranchCommands::Get { targets } => {
+                let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
+                let branch = given.text(0).to_string();
+                let repo = repos.resolve(&given, "branch get", None)?;
                 branches::get_branch(&ctx, &workspace, &repo, &branch).await
             }
-            BranchCommands::Create { repo, branch, from } => {
+            BranchCommands::Create { targets, from } => {
+                let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
+                let branch = given.text(0).to_string();
+                let repo = repos.resolve(&given, "branch create", None)?;
                 branches::create_branch(&ctx, &workspace, &repo, &branch, &from).await
             }
-            BranchCommands::Delete {
-                repo,
-                branch,
-                force,
-            } => branches::delete_branch(&ctx, &workspace, &repo, &branch, force).await,
+            BranchCommands::Delete { targets, force } => {
+                let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
+                let branch = given.text(0).to_string();
+                let repo = repos.resolve(&given, "branch delete", Some(DELETES))?;
+                branches::delete_branch(&ctx, &workspace, &repo, &branch, force).await
+            }
             BranchCommands::Protect {
-                repo,
+                repo_arg,
                 pattern,
                 kind,
                 approvals,
             } => {
+                let repo = repos.any(repo_arg, "branch protect")?;
                 branches::protect_branch(&ctx, &workspace, &repo, &pattern, &kind, approvals).await
             }
-            BranchCommands::Unprotect {
-                repo,
-                restriction_id,
-            } => branches::unprotect_branch(&ctx, &workspace, &repo, restriction_id).await,
-            BranchCommands::Restrictions { repo } => {
+            BranchCommands::Unprotect { targets } => {
+                let given = positional::split_repo_and_required(targets, &["RESTRICTION_ID"])?;
+                let restriction_id = given.number(0)?;
+                let repo = repos.resolve(&given, "branch unprotect", Some(DELETES))?;
+                branches::unprotect_branch(&ctx, &workspace, &repo, restriction_id).await
+            }
+            BranchCommands::Restrictions { repo_arg } => {
+                let repo = repos.any(repo_arg, "branch restrictions")?;
                 branches::list_restrictions(&ctx, &workspace, &repo).await
             }
         },
         BitbucketCommands::Pr(cmd) => match cmd {
-            PrCommands::List { repo, state, limit } => {
+            PrCommands::List {
+                repo_arg,
+                state,
+                limit,
+            } => {
+                let repo = repos.any(repo_arg, "pr list")?;
                 pullrequests::list_pull_requests(&ctx, &workspace, &repo, &state, limit).await
             }
-            PrCommands::Get { repo, pr_id } => {
+            PrCommands::Get { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr get", None)?;
                 pullrequests::get_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Create {
-                repo,
+                repo_arg,
                 title,
                 source,
                 destination,
@@ -1231,6 +447,7 @@ pub async fn execute(
                 reviewers,
                 default_reviewers,
             } => {
+                let repo = repos.any(repo_arg, "pr create")?;
                 pullrequests::create_pull_request(
                     &ctx,
                     &workspace,
@@ -1245,12 +462,12 @@ pub async fn execute(
                 .await
             }
             PrCommands::Update {
-                repo,
-                pr_id,
+                targets,
                 title,
                 description,
                 reviewers,
             } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr update", None)?;
                 pullrequests::update_pull_request(
                     &ctx,
                     &workspace,
@@ -1263,11 +480,11 @@ pub async fn execute(
                 .await
             }
             PrCommands::Merge {
-                repo,
-                pr_id,
+                targets,
                 strategy,
                 message,
             } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr merge", Some(NOT_REVERSIBLE))?;
                 pullrequests::merge_pull_request(
                     &ctx,
                     &workspace,
@@ -1278,30 +495,36 @@ pub async fn execute(
                 )
                 .await
             }
-            PrCommands::Decline { repo, pr_id } => {
+            PrCommands::Decline { targets } => {
+                let (repo, pr_id) =
+                    repo_and_pr(&repos, targets, "pr decline", Some(NOT_REVERSIBLE))?;
                 pullrequests::decline_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Approve { repo, pr_id } => {
+            PrCommands::Approve { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr approve", None)?;
                 pullrequests::approve_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Unapprove { repo, pr_id } => {
+            PrCommands::Unapprove { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr unapprove", None)?;
                 pullrequests::unapprove_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Diff { repo, pr_id } => {
+            PrCommands::Diff { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr diff", None)?;
                 pullrequests::get_pr_diff(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Comments { repo, pr_id } => {
+            PrCommands::Comments { targets } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comments", None)?;
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Comment {
-                repo,
-                pr_id,
+                targets,
                 text,
                 parent,
                 path,
                 line,
                 side,
             } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comment", None)?;
                 pullrequests::add_pr_comment(
                     &ctx,
                     &workspace,
@@ -1315,22 +538,20 @@ pub async fn execute(
                 )
                 .await
             }
-            PrCommands::ResolveComment {
-                repo,
-                pr_id,
-                comment_id,
-            } => pullrequests::resolve_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
-            PrCommands::ReopenComment {
-                repo,
-                pr_id,
-                comment_id,
-            } => pullrequests::reopen_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await,
-            PrCommands::Reviewers {
-                repo,
-                pr_id,
-                add,
-                all,
-            } => {
+            PrCommands::ResolveComment { targets } => {
+                let given = positional::split_repo_and_required(targets, &["PR_ID", "COMMENT_ID"])?;
+                let (pr_id, comment_id) = (given.number(0)?, given.number(1)?);
+                let repo = repos.resolve(&given, "pr resolve-comment", None)?;
+                pullrequests::resolve_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await
+            }
+            PrCommands::ReopenComment { targets } => {
+                let given = positional::split_repo_and_required(targets, &["PR_ID", "COMMENT_ID"])?;
+                let (pr_id, comment_id) = (given.number(0)?, given.number(1)?);
+                let repo = repos.resolve(&given, "pr reopen-comment", None)?;
+                pullrequests::reopen_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await
+            }
+            PrCommands::Reviewers { targets, add, all } => {
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr reviewers", None)?;
                 if add.is_empty() {
                     pullrequests::list_pr_reviewers(&ctx, &workspace, &repo, pr_id, all).await
                 } else {
@@ -1394,7 +615,7 @@ pub async fn execute(
                 all,
                 steps,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline list")?;
+                let repo_slug = repos.any(repo_arg, "pipeline list")?;
 
                 // Handle --pr flag
                 let effective_branch = if let Some(pr_id) = pr {
@@ -1469,7 +690,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline get")?;
+                let repo_slug = repos.any(given.repo, "pipeline get")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 pipelines::get_pipeline(&ctx, &workspace, &repo_slug, &id, steps).await
             }
@@ -1478,7 +699,7 @@ pub async fn execute(
                 branch,
                 steps,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline latest")?;
+                let repo_slug = repos.any(repo_arg, "pipeline latest")?;
 
                 // Prefer explicit --branch over auto-detected
                 let effective_branch = if let Some(b) = branch {
@@ -1529,7 +750,7 @@ pub async fn execute(
                 secured,
                 custom_pipeline,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline trigger")?;
+                let repo_slug = repos.any(repo_arg, "pipeline trigger")?;
                 pipelines::trigger_pipeline(
                     &ctx,
                     &workspace,
@@ -1551,7 +772,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline stop")?;
+                let repo_slug = repos.any(given.repo, "pipeline stop")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 let pipeline_uuid =
                     pipelines::resolve_pipeline_id(&ctx, &workspace, &repo_slug, &id).await?;
@@ -1571,7 +792,7 @@ pub async fn execute(
                     &["PIPELINE", "STEP_UUID"],
                     &[pipeline_flag.is_some(), step_uuid_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline logs")?;
+                let repo_slug = repos.any(given.repo, "pipeline logs")?;
                 // Positional identifiers fill the slots no flag supplied, in order.
                 let mut ids = given.ids.into_iter();
                 let pipeline_positional = if pipeline_flag.is_none() {
@@ -1615,7 +836,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline watch")?;
+                let repo_slug = repos.any(given.repo, "pipeline watch")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 let final_status = pipelines::watch_pipeline(
                     &ctx,
@@ -1644,7 +865,7 @@ pub async fn execute(
                     &["PIPELINE"],
                     &[pipeline_flag.is_some()],
                 )?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline steps")?;
+                let repo_slug = repos.any(given.repo, "pipeline steps")?;
                 let id = resolve_pipeline_arg(given.ids.into_iter().next(), pipeline_flag)?;
                 pipelines::list_steps(&ctx, &workspace, &repo_slug, &id).await
             }
@@ -1654,7 +875,7 @@ pub async fn execute(
                 wait,
                 interval,
             } => {
-                let repo_slug = pipeline_repo(repo_arg, "pipeline status")?;
+                let repo_slug = repos.any(repo_arg, "pipeline status")?;
                 pipelines::pipeline_status(&ctx, &workspace, &repo_slug, steps, wait, interval)
                     .await
             }
@@ -1667,7 +888,7 @@ pub async fn execute(
             } => {
                 let given =
                     positional::split_leading_repo(targets, &["PIPELINE"], &[pr.is_some()])?;
-                let repo_slug = pipeline_repo(given.repo, "pipeline rerun")?;
+                let repo_slug = repos.any(given.repo, "pipeline rerun")?;
                 let pipeline_id = given.ids.into_iter().next();
 
                 // Determine which pipeline to rerun
@@ -1808,16 +1029,18 @@ pub async fn execute(
             }
         },
         BitbucketCommands::Webhook(cmd) => match cmd {
-            WebhookCommands::List { repo } => {
+            WebhookCommands::List { repo_arg } => {
+                let repo = repos.any(repo_arg, "webhook list")?;
                 webhooks::list_webhooks(&ctx, &workspace, &repo).await
             }
             WebhookCommands::Create {
-                repo,
+                repo_arg,
                 url,
                 description,
                 events,
                 active,
             } => {
+                let repo = repos.any(repo_arg, "webhook create")?;
                 webhooks::create_webhook(
                     &ctx,
                     &workspace,
@@ -1829,48 +1052,81 @@ pub async fn execute(
                 )
                 .await
             }
-            WebhookCommands::Delete { repo, uuid } => {
+            WebhookCommands::Delete { targets } => {
+                let given = positional::split_repo_and_required(targets, &["UUID"])?;
+                let uuid = given.text(0).to_string();
+                let repo = repos.resolve(&given, "webhook delete", Some(DELETES))?;
                 webhooks::delete_webhook(&ctx, &workspace, &repo, &uuid).await
             }
         },
         BitbucketCommands::SshKey(cmd) => match cmd {
-            SshKeyCommands::List { repo } => webhooks::list_ssh_keys(&ctx, &workspace, &repo).await,
-            SshKeyCommands::Add { repo, label, key } => {
+            SshKeyCommands::List { repo_arg } => {
+                let repo = repos.any(repo_arg, "ssh-key list")?;
+                webhooks::list_ssh_keys(&ctx, &workspace, &repo).await
+            }
+            SshKeyCommands::Add {
+                repo_arg,
+                label,
+                key,
+            } => {
+                let repo = repos.explicit(repo_arg, "ssh-key add", GIVES_ACCESS, "")?;
                 webhooks::add_ssh_key(&ctx, &workspace, &repo, &label, &key).await
             }
-            SshKeyCommands::Delete { repo, uuid } => {
+            SshKeyCommands::Delete { targets } => {
+                let given = positional::split_repo_and_required(targets, &["UUID"])?;
+                let uuid = given.text(0).to_string();
+                let repo = repos.resolve(&given, "ssh-key delete", Some(DELETES))?;
                 webhooks::delete_ssh_key(&ctx, &workspace, &repo, &uuid).await
             }
         },
         BitbucketCommands::Permission(cmd) => match cmd {
-            PermissionCommands::List { repo } => {
+            PermissionCommands::List { repo_arg } => {
+                let repo = repos.any(repo_arg, "permission list")?;
                 permissions::list_repo_permissions(&ctx, &workspace, &repo).await
             }
             PermissionCommands::Grant {
-                repo,
+                repo_arg,
                 user_uuid,
                 permission,
             } => {
+                let repo = repos.explicit(repo_arg, "permission grant", GIVES_ACCESS, "")?;
                 permissions::grant_repo_permission(&ctx, &workspace, &repo, &user_uuid, &permission)
                     .await
             }
-            PermissionCommands::Revoke { repo, user_uuid } => {
+            PermissionCommands::Revoke { targets } => {
+                let given = positional::split_repo_and_required(targets, &["USER_UUID"])?;
+                let user_uuid = given.text(0).to_string();
+                let repo = repos.resolve(&given, "permission revoke", Some(DELETES))?;
                 permissions::revoke_repo_permission(&ctx, &workspace, &repo, &user_uuid).await
             }
         },
         BitbucketCommands::Commit(cmd) => match cmd {
             CommitCommands::List {
-                repo,
+                repo_arg,
                 branch,
                 limit,
-            } => commits::list_commits(&ctx, &workspace, &repo, branch.as_deref(), limit).await,
-            CommitCommands::Get { repo, hash } => {
+            } => {
+                let repo = repos.any(repo_arg, "commit list")?;
+                commits::list_commits(&ctx, &workspace, &repo, branch.as_deref(), limit).await
+            }
+            CommitCommands::Get { targets } => {
+                let given = positional::split_repo_and_required(targets, &["HASH"])?;
+                let hash = given.text(0).to_string();
+                let repo = repos.resolve(&given, "commit get", None)?;
                 commits::get_commit(&ctx, &workspace, &repo, &hash).await
             }
-            CommitCommands::Diff { repo, hash } => {
+            CommitCommands::Diff { targets } => {
+                let given = positional::split_repo_and_required(targets, &["HASH"])?;
+                let hash = given.text(0).to_string();
+                let repo = repos.resolve(&given, "commit diff", None)?;
                 commits::get_commit_diff(&ctx, &workspace, &repo, &hash).await
             }
-            CommitCommands::Browse { repo, commit, path } => {
+            CommitCommands::Browse {
+                repo_arg,
+                commit,
+                path,
+            } => {
+                let repo = repos.any(repo_arg, "commit browse")?;
                 commits::browse_source(&ctx, &workspace, &repo, &commit, path.as_deref()).await
             }
         },
@@ -1887,7 +1143,7 @@ pub async fn execute(
                 bulk::disable_features_on_stale_repos(&ctx, &workspace, days, execute, yes).await
             }
             BulkCommands::DeleteBranches {
-                repo,
+                repo_arg,
                 exclude,
                 execute,
                 yes,
@@ -1900,6 +1156,7 @@ pub async fn execute(
                 // braces, so removing the `conflicts_with` can never silently
                 // turn `--dry-run` into a no-op that deletes.
                 let execute = execute && !dry_run;
+                let repo = repos.explicit(repo_arg, "bulk delete-branches", DELETES, "")?;
                 bulk::delete_branches(&ctx, &workspace, &repo, exclude, execute, yes).await
             }
         },

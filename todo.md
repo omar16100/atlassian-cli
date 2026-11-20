@@ -3370,3 +3370,13 @@ lists lost their hint in a table, and "Rate limit usage high" was a warning on
 successful runs. All are corrected. New tests:
 `crates/cli/tests/quiet_stderr_e2e.rs` and two filter tests in `main.rs`.
 See `docs/20112026_quiet_default_logging.md`.
+## 2026-11-20: `--repo` on all Bitbucket repository commands
+
+`bb pr`, `bb branch`, `bb commit`, `bb webhook`, `bb ssh-key`, `bb permission`,
+`bb repo` and `bb bulk delete-branches` rejected `--repo`, because a positional
+argument with the clap id `repo` hid the global option. Each command now takes
+`[REPO]`, `--repo` or the Git remote through `bitbucket/positional.rs`, with the
+rules and the error text of the pipeline commands. Commands that delete, that are
+not reversible, or that give access, and `repo create`, do not read the Git remote. The clap argument tree moved from
+`bitbucket/mod.rs` to `bitbucket/args.rs` to keep the files below 2000 lines.
+Details: `docs/20112026_bb_repo_flag.md`.
