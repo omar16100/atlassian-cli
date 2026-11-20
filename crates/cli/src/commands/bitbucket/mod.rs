@@ -517,9 +517,12 @@ async fn execute_in(
                 let (repo, pr_id) = repo_and_pr(&repos, targets, "pr diff", None)?;
                 pullrequests::get_pr_diff(&ctx, &workspace, &repo, pr_id).await
             }
-            PrCommands::Comments { targets } => {
+            PrCommands::Comments {
+                targets,
+                unresolved,
+            } => {
                 let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comments", None)?;
-                pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
+                pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id, unresolved).await
             }
             PrCommands::Comment {
                 targets,

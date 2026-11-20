@@ -637,6 +637,35 @@ mod tests {
             assert_eq!(text, "LGTM");
         }
 
+        /// `--unresolved` came with pull request 183, before the argument
+        /// tree moved. It must work with each form of the repository.
+        #[test]
+        fn pr_comments_takes_unresolved_with_each_repository_form() {
+            for (argv, expected) in [
+                (
+                    &["pr", "comments", "web_app", "42", "--unresolved"][..],
+                    true,
+                ),
+                (
+                    &["pr", "comments", "--repo", "web_app", "42", "--unresolved"],
+                    true,
+                ),
+                (&["pr", "comments", "--unresolved", "42"], true),
+                (&["pr", "comments", "web_app", "42"], false),
+            ] {
+                let args = parse(argv);
+                let BitbucketCommands::Pr(PrCommands::Comments {
+                    targets,
+                    unresolved,
+                }) = args.command
+                else {
+                    panic!("not pr comments: {argv:?}");
+                };
+                assert_eq!(unresolved, expected, "{argv:?}");
+                assert_eq!(targets.last().map(String::as_str), Some("42"), "{argv:?}");
+            }
+        }
+
         #[test]
         fn more_values_than_the_command_takes_are_rejected() {
             let result = Cli::try_parse_from(["bb", "pipeline", "get", "a", "b", "c"]);
