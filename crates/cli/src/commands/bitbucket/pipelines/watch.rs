@@ -92,7 +92,7 @@ pub async fn watch_pipeline(
             std::io::stdout().flush().ok();
         } else if use_log_mode {
             // Log mode: one timestamped line per poll, no ANSI
-            let now = chrono::Local::now().format("%H:%M:%S");
+            let now = local_clock();
             let build_num = pipeline
                 .build_number
                 .map(|n| format!("#{}", n))
@@ -143,7 +143,7 @@ pub async fn watch_pipeline(
                     println!("\n{icon} Pipeline completed with status: {status}");
                 }
             } else if use_log_mode {
-                let now = chrono::Local::now().format("%H:%M:%S");
+                let now = local_clock();
                 let icon = get_status_icon(&status);
                 if paused {
                     println!("[{now}] {icon} {}", paused_message(&status, pending));
@@ -230,9 +230,95 @@ fn paused_message(status: &str, pending: Option<usize>) -> String {
     }
 }
 
+/// The local wall clock time as `HH:MM:SS`, for the lines of the log mode.
+fn local_clock() -> String {
+    clock_text(&chrono::Local::now())
+}
+
+/// The wall clock time of `time` as `HH:MM:SS`, in the time zone of `time`.
+fn clock_text<Tz: chrono::TimeZone>(time: &chrono::DateTime<Tz>) -> String
+where
+    Tz::Offset: std::fmt::Display,
+{
+    time.format("%H:%M:%S").to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The `pinned_` tests pin the clock text of the log mode. The expected
+    // values were recorded with `chrono` and did not change when `chrono` was
+    // removed. Only the helper `clock_at` knows the time types.
+
+    /// `clock_text` for an RFC 3339 time, in the offset of that time.
+    fn clock_at(time: &str) -> String {
+        clock_text(&chrono::DateTime::parse_from_rfc3339(time).unwrap())
+    }
+
+    #[test]
+    fn pinned_the_clock_text_is_hh_mm_ss_with_leading_zeros() {
+        for (time, expected) in [
+            ("2026-11-20T09:05:03+08:00", "09:05:03"),
+            ("2026-11-20T00:00:00+00:00", "00:00:00"),
+            ("2026-11-20T23:59:59.999999999-05:00", "23:59:59"),
+            ("2026-11-20T12:34:56.5+05:30", "12:34:56"),
+            ("2026-01-02T03:04:05Z", "03:04:05"),
+        ] {
+            assert_eq!(clock_at(time), expected, "time {time:?}");
+        }
+    }
+
+    fn assert_clock_shape(clock: &str) {
+        let bytes = clock.as_bytes();
+        assert_eq!(bytes.len(), 8, "clock {clock:?}");
+        assert_eq!(bytes[2], b':', "clock {clock:?}");
+        assert_eq!(bytes[5], b':', "clock {clock:?}");
+        let part = |from: usize| clock[from..from + 2].parse::<u32>().unwrap();
+        assert!(bytes
+            .iter()
+            .enumerate()
+            .all(|(i, b)| i == 2 || i == 5 || b.is_ascii_digit()));
+        assert!(part(0) < 24, "clock {clock:?}");
+        assert!(part(3) < 60, "clock {clock:?}");
+        assert!(part(6) < 60, "clock {clock:?}");
+    }
+
+    #[test]
+    fn pinned_the_local_clock_has_the_hh_mm_ss_shape() {
+        assert_clock_shape(&local_clock());
+    }
+
+    /// The local clock must agree with the system `date` command. The test
+    /// runs on a multi-thread runtime, as the command does.
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pinned_the_local_clock_agrees_with_the_date_command() {
+        fn date_command() -> String {
+            let output = std::process::Command::new("date")
+                .arg("+%H:%M:%S")
+                .output()
+                .expect("the date command must run");
+            String::from_utf8(output.stdout).unwrap().trim().to_string()
+        }
+
+        // The clock can pass midnight between the three reads. Then the order
+        // does not hold, so read again.
+        for _ in 0..3 {
+            let before = date_command();
+            let clock = tokio::spawn(async { local_clock() }).await.unwrap();
+            let after = date_command();
+            assert_clock_shape(&clock);
+            if before <= after {
+                assert!(
+                    before <= clock && clock <= after,
+                    "local clock {clock} is not between {before} and {after}"
+                );
+                return;
+            }
+        }
+        panic!("the clock passed midnight three times");
+    }
 
     #[test]
     fn the_paused_message_counts_manual_steps() {

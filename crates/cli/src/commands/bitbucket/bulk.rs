@@ -506,6 +506,177 @@ mod tests {
         assert!(!is_stale(Some(&recent), now, 180));
     }
 
+    // The tests from here to `server_with_repos` pin the staleness decision
+    // for fixed times. The expected values were recorded with `chrono` and did
+    // not change when `chrono` was removed. Only the helper `stale` knows the
+    // time types.
+
+    const STALE_NOW: &str = "2026-11-20T12:00:00Z";
+
+    /// `is_stale` with the current time fixed at the RFC 3339 time `now`.
+    fn stale(updated_on: Option<&str>, now: &str, days: i64) -> bool {
+        let now = chrono::DateTime::parse_from_rfc3339(now)
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        is_stale(updated_on, now, days)
+    }
+
+    #[test]
+    fn pinned_exactly_n_days_is_not_stale_and_one_second_more_is_stale() {
+        // 2026-05-24T12:00:00Z is 180 days before the current time.
+        assert!(!stale(Some("2026-05-24T12:00:00Z"), STALE_NOW, 180));
+        assert!(stale(Some("2026-05-24T11:59:59Z"), STALE_NOW, 180));
+        assert!(!stale(Some("2026-05-24T12:00:01Z"), STALE_NOW, 180));
+        // The comparison uses the fraction of a second too.
+        assert!(stale(
+            Some("2026-05-24T11:59:59.999999999Z"),
+            STALE_NOW,
+            180
+        ));
+        assert!(!stale(
+            Some("2026-05-24T12:00:00.000000001Z"),
+            STALE_NOW,
+            180
+        ));
+        assert!(stale(
+            Some("2026-05-24T12:00:00Z"),
+            "2026-11-20T12:00:00.000000001Z",
+            180
+        ));
+        // Digits after the ninth are not used.
+        assert!(!stale(
+            Some("2026-05-24T12:00:00.0000000009Z"),
+            STALE_NOW,
+            180
+        ));
+        assert!(!stale(Some("2026-05-24T12:00:00Z"), STALE_NOW, 181));
+        assert!(stale(Some("2026-05-24T12:00:00Z"), STALE_NOW, 179));
+    }
+
+    #[test]
+    fn pinned_a_timestamp_with_an_offset_is_compared_as_an_instant() {
+        // 20:00:00+08:00 and 07:00:00-05:00 are 12:00:00Z.
+        assert!(!stale(Some("2026-05-24T20:00:00+08:00"), STALE_NOW, 180));
+        assert!(stale(Some("2026-05-24T19:59:59+08:00"), STALE_NOW, 180));
+        assert!(!stale(Some("2026-05-24T07:00:00-05:00"), STALE_NOW, 180));
+        assert!(stale(Some("2026-05-24T06:59:59-05:00"), STALE_NOW, 180));
+        assert!(stale(Some("2026-05-24T12:29:59+00:30"), STALE_NOW, 180));
+        assert!(!stale(Some("2026-05-25T11:59:00+23:59"), STALE_NOW, 180));
+        assert!(stale(Some("2026-05-25T11:58:59+23:59"), STALE_NOW, 180));
+        assert!(!stale(Some("2026-05-23T12:01:00-23:59"), STALE_NOW, 180));
+        assert!(stale(Some("2026-05-23T12:00:59-23:59"), STALE_NOW, 180));
+        // Lower case letters and a space separator are accepted.
+        assert!(stale(Some("2026-05-24t11:59:59z"), STALE_NOW, 180));
+        assert!(stale(Some("2026-05-24 11:59:59Z"), STALE_NOW, 180));
+        // Bitbucket sends six fraction digits and `+00:00`.
+        assert!(stale(
+            Some("2026-05-24T11:59:59.999999+00:00"),
+            STALE_NOW,
+            180
+        ));
+        assert!(!stale(
+            Some("2026-05-24T12:00:00.000001+00:00"),
+            STALE_NOW,
+            180
+        ));
+    }
+
+    #[test]
+    fn pinned_an_invalid_timestamp_is_never_stale() {
+        for updated in [
+            "",
+            "not-a-date",
+            "2020-01-01",
+            "2020-01-01T00:00:00",
+            "2020-01-01T00:00Z",
+            "2020-01-01T00:00:00+0000",
+            "2020-02-30T00:00:00Z",
+            "2020-01-01T24:00:00Z",
+            "2020-01-01T00:00:00Z ",
+            " 2020-01-01T00:00:00Z",
+            "2020-01-01T00:00:00+00:00[UTC]",
+            "20200101T000000Z",
+            "1577836800",
+        ] {
+            assert!(!stale(Some(updated), STALE_NOW, 180), "{updated:?}");
+            assert!(!stale(Some(updated), STALE_NOW, 0), "{updated:?}");
+            assert!(!stale(Some(updated), STALE_NOW, -1), "{updated:?}");
+        }
+        assert!(!stale(None, STALE_NOW, 0));
+    }
+
+    #[test]
+    fn pinned_the_limits_of_the_timestamp_year() {
+        assert!(stale(Some("0000-01-01T00:00:00Z"), STALE_NOW, 180));
+        assert!(stale(Some("0000-01-01T00:00:00+23:59"), STALE_NOW, 180));
+        assert!(!stale(Some("9999-12-31T23:59:59Z"), STALE_NOW, 180));
+        assert!(!stale(Some("9999-12-31T23:59:59-23:59"), STALE_NOW, 180));
+        // The year 0000 is 740305 days before the current time.
+        assert!(stale(Some("0000-01-01T12:00:00Z"), STALE_NOW, 740_304));
+        assert!(!stale(Some("0000-01-01T12:00:00Z"), STALE_NOW, 740_305));
+    }
+
+    #[test]
+    fn pinned_zero_and_negative_day_values() {
+        // Zero days: each timestamp before the current time is stale.
+        assert!(!stale(Some("2026-11-20T12:00:00Z"), STALE_NOW, 0));
+        assert!(stale(Some("2026-11-20T11:59:59.999999999Z"), STALE_NOW, 0));
+        assert!(!stale(Some("2026-11-21T12:00:00Z"), STALE_NOW, 0));
+        // Negative days: a timestamp less than that time in the future is
+        // stale too.
+        assert!(stale(Some("2026-11-20T12:00:00Z"), STALE_NOW, -1));
+        assert!(stale(Some("2026-11-21T11:59:59Z"), STALE_NOW, -1));
+        assert!(!stale(Some("2026-11-21T12:00:00Z"), STALE_NOW, -1));
+    }
+
+    #[test]
+    fn pinned_an_out_of_range_day_value_treats_nothing_as_stale() {
+        let old = Some("2000-01-01T00:00:00Z");
+        let future = Some("2100-01-01T00:00:00Z");
+        // 106751991167 days is the largest value in range.
+        assert!(!stale(old, STALE_NOW, 106_751_991_167));
+        assert!(!stale(old, STALE_NOW, 106_751_991_168));
+        assert!(!stale(old, STALE_NOW, i64::MAX));
+        // In range and negative: each timestamp is stale.
+        assert!(stale(old, STALE_NOW, -106_751_991_167));
+        assert!(stale(future, STALE_NOW, -106_751_991_167));
+        // Out of range and negative: nothing is stale.
+        assert!(!stale(old, STALE_NOW, -106_751_991_168));
+        assert!(!stale(future, STALE_NOW, -106_751_991_168));
+        assert!(!stale(old, STALE_NOW, i64::MIN));
+        assert!(!stale(future, STALE_NOW, i64::MIN));
+    }
+
+    /// A leap second (`:60`) is read as second 59 when the time of day of the
+    /// current time (UTC) is later than second 59. If not, it is read as the
+    /// first second of the next minute.
+    #[test]
+    fn pinned_a_leap_second_in_the_timestamp() {
+        // Current time of day later: 11:59:60 is read as 11:59:59, which is
+        // 180 days and 1 second before.
+        assert!(stale(Some("2026-05-24T11:59:60Z"), STALE_NOW, 180));
+        // Same second of the day: read as 12:00:00, which is 180 days less
+        // 0.5 seconds before.
+        assert!(!stale(
+            Some("2026-05-24T11:59:60Z"),
+            "2026-11-20T11:59:59.500Z",
+            180
+        ));
+        assert!(!stale(
+            Some("2026-05-24T12:00:60Z"),
+            "2026-11-20T12:00:59.999Z",
+            180
+        ));
+        // One second later, 12:00:60 is read as 12:00:59.
+        assert!(stale(
+            Some("2026-05-24T12:00:60Z"),
+            "2026-11-20T12:01:00Z",
+            180
+        ));
+        // With an offset, the time of day in UTC decides.
+        assert!(stale(Some("2026-05-24T19:59:60+08:00"), STALE_NOW, 180));
+    }
+
     async fn server_with_repos(slugs_and_dates: &[(&str, String)]) -> MockServer {
         let server = MockServer::start().await;
         let values: Vec<_> = slugs_and_dates
