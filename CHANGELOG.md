@@ -20,6 +20,7 @@ resolve. `git log` remains the complete record.
   `rpassword` moves to 7.5.5 and `want` to 0.3.2. `chrono` is reported as
   unmaintained (RUSTSEC-2026-0543) and has no patched version: the advisory
   check ignores it until `chrono` is replaced. (#190)
+
 ### Fixed
 
 - `confluence space list`, `page list` and `blog list` accept a `--limit` above
@@ -30,7 +31,7 @@ resolve. `git log` remains the complete record.
   before, and now send `limit=25`. When more results exist than the commands
   show, a warning goes to stderr, also for an explicit small `--limit`. Stdout
   and the output keys do not change. `blog list` no longer fails when a blog
-  post has a null title or status: the value is empty in the output. (#PR)
+  post has a null title or status: the value is empty in the output. (#193)
 
 ### Fixed
 

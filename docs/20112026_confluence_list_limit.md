@@ -1,6 +1,6 @@
 # Confluence `space list`, `page list` and `blog list`: `--limit` is a total
 
-Status: in progress on fix/confluence-space-list-limit (PR #PR)
+Status: in progress on `fix/confluence-space-list-limit` (PR #193).
 
 ## Problem
 
