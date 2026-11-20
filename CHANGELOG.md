@@ -13,9 +13,13 @@ resolve. `git log` remains the complete record.
 
 ### Changed
 
-- The API crate field `RateLimitInfo::reset_at` is now
-  `Option<std::time::SystemTime>`. It was `Option<chrono::DateTime<chrono::Utc>>`.
-  This is a part of the `chrono` removal. (#PR)
+- **Breaking for callers of the API crate:** the field
+  `RateLimitInfo::reset_at` is now `Option<std::time::SystemTime>`. It was
+  `Option<chrono::DateTime<chrono::Utc>>`. This is a part of the `chrono`
+  removal. (#PR)
+- The clock in `bb pipeline watch --log` lines can show UTC when `TZ` has a zone
+  name that the machine cannot resolve. Before, the system zone was used in
+  that case. (#PR)
 - A relative time expression for `bb pipeline list --since` or `--before` that
   gives a time before the year -9999, such as `5000000d`, is now an error.
   Before, it gave a timestamp with a negative year, and a larger value caused a

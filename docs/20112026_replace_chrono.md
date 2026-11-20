@@ -1,6 +1,6 @@
 # `chrono` is replaced by `jiff` and the standard library
 
-Status: in progress on chore/replace-chrono (PR #PR)
+Status: in progress on `chore/replace-chrono` (PR #PR).
 
 The branch starts from `fix/security-advisories` (PR #190), because PR #190 was
 not merged when this work started. PR #190 added the temporary advisory
