@@ -27,18 +27,26 @@ resolve. `git log` remains the complete record.
   and `bb bulk delete-branches`. Before, `bb pr get --repo web_app 42` failed with
   "unexpected argument '--repo'". The repository can be the first argument (as
   before), `--repo`, or the Git remote of the current directory, with the rules of
-  the pipeline commands: an argument that disagrees with `--repo` is an error.
-  Commands that delete or revoke (`branch delete`, `branch unprotect`,
-  `webhook delete`, `ssh-key delete`, `permission revoke`, `repo delete`,
-  `bulk delete-branches`) and `repo create` accept the argument or `--repo`, but do
-  not read the Git remote. A script can see three differences. A missing
-  repository is now the error `Repository required for '<command>'` with exit
-  code 1, not a usage error with exit code 2. The same is true for a missing
-  argument after the repository (`Missing argument: expected [REPO] <PR_ID>.`) and
-  for a pull request ID, comment ID or restriction ID that is not a number
-  (`Invalid PR_ID ...`). In
-  a checkout, a command with one value (for example `bb branch get web_app`) now
-  reads the value as the branch and not as the repository. (#PR)
+  the pipeline commands. Commands that delete, that are not reversible, or that
+  give access accept the argument or `--repo`, but do not read the Git remote:
+  `branch delete`, `branch unprotect`, `webhook delete`, `ssh-key delete`,
+  `permission revoke`, `repo delete`, `bulk delete-branches`, `pr merge`,
+  `pr decline`, `repo update`, `permission grant` and `ssh-key add`. `repo create`
+  has the same rule. A script can see these differences:
+  - `--repo` together with a different repository as the argument is now the error
+    `Repository given twice`. Before, `bb --repo other pr get web_app 42` used the
+    argument. A wrapper that always adds `--repo <default>` fails when its caller
+    also gives a repository.
+  - In a checkout, a command with one value reads the value as the argument after
+    the repository. `bb branch get web_app` reads `web_app` as the branch, and
+    `bb branch create web_app --from main` creates the branch `web_app` in the
+    repository of the Git remote. Before, the two commands were usage errors for a
+    missing branch name.
+  - A missing repository is the error `Repository required for '<command>'` with
+    exit code 1, not a usage error with exit code 2. The same is true for a missing
+    argument after the repository (`Missing argument: expected [REPO] <PR_ID>.`) and
+    for a pull request ID, comment ID or restriction ID that is not a number
+    (`Invalid PR_ID ...`). (#PR)
 
 ### Changed
 

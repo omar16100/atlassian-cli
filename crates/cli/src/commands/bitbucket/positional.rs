@@ -118,6 +118,35 @@ impl RequiredPositionals {
             .join(" ")
     }
 
+    /// `<PR_ID> <COMMENT_ID>`: the required arguments, for an example command.
+    pub(super) fn required_usage(&self) -> String {
+        self.names
+            .iter()
+            .map(|n| format!("<{n}>"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    /// How the values were read, when no repository came with them.
+    ///
+    /// `bb branch get web_app` outside a checkout has one value, and the count
+    /// makes it the branch. The user most probably gave the repository and
+    /// forgot the branch. An error about a missing repository alone would not
+    /// show that.
+    pub(super) fn read_note(&self) -> Option<String> {
+        if self.repo.is_some() {
+            return None;
+        }
+        let read = self
+            .values
+            .iter()
+            .zip(&self.names)
+            .map(|(value, name)| format!("'{value}' was read as <{name}>"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        Some(format!("{read}. Arguments: {}.", self.usage()))
+    }
+
     /// The required argument at `index`, as text.
     pub(super) fn text(&self, index: usize) -> &str {
         &self.values[index]
@@ -377,6 +406,26 @@ mod tests {
         let two_no_repo = required(&["42", "9"], &["PR_ID", "COMMENT_ID"]).unwrap();
         assert_eq!(two_no_repo.repo, None);
         assert_eq!(two_no_repo.number(1).unwrap(), 9);
+    }
+
+    #[test]
+    fn the_read_note_names_each_value_when_no_repo_came_with_them() {
+        let one = required(&["web_app"], &["BRANCH"]).unwrap();
+        assert_eq!(
+            one.read_note().as_deref(),
+            Some("'web_app' was read as <BRANCH>. Arguments: [REPO] <BRANCH>.")
+        );
+        let two = required(&["42", "9"], &["PR_ID", "COMMENT_ID"]).unwrap();
+        assert_eq!(
+            two.read_note().as_deref(),
+            Some(
+                "'42' was read as <PR_ID>, '9' was read as <COMMENT_ID>. \
+                 Arguments: [REPO] <PR_ID> <COMMENT_ID>."
+            )
+        );
+        assert_eq!(two.required_usage(), "<PR_ID> <COMMENT_ID>");
+        let with_repo = required(&["web_app", "main"], &["BRANCH"]).unwrap();
+        assert_eq!(with_repo.read_note(), None);
     }
 
     #[test]

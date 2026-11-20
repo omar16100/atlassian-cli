@@ -23,13 +23,37 @@ struct Fixture {
     plain: PathBuf,
 }
 
+/// Keep git away from the configuration of the developer and of the system,
+/// and from a repository above the sandbox.
+///
+/// A `url.<base>.insteadOf` rule in a global configuration would rewrite the
+/// remote that `git remote get-url` prints. A repository above the temporary
+/// directory would give the "plain" directory a remote.
+fn hermetic_git(cmd: &mut Command, sandbox_home: &Path) {
+    let git_variables: Vec<_> = std::env::vars_os()
+        .map(|(key, _)| key)
+        .filter(|key| {
+            let name = key.to_string_lossy();
+            name == "GIT_DIR"
+                || name == "GIT_WORK_TREE"
+                || name == "GIT_CONFIG_COUNT"
+                || name.starts_with("GIT_CONFIG_KEY_")
+                || name.starts_with("GIT_CONFIG_VALUE_")
+        })
+        .collect();
+    for key in git_variables {
+        cmd.env_remove(key);
+    }
+    cmd.env("GIT_CONFIG_NOSYSTEM", "1")
+        .env("GIT_CONFIG_GLOBAL", "/dev/null")
+        .env("GIT_CEILING_DIRECTORIES", sandbox_home);
+}
+
 fn git(dir: &Path, home: &Path, args: &[&str]) {
-    let status = Command::new("git")
-        .args(args)
-        .current_dir(dir)
-        .env("HOME", home)
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
+    let mut cmd = Command::new("git");
+    cmd.args(args).current_dir(dir).env("HOME", home);
+    hermetic_git(&mut cmd, home);
+    let status = cmd
         .output()
         .expect("git must be installed to run this test");
     assert!(
@@ -79,18 +103,15 @@ fn fixture() -> Fixture {
 
 impl Fixture {
     fn run(&self, dir: &Path, args: &[&str]) -> Output {
-        self.sandbox
-            .cli()
-            .arg("--config")
+        let mut cmd = self.sandbox.cli();
+        cmd.arg("--config")
             .arg(&self.config)
             .env("ATLASSIAN_CLI_TOKEN_LOCAL", "fake-token")
             .env("ATLASSIAN_CLI_BITBUCKET_TOKEN_LOCAL", "fake-token")
-            .env_remove("GIT_DIR")
-            .env_remove("GIT_WORK_TREE")
             .current_dir(dir)
-            .args(args)
-            .output()
-            .expect("failed to run the CLI")
+            .args(args);
+        hermetic_git(&mut cmd, self.sandbox.home());
+        cmd.output().expect("failed to run the CLI")
     }
 }
 
@@ -207,4 +228,40 @@ fn the_help_shows_the_repo_as_optional() {
         "{help}"
     );
     assert!(help.contains("--repo <REPO>"), "{help}");
+}
+
+/// A merge is not reversible, so the directory must not select its target.
+#[test]
+fn pr_merge_does_not_read_the_repo_from_the_git_remote() {
+    let fx = fixture();
+    let out = fx.run(&fx.checkout, &["bb", "pr", "merge", "42"]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(err.contains("Repository required for 'pr merge'"), "{err}");
+    assert!(
+        err.contains("The Git remote names 'web_app'. Add --repo web_app"),
+        "{err}"
+    );
+    assert!(
+        err.contains("atlassian-cli bb pr merge --workspace <workspace> --repo <repo> <PR_ID>"),
+        "{err}"
+    );
+}
+
+/// A repository with the branch missing, outside a checkout. The error must
+/// say that the value was read as the branch.
+#[test]
+fn a_lone_value_with_no_repo_says_how_it_was_read() {
+    let fx = fixture();
+    let out = fx.run(&fx.plain, &["bb", "branch", "get", "web_app"]);
+    assert!(!out.status.success());
+    let err = stderr(&out);
+    assert!(
+        err.contains("'web_app' was read as <BRANCH>. Arguments: [REPO] <BRANCH>."),
+        "{err}"
+    );
+    assert!(
+        err.contains("Repository required for 'branch get'"),
+        "{err}"
+    );
 }

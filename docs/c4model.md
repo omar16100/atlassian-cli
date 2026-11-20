@@ -219,7 +219,8 @@ Their arguments after the repository are required, so
 `split_repo_and_required` decides by count only. `RepoResolver` in
 `commands/bitbucket/mod.rs` holds `--repo` and the Git remote for one run:
 `any` resolves argument, `--repo`, Git remote; `explicit` leaves out the Git
-remote and is used by the commands that delete or revoke and by `repo create`.
+remote and is used by the commands that delete, that are not reversible, or
+that give access, and by `repo create`.
 `execute` reads the Git context and passes it to `execute_in`, so a test can
 supply one. The clap argument tree is in `commands/bitbucket/args.rs`; `mod.rs`
 keeps the entry point and the dispatch.

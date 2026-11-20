@@ -76,7 +76,12 @@ fn require_repo(
 }
 
 /// Why a command does not read its repository from the Git remote.
+///
+/// The rule is about the effect, not the HTTP verb: a command that deletes,
+/// that is not reversible, or that gives access needs an explicit repository.
 const DELETES: &str = "This command deletes or revokes";
+const NOT_REVERSIBLE: &str = "This command makes a change that is not reversible";
+const GIVES_ACCESS: &str = "This command gives access to the repository";
 const NAMES_A_NEW_REPO: &str = "This command names a new repository";
 
 /// Where the repository of a command can come from, apart from its argument.
@@ -107,15 +112,40 @@ impl RepoResolver {
         Ok(repo)
     }
 
+    /// The repository of a command with required arguments after it.
+    ///
+    /// `reason` is `Some` for a command that does not read the Git remote.
+    /// When no repository resolves, the error says first how the values were
+    /// read, because a lone value is most frequently the repository with the
+    /// argument after it missing.
+    fn resolve(
+        &self,
+        given: &positional::RequiredPositionals,
+        cmd: &str,
+        reason: Option<&str>,
+    ) -> anyhow::Result<String> {
+        let resolved = match reason {
+            None => self.any(given.repo.clone(), cmd),
+            Some(reason) => self.explicit(given.repo.clone(), cmd, reason, &given.required_usage()),
+        };
+        match (resolved, given.read_note()) {
+            (Err(err), Some(note)) => Err(anyhow::anyhow!("{note}\n\n{err}")),
+            (resolved, _) => resolved,
+        }
+    }
+
     /// The argument, then `--repo`. Not the Git remote.
     ///
-    /// For a command that deletes, the directory that the user is in must not
-    /// select the target. Most of these commands have no confirmation prompt.
+    /// For a command that deletes, that is not reversible, or that gives
+    /// access, the directory that the user is in must not select the target.
+    /// Most of these commands have no confirmation prompt. `arguments` is the
+    /// required part of the command line after the repository, for the example.
     fn explicit(
         &self,
         positional: Option<String>,
         cmd: &str,
         reason: &str,
+        arguments: &str,
     ) -> anyhow::Result<String> {
         let chosen = positional::choose_repo(positional.as_deref(), self.flag.as_deref(), None)?;
         if let Some(repo) = chosen {
@@ -142,8 +172,13 @@ impl RepoResolver {
                 "\nThe Git remote names '{git}'. Add --repo {git} if that is the repository.\n"
             ));
         }
+        let arguments = if arguments.is_empty() {
+            String::new()
+        } else {
+            format!(" {arguments}")
+        };
         msg.push_str(&format!(
-            "\nExample:\n  atlassian-cli bb {cmd} --workspace <workspace> --repo <repo>\n"
+            "\nExample:\n  atlassian-cli bb {cmd} --workspace <workspace> --repo <repo>{arguments}\n"
         ));
         Err(anyhow::anyhow!(msg))
     }
@@ -157,10 +192,11 @@ fn repo_and_pr(
     repos: &RepoResolver,
     targets: Vec<String>,
     cmd: &str,
+    reason: Option<&str>,
 ) -> anyhow::Result<(String, i64)> {
     let given = positional::split_repo_and_required(targets, &["PR_ID"])?;
     let pr_id = given.number(0)?;
-    Ok((repos.any(given.repo, cmd)?, pr_id))
+    Ok((repos.resolve(&given, cmd, reason)?, pr_id))
 }
 
 #[derive(Args, Debug, Clone)]
@@ -169,7 +205,9 @@ pub struct BitbucketArgs {
     #[arg(long, global = true)]
     pub workspace: Option<String>,
 
-    /// Repository slug (auto-detected from git remote if not specified).
+    /// Repository slug. For most commands it is auto-detected from the git
+    /// remote if not specified. Commands that delete, that are not reversible,
+    /// or that give access need it here or as an argument.
     #[arg(long, global = true)]
     pub repo: Option<String>,
 
@@ -310,7 +348,7 @@ async fn execute_in(
                 private,
                 project,
             } => {
-                let slug = repos.explicit(slug, "repo create", NAMES_A_NEW_REPO)?;
+                let slug = repos.explicit(slug, "repo create", NAMES_A_NEW_REPO, "")?;
                 repos::create_repo(
                     &ctx,
                     &workspace,
@@ -328,7 +366,7 @@ async fn execute_in(
                 description,
                 language,
             } => {
-                let slug = repos.any(slug, "repo update")?;
+                let slug = repos.explicit(slug, "repo update", NOT_REVERSIBLE, "")?;
                 repos::update_repo(
                     &ctx,
                     &workspace,
@@ -340,7 +378,7 @@ async fn execute_in(
                 .await
             }
             RepoCommands::Delete { slug, force } => {
-                let slug = repos.explicit(slug, "repo delete", DELETES)?;
+                let slug = repos.explicit(slug, "repo delete", DELETES, "")?;
                 repos::delete_repo(&ctx, &workspace, &slug, force).await
             }
         },
@@ -352,19 +390,19 @@ async fn execute_in(
             BranchCommands::Get { targets } => {
                 let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
                 let branch = given.text(0).to_string();
-                let repo = repos.any(given.repo, "branch get")?;
+                let repo = repos.resolve(&given, "branch get", None)?;
                 branches::get_branch(&ctx, &workspace, &repo, &branch).await
             }
             BranchCommands::Create { targets, from } => {
                 let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
                 let branch = given.text(0).to_string();
-                let repo = repos.any(given.repo, "branch create")?;
+                let repo = repos.resolve(&given, "branch create", None)?;
                 branches::create_branch(&ctx, &workspace, &repo, &branch, &from).await
             }
             BranchCommands::Delete { targets, force } => {
                 let given = positional::split_repo_and_required(targets, &["BRANCH"])?;
                 let branch = given.text(0).to_string();
-                let repo = repos.explicit(given.repo, "branch delete", DELETES)?;
+                let repo = repos.resolve(&given, "branch delete", Some(DELETES))?;
                 branches::delete_branch(&ctx, &workspace, &repo, &branch, force).await
             }
             BranchCommands::Protect {
@@ -379,7 +417,7 @@ async fn execute_in(
             BranchCommands::Unprotect { targets } => {
                 let given = positional::split_repo_and_required(targets, &["RESTRICTION_ID"])?;
                 let restriction_id = given.number(0)?;
-                let repo = repos.explicit(given.repo, "branch unprotect", DELETES)?;
+                let repo = repos.resolve(&given, "branch unprotect", Some(DELETES))?;
                 branches::unprotect_branch(&ctx, &workspace, &repo, restriction_id).await
             }
             BranchCommands::Restrictions { repo_arg } => {
@@ -397,7 +435,7 @@ async fn execute_in(
                 pullrequests::list_pull_requests(&ctx, &workspace, &repo, &state, limit).await
             }
             PrCommands::Get { targets } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr get")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr get", None)?;
                 pullrequests::get_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Create {
@@ -429,7 +467,7 @@ async fn execute_in(
                 description,
                 reviewers,
             } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr update")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr update", None)?;
                 pullrequests::update_pull_request(
                     &ctx,
                     &workspace,
@@ -446,7 +484,7 @@ async fn execute_in(
                 strategy,
                 message,
             } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr merge")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr merge", Some(NOT_REVERSIBLE))?;
                 pullrequests::merge_pull_request(
                     &ctx,
                     &workspace,
@@ -458,23 +496,24 @@ async fn execute_in(
                 .await
             }
             PrCommands::Decline { targets } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr decline")?;
+                let (repo, pr_id) =
+                    repo_and_pr(&repos, targets, "pr decline", Some(NOT_REVERSIBLE))?;
                 pullrequests::decline_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Approve { targets } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr approve")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr approve", None)?;
                 pullrequests::approve_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Unapprove { targets } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr unapprove")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr unapprove", None)?;
                 pullrequests::unapprove_pull_request(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Diff { targets } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr diff")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr diff", None)?;
                 pullrequests::get_pr_diff(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Comments { targets } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comments")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comments", None)?;
                 pullrequests::list_pr_comments(&ctx, &workspace, &repo, pr_id).await
             }
             PrCommands::Comment {
@@ -485,7 +524,7 @@ async fn execute_in(
                 line,
                 side,
             } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comment")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr comment", None)?;
                 pullrequests::add_pr_comment(
                     &ctx,
                     &workspace,
@@ -502,17 +541,17 @@ async fn execute_in(
             PrCommands::ResolveComment { targets } => {
                 let given = positional::split_repo_and_required(targets, &["PR_ID", "COMMENT_ID"])?;
                 let (pr_id, comment_id) = (given.number(0)?, given.number(1)?);
-                let repo = repos.any(given.repo, "pr resolve-comment")?;
+                let repo = repos.resolve(&given, "pr resolve-comment", None)?;
                 pullrequests::resolve_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await
             }
             PrCommands::ReopenComment { targets } => {
                 let given = positional::split_repo_and_required(targets, &["PR_ID", "COMMENT_ID"])?;
                 let (pr_id, comment_id) = (given.number(0)?, given.number(1)?);
-                let repo = repos.any(given.repo, "pr reopen-comment")?;
+                let repo = repos.resolve(&given, "pr reopen-comment", None)?;
                 pullrequests::reopen_pr_comment(&ctx, &workspace, &repo, pr_id, comment_id).await
             }
             PrCommands::Reviewers { targets, add, all } => {
-                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr reviewers")?;
+                let (repo, pr_id) = repo_and_pr(&repos, targets, "pr reviewers", None)?;
                 if add.is_empty() {
                     pullrequests::list_pr_reviewers(&ctx, &workspace, &repo, pr_id, all).await
                 } else {
@@ -1016,7 +1055,7 @@ async fn execute_in(
             WebhookCommands::Delete { targets } => {
                 let given = positional::split_repo_and_required(targets, &["UUID"])?;
                 let uuid = given.text(0).to_string();
-                let repo = repos.explicit(given.repo, "webhook delete", DELETES)?;
+                let repo = repos.resolve(&given, "webhook delete", Some(DELETES))?;
                 webhooks::delete_webhook(&ctx, &workspace, &repo, &uuid).await
             }
         },
@@ -1030,13 +1069,13 @@ async fn execute_in(
                 label,
                 key,
             } => {
-                let repo = repos.any(repo_arg, "ssh-key add")?;
+                let repo = repos.explicit(repo_arg, "ssh-key add", GIVES_ACCESS, "")?;
                 webhooks::add_ssh_key(&ctx, &workspace, &repo, &label, &key).await
             }
             SshKeyCommands::Delete { targets } => {
                 let given = positional::split_repo_and_required(targets, &["UUID"])?;
                 let uuid = given.text(0).to_string();
-                let repo = repos.explicit(given.repo, "ssh-key delete", DELETES)?;
+                let repo = repos.resolve(&given, "ssh-key delete", Some(DELETES))?;
                 webhooks::delete_ssh_key(&ctx, &workspace, &repo, &uuid).await
             }
         },
@@ -1050,14 +1089,14 @@ async fn execute_in(
                 user_uuid,
                 permission,
             } => {
-                let repo = repos.any(repo_arg, "permission grant")?;
+                let repo = repos.explicit(repo_arg, "permission grant", GIVES_ACCESS, "")?;
                 permissions::grant_repo_permission(&ctx, &workspace, &repo, &user_uuid, &permission)
                     .await
             }
             PermissionCommands::Revoke { targets } => {
                 let given = positional::split_repo_and_required(targets, &["USER_UUID"])?;
                 let user_uuid = given.text(0).to_string();
-                let repo = repos.explicit(given.repo, "permission revoke", DELETES)?;
+                let repo = repos.resolve(&given, "permission revoke", Some(DELETES))?;
                 permissions::revoke_repo_permission(&ctx, &workspace, &repo, &user_uuid).await
             }
         },
@@ -1073,13 +1112,13 @@ async fn execute_in(
             CommitCommands::Get { targets } => {
                 let given = positional::split_repo_and_required(targets, &["HASH"])?;
                 let hash = given.text(0).to_string();
-                let repo = repos.any(given.repo, "commit get")?;
+                let repo = repos.resolve(&given, "commit get", None)?;
                 commits::get_commit(&ctx, &workspace, &repo, &hash).await
             }
             CommitCommands::Diff { targets } => {
                 let given = positional::split_repo_and_required(targets, &["HASH"])?;
                 let hash = given.text(0).to_string();
-                let repo = repos.any(given.repo, "commit diff")?;
+                let repo = repos.resolve(&given, "commit diff", None)?;
                 commits::get_commit_diff(&ctx, &workspace, &repo, &hash).await
             }
             CommitCommands::Browse {
@@ -1117,7 +1156,7 @@ async fn execute_in(
                 // braces, so removing the `conflicts_with` can never silently
                 // turn `--dry-run` into a no-op that deletes.
                 let execute = execute && !dry_run;
-                let repo = repos.explicit(repo_arg, "bulk delete-branches", DELETES)?;
+                let repo = repos.explicit(repo_arg, "bulk delete-branches", DELETES, "")?;
                 bulk::delete_branches(&ctx, &workspace, &repo, exclude, execute, yes).await
             }
         },

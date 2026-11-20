@@ -27,7 +27,8 @@ struct Cli {
 enum Source {
     /// Argument, `--repo`, or the Git remote.
     AnyRemote,
-    /// Argument or `--repo` only. The command deletes or revokes.
+    /// Argument or `--repo` only. The command deletes, is not reversible, or
+    /// gives access.
     ExplicitOnly,
 }
 use Source::{AnyRemote, ExplicitOnly};
@@ -36,7 +37,7 @@ use Source::{AnyRemote, ExplicitOnly};
 /// the words after it, and where the repository can come from.
 const COMMANDS: &[(&[&str], &[&str], Source)] = &[
     (&["repo", "get"], &[], AnyRemote),
-    (&["repo", "update"], &["--name", "Web app"], AnyRemote),
+    (&["repo", "update"], &["--name", "Web app"], ExplicitOnly),
     (&["repo", "create"], &[], ExplicitOnly),
     (&["repo", "delete"], &["--force"], ExplicitOnly),
     (&["branch", "list"], &[], AnyRemote),
@@ -73,8 +74,8 @@ const COMMANDS: &[(&[&str], &[&str], Source)] = &[
         AnyRemote,
     ),
     (&["pr", "update"], &["42", "--title", "T"], AnyRemote),
-    (&["pr", "merge"], &["42"], AnyRemote),
-    (&["pr", "decline"], &["42"], AnyRemote),
+    (&["pr", "merge"], &["42"], ExplicitOnly),
+    (&["pr", "decline"], &["42"], ExplicitOnly),
     (&["pr", "approve"], &["42"], AnyRemote),
     (&["pr", "unapprove"], &["42"], AnyRemote),
     (&["pr", "diff"], &["42"], AnyRemote),
@@ -94,14 +95,14 @@ const COMMANDS: &[(&[&str], &[&str], Source)] = &[
     (
         &["ssh-key", "add"],
         &["--label", "ci", "--key", "ssh-ed25519 AAAA"],
-        AnyRemote,
+        ExplicitOnly,
     ),
     (&["ssh-key", "delete"], &["{key-1}"], ExplicitOnly),
     (&["permission", "list"], &[], AnyRemote),
     (
         &["permission", "grant"],
         &["--user-uuid", "{acc-1}", "--permission", "read"],
-        AnyRemote,
+        ExplicitOnly,
     ),
     (&["permission", "revoke"], &["{acc-1}"], ExplicitOnly),
     (&["commit", "list"], &[], AnyRemote),
@@ -302,7 +303,7 @@ async fn the_repo_flag_wins_over_the_git_remote() {
 }
 
 #[tokio::test]
-async fn commands_that_do_not_delete_read_the_repo_from_the_git_remote() {
+async fn commands_that_are_safe_to_repeat_read_the_repo_from_the_git_remote() {
     for (head, tail, source) in COMMANDS {
         if *source != AnyRemote {
             continue;
@@ -313,10 +314,10 @@ async fn commands_that_do_not_delete_read_the_repo_from_the_git_remote() {
     }
 }
 
-/// A command that deletes or revokes must not take its target from the
-/// directory that the user is in.
+/// A command that deletes, that is not reversible, or that gives access must
+/// not take its target from the directory that the user is in.
 #[tokio::test]
-async fn commands_that_delete_do_not_read_the_repo_from_the_git_remote() {
+async fn commands_that_delete_or_give_access_do_not_read_the_repo_from_the_git_remote() {
     for (head, tail, source) in COMMANDS {
         if *source != ExplicitOnly {
             continue;
@@ -527,4 +528,178 @@ fn no_command_hides_the_global_repo_or_workspace() {
     let mut found = Vec::new();
     walk(&Cli::command(), "bb", &mut found);
     assert!(found.is_empty(), "{}", found.join("\n"));
+}
+
+/// The count of explicit-only commands is fixed here, so that a change of the
+/// table is a deliberate act.
+#[test]
+fn the_explicit_only_commands_are_the_documented_ones() {
+    let mut names: Vec<String> = COMMANDS
+        .iter()
+        .filter(|(_, _, source)| *source == ExplicitOnly)
+        .map(|(head, _, _)| head.join(" "))
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "branch delete",
+            "branch unprotect",
+            "bulk delete-branches",
+            "permission grant",
+            "permission revoke",
+            "pr decline",
+            "pr merge",
+            "repo create",
+            "repo delete",
+            "repo update",
+            "ssh-key add",
+            "ssh-key delete",
+            "webhook delete",
+        ]
+    );
+}
+
+/// The error of an explicit-only command shows a complete command line and
+/// names the repository of the Git remote.
+#[tokio::test]
+async fn the_explicit_only_error_shows_a_complete_example() {
+    let cases: &[(&[&str], &str)] = &[
+        (
+            &["branch", "delete", "feature-x", "--force"],
+            "atlassian-cli bb branch delete --workspace <workspace> --repo <repo> <BRANCH>",
+        ),
+        (
+            &["pr", "merge", "42"],
+            "atlassian-cli bb pr merge --workspace <workspace> --repo <repo> <PR_ID>",
+        ),
+        (
+            &["pr", "decline", "42"],
+            "atlassian-cli bb pr decline --workspace <workspace> --repo <repo> <PR_ID>",
+        ),
+        (
+            &[
+                "permission",
+                "grant",
+                "--user-uuid",
+                "{acc-1}",
+                "--permission",
+                "read",
+            ],
+            "atlassian-cli bb permission grant --workspace <workspace> --repo <repo>\n",
+        ),
+    ];
+    for (argv, example) in cases {
+        let outcome = run(argv, Some("web_app")).await;
+        let error = outcome.error();
+        assert!(error.contains(example), "{argv:?}: {error}");
+        assert!(
+            error.contains("The Git remote names 'web_app'. Add --repo web_app"),
+            "{argv:?}: {error}"
+        );
+        assert!(outcome.requests.is_empty(), "{argv:?}");
+    }
+}
+
+/// One value and no repository from any source: the value is most probably
+/// the repository, with the argument after it missing. The error must say how
+/// the value was read.
+#[tokio::test]
+async fn a_lone_value_with_no_repo_says_how_it_was_read() {
+    let cases: &[(&[&str], &str)] = &[
+        (&["branch", "get", "web_app"], "BRANCH"),
+        (&["branch", "create", "web_app", "--from", "main"], "BRANCH"),
+        (&["branch", "delete", "web_app", "--force"], "BRANCH"),
+        (&["commit", "get", "web_app"], "HASH"),
+        (&["commit", "diff", "web_app"], "HASH"),
+        (&["webhook", "delete", "web_app"], "UUID"),
+        (&["ssh-key", "delete", "web_app"], "UUID"),
+        (&["permission", "revoke", "web_app"], "USER_UUID"),
+    ];
+    for (argv, slot) in cases {
+        let outcome = run(argv, None).await;
+        let error = outcome.error();
+        let note = format!("'web_app' was read as <{slot}>. Arguments: [REPO] <{slot}>.");
+        assert!(error.contains(&note), "{argv:?}: {error}");
+        let name = argv[..2].join(" ");
+        assert!(
+            error.contains(&format!("Repository required for '{name}'")),
+            "{argv:?}: {error}"
+        );
+        assert!(outcome.requests.is_empty(), "{argv:?}");
+    }
+}
+
+/// With a repository from `--repo`, the same value is correct and no note is
+/// necessary.
+#[tokio::test]
+async fn a_lone_value_with_a_repo_flag_is_not_an_error() {
+    let outcome = run(&["branch", "get", "main", "--repo", "web_app"], None).await;
+    assert_eq!(
+        outcome.requests,
+        vec![("GET".to_string(), format!("{REPO_PATH}/refs/branches/main"))]
+    );
+}
+
+/// The form that worked before this change, with the full request. A swap of
+/// two identifiers, or of the repository and an identifier, fails here.
+#[tokio::test]
+async fn the_old_positional_form_sends_the_same_request() {
+    let cases: &[(&[&str], &str, &str)] = &[
+        (
+            &["pr", "resolve-comment", "web_app", "42", "9"],
+            "POST",
+            "/pullrequests/42/comments/9/resolve",
+        ),
+        (
+            &["pr", "reopen-comment", "web_app", "42", "9"],
+            "DELETE",
+            "/pullrequests/42/comments/9/resolve",
+        ),
+        (
+            &["branch", "get", "web_app", "main"],
+            "GET",
+            "/refs/branches/main",
+        ),
+        (
+            &["webhook", "delete", "web_app", "hook-1"],
+            "DELETE",
+            "/hooks/hook-1",
+        ),
+        (
+            &["branch", "unprotect", "web_app", "7"],
+            "DELETE",
+            "/branch-restrictions/7",
+        ),
+        (
+            &["pr", "comment", "web_app", "42", "--text", "hi"],
+            "POST",
+            "/pullrequests/42/comments",
+        ),
+        (
+            &["pr", "merge", "web_app", "42"],
+            "POST",
+            "/pullrequests/42/merge",
+        ),
+        (
+            &["pr", "decline", "web_app", "42"],
+            "POST",
+            "/pullrequests/42/decline",
+        ),
+        (
+            &["commit", "get", "web_app", "abc123"],
+            "GET",
+            "/commit/abc123",
+        ),
+    ];
+    for (argv, verb, suffix) in cases {
+        // A Git remote that names a different repository must not win.
+        let outcome = run(argv, Some("other_repo")).await;
+        assert_eq!(
+            outcome.requests,
+            vec![(verb.to_string(), format!("{REPO_PATH}{suffix}"))],
+            "{argv:?}: {}",
+            outcome.error()
+        );
+    }
 }

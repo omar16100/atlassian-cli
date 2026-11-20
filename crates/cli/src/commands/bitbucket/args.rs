@@ -107,7 +107,8 @@ pub(super) enum RepoCommands {
     },
     /// Update repository metadata.
     Update {
-        /// Repository slug. Defaults to --repo, then the git remote.
+        /// Repository slug, or use --repo. Not read from the git remote, because
+        /// this command overwrites repository settings.
         slug: Option<String>,
         /// New display name.
         #[arg(long)]
@@ -291,8 +292,8 @@ pub(super) enum PrCommands {
     /// Merge pull request.
     #[command(override_usage = "atlassian-cli bitbucket pr merge [OPTIONS] [REPO] <PR_ID>")]
     Merge {
-        /// Repository slug (defaults to --repo, then the git remote), then the
-        /// pull request ID.
+        /// Repository slug (or use --repo; not read from the git remote, because
+        /// a merge is not reversible), then the pull request ID.
         #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
         targets: Vec<String>,
         /// Merge strategy: merge_commit, squash, or fast_forward.
@@ -305,8 +306,8 @@ pub(super) enum PrCommands {
     /// Decline/close pull request.
     #[command(override_usage = "atlassian-cli bitbucket pr decline [OPTIONS] [REPO] <PR_ID>")]
     Decline {
-        /// Repository slug (defaults to --repo, then the git remote), then the
-        /// pull request ID.
+        /// Repository slug (or use --repo; not read from the git remote, because
+        /// a declined pull request cannot be reopened), then the pull request ID.
         #[arg(value_names = ["REPO", "PR_ID"], num_args = 1..=2)]
         targets: Vec<String>,
     },
@@ -857,7 +858,8 @@ pub(super) enum SshKeyCommands {
     },
     /// Add SSH deploy key.
     Add {
-        /// Repository slug. Defaults to --repo, then the git remote.
+        /// Repository slug, or use --repo. Not read from the git remote, because
+        /// this command gives access.
         #[arg(value_name = "REPO")]
         repo_arg: Option<String>,
         /// Key label.
@@ -887,7 +889,8 @@ pub(super) enum PermissionCommands {
     },
     /// Grant repository permission.
     Grant {
-        /// Repository slug. Defaults to --repo, then the git remote.
+        /// Repository slug, or use --repo. Not read from the git remote, because
+        /// this command gives access.
         #[arg(value_name = "REPO")]
         repo_arg: Option<String>,
         /// User UUID.
