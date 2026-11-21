@@ -11,6 +11,22 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-11-21
+
+Release 0.14.0 was published on crates.io only. Its release workflow could not
+run the two macOS build jobs, so 0.14.0 has no GitHub Release, no binaries, no
+installer and no Homebrew formula. Release 0.14.1 has the same code as 0.14.0,
+with the corrected release workflow. For the changes since 0.13.0, read the
+0.14.0 section of
+[CHANGELOG.md](https://github.com/omar16100/atlassian-cli/blob/main/CHANGELOG.md).
+
+### Fixed
+
+- The release workflow builds the two macOS targets on the `macos-15` runner.
+  GitHub no longer runs the `macos-14` image that the workflow used, and it
+  cancelled the two macOS jobs of the 0.14.0 release before their first step.
+  (#202)
+
 ## [0.14.0] - 2026-11-21
 
 This release changes output and errors that scripts can see. Each such entry
@@ -847,7 +863,8 @@ in scripts.
 First release: a Rust CLI for Jira, Confluence and Bitbucket, distributed through
 cargo-dist with a Homebrew tap and a shell installer.
 
-[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/omar16100/atlassian-cli/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/omar16100/atlassian-cli/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/omar16100/atlassian-cli/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/omar16100/atlassian-cli/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/omar16100/atlassian-cli/compare/v0.11.0...v0.12.0
