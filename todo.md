@@ -3555,3 +3555,11 @@ annotation "The configuration 'macos-14-arm64-us-default' is not supported".
 GitHub no longer runs that image. The crates.io workflow published the six
 crates at 0.14.0. The runner is `macos-15` now. The pull request runs of the
 release workflow only make the plan, so they did not show this.
+
+## 2026-11-21: release v0.14.1
+
+Release 0.14.0 reached crates.io only (see the entry above). The owner selected
+a patch release. The release branch adds the `0.14.1 - 2026-11-21` section to
+the changelog, sets version 0.14.1 in the workspace and in the five internal
+dependency pins, corrects the status of the 0.14.0 plan and adds
+`docs/21112026_release_0_14_1_plan.md`. The tag `v0.14.0` is not moved.
