@@ -11,6 +11,12 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Security
+
+- Update `url` to 2.5.9 to correct RUSTSEC-2026-0592, a stack overflow in
+  `Url::origin()` on nested `blob:` URLs. `form_urlencoded` moves to 1.2.3 with
+  it. (#206)
+
 ## [0.14.1] - 2026-11-21
 
 Release 0.14.0 was published on crates.io only. Its release workflow could not
