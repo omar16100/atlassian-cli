@@ -461,13 +461,33 @@ enum AttachmentCommands {
         #[arg(long)]
         comment: Option<String>,
     },
-    /// Download an attachment
+    /// Download an attachment, or all attachments of a page
+    #[command(
+        long_about = "Download an attachment, or all attachments of a page.\n\nExamples:\n  \
+        confluence attachment download att10001                     # -> ./<attachment title>\n  \
+        confluence attachment download att10001 --output ./logo.png\n  \
+        confluence attachment download att10001 --output - | file -  # stream to stdout\n  \
+        confluence attachment download --page 12345 --dir ./attachments\n\n\
+        An existing file is not overwritten without --force. File names taken from the\n\
+        server are reduced to their last path component, so a title cannot write\n\
+        outside the target directory."
+    )]
     Download {
-        /// Attachment ID
-        attachment_id: String,
-        /// Output file path
+        /// Attachment ID. Omit it and pass --page to download every attachment of a page
+        #[arg(required_unless_present = "page")]
+        attachment_id: Option<String>,
+        /// Output file path, or `-` for stdout. Default: the attachment title in the current directory
+        #[arg(long, conflicts_with_all = ["page", "dir"])]
+        output: Option<std::path::PathBuf>,
+        /// Download every attachment of this page
+        #[arg(long, conflicts_with = "attachment_id")]
+        page: Option<String>,
+        /// Directory for --page downloads (created if missing). Default: the current directory
+        #[arg(long, requires = "page")]
+        dir: Option<std::path::PathBuf>,
+        /// Overwrite existing files
         #[arg(long)]
-        output: std::path::PathBuf,
+        force: bool,
     },
     /// Delete an attachment
     Delete {
@@ -834,7 +854,21 @@ pub async fn execute(
             AttachmentCommands::Download {
                 attachment_id,
                 output,
-            } => attachments::download_attachment(&ctx, &attachment_id, &output).await,
+                page,
+                dir,
+                force,
+            } => match (attachment_id, page) {
+                (_, Some(page_id)) => {
+                    let dir = dir.unwrap_or_else(|| std::path::PathBuf::from("."));
+                    attachments::download_page_attachments(&ctx, &page_id, &dir, force).await
+                }
+                (Some(attachment_id), None) => {
+                    attachments::download_attachment(&ctx, &attachment_id, output.as_deref(), force)
+                        .await
+                }
+                // clap's required_unless_present rules this out.
+                (None, None) => Err(anyhow::anyhow!("Pass an attachment ID or --page <PAGE_ID>")),
+            },
             AttachmentCommands::Delete {
                 attachment_id,
                 force,

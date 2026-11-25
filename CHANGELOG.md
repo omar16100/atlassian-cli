@@ -11,6 +11,24 @@ resolve. `git log` remains the complete record.
 
 ## [Unreleased]
 
+### Added
+
+- `confluence attachment download --page <PAGE_ID> [--dir <DIR>]` downloads
+  every attachment of a page. It reads all pages of the attachment listing,
+  creates the directory, and gives a second attachment with the same title its
+  id before the extension. A failed file does not stop the others; the command
+  names each failure on stderr and exits 1. (#205, #204)
+- `confluence attachment download <ID> --output -` writes the attachment bytes
+  to stdout and nothing else. It used to create a file named `-`. Without
+  `--output`, the file is named after the attachment title in the current
+  directory. Titles are reduced to their last path component. (#205, #204)
+
+### Changed
+
+- **Behaviour change:** `confluence attachment download` no longer overwrites
+  an existing file. Pass `--force` to overwrite, as with `jira api --output`.
+  (#205)
+
 ## [0.14.1] - 2026-11-21
 
 Release 0.14.0 was published on crates.io only. Its release workflow could not
